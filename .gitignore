@@ -4,6 +4,10 @@
 # first experience — so nothing here needs to be committed, and some of it must
 # never be.
 
+# ── Embedded git repos (not submodules) ──────────────────────────────
+References/hermes-agent/
+References/qwenpaw/QwenPaw/
+
 # ── Secrets. Committing any of these publishes them. ──────────────────────────
 config/api_keys.json          # your Gemini API key, plus per-plugin credentials
 config/certs/                 # the dashboard's TLS private key and certificate
