@@ -59,7 +59,7 @@ def _read_full_config() -> dict:
 
 # Single source of truth for the release name — the window title, the header
 # badge and the readme must never disagree again.
-APP_VERSION  = "MARK LIV"
+APP_VERSION  = "JARVIS"
 APP_PROTOCOL = APP_VERSION.split()[-1]
 
 _DEFAULT_W, _DEFAULT_H = 980, 700
@@ -2146,8 +2146,186 @@ class AudioDeviceOverlay(_HudOverlay):
         self.hide()
         # Only rebuild the session if something actually moved — a no-op Apply
         # should not cost a reconnect.
-        if changed:
-            self.picked.emit()
+
+class CodingAgentsOverlay(_HudOverlay):
+    """Configuration & inspector panel for OpenCode Zen, Kilo Code, and Autonomous Skills."""
+
+    _OW = 540
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet(f"""
+            CodingAgentsOverlay {{
+                background: rgba(0, 6, 10, 248);
+                border: 1px solid {C.BORDER_B};
+                border-radius: 6px;
+            }}
+        """)
+        self.setFixedWidth(self._OW)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 16, 20, 16)
+        lay.setSpacing(8)
+
+        # Header
+        hdr = QLabel("🤖  AUTONOMOUS CODING AGENTS & SKILLS")
+        hdr.setFont(QFont("Courier New", 11, QFont.Weight.Bold))
+        hdr.setStyleSheet(f"color: {C.PRI}; background: transparent;")
+        lay.addWidget(hdr)
+
+        sub = QLabel("Configure zero-cost ($0) Free Models for OpenCode Zen & Kilo Code, and inspect active procedural skills.")
+        sub.setFont(QFont("Courier New", 7))
+        sub.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+        sub.setWordWrap(True)
+        lay.addWidget(sub)
+
+        sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet(f"color: {C.BORDER}; margin: 2px 0;")
+        lay.addWidget(sep)
+
+        # 1. OpenCode Zen Section
+        from memory.config_manager import (
+            OPENCODE_ZEN_FREE_MODELS, get_opencode_model, save_opencode_model,
+            KILO_CODE_FREE_MODELS, get_kilo_model, save_kilo_model
+        )
+        import shutil
+
+        oc_installed = bool(shutil.which("opencode") or shutil.which("opencode.exe"))
+        oc_hdr = QHBoxLayout()
+        oc_lbl = QLabel("◈ OPENCODE ZEN (FREE TIER)")
+        oc_lbl.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        oc_lbl.setStyleSheet(f"color: {C.TEXT}; background: transparent;")
+        oc_hdr.addWidget(oc_lbl)
+        oc_hdr.addStretch()
+        
+        st_oc = QLabel("🟢 CLI INSTALLED" if oc_installed else "⚪ CLI NOT FOUND")
+        st_oc.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
+        st_oc.setStyleSheet(f"color: {C.GREEN if oc_installed else C.MUTED_C}; background: transparent;")
+        oc_hdr.addWidget(st_oc)
+        lay.addLayout(oc_hdr)
+
+        self._oc_combo = QComboBox()
+        self._oc_combo.setFont(QFont("Courier New", 8))
+        self._oc_combo.setFixedHeight(28)
+        self._oc_combo.setStyleSheet(f"""
+            QComboBox {{
+                background: {C.PANEL2}; color: {C.TEXT};
+                border: 1px solid {C.BORDER_A}; border-radius: 3px; padding: 2px 8px;
+            }}
+            QComboBox:hover {{ border-color: {C.PRI}; }}
+            QComboBox QAbstractItemView {{
+                background: {C.PANEL}; color: {C.TEXT};
+                selection-background-color: {C.PRI_GHO}; selection-color: {C.PRI};
+            }}
+        """)
+        for m in OPENCODE_ZEN_FREE_MODELS:
+            self._oc_combo.addItem(m, m)
+        cur_oc = get_opencode_model()
+        idx = self._oc_combo.findData(cur_oc)
+        if idx >= 0:
+            self._oc_combo.setCurrentIndex(idx)
+        self._oc_combo.currentIndexChanged.connect(self._on_oc_changed)
+        lay.addWidget(self._oc_combo)
+
+        sep2 = QFrame(); sep2.setFrameShape(QFrame.Shape.HLine)
+        sep2.setStyleSheet(f"color: {C.BORDER}; margin: 2px 0;")
+        lay.addWidget(sep2)
+
+        # 2. Kilo Code Section
+        kilo_installed = bool(shutil.which("kilo") or shutil.which("kilo.exe") or shutil.which("kilocode"))
+        kc_hdr = QHBoxLayout()
+        kc_lbl = QLabel("◈ KILO CODE (ZERO-COST $0/0)")
+        kc_lbl.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        kc_lbl.setStyleSheet(f"color: {C.TEXT}; background: transparent;")
+        kc_hdr.addWidget(kc_lbl)
+        kc_hdr.addStretch()
+
+        st_kc = QLabel("🟢 CLI INSTALLED" if kilo_installed else "⚪ CLI NOT FOUND")
+        st_kc.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
+        st_kc.setStyleSheet(f"color: {C.GREEN if kilo_installed else C.MUTED_C}; background: transparent;")
+        kc_hdr.addWidget(st_kc)
+        lay.addLayout(kc_hdr)
+
+        self._kc_combo = QComboBox()
+        self._kc_combo.setFont(QFont("Courier New", 8))
+        self._kc_combo.setFixedHeight(28)
+        self._kc_combo.setStyleSheet(f"""
+            QComboBox {{
+                background: {C.PANEL2}; color: {C.TEXT};
+                border: 1px solid {C.BORDER_A}; border-radius: 3px; padding: 2px 8px;
+            }}
+            QComboBox:hover {{ border-color: {C.PRI}; }}
+            QComboBox QAbstractItemView {{
+                background: {C.PANEL}; color: {C.TEXT};
+                selection-background-color: {C.PRI_GHO}; selection-color: {C.PRI};
+            }}
+        """)
+        for km in KILO_CODE_FREE_MODELS:
+            self._kc_combo.addItem(km, km)
+        cur_kc = get_kilo_model()
+        idx_k = self._kc_combo.findData(cur_kc)
+        if idx_k >= 0:
+            self._kc_combo.setCurrentIndex(idx_k)
+        self._kc_combo.currentIndexChanged.connect(self._on_kc_changed)
+        lay.addWidget(self._kc_combo)
+
+        sep3 = QFrame(); sep3.setFrameShape(QFrame.Shape.HLine)
+        sep3.setStyleSheet(f"color: {C.BORDER}; margin: 2px 0;")
+        lay.addWidget(sep3)
+
+        # 3. Active Procedural Skills
+        sk_hdr = QLabel("◈ ACTIVE PROCEDURAL SKILLS")
+        sk_hdr.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        sk_hdr.setStyleSheet(f"color: {C.PRI_DIM}; background: transparent;")
+        lay.addWidget(sk_hdr)
+
+        try:
+            from core.skill_loader import SkillRegistry
+            reg = SkillRegistry()
+            skills = reg.list_skills()
+            for sk in skills[:5]:
+                sk_row = QHBoxLayout()
+                s_name = QLabel(f"• {sk['name']}")
+                s_name.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
+                s_name.setStyleSheet(f"color: {C.TEXT}; background: transparent;")
+                desc_str = sk.get('description', '') or ''
+                s_desc = QLabel((desc_str[:42] + '...') if len(desc_str) > 42 else desc_str)
+                s_desc.setFont(QFont("Courier New", 7))
+                s_desc.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+                sk_row.addWidget(s_name)
+                sk_row.addWidget(s_desc, stretch=1)
+                lay.addLayout(sk_row)
+        except Exception:
+            pass
+
+        lay.addSpacing(6)
+        close_btn = QPushButton("DONE")
+        close_btn.setFixedHeight(30)
+        close_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.PRI};
+                border: 1px solid {C.PRI_DIM}; border-radius: 3px;
+            }}
+            QPushButton:hover {{ background: {C.PRI_GHO}; border-color: {C.PRI}; }}
+        """)
+        close_btn.clicked.connect(self.hide)
+        lay.addWidget(close_btn)
+        self.adjustSize()
+
+    def _on_oc_changed(self, idx: int):
+        from memory.config_manager import save_opencode_model
+        val = self._oc_combo.itemData(idx)
+        if val:
+            save_opencode_model(val)
+
+    def _on_kc_changed(self, idx: int):
+        from memory.config_manager import save_kilo_model
+        val = self._kc_combo.itemData(idx)
+        if val:
+            save_kilo_model(val)
 
 
 class MemoryOverlay(_HudOverlay):
@@ -3645,6 +3823,7 @@ class MainWindow(QMainWindow):
         lay.addSpacing(8)
         self._drawer_btn = QPushButton("⚙")
         self._drawer_btn.setFixedSize(26, 26)
+        self._drawer_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._drawer_btn.setFont(QFont("Courier New", 11))
         self._drawer_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._drawer_btn.setToolTip("Settings & Controls")
@@ -3992,6 +4171,14 @@ class MainWindow(QMainWindow):
         settings_btn.setStyleSheet(_BTN_STYLE_DIM)
         settings_btn.clicked.connect(self._open_plugin_settings)
         lay.addWidget(settings_btn)
+
+        coding_btn = QPushButton("🤖  CODING AGENTS & SKILLS")
+        coding_btn.setFixedHeight(26)
+        coding_btn.setFont(QFont("Courier New", 7))
+        coding_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        coding_btn.setStyleSheet(_BTN_STYLE_DIM)
+        coding_btn.clicked.connect(self._open_coding_agents)
+        lay.addWidget(coding_btn)
 
         w.adjustSize()
         return w
@@ -5036,6 +5223,13 @@ class MainWindow(QMainWindow):
         ov = MemoryOverlay(parent=self.centralWidget())
         self._centre_overlay(ov)
         self._memory_overlay = ov
+
+    # ── Coding Agents & Skills panel ─────────────────────────────────────────
+
+    def _open_coding_agents(self):
+        ov = CodingAgentsOverlay(parent=self.centralWidget())
+        self._centre_overlay(ov)
+        self._coding_overlay = ov
 
     # ── Irreversible-action confirmation ─────────────────────────────────────
 

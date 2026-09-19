@@ -137,7 +137,7 @@ def get_hud_style() -> str:
     """Which centrepiece the HUD draws: the animated head, or the reactor core.
 
     Taste, not capability — both render in the same software painter and cost
-    about the same. Defaults to the head because that is what MARK LIV shipped
+    about the same. Defaults to the head because that is what JARVIS shipped
     with; anyone who preferred the older look can switch back in ⚙ and the
     choice survives a restart.
     """
@@ -381,4 +381,108 @@ def save_plugin_enabled(plugin_name: str, enabled: bool) -> None:
         plugins_cfg = {}
     plugins_cfg[plugin_name] = enabled
     data["plugins_enabled"] = plugins_cfg
+    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+
+
+# ── OpenCode Zen & Free Models Config ─────────────────────────────────────────
+
+# ── OpenCode Zen & Free Models Config ─────────────────────────────────────────
+
+OPENCODE_ZEN_FREE_MODELS = [
+    "opencode/nemotron-3-ultra-free",  # 1M Context, complex multi-file refactoring (Default)
+    "opencode/big-pickle",             # Specialized agentic coding stealth model
+    "opencode/mimo-v2.5-free",         # Fast execution code generator
+    "opencode/nemotron-3.5-lightning-free", # High speed NVIDIA model
+    "opencode/ling-3.0-flash-fin-free",     # Multimodal vision & reasoning
+    "toeknh/deepseek-v4.1-flash:free",      # DeepSeek V4.1 Flash free
+]
+
+DEFAULT_OPENCODE_MODEL = "opencode/nemotron-3-ultra-free"
+DEFAULT_OPENCODE_PROVIDER = "zen"
+
+
+def get_opencode_provider() -> str:
+    """Return configured OpenCode provider (defaults to 'zen')."""
+    return load_api_keys().get("opencode_provider", DEFAULT_OPENCODE_PROVIDER) or DEFAULT_OPENCODE_PROVIDER
+
+
+def save_opencode_provider(provider: str) -> None:
+    """Persist OpenCode provider to config."""
+    ensure_config_dir()
+    data: dict = {}
+    if CONFIG_FILE.exists():
+        try:
+            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    data["opencode_provider"] = provider.strip() or DEFAULT_OPENCODE_PROVIDER
+    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+
+
+def get_opencode_model() -> str:
+    """Return configured OpenCode model (defaults to 'opencode/nemotron-3-ultra-free')."""
+    raw = load_api_keys().get("opencode_model", DEFAULT_OPENCODE_MODEL) or DEFAULT_OPENCODE_MODEL
+    # Normalize legacy zen/ prefixes if found in config
+    if raw.startswith("zen/"):
+        name = raw.replace("zen/", "")
+        if "nemotron" in name:
+            raw = "opencode/nemotron-3-ultra-free"
+        elif "pickle" in name:
+            raw = "opencode/big-pickle"
+        elif "mimo" in name:
+            raw = "opencode/mimo-v2.5-free"
+        else:
+            raw = f"opencode/{name}"
+    return raw
+
+
+def save_opencode_model(model: str) -> None:
+    """Persist chosen OpenCode model to config."""
+    ensure_config_dir()
+    data: dict = {}
+    if CONFIG_FILE.exists():
+        try:
+            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    data["opencode_model"] = model.strip() or DEFAULT_OPENCODE_MODEL
+    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+
+
+# ── Kilo Code & Free Models Config ───────────────────────────────────────────
+
+KILO_CODE_FREE_MODELS = [
+    "kilo/kilo-auto/free",                         # Auto Free (Dynamic router) - Default
+    "kilo/dots-studio/dots-3-note-preview:free",    # Dots Studio Dots3-Note Preview
+    "kilo/inclusionai/ling-3.0-flash-vl:free",      # Ling 3.0 Flash VL (Multimodal Vision)
+    "kilo/nex-agi/nex-n2.5-pro:free",               # Nex AGI Nex-N2.5-Pro
+    "kilo/nvidia/nemotron-3-ultra-550b-a55b:free",  # NVIDIA Nemotron 3 Ultra
+    "kilo/poolside/laguna-s-2.1:free",              # Poolside Laguna S 2.1
+    "kilo/stepfun/step-3.7-flash:free",             # StepFun Step 3.7 Flash
+]
+
+DEFAULT_KILO_MODEL = "kilo/kilo-auto/free"
+
+
+def get_kilo_model() -> str:
+    """Return configured Kilo Code model (defaults to 'kilo/kilo-auto/free')."""
+    raw = load_api_keys().get("kilo_model", DEFAULT_KILO_MODEL) or DEFAULT_KILO_MODEL
+    if not raw.startswith("kilo/"):
+        raw = f"kilo/{raw}"
+    return raw
+
+
+def save_kilo_model(model: str) -> None:
+    """Persist chosen Kilo Code model to config."""
+    ensure_config_dir()
+    data: dict = {}
+    if CONFIG_FILE.exists():
+        try:
+            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    m = model.strip() or DEFAULT_KILO_MODEL
+    if not m.startswith("kilo/"):
+        m = f"kilo/{m}"
+    data["kilo_model"] = m
     CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")

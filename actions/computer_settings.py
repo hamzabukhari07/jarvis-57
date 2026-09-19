@@ -90,25 +90,35 @@ def volume_mute():
         subprocess.run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle"],
             capture_output=True)
 
-def volume_get() -> int | None:
-    """Current master volume 0-100, or None if this platform will not say.
+def _get_windows_volume_endpoint():
+    try:
+        from pycaw.pycaw import AudioUtilities
+        devices = AudioUtilities.GetSpeakers()
+        if hasattr(devices, "EndpointVolume"):
+            return devices.EndpointVolume
+        from ctypes import cast, POINTER
+        from comtypes import CLSCTX_ALL
+        from pycaw.pycaw import IAudioEndpointVolume
+        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+        return cast(interface, POINTER(IAudioEndpointVolume))
+    except Exception as e:
+        print(f"[Settings] pycaw get endpoint error: {e}")
+        return None
 
-    Undo needs a "before" value, and reading one is cheap on every OS we
-    support. Where it is not readable the action simply is not registered as
-    undoable — a wrong undo is worse than no undo."""
+
+def volume_get() -> int | None:
+    """Current master volume 0-100, or None if this platform will not say."""
     try:
         if _OS == "Windows":
-            import math
-            from ctypes import cast, POINTER
-            from comtypes import CLSCTX_ALL
-            from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-            devices   = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            vol       = cast(interface, POINTER(IAudioEndpointVolume))
-            db        = vol.GetMasterVolumeLevel()
-            if db <= -65.0:
-                return 0
-            return max(0, min(100, round(10 ** (db / 20) * 100)))
+            ep = _get_windows_volume_endpoint()
+            if ep is not None:
+                if hasattr(ep, "GetMasterVolumeLevelScalar"):
+                    return max(0, min(100, round(ep.GetMasterVolumeLevelScalar() * 100)))
+                db = ep.GetMasterVolumeLevel()
+                if db <= -65.0:
+                    return 0
+                return max(0, min(100, round(10 ** (db / 20) * 100)))
+            return None
         if _OS == "Darwin":
             r = subprocess.run(["osascript", "-e", "output volume of (get volume settings)"],
                                capture_output=True, text=True, timeout=5)
@@ -145,8 +155,7 @@ def brightness_get() -> int | None:
 
 
 def brightness_set(value: int) -> None:
-    """Set brightness to an absolute percentage. Only used to restore a value
-    captured before a change, so it is undo's counterpart to the up/down pair."""
+    """Set brightness to an absolute percentage."""
     value = max(0, min(100, int(value)))
     if _OS == "Windows":
         subprocess.run(
@@ -163,20 +172,20 @@ def volume_set(value: int):
     value = max(0, min(100, int(value)))
     if _OS == "Windows":
         try:
-            import math
-            from ctypes import cast, POINTER
-            from comtypes import CLSCTX_ALL
-            from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-            devices   = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            vol       = cast(interface, POINTER(IAudioEndpointVolume))
-            vol_db    = -65.25 if value == 0 else max(-65.25, 20 * math.log10(value / 100))
-            vol.SetMasterVolumeLevel(vol_db, None)
-            return
+            ep = _get_windows_volume_endpoint()
+            if ep is not None:
+                if hasattr(ep, "SetMasterVolumeLevelScalar"):
+                    ep.SetMasterVolumeLevelScalar(value / 100.0, None)
+                    return
+                import math
+                vol_db = -65.25 if value == 0 else max(-65.25, 20 * math.log10(value / 100))
+                ep.SetMasterVolumeLevel(vol_db, None)
+                return
         except Exception as e:
-            print(f"[Settings] pycaw failed, using keypress fallback: {e}")
-            pyautogui.press("volumemute")
-            pyautogui.press("volumemute")
+            print(f"[Settings] pycaw failed, using fallback: {e}")
+        # Keypress fallback
+        pyautogui.press("volumemute")
+        pyautogui.press("volumemute")
     elif _OS == "Darwin":
         subprocess.run(["osascript", "-e", f"set volume output volume {value}"],
             capture_output=True)
@@ -244,9 +253,36 @@ def brightness_down():
         except Exception as e:
             print(f"[Settings] Brightness down failed on Windows: {e}")
 
-def close_app():
+def close_app(app_name: str = ""):
+    if app_name and isinstance(app_name, str):
+        target = app_name.strip().lower()
+        if _OS == "Windows":
+            exe_name = target if target.endswith(".exe") else f"{target}.exe"
+            try:
+                res = subprocess.run(["taskkill", "/IM", exe_name, "/F"], capture_output=True, **_WIN_HIDE)
+                if res.returncode == 0:
+                    return f"Closed {app_name}."
+            except Exception:
+                pass
+            try:
+                import psutil
+                killed = False
+                for p in psutil.process_iter(['name']):
+                    pname = (p.info.get('name') or '').lower()
+                    if target in pname or target.replace(" ", "") in pname:
+                        p.kill()
+                        killed = True
+                if killed:
+                    return f"Closed {app_name}."
+            except Exception:
+                pass
+        elif _OS in ("Darwin", "Linux"):
+            subprocess.run(["pkill", "-f", target], capture_output=True)
+            return f"Closed {app_name}."
+
     if _OS == "Darwin": pyautogui.hotkey("command", "q")
     else:               pyautogui.hotkey("alt", "f4")
+    return "Closed active window."
 
 def close_window():
     if _OS == "Darwin": pyautogui.hotkey("command", "w")
@@ -866,9 +902,14 @@ def computer_settings(
         scroll_up(int(value or 500))
         return "Scrolled up."
 
-    if action == "scroll_down":
-        scroll_down(int(value or 500))
-        return "Scrolled down."
+    if action in ("close_app", "close_application"):
+        app_target = str(value or params.get("app_name") or params.get("target") or params.get("text") or "").strip()
+        if not app_target and description:
+            m = re.search(r"close\s+([a-zA-Z0-9_\-\.]+)", description, re.IGNORECASE)
+            if m:
+                app_target = m.group(1).strip()
+        res = close_app(app_target)
+        return res
 
     func = ACTION_MAP.get(action)
     if not func:

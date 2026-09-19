@@ -795,12 +795,22 @@ class _BrowserSession:
     async def close_tab(self) -> str:
         page = self._page
         if page and not page.is_closed():
-            ctx   = page.context
-            await page.close()
-            pages = ctx.pages
-            self._page = pages[-1] if pages else None
-            return "Tab closed."
-        return "No active tab to close."
+            try:
+                ctx   = page.context
+                await page.close()
+                pages = ctx.pages
+                self._page = pages[-1] if pages else None
+                return "Tab closed."
+            except Exception:
+                pass
+        # Fallback to universal hotkey (Ctrl+W / Cmd+W) on the active window
+        try:
+            import pyautogui
+            modifier = "command" if platform.system() == "Darwin" else "ctrl"
+            pyautogui.hotkey(modifier, "w")
+            return "Closed active browser tab."
+        except Exception:
+            return "No active tab to close."
 
     async def screenshot(self, path: str = None) -> str:
         page = await self._get_page()

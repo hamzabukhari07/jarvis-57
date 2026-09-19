@@ -125,6 +125,11 @@ def save_memory(memory: dict) -> None:
             json.dumps(memory, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
+    try:
+        from memory import sqlite_memory
+        sqlite_memory.sync_facts_from_dict(memory)
+    except Exception:
+        pass
 
 
 def _truncate_value(val: str) -> str:
@@ -347,11 +352,8 @@ def _score(query_words: list[str], cat: str, key: str, value: str) -> int:
     return score
 
 
-def search_memory(query: str, limit: int = 8) -> str:
-    """Find stored facts matching `query`. Backs the recall_memory tool.
-
-    An empty query is treated as "show me everything you know", capped - the
-    model asks that when the user says "what do you remember about me?"."""
+def _search_raw_facts(query: str, limit: int = 8) -> str:
+    """Find stored facts matching `query` from local JSON memory."""
     memory = load_memory()
     words  = [w for w in re.split(r"[^\w]+", (query or "").lower()) if len(w) > 1]
 
@@ -378,6 +380,16 @@ def search_memory(query: str, limit: int = 8) -> str:
     more  = (f"\n(+{len(rows) - len(lines)} more — search with a narrower keyword)"
              if len(rows) > len(lines) else "")
     return head + "\n" + "\n".join(lines) + more
+
+
+def search_memory(query: str, limit: int = 8) -> str:
+    """Find stored facts and verbatim conversation history matching `query`. Backs the recall_memory tool."""
+    try:
+        from memory import sqlite_memory
+        return sqlite_memory.search_unified_memory(query, limit=limit)
+    except Exception as e:
+        print(f"[Memory] ⚠️ SQLite memory search fallback: {e}")
+        return _search_raw_facts(query, limit=limit)
 
 
 def all_entries_for_ui() -> list[dict]:

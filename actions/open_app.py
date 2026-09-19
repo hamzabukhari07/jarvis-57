@@ -1,7 +1,9 @@
+import os
 import time
 import subprocess
 import platform
 import shutil
+from pathlib import Path
 
 try:
     import psutil
@@ -237,22 +239,111 @@ _OS_LAUNCHERS = {
     "Linux":   _launch_linux,
 }
 
+def close_application_by_name(app_name: str) -> bool:
+    target = _normalize(app_name).lower()
+    clean_name = app_name.lower().strip()
+    if _SYSTEM == "Windows":
+        exe_name = target if target.endswith(".exe") else f"{target}.exe"
+        try:
+            res = subprocess.run(["taskkill", "/IM", exe_name, "/F"], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            if res.returncode == 0:
+                return True
+        except Exception:
+            pass
+        if _PSUTIL:
+            try:
+                killed = False
+                for p in psutil.process_iter(['name']):
+                    pname = (p.info.get('name') or '').lower()
+                    if clean_name in pname or target in pname:
+                        p.kill()
+                        killed = True
+                if killed:
+                    return True
+            except Exception:
+                pass
+    elif _SYSTEM in ("Darwin", "Linux"):
+        try:
+            res = subprocess.run(["pkill", "-f", clean_name], capture_output=True)
+            if res.returncode == 0:
+                return True
+        except Exception:
+            pass
+    return False
+
+
 def open_app(
     parameters=None,
     response=None,
     player=None,
     session_memory=None,
 ) -> str:
-    app_name = (parameters or {}).get("app_name", "").strip()
+    params = parameters or {}
+    app_name = params.get("app_name", "").strip()
+    action = params.get("action", "open").lower().strip()
 
     if not app_name:
         return "No application name provided."
+
+    if action in ("close", "exit", "kill", "terminate", "stop"):
+        if close_application_by_name(app_name):
+            if player:
+                player.write_log(f"[close_app] {app_name}")
+            return f"Closed {app_name}."
+        return f"Could not find or close {app_name}."
+
+    path_arg = params.get("path") or params.get("target") or ""
+    normalized = _normalize(app_name)
+
+    if path_arg:
+        raw_p = str(path_arg).strip().strip("\"'")
+        norm_p = raw_p.replace("\\", "/")
+        parts = [x for x in norm_p.split("/") if x]
+
+        p = Path(raw_p).expanduser()
+        if not p.is_absolute():
+            if parts and parts[0].lower() in ("desktop", "downloads", "documents"):
+                if len(parts) > 1:
+                    p = Path.home() / parts[0].capitalize() / Path(*parts[1:])
+                else:
+                    p = Path.home() / parts[0].capitalize()
+            else:
+                desk_cand = Path.home() / "Desktop" / raw_p
+                cwd_cand = Path.cwd() / raw_p
+                if desk_cand.exists():
+                    p = desk_cand
+                elif cwd_cand.exists():
+                    p = cwd_cand
+                else:
+                    p = desk_cand
+
+        try:
+            if _SYSTEM == "Windows":
+                try:
+                    subprocess.Popen(f'cmd /c start "" "{normalized}" "{p}"', shell=True)
+                except Exception:
+                    os.startfile(str(p))
+            elif _SYSTEM == "Darwin":
+                subprocess.Popen(["open", "-a", normalized, str(p)])
+            else:
+                subprocess.Popen([normalized, str(p)])
+
+            if player:
+                player.write_log(f"[open_app] {app_name} → {p}")
+            return f"Opened {p.name} in {app_name}."
+        except Exception as e:
+            print(f"[open_app] Error launching with path: {e}")
+            try:
+                if _SYSTEM == "Windows":
+                    os.startfile(str(p))
+                    return f"Opened {p.name}."
+            except Exception as e2:
+                return f"Failed to open {p}: {e2}"
 
     launcher = _OS_LAUNCHERS.get(_SYSTEM)
     if launcher is None:
         return f"Unsupported operating system: {_SYSTEM}"
 
-    normalized = _normalize(app_name)
     print(f"[open_app] Launching: '{app_name}' → '{normalized}' ({_SYSTEM})")
 
     if player:
@@ -276,13 +367,22 @@ def open_app(
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "open_app",
-    "description": "Opens any application on the computer. Use this whenever the user asks to open, launch, or start any app, website, or program. Always call this tool — never just say you opened it.",
+    "description": "Opens or closes any application or opens specific files/folders with an app (e.g. open folder 'in' in VS Code). Always call this tool.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
             "app_name": {
                 "type": "STRING",
-                "description": "Exact name of the application (e.g. 'WhatsApp', 'Chrome', 'Spotify')"
+                "description": "Exact name of the application (e.g. 'Visual Studio Code', 'Notepad', 'Chrome', 'Spotify')"
+            },
+            "path": {
+                "type": "STRING",
+                "description": "Optional file or folder path to open directly in the app (e.g. 'C:/Users/Hamza/Desktop/in' or 'Desktop/in')"
+            },
+            "action": {
+                "type": "STRING",
+                "enum": ["open", "close"],
+                "description": "Whether to 'open' (default) or 'close' the application."
             }
         },
         "required": [

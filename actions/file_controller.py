@@ -90,18 +90,24 @@ def _restore_from_trash(original: Path) -> str:
             f"automatically, but it is there and can be restored by hand.")
 
 
-_SAFE_ROOTS: list[Path] = [
-    Path.home(),
+_FORBIDDEN_ROOTS: list[Path] = [
+    Path(os.environ.get("SystemRoot", r"C:\Windows")).resolve(),
+    Path(os.environ.get("ProgramFiles", r"C:\Program Files")).resolve(),
+    Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")).resolve(),
+    Path(os.environ.get("ProgramData", r"C:\ProgramData")).resolve(),
 ]
 
 def _is_safe_path(target: Path) -> bool:
-    """Is the given path inside _SAFE_ROOTS? If not, reject the operation."""
+    """Is the given path safe for file operations (not a protected OS system dir)?"""
     try:
         resolved = target.resolve()
-        return any(
-            resolved == root.resolve() or resolved.is_relative_to(root.resolve())
-            for root in _SAFE_ROOTS
-        )
+        for f in _FORBIDDEN_ROOTS:
+            try:
+                if resolved == f or resolved.is_relative_to(f):
+                    return False
+            except Exception:
+                pass
+        return True
     except Exception:
         return False
 
@@ -158,23 +164,28 @@ def _resolve_path(raw: str) -> Path:
         "videos":    _get_videos(),
         "home":      Path.home(),
     }
-    raw   = raw.strip().strip('"').strip("'")
+    raw   = str(raw or "").strip().strip('"').strip("'")
     lower = raw.lower()
     if lower in shortcuts:
         return shortcuts[lower]
 
-    # "desktop/notes/a.md" and "desktop\notes\a.md" — a shortcut followed by a
-    # sub-path.  Without this branch the whole string falls through to the
-    # relative-path return below and is resolved against the process CWD instead
-    # of the real Desktop: an "Access denied" when the project lives outside the
-    # home directory, or — worse — a silent write into a stray "desktop" folder
-    # inside the project when it lives inside it.
     head, sep, rest = raw.replace("\\", "/").partition("/")
     if sep and head.lower() in shortcuts:
         rest = rest.strip("/")
         return shortcuts[head.lower()] / rest if rest else shortcuts[head.lower()]
 
-    return Path(raw).expanduser()
+    p = Path(raw).expanduser()
+    if not p.exists():
+        # Auto-remap hallucinated Windows usernames (e.g. C:\Users\Administrator\Desktop... -> C:\Users\<Current>\Desktop...)
+        parts = [part.lower() for part in p.parts]
+        for key in ("desktop", "downloads", "documents", "pictures", "music", "videos"):
+            if key in parts:
+                idx = parts.index(key)
+                subpath = Path(*p.parts[idx:])
+                remapped = Path.home() / subpath
+                if remapped.exists():
+                    return remapped
+    return p
 
 def _format_size(b: int) -> str:
     for unit in ["B", "KB", "MB", "GB", "TB"]:
@@ -184,15 +195,18 @@ def _format_size(b: int) -> str:
     return f"{b:.1f} TB"
 
 def _safe_trash(target: Path) -> str:
-
-    if not _SEND2TRASH:
+    try:
+        import send2trash
+        send2trash.send2trash(str(target))
+        return f"Moved to Trash: {target.name}"
+    except ImportError:
         return (
             "send2trash is not installed. "
             "Run: pip install send2trash — "
             "Permanent deletion is disabled for safety."
         )
-    send2trash.send2trash(str(target))
-    return f"Moved to Trash: {target.name}"
+    except Exception as e:
+        return f"Could not move to trash: {e}"
 
 
 def list_files(path: str = "desktop", show_hidden: bool = False) -> str:
@@ -229,9 +243,19 @@ def list_files(path: str = "desktop", show_hidden: bool = False) -> str:
 def create_file(path: str, name: str = "", content: str = "") -> str:
     try:
         base   = _resolve_path(path)
-        target = (base / name) if name else base
+        if name:
+            target = base / name
+        elif base.is_dir() or base.suffix == "":
+            target = base / "note.txt"
+        else:
+            target = base
+
+        if target.is_dir():
+            target = target / (name or "note.txt")
+
         if not _is_safe_path(target):
             return f"Access denied: {target}"
+
         target.parent.mkdir(parents=True, exist_ok=True)
         existed = target.exists()
         previous = None
@@ -243,7 +267,7 @@ def create_file(path: str, name: str = "", content: str = "") -> str:
         target.write_text(content, encoding="utf-8")
         push_undo(f"created {target.name}",
                   _undo_write(target, previous) if existed else _undo_create(target))
-        return f"File created: {target.name}"
+        return f"File created: {target.name} at {target.parent.name}/"
     except Exception as e:
         return f"Could not create file: {e}"
 
@@ -711,8 +735,24 @@ def file_controller(
         elif action == "organize_desktop":
             return organize_desktop()
 
-        elif action == "info":
-            return get_file_info(path, name=name)
+        elif action in ("open", "launch", "open_file"):
+            target_p = _resolve_path(path)
+            if not target_p.exists():
+                if name:
+                    cand = target_p / name
+                    if cand.exists():
+                        target_p = cand
+            if target_p.exists():
+                if _OS == "Windows":
+                    os.startfile(str(target_p))
+                elif _OS == "Darwin":
+                    import subprocess
+                    subprocess.Popen(["open", str(target_p)])
+                else:
+                    import subprocess
+                    subprocess.Popen(["xdg-open", str(target_p)])
+                return f"Opened '{target_p.name}'."
+            return f"Cannot open '{path}': file not found."
 
         else:
             return f"Unknown action: '{action}'"
@@ -730,7 +770,7 @@ TOOL = {
         "properties": {
             "action": {
                 "type": "STRING",
-                "description": "list | create_file | create_folder | delete | move | copy | rename | read | write | find | largest | disk_usage | organize_desktop | info"
+                "description": "open | list | create_file | create_folder | delete | move | copy | rename | read | write | find | largest | disk_usage | organize_desktop | info"
             },
             "path": {
                 "type": "STRING",

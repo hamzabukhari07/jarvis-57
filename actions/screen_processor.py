@@ -86,17 +86,49 @@ def _compress(img_bytes: bytes, source_format: str = "PNG") -> tuple[bytes, str]
 
 
 def _capture_screen() -> tuple[bytes, str]:
+    # 1. Try mss (fastest)
+    if _MSS:
+        try:
+            with mss.mss() as sct:
+                monitors = sct.monitors          # [0] = all combined, [1..n] = real screens
+                target   = monitors[1] if len(monitors) > 1 else monitors[0]
+                shot     = sct.grab(target)
+                png      = mss.tools.to_png(shot.rgb, shot.size)
+                return _compress(png, "PNG")
+        except Exception as e:
+            print(f"[Vision] ⚠️  mss capture failed ({e}), trying PIL.ImageGrab...")
 
-    if not _MSS:
-        raise RuntimeError("mss is not installed. Run: pip install mss")
+    # 2. Try PIL ImageGrab
+    if _PIL:
+        try:
+            import PIL.ImageGrab
+            img = PIL.ImageGrab.grab(all_screens=True)
+            img.thumbnail((_IMG_MAX_W, _IMG_MAX_H), PIL.Image.BILINEAR)
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, format="JPEG", quality=_JPEG_Q, optimize=False)
+            return buf.getvalue(), "image/jpeg"
+        except Exception as e:
+            print(f"[Vision] ⚠️  PIL.ImageGrab failed ({e}), trying Qt...")
 
-    with mss.mss() as sct:
-        monitors = sct.monitors          # [0] = all combined, [1..n] = real screens
-        target   = monitors[1] if len(monitors) > 1 else monitors[0]
-        shot     = sct.grab(target)
-        png      = mss.tools.to_png(shot.rgb, shot.size)
+    # 3. Try Qt screen capture if GUI is active
+    try:
+        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtCore import QBuffer, QIODevice
+        app = QApplication.instance()
+        if app:
+            screen = app.primaryScreen()
+            if screen:
+                pix = screen.grabWindow(0)
+                buf = QBuffer()
+                buf.open(QIODevice.OpenModeFlag.ReadWrite)
+                pix.save(buf, "JPEG", _JPEG_Q)
+                data = bytes(buf.data())
+                if data:
+                    return data, "image/jpeg"
+    except Exception as e:
+        print(f"[Vision] ⚠️  Qt screen grab failed: {e}")
 
-    return _compress(png, "PNG")
+    raise RuntimeError("No working screen capture method available on this system.")
 
 
 def _cv2_backend() -> int:

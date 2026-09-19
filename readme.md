@@ -1,7 +1,5 @@
-# ⚙️ MARK LIV (54)
-### The Ultimate Cross-Platform Personal AI Assistant — By FatihMakes
-
-> 📺 **[Watch the full setup video on YouTube](https://www.youtube.com/@FatihMakes)**
+# ⚙️ JARVIS
+### The Ultimate Cross-Platform Personal AI Assistant — By Hamza Bukhari
 
 A real-time voice AI that can hear, see, speak, and control your computer — on any OS. Supports Windows, macOS, and Linux. Built on the Gemini Live API for native audio streaming, delivering zero subscriptions and total digital autonomy.
 
@@ -9,13 +7,13 @@ A real-time voice AI that can hear, see, speak, and control your computer — on
 
 ## ✨ Overview
 
-**MARK LIV is the release where JARVIS gets a face.** A holographic head sits at the centre of the HUD and **speaks your assistant's words with real lip-sync** — not a jaw flapping to the volume meter, but actual mouth shapes: lips closing on *m*, *b*, *p*, spreading on *i*, rounding on *u*. Brows ride the sentence, the eyes flick between fixation points, and it blinks. Turn the sound down and you can follow roughly what it just said.
+**JARVIS is an intelligent voice assistant with a real-time responsive holographic face.** A holographic head sits at the centre of the HUD and **speaks your assistant's words with real lip-sync** — not a jaw flapping to the volume meter, but actual mouth shapes: lips closing on *m*, *b*, *p*, spreading on *i*, rounding on *u*. Brows ride the sentence, the eyes flick between fixation points, and it blinks. Turn the sound down and you can follow roughly what it just said.
 
 It ships as **zero extra dependencies and one 25 KB asset**. The face is real measured human geometry; everything else — the skull, the rig, the lighting — is generated at startup and drawn in software, so it looks identical on a gaming rig and a 2013 laptop, with no GPU driver in the loop.
 
 The face is also the fastest status indicator in the app: it looks away while thinking, meets your eyes while listening, and lets its lids fall while asleep.
 
-Underneath, Mark LIV rebuilt how the assistant knows itself — what it is, what machine it runs on, what it can do and, new, **what it cannot do** — all assembled from the live system at session start rather than written into a prompt that goes stale.
+Underneath, JARVIS rebuilt how the assistant knows itself — what it is, what machine it runs on, what it can do and, new, **what it cannot do** — all assembled from the live system at session start rather than written into a prompt that goes stale.
 
 It's not just an assistant — it's an extension of your digital life.
 
@@ -26,6 +24,10 @@ It's not just an assistant — it's an extension of your digital life.
 ### Core Features
 | Feature | Description |
 |---|---|
+| 🤖 Autonomous Agents | Integrated agentic execution via OpenCode, Kilo Code, and Antigravity agents |
+| 📚 Skills Engine | Dynamic multi-step skill loader supporting social research, scraping, git workflows & diagnostics |
+| 🧠 SQLite FTS5 Memory Engine | Full-text search (BM25) over verbatim chat history with automatic secret redaction (`zezo_brain.db`) |
+| 🛡️ Governance & Security | Strict parameter validation, path safety guards, and credential scrubbing |
 | 🧑‍🎤 Holographic Avatar | An animated human head in the HUD — real facial geometry, lit and drawn in software, no GPU or extra packages |
 | 👄 Real Lip-Sync | ~50 mouth shapes a second from the audio's formants **and** the transcript — closures, spreads and rounds, not a volume meter |
 | 🌍 Language-Free Mouth | Articulation is derived by Unicode reduction, so Latin, Cyrillic and Greek scripts all work from one rule set — and scripts that hide pronunciation fall back cleanly |
@@ -80,7 +82,7 @@ It's not just an assistant — it's an extension of your digital life.
 
 ---
 
-## 🆕 What's New in Mark LIV
+## 🆕 What's New in JARVIS
 
 No hardcoded language, no GPU requirement, no new dependencies — identical on Windows, macOS and Linux.
 
@@ -132,7 +134,7 @@ On **Windows** the chord is genuinely global: it works while any other applicati
 #### 🔇 It no longer talks itself into replying
 Writing audio to a device returns when the buffer *accepts* the sound, not when the speaker has finished with it — so for a moment after a reply "ends", it is still in the room. Streaming the microphone during that gap is how an assistant hears its own last sentence, decides it was addressed, and answers itself.
 
-Mark LIV holds a guard open across that gap, sized from the **device's own reported latency** rather than a guessed constant, so a machine with a large audio buffer gets a longer guard and one with a small buffer is not penalised. The microphone is **not muted** during it: both streams are reduced to band energies and as much of what was just played is subtracted from the microphone as fits, so only your assistant's own voice is dropped — replying the instant it stops still works.
+JARVIS holds a guard open across that gap, sized from the **device's own reported latency** rather than a guessed constant, so a machine with a large audio buffer gets a longer guard and one with a small buffer is not penalised. The microphone is **not muted** during it: both streams are reduced to band energies and as much of what was just played is subtracted from the microphone as fits, so only your assistant's own voice is dropped — replying the instant it stops still works.
 
 > Interrupting it mid-sentence by voice is built on the same machinery and is deliberately **switched off** in this release. It depends too much on the listener's room to ship without testing on real hardware.
 
@@ -159,13 +161,13 @@ All prompt wording lives in `core/prompt.txt` with `{tokens}` the app fills in �
 * The **brows barely moved** — 6 px of travel on a 250 px head, because the rig weights halved an already small constant. Derived from the anatomy instead: 19 px.
 * The activity log opened with **a dozen lines of plumbing** — one per plugin loaded, plus wake-word and briefing status. The console still carries the full boot transcript; the log now shows your conversation, state changes and anything you have to act on, and nothing else.
 
-> Built on the Mark LI–LIII foundation: the **🧩 Plugin System**, **♾️ Unlimited Sessions**, **🎨 Live Theming**, **🎙️ Wake Word** and **🧩 Self-Describing Skills** are all still here.
+> Built with core stability: the **🧩 Plugin System**, **♾️ Unlimited Sessions**, **🎨 Live Theming**, **🎙️ Wake Word** and **🧩 Self-Describing Skills** are all built-in.
 
 ---
 
-## 🔄 The Foundation Update — in every Mark from LII
+## 🔄 The Foundation Update
 
-These four landed across **Mark LII, LIII, LIV and LV at the same time**, after each of those releases had already shipped. They are not what any one of those versions originally introduced; they are the floor all of them now stand on, so moving up a Mark never costs you something the one below it had.
+These core architectural enhancements form the foundation of the assistant engine:
 
 No new dependencies. No bundled asset files. No hardcoded language, and nothing that assumes one operating system.
 
@@ -260,26 +262,25 @@ It is held in memory only, deliberately: writing it to disk would make a fresh l
 
 ---
 
-## 🗺️ Mark Roadmap
+## 🗺️ Feature Roadmap & Evolution
 
-| Mark | Focus |
+| Phase | Key Features & Focus |
 |---|---|
-| **XLIX** | Auto-start · clipboard intelligence · assistant customization |
-| **L** | Session memory · background monitoring · proactive 2.0 · instant vision |
-| **LI** | Plugin system · affective dialog · proactive audio · unlimited sessions |
-| **LII** | Voice picker · live theming · reactive HUD · recallable memory · undo · real confirmation · audio device picker · session continuity |
-| **LIII** | Wake word · Gemini 3.1 Flash Live · instant acknowledgment · self-describing action/plugin architecture |
-| **LIV** | Holographic avatar · viseme lip-sync · facial acting · face-as-status · push-to-talk · self-echo guard · runtime self-knowledge & limits |
-| *shared* | The last five above also shipped to LIII, LIV and LV at the same time — moving up a Mark never loses them |
-| **LV+** | Interrupt by voice · conversation history · plugin files: email · quiz mode · calendar · home assistant · 3D-printer |
+| **Core Platform** | Auto-start · Clipboard intelligence · Assistant customization & settings |
+| **Context & Memory** | Session memory · Background monitoring · Proactive 2.0 · Instant vision · SQLite FTS5 store |
+| **Agentic Systems** | Plugin system · OpenCode Agent · Kilo Agent · Antigravity Agent · Unlimited sessions |
+| **Audio & Interface**| Voice picker · Live theming · Reactive HUD · Recallable memory · Undo stack · Safety gates |
+| **Realtime Engine** | Wake word · Gemini 3.1 Flash Live · Instant acknowledgment · Self-describing skills |
+| **Holographic HUD** | Animated avatar head · Viseme lip-sync · Facial acting · Push-to-talk · Self-echo cancellation |
+| **Next Horizons** | Voice interruption · Cloud workspace sync · Smart calendar / Email workflows · Local vision LLMs |
 
 ---
 
 ## ⚡ Quick Start
 
 ```bash
-git clone https://github.com/FatihMakes/Mark-LIV.git
-cd Mark-LIV
+git clone https://github.com/HamzaBukhari/JARVIS.git
+cd JARVIS
 python setup.py        # installs deps for YOUR OS + the browser automation engine
 python main.py
 ```
@@ -304,23 +305,67 @@ python main.py
 
 ---
 
+## 🧪 Testing & Verification Scenarios Matrix
+
+Use these structured voice or text prompts to test every feature across the entire assistant:
+
+| Category | Test Prompt / Action | Target Feature & Expected Result |
+|---|---|---|
+| **Voice & Avatar** | `"Hey Jarvis, are you awake?"` | Wake Word detection, avatar wakes up & greets |
+| **Push-to-Talk** | Hold `Ctrl+Space` → *"What's the current time?"* | Mic opens only while holding chord; instant response |
+| **Phoneme Lip-Sync**| *"Say: Peter Piper picked a pepper and bought an umbrella"* | Viseme mouth shapes (p/b/m closures, i/e spreads, u/o rounds) |
+| **HUD Toggle** | ⚙ → Switch HUD from **Avatar** to **Reactor Core** | Reactive spectrum ring & spinning gauge mode switches live |
+| **Voice Switching**| ⚙ → Choose any other Gemini Voice | Session adapts to selected voice immediately |
+| **Self-Echo Guard**| Speak immediately after the assistant finishes | Guard filters speaker output without cutting your voice |
+| **Agents & Coding**| *"Write a Python script for exponential backoff with jitter"* | Code Helper inline generation with type safety |
+| **OpenCode Agent** | *"Run OpenCode agent to inspect git status"* | OpenCode CLI agent inspects and reports repository status |
+| **Kilo / Antigravity**| *"Run system diagnostics and verify dependencies"* | Automated skills diagnostics and pipeline execution |
+| **Social Research**| *"Run social research on recent Gemini 3.0 updates"* | Multi-platform research aggregation skill |
+| **System Control** | *"Open Notepad"* / *"Close Notepad"* | Cross-platform application lifecycle management |
+| **Hardware Stats** | *"What is my current CPU, GPU, and RAM usage?"* | System telemetry stats via hardware monitor |
+| **Safety Gate** | *"Shutdown my computer"* | Confirmation modal appears; action halts until user clicks Confirm |
+| **Undo Stack** | *"Undo the last action"* | Reverts last reversible file operation or setting change |
+| **File Operations**| *"Create a file test.txt on Desktop with text 'Zezo V2'"* | File created safely through file controller |
+| **File Processor** | *"Summarize the file readme.md"* | Analyzes local document and extracts key highlights |
+| **Memory Recall** | *"Remember that my primary database is PostgreSQL on port 5432"* | Persisted into structured memory & SQLite FTS5 database |
+| **Brain Search** | *"What port is my database on?"* | BM25 full-text recall from `zezo_brain.db` |
+| **Vision & Screen** | *"What is currently open on my screen?"* | Screen capture sent directly into active multimodal session |
+| **Web & Media** | *"Search latest AI news"* / *"Play Interstellar theme on YouTube"* | Dynamic content panel displays results / YouTube opens |
+| **Smart Reminders**| *"Remind me in 5 minutes to submit the PR"* | Native OS scheduler (Task Scheduler/LaunchAgent/systemd) |
+| **Live Theming** | ⚙ → Pick accent color (Cyan / Crimson / Emerald / Gold) | Real-time HUD and 3D Avatar lighting retinting |
+
+---
+
 ## 🗂️ Project Structure
 
 ```
-Mark LIV/
+JARVIS/
 ├── main.py                   # Core loop — Gemini Live session, audio I/O, viseme extraction, tool dispatch
 ├── ui.py                     # PyQt6 HUD — avatar canvas, waveform, log panel, settings drawer, camera feed
 ├── setup.py                  # OS-aware installer (skips wrong-OS dependencies, checks your Python)
 ├── .gitignore                # Keeps your API key, TLS key and memories out of the repository
-├── plugins/
+├── skills/                   # High-level autonomous workflow & skill pipelines
+│   ├── opencode/             # OpenCode integration skills
+│   ├── kilo_code/            # Kilo code editing & refactoring agent
+│   ├── antigravity_agent/    # Advanced agent orchestration workflows
+│   ├── social_research/      # Multi-platform social intelligence research
+│   ├── web_research_pipeline/# In-depth multi-source web researcher
+│   ├── web_scraper/          # Structured HTML/text content extractor
+│   ├── git_workflow/         # Automated branch, commit and PR operations
+│   └── system_diagnostics/   # Automated health check and benchmark suite
+├── plugins/                  # Modular plugin extensions
 │   ├── quiz.py               # Interactive quiz — JARVIS writes the questions, you answer on screen
-│   ├── document_review.py    # Contracts and policies in plain language, ordered by what matters
-│   ├── _google_core.py       # Shared OAuth for the Gmail/Calendar plugins (not a plugin itself)
-│   ├── _printer_core.py      # Shared printer connectivity (not a plugin itself)
-│   ├── _template.py          # Copy this to write a new plugin — one file, drop in, done
-│   └── ...                   # Drop-in skills (each self-describes via a PLUGIN dict + run())
-├── actions/                  # Bundled skills — each self-describes via a TOOL dict + handler
-│   ├── web_search.py         # Gemini + DDG parallel search (news, research, price, compare)
+│   ├── document_review.py    # Contracts and policies in plain language
+│   ├── _google_core.py       # Shared OAuth for Gmail/Calendar plugins
+│   ├── _printer_core.py      # Shared printer connectivity
+│   └── _template.py          # Quick starter template for custom plugins
+├── actions/                  # Built-in tool registry
+│   ├── opencode_agent.py     # OpenCode CLI runner & workspace agent
+│   ├── kilo_agent.py         # Kilo multi-file coding agent
+│   ├── antigravity_agent.py  # Antigravity agent bridge
+│   ├── agent_reach.py        # Autonomous agent reach & delegator
+│   ├── web_search.py         # Multi-mode parallel search (news, research, price, compare)
+│   ├── web_reader.py         # Direct web page reading & markdown extraction
 │   ├── screen_processor.py   # Screen & webcam capture for vision
 │   ├── background_monitor.py # User-configured topic watching — daily DDG check
 │   ├── proactive.py          # Proactive 2.0 — time/context/rotation-aware check-ins
@@ -329,8 +374,8 @@ Mark LIV/
 │   ├── computer_settings.py  # Volume, brightness, WiFi, power (per-OS)
 │   ├── computer_control.py   # Keyboard shortcuts, mouse, window management
 │   ├── open_app.py           # Application launcher (per-OS name map)
-│   ├── browser_control.py    # Web browser control
-│   ├── file_controller.py    # File system operations
+│   ├── browser_control.py    # Web browser control & automation
+│   ├── file_controller.py    # File system operations with safety validation
 │   ├── file_processor.py     # Document reading and summarization
 │   ├── send_message.py       # Messaging integration
 │   ├── weather_report.py     # Live weather data
@@ -341,26 +386,32 @@ Mark LIV/
 │   ├── dev_agent.py          # Developer task agent
 │   └── desktop.py            # Desktop and taskbar control
 ├── memory/
+│   ├── sqlite_memory.py      # SQLite WAL + FTS5 BM25 verbatim history & secret scrubber
 │   ├── memory_manager.py     # Load/save long_term.json — sessions, monitors, identity
 │   ├── config_manager.py     # api_keys.json access — key, OS, name, voice, colour, toggles
-│   └── long_term.json        # Persistent store — created on first run
+│   ├── long_term.json        # Persistent structured memory store
+│   └── zezo_brain.db         # High-concurrency WAL SQLite FTS5 database
 ├── core/
-│   ├── prompt.txt            # All prompt wording — {tokens} are filled from the live system at startup
+│   ├── prompt.txt            # System prompt templates with dynamic live system tokens
+│   ├── skill_loader.py       # Dynamic skill discovery & instruction parser
+│   ├── governance.py         # Security guards, path safety, and parameter sanitizer
 │   ├── avatar.py             # Avatar renderer — lighting, pose, expression, mouth (QPainter)
 │   ├── avatar_mesh.py        # Head geometry — loads the face, generates skull/neck/rigs
 │   ├── face_model.obj        # The face itself (MediaPipe canonical model, Apache-2.0, 25 KB)
 │   ├── viseme.py             # Transcript → mouth shapes, fused with the audio's timing
-│   ├── echo.py               # Tells your voice from the assistant's own echo; self-calibrating
-│   ├── hotkey.py             # Push-to-talk chord — global on Windows, windowed fallback elsewhere
-│   ├── undo.py               # One shared undo stack — actions register how to reverse themselves
-│   ├── confirm.py            # Irreversible-action gate — the token is issued by the UI, not the model
+│   ├── echo.py               # Self-calibrating echo cancellation guard
+│   ├── hotkey.py             # Push-to-talk chord (global on Windows)
+│   ├── undo.py               # Shared undo stack for settings and file operations
+│   ├── confirm.py            # Irreversible-action gate issued by UI
 │   ├── audio_devices.py      # Microphone / speaker list — filtered, measured, resolved by name
 │   ├── plugin_loader.py      # Plugin engine — discovery, validation, crash isolation
-│   ├── action_loader.py      # Bundled-action engine — the built-in twin of plugin_loader
-│   └── wake_word.py          # Local "Hey Jarvis" detector — own thread, offline, opt-in
+│   ├── action_loader.py      # Built-in action discovery and loader
+│   ├── wake_word.py          # Local "Hey Jarvis" detector (offline)
+│   ├── stt.py / tts.py       # Speech-to-text and text-to-speech fallback engines
+│   └── llm_client.py         # Multi-model LLM gateway
 └── config/
-    ├── api_keys.json         # API key, name, voice, colour, toggles — created on first launch (git-ignored)
-    └── certs/                # Self-signed TLS pair for the phone dashboard — generated locally (git-ignored)
+    ├── api_keys.json         # API key, name, voice, colour, toggles (git-ignored)
+    └── certs/                # Self-signed TLS pair for remote dashboard (git-ignored)
 ```
 
 ---
@@ -389,6 +440,15 @@ Your voice is streamed to Google's Gemini Live API while a session is open; that
 
 ---
 
+## 📚 Documentation & Architecture Roadmaps
+
+- 🌐 **[Master System Architecture & AI Blueprint](file:///d:/anitgravity/zezo%20version%202/PROJECT_ARCHITECTURE.md)** — Complete self-contained system guide for AI agents and developers.
+- 📖 **[Comprehensive System Documentation](file:///d:/anitgravity/zezo%20version%202/DOCUMENTATION/PROJECT_OVERVIEW.md)** — Core subsystems, tool lifecycle & security design.
+- 🚀 **[Future Upgrades & Realtime Agent OS Blueprint](file:///d:/anitgravity/zezo%20version%202/FUTURE_UPGRADES.md)** — Gemini Live + Groq hybrid architecture, deterministic routing & audio guardrails.
+- 🧠 **[SQLite FTS5 Memory Engine](file:///d:/anitgravity/zezo%20version%202/DOCUMENTATION/SQLITE_MEMORY_ARCHITECTURE.md)** — High-speed full text memory and secret redaction.
+
+---
+
 ## ⚠️ License
 
 Personal and non-commercial use only.
@@ -398,10 +458,11 @@ Licensed under **[Creative Commons BY-NC 4.0](https://creativecommons.org/licens
 
 ## 👤 Connect with the Creator
 
-Engineered by a developer building a real-world JARVIS-style assistant.
-⭐ **Star the repository to support the journey to Mark 100.**
+Engineered by **Hamza Bukhari** — building a real-world JARVIS-style assistant.
+⭐ **Star the repository to support the project.**
 
-| Platform | Link |
+| Info | Details |
 | --- | --- |
-| YouTube | [@FatihMakes](https://www.youtube.com/@FatihMakes) |
-| Instagram | [@fatihmakes](https://www.instagram.com/fatihmakes) |
+| **Creator** | Hamza Bukhari |
+| **Assistant** | JARVIS |
+| **License** | Creative Commons BY-NC 4.0 |

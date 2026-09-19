@@ -284,27 +284,60 @@ def _schedule_linux(target_dt: datetime, task_name: str,
     print("[Reminder] ❌ Neither systemd-run nor at found on this Linux system.")
     return ""
 
+from datetime import datetime, timedelta
+
+
 def reminder(
     parameters: dict,
     response=None,
     player=None,
     session_memory=None,
 ) -> str:
+    params = parameters or {}
+    date_str = params.get("date", "").strip()
+    time_str = params.get("time", "").strip()
+    minutes_raw = params.get("minutes") or params.get("minutes_from_now")
+    seconds_raw = params.get("seconds")
+    message  = params.get("message", "Reminder").strip()
 
-    date_str = parameters.get("date", "").strip()
-    time_str = parameters.get("time", "").strip()
-    message  = parameters.get("message", "Reminder").strip()
+    target_dt = None
+    now = datetime.now()
 
-    if not date_str or not time_str:
-        return "I need both a date and a time to set a reminder."
+    if minutes_raw is not None or seconds_raw is not None:
+        try:
+            mins = float(minutes_raw or 0)
+            secs = float(seconds_raw or 0)
+            target_dt = now + timedelta(minutes=mins, seconds=secs)
+        except Exception:
+            pass
 
-    try:
-        target_dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
-    except ValueError:
-        return "I couldn't parse that date or time. Please use YYYY-MM-DD and HH:MM."
+    if target_dt is None:
+        if not date_str and not time_str:
+            return "Please provide either relative minutes (e.g. 2) or a date and time."
+        if not date_str:
+            date_str = now.strftime("%Y-%m-%d")
+        if not time_str:
+            return "Please provide a time for the reminder."
 
-    if target_dt <= datetime.now():
-        return "That time has already passed — I can't set a reminder in the past."
+        try:
+            target_dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+        except ValueError:
+            try:
+                target_dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %I:%M %p")
+            except ValueError:
+                return "I couldn't parse that date or time. Please use YYYY-MM-DD and HH:MM."
+
+        # If time is within the same minute or up to 2 minutes behind due to network/tool latency,
+        # schedule for 1 minute in the future rather than rejecting.
+        if target_dt <= now:
+            diff_seconds = (now - target_dt).total_seconds()
+            if diff_seconds <= 180:
+                target_dt = now + timedelta(minutes=1)
+            else:
+                return (
+                    f"That time ({target_dt.strftime('%I:%M %p')}) has already passed on this system "
+                    f"(Current local time is {now.strftime('%I:%M %p')})."
+                )
 
     os_name    = _get_os()
     safe_msg   = _sanitise(message)
@@ -331,7 +364,7 @@ def reminder(
         return "I couldn't register the reminder with the system scheduler."
 
     if player:
-        player.write_log(f"[Reminder] ✅ {date_str} {time_str} — {safe_msg[:40]}")
+        player.write_log(f"[Reminder] ✅ {target_dt.strftime('%Y-%m-%d %H:%M')} — {safe_msg[:40]}")
 
     friendly_time = target_dt.strftime("%B %d at %I:%M %p")
     return f"Reminder set for {friendly_time}."
@@ -340,26 +373,28 @@ def reminder(
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "reminder",
-    "description": "Sets a timed reminder using Task Scheduler.",
+    "description": "Sets a timed notification reminder using the native system Task Scheduler. Supports relative minutes (e.g. in 2 minutes) or specific date and 24h time.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
+            "minutes": {
+                "type": "NUMBER",
+                "description": "Number of minutes from now to trigger the reminder (e.g. 2, 10, 30)."
+            },
             "date": {
                 "type": "STRING",
-                "description": "Date in YYYY-MM-DD format"
+                "description": "Date in YYYY-MM-DD format (defaults to today if time is specified)"
             },
             "time": {
                 "type": "STRING",
-                "description": "Time in HH:MM format (24h)"
+                "description": "Time in HH:MM format (24h) or HH:MM AM/PM"
             },
             "message": {
                 "type": "STRING",
-                "description": "Reminder message text"
+                "description": "Reminder message text (e.g. 'Drink water')"
             }
         },
         "required": [
-            "date",
-            "time",
             "message"
         ]
     },

@@ -17,7 +17,7 @@ from pathlib import Path
 
 try:
     import pyautogui
-    pyautogui.FAILSAFE = True
+    pyautogui.FAILSAFE = False
     pyautogui.PAUSE    = 0.05
     _PYAUTOGUI = True
 except ImportError:
@@ -412,7 +412,7 @@ def computer_control(
     if player:
         player.write_log(f"[Computer] {action}")
 
-    print(f"[ComputerControl] ▶ {action}  {params}")
+    print(f"[ComputerControl] > {action}  {params}")
 
     try:
 
@@ -443,13 +443,43 @@ def computer_control(
                 int(params.get("x2", 0)), int(params.get("y2", 0)),
             )
 
-        if action == "hotkey":
-            raw  = params.get("keys", "")
+        if action in ("hotkey", "shortcut"):
+            raw  = params.get("keys", "") or params.get("key", "")
             keys = [k.strip() for k in raw.split("+")] if isinstance(raw, str) else raw
             return _hotkey(*keys)
 
-        if action == "press":
-            return _press(params.get("key", "enter"))
+        if action in ("close_tab", "close_current_tab", "close_browser_tab"):
+            modifier = "command" if platform.system() == "Darwin" else "ctrl"
+            return _hotkey(modifier, "w")
+
+        if action in ("close_window", "close_active_window", "close_current_window"):
+            if platform.system() == "Windows":
+                return _hotkey("alt", "f4")
+            elif platform.system() == "Darwin":
+                return _hotkey("command", "w")
+            else:
+                return _hotkey("ctrl", "q")
+
+        if action in ("press", "key", "press_key"):
+            return _press(params.get("key") or params.get("text", "enter"))
+
+        if action in ("open_folder", "open_path", "open_in_app"):
+            target_path = params.get("path") or params.get("target") or params.get("text", "")
+            app = params.get("app") or params.get("app_name", "")
+            p = Path(target_path).expanduser()
+            if not p.is_absolute():
+                # check Desktop
+                desk_p = Path.home() / "Desktop" / target_path
+                if desk_p.exists():
+                    p = desk_p
+            if app:
+                subprocess.Popen(f'{app} "{p}"', shell=True, creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0)
+                return f"Opened {p} in {app}."
+            if platform.system() == "Windows":
+                subprocess.Popen(f'explorer "{p}"', shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            else:
+                subprocess.Popen(["xdg-open", str(p)])
+            return f"Opened folder: {p}"
 
         if action == "scroll":
             return _scroll(
@@ -494,7 +524,7 @@ def computer_control(
         if action == "random_data":
             dt     = params.get("type", "name")
             result = _random_data(dt)
-            print(f"[ComputerControl] 🎲 random {dt} → {result}")
+            print(f"[ComputerControl] (random {dt}) -> {result}")
             return result
 
         if action == "user_data":
@@ -503,13 +533,13 @@ def computer_control(
             value   = profile.get(field, "")
             if not value:
                 value = _random_data(field)
-                print(f"[ComputerControl] ⚠️ No '{field}' in memory, using random: {value}")
+                print(f"[ComputerControl] (No '{field}' in memory, using random: {value})")
             return value
 
         return f"Unknown action: '{action}'"
 
     except Exception as e:
-        print(f"[ComputerControl] ❌ {action}: {e}")
+        print(f"[ComputerControl] Error in {action}: {e}")
         return f"computer_control '{action}' failed: {e}"
 
 

@@ -54,6 +54,7 @@ from memory.memory_manager import (
     save_session_summary, pop_last_session,
     search_memory, set_trim_notifier,
 )
+from memory import sqlite_memory
 
 # The file-backed tools (open_app, web_search, browser_control, …) are no longer
 # imported or declared here — they self-describe via a TOOL dict in their own
@@ -76,7 +77,9 @@ from memory.config_manager     import (
 from core.plugin_loader        import discover_plugins
 from core                      import undo as undo_stack
 from core                      import confirm as confirm_gate
+from core                      import governance
 from core                      import audio_devices
+from core.skill_loader         import get_skill_registry
 from core.action_loader        import discover_actions
 from core.echo                 import EchoGuard
 from core.viseme               import VisemeStream
@@ -438,15 +441,12 @@ TOOL_DECLARATIONS = [
     {
         "name": "recall_memory",
         "description": (
-            "Look up a fact you have stored about the user but which is NOT in "
-            "the memory block of your system prompt. "
-            "The prompt lists the keys it did not have room for under "
-            "'[ALSO REMEMBERED]' — if the user asks about anything named there, "
-            "call this FIRST. "
-            "Also call it before saying you do not know something personal, and "
-            "when the user asks what you remember about them (leave query empty "
-            "for everything). "
-            "This is a local file search: it is instant and costs nothing."
+            "Look up long-term facts about the user OR search historical past conversations, "
+            "tasks, and executed tool actions from previous sessions using full-text search. "
+            "Call this whenever the user asks 'what did we talk about earlier?', "
+            "'what did I tell you about X?', 'what was the error/command from last time?', "
+            "or when referring to keys listed under '[ALSO REMEMBERED]'. "
+            "Leave query empty to retrieve general memory facts. Instant and costs nothing."
         ),
         "parameters": {
             "type": "OBJECT",
@@ -454,9 +454,9 @@ TOOL_DECLARATIONS = [
                 "query": {
                     "type": "STRING",
                     "description": (
-                        "Keyword to search for — a name, a topic, a category "
-                        "(e.g. 'ayse', 'coffee', 'projects'). "
-                        "Leave empty to list everything stored."
+                        "Keyword or phrase to search for across profile facts and historical conversations "
+                        "(e.g. 'ayse', 'python error', 'wifi password', 'projects'). "
+                        "Leave empty to list general stored facts."
                     ),
                 },
             },
@@ -485,6 +485,41 @@ TOOL_DECLARATIONS = [
                 },
             },
             "required": [],
+        },
+    },
+    {
+        "name": "read_skill",
+        "description": (
+            "Read full step-by-step guidelines and instructions for a skill listed under '[AVAILABLE SKILLS]'. "
+            "Call this before executing a complex multi-step workflow (e.g. system diagnostics, git workflow, deep research)."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "skill_name": {"type": "STRING", "description": "Name of the skill to read (e.g. 'system_diagnostics', 'git_workflow')"},
+            },
+            "required": ["skill_name"],
+        },
+    },
+    {
+        "name": "list_skills",
+        "description": "List all available skills and workflows on disk with their descriptions.",
+        "parameters": {"type": "OBJECT", "properties": {}},
+    },
+    {
+        "name": "save_learned_skill",
+        "description": (
+            "Autonomously synthesize and persist a new skill after successfully completing a complex or novel multi-step task. "
+            "This adds a permanent new capability to your skills catalog for future sessions."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "name": {"type": "STRING", "description": "Short snake_case name for the skill (e.g. 'docker_cleanup', 'audio_troubleshoot')"},
+                "description": {"type": "STRING", "description": "1-2 sentence summary of when to use this skill"},
+                "instructions": {"type": "STRING", "description": "Clear step-by-step markdown instructions and best practices"},
+            },
+            "required": ["name", "description", "instructions"],
         },
     },
 ]
@@ -598,6 +633,15 @@ class JarvisLive:
         self._proactive        = ProactiveEngine()
         self._last_user_speech = time.monotonic()  # updated on every user utterance
         self._session_log: list[str] = []          # conversation turns for end-of-session summary
+        try:
+            sqlite_memory.init_db()
+            sqlite_memory.sync_facts_from_dict(load_memory())
+            print("[JARVIS] 🧠 SQLite FTS5 Memory Engine initialized")
+        except Exception as _e:
+            print(f"[JARVIS] ⚠️ SQLite memory init warning: {_e}")
+
+        self._skill_registry = get_skill_registry()
+        print(f"[Skills] Discovered {len(self._skill_registry.list_skills())} declarative skills")
 
         self._enhanced_live = True  # proactive audio; auto-disabled if the server rejects it
         self._tuned_live    = True  # turn-taking / media / thinking knobs; same fallback
@@ -901,15 +945,22 @@ class JarvisLive:
         """Chord pressed or released — may arrive on the hotkey thread."""
         self._ptt_held = held
         if held:
-            # Holding the key is also a way to wake it, so push-to-talk works
-            # without having to say the wake word first.
+            # Holding the key wakes it and opens the mic
             if self._wake_enabled and not self._awake:
                 self._awake = True
-                self._last_user_speech = time.monotonic()
-        try:
-            self.ui.set_state("LISTENING" if held else "SLEEPING")
-        except Exception:
-            pass
+            self._last_user_speech = time.monotonic()
+            try:
+                self.ui.set_state("LISTENING")
+            except Exception:
+                pass
+        else:
+            # On release: keep awake, move to THINKING so the answer can generate & speak
+            self._last_user_speech = time.monotonic()
+            try:
+                if self.state in ("LISTENING", "IDLE"):
+                    self.ui.set_state("THINKING")
+            except Exception:
+                pass
 
     def interrupt(self) -> None:
         """Stop JARVIS mid-speech: drain queued audio and open mic immediately."""
@@ -966,11 +1017,13 @@ class JarvisLive:
         sys_prompt = _load_system_prompt()
 
         now      = datetime.now()
-        time_str = now.strftime("%A, %B %d, %Y — %I:%M %p")
+        tz_name  = time.tzname[time.daylight] if time.tzname else "Local Time"
+        time_str = now.strftime("%A, %B %d, %Y — %I:%M:%S %p (%H:%M 24h)")
         time_ctx = (
-            f"[CURRENT DATE & TIME]\n"
-            f"Right now it is: {time_str}\n"
-            f"Use this to calculate exact times for reminders.\n\n"
+            f"[SYSTEM LOCAL DATE & TIME]\n"
+            f"The user's computer local time is: {time_str} [{tz_name}].\n"
+            f"Always use and refer to this local system time (NOT UTC) when answering the current time or scheduling reminders.\n"
+            f"For relative reminders (e.g. 'in 2 minutes'), pass `minutes: 2` to the reminder tool.\n\n"
         )
 
         # Identity injection — overrides any hardcoded name in prompt.txt
@@ -1015,6 +1068,9 @@ class JarvisLive:
         parts = [time_ctx, identity_ctx]
         if mem_str:
             parts.append(mem_str)
+        skills_str = self._skill_registry.format_prompt_block()
+        if skills_str:
+            parts.append(skills_str)
         parts.append(sys_prompt)
 
         cfg = dict(
@@ -1135,6 +1191,22 @@ class JarvisLive:
         loop   = asyncio.get_event_loop()
         result = "Done."
 
+        # ── Governance & Security Policy Gate ────────────────────────────
+        try:
+            decision, reason = governance.evaluate(name, args)
+            if decision == governance.PolicyDecision.DENY:
+                print(f"[Security] 🛑 Action '{name}' BLOCKED by governance policy: {reason}")
+                self.ui.write_log(f"ERR: Security Block — {name} ({reason})")
+                self.speak("Sir, that action was blocked by security governance for system protection.")
+                if not self.ui.muted:
+                    self.ui.set_state("LISTENING")
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"result": f"SECURITY POLICY VIOLATION: Action '{name}' was blocked by safety governance. Reason: {reason}"}
+                )
+        except Exception as _gov_err:
+            print(f"[Security] ⚠️ Governance evaluation warning: {_gov_err}")
+
         try:
             if name == "recall_memory":
                 # Local file search: no network, no second model. Kept out of
@@ -1155,7 +1227,7 @@ class JarvisLive:
             elif name == "screen_process":
                 import time as _t_mod
                 _now = _t_mod.monotonic()
-                _cooldown = 4.0  # seconds — covers echo window after speaking ends
+                _cooldown = 2.5  # seconds — responsive cooldown
                 if self._vision_busy or (_now - self._vision_last_time) < _cooldown:
                     _wait = max(0, _cooldown - (_now - self._vision_last_time))
                     print(f"[Vision] ⏳ Cooldown active ({_wait:.1f}s remaining) — ignoring duplicate call")
@@ -1165,28 +1237,38 @@ class JarvisLive:
                     self._vision_last_time = _now
                     angle     = args.get("angle", "screen").lower()
                     user_text = args.get("text", "What do you see?")
-                    if angle == "camera":
-                        img_b, mime_t = await loop.run_in_executor(None, _capture_camera)
-                        self.ui.start_camera_stream()
-                        self._vision_cam_active = True
-                        print(f"[Vision] 📷 Camera: {len(img_b):,} bytes")
-                        _stall = "camera"
-                    else:
-                        img_b, mime_t = await loop.run_in_executor(None, _capture_screen)
-                        print(f"[Vision] 🖥️  Screen: {len(img_b):,} bytes")
-                        _stall = "screen"
-                    self._pending_vision = (img_b, mime_t, user_text, angle)
-                    # The image is attached to this same exchange, so there is
-                    # nothing to stall for and nothing to announce. Asking for an
-                    # acknowledgement here is what produced two spoken answers —
-                    # the model filled that turn by answering the question from
-                    # imagination, then answered it again once it could see.
-                    result = (
-                        f"[VISION_ACTIVE] {_stall.capitalize()} captured and attached to this "
-                        f"same exchange. Do not acknowledge and do not answer yet — the image "
-                        f"is arriving with this result. Reply once, from what you actually see "
-                        f"in it."
-                    )
+                    _stall    = "screen"
+                    img_b, mime_t = None, "image/jpeg"
+                    try:
+                        if angle == "camera":
+                            try:
+                                img_b, mime_t = await loop.run_in_executor(None, _capture_camera)
+                                if hasattr(self.ui, "start_camera_stream"):
+                                    self.ui.start_camera_stream()
+                                self._vision_cam_active = True
+                                print(f"[Vision] 📷 Camera: {len(img_b):,} bytes")
+                                _stall = "camera"
+                            except Exception as cam_err:
+                                print(f"[Vision] ⚠️ Camera unavailable ({cam_err}) — falling back to screen capture")
+                                img_b, mime_t = await loop.run_in_executor(None, _capture_screen)
+                                _stall = "screen"
+                        else:
+                            img_b, mime_t = await loop.run_in_executor(None, _capture_screen)
+                            print(f"[Vision] 🖥️  Screen: {len(img_b):,} bytes")
+                            _stall = "screen"
+
+                        self._pending_vision = (img_b, mime_t, user_text, angle)
+                        result = (
+                            f"[VISION_ACTIVE] {_stall.capitalize()} captured and attached to this "
+                            f"same exchange. Do not acknowledge and do not answer yet — the image "
+                            f"is arriving with this result. Reply once, from what you actually see "
+                            f"in it."
+                        )
+                    except Exception as e:
+                        print(f"[Vision] ❌ Vision capture error: {e}")
+                        self._vision_busy = False
+                        self._pending_vision = None
+                        result = f"I could not capture the visual right now: {e}"
 
             elif name == "close_camera":
                 self.ui.stop_camera_stream()
@@ -1208,6 +1290,29 @@ class JarvisLive:
                     result = ("Monitoring: " + ", ".join(topics)) if topics else "No topics are being monitored."
                 else:
                     result = "Specify action (add/remove/list) and a topic."
+
+            elif name == "read_skill":
+                s_name = args.get("skill_name", "")
+                result = await loop.run_in_executor(None, lambda: self._skill_registry.read_skill(s_name))
+
+            elif name == "list_skills":
+                s_list = await loop.run_in_executor(None, self._skill_registry.list_skills)
+                if s_list:
+                    result = "Available Skills:\n" + "\n".join(
+                        f"• {s['name']}: {s['description']} (v{s['version']} by {s['author']})"
+                        for s in s_list
+                    )
+                else:
+                    result = "No skills installed in skills/ directory."
+
+            elif name == "save_learned_skill":
+                s_name = args.get("name", "")
+                s_desc = args.get("description", "")
+                s_inst = args.get("instructions", "")
+                result = await loop.run_in_executor(
+                    None,
+                    lambda: self._skill_registry.save_learned_skill(s_name, s_desc, s_inst, author="auto_learned")
+                )
 
             elif name == "shutdown_jarvis":
                 self.ui.write_log("SYS: Shutdown requested.")
@@ -1262,6 +1367,10 @@ class JarvisLive:
             self.ui.set_state("LISTENING")
 
         print(f"[JARVIS] 📤 {name} → {str(result)[:80]}")
+        try:
+            sqlite_memory.log_turn("tool", str(result), tool_name=name, tool_args=args, tool_result=str(result))
+        except Exception:
+            pass
 
         # A tool that declared itself NON_BLOCKING also says when its answer may
         # re-enter the conversation. Without this the model finishes whatever it
@@ -1447,18 +1556,15 @@ class JarvisLive:
             turn_complete=True,
         )
 
-        if self._vision_cam_active:
-            # Camera: stay busy until JARVIS has finished speaking the answer,
-            # then close the preview.
-            self._vision_cam_active    = False
-            self._vision_close_pending = True
-        else:
-            self._vision_busy = False
+        self._vision_busy = False
+        self._vision_cam_active = False
+        self._vision_close_pending = False
         return True
 
     async def _receive_audio(self):
         print("[JARVIS] 👂 Recv started")
         out_buf, in_buf = [], []
+        in_logged = False
 
         try:
             while True:
@@ -1495,19 +1601,27 @@ class JarvisLive:
 
                         if sc.output_transcription and sc.output_transcription.text:
                             txt = _clean_transcript(sc.output_transcription.text)
-                            # A turn that involves a tool call passes through
-                            # several turn_completes, and the API re-sends the
-                            # tail of the transcript across them. Comparing only
-                            # against the previous chunk missed that — once
-                            # out_buf had been flushed and emptied, the repeat
-                            # sailed straight back in, which logged the answer
-                            # twice AND made the avatar mouth it twice.
+                            # Log user speech immediately as soon as model starts answering
+                            if in_buf and not in_logged:
+                                full_in = " ".join(in_buf).strip()
+                                if full_in:
+                                    self._last_out_logged = ""
+                                    self.ui.write_log(f"You: {full_in}")
+                                    self._session_log.append(f"User: {full_in}")
+                                    try:
+                                        sqlite_memory.log_turn("user", full_in)
+                                    except Exception:
+                                        pass
+                                    if self._dashboard:
+                                        asyncio.create_task(self._dashboard.broadcast({
+                                            "type": "log", "speaker": "user",
+                                            "text": full_in,
+                                            "ts": datetime.now().isoformat(),
+                                        }))
+                                in_logged = True
+
                             if txt and not _is_repeat_chunk(txt, out_buf):
                                 out_buf.append(txt)
-                                # Hand the words to the mouth as they arrive, so
-                                # the avatar can form the consonants the audio
-                                # alone cannot show. Pure string work — it adds
-                                # nothing measurable to the response path.
                                 self._visemes.feed_text(txt)
 
                         if sc.input_transcription and sc.input_transcription.text:
@@ -1515,6 +1629,7 @@ class JarvisLive:
                             if txt:
                                 in_buf.append(txt)
                                 self._last_user_speech = time.monotonic()
+                                in_logged = False
 
                         if sc.turn_complete:
                             if self._turn_done_event:
@@ -1526,14 +1641,19 @@ class JarvisLive:
                                 self._interrupted = False
                                 in_buf  = []
                                 out_buf = []
+                                in_logged = False
                                 self._visemes.reset()
                                 continue
 
                             full_in = " ".join(in_buf).strip()
-                            if full_in:
+                            if full_in and not in_logged:
                                 self._last_out_logged = ""   # new exchange
                                 self.ui.write_log(f"You: {full_in}")
                                 self._session_log.append(f"User: {full_in}")
+                                try:
+                                    sqlite_memory.log_turn("user", full_in)
+                                except Exception:
+                                    pass
                                 if self._dashboard:
                                     asyncio.create_task(self._dashboard.broadcast({
                                         "type": "log", "speaker": "user",
@@ -1541,11 +1661,9 @@ class JarvisLive:
                                         "ts": datetime.now().isoformat(),
                                     }))
                             in_buf = []
+                            in_logged = False
 
                             full_out = " ".join(out_buf).strip()
-                            # Second line of defence: even if a repeat slips
-                            # into a *fresh* buffer after a flush, never log the
-                            # same answer (or a tail of it) twice in a row.
                             if full_out and len(full_out) >= _REPEAT_MIN and self._last_out_logged:
                                 if full_out in self._last_out_logged:
                                     full_out = ""
@@ -1553,6 +1671,10 @@ class JarvisLive:
                                 self._last_out_logged = full_out
                                 self.ui.write_log(f"{self._asst_name}: {full_out}")
                                 self._session_log.append(f"{self._asst_name}: {full_out}")
+                                try:
+                                    sqlite_memory.log_turn("assistant", full_out)
+                                except Exception:
+                                    pass
                                 if self._dashboard:
                                     asyncio.create_task(self._dashboard.broadcast({
                                         "type": "log", "speaker": "jarvis",
