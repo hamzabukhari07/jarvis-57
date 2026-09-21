@@ -48,10 +48,17 @@ def _save(data: dict) -> None:
 
 def remember_repo(path: str) -> None:
     """Persist a repo path as the last active one."""
+    resolved_path = str(Path(path).resolve())
     data = _load()
-    data[_STORE_KEY] = str(Path(path).resolve())
+    data[_STORE_KEY] = resolved_path
     _save(data)
     logger.info("repo_context: remembered %s", path)
+    try:
+        from memory.memory_manager import remember
+        remember("active_project", resolved_path, category="projects")
+    except Exception:
+        pass
+
 
 
 def get_last_repo() -> Optional[str]:
@@ -65,7 +72,8 @@ def _is_git_repo(p: Path) -> bool:
 
 
 def _expand(raw: str) -> Optional[Path]:
-    """Turn a possibly-relative user-typed path into an absolute one."""
+    """Turn a possibly-relative user-typed path into an absolute one with fuzzy matching."""
+    import re
     if not raw:
         return None
     raw = raw.strip().strip("\"'")
@@ -73,7 +81,7 @@ def _expand(raw: str) -> Optional[Path]:
 
     # Check if absolute path (e.g. C:/... or /home/...)
     p = Path(raw).expanduser()
-    if p.is_absolute():
+    if p.is_absolute() and p.exists():
         return p.resolve()
 
     parts = [part for part in norm.split("/") if part]
@@ -83,14 +91,29 @@ def _expand(raw: str) -> Optional[Path]:
     first = parts[0].lower()
     # Common user folder shorthands
     if first in ("desktop", "downloads", "documents", "projects", "dev"):
-        # e.g. "Desktop/coding" -> Path.home() / "Desktop" / "coding"
-        if len(parts) > 1:
-            target = Path.home() / parts[0].capitalize() / Path(*parts[1:])
-        else:
-            target = Path.home() / parts[0].capitalize()
-        return target.resolve()
+        base = Path.home() / parts[0].capitalize()
+        sub = "/".join(parts[1:]) if len(parts) > 1 else ""
+        if not sub:
+            return base.resolve()
 
-    # Check under common roots if subfolder exists
+        direct = base / sub
+        if direct.exists():
+            return direct.resolve()
+
+        # Fuzzy match subfolder under base
+        target_norm = re.sub(r"[\s_\-]+", "", sub.lower())
+        if base.exists():
+            try:
+                for child in base.iterdir():
+                    child_norm = re.sub(r"[\s_\-]+", "", child.name.lower())
+                    if target_norm == child_norm or target_norm in child_norm or child_norm in target_norm:
+                        return child.resolve()
+            except Exception:
+                pass
+        return direct.resolve()
+
+    # Check under common roots if subfolder exists (exact or fuzzy)
+    target_norm = re.sub(r"[\s_\-]+", "", raw.lower())
     for root in (
         Path.home() / "Desktop",
         Path.home() / "Documents",
@@ -98,12 +121,22 @@ def _expand(raw: str) -> Optional[Path]:
         Path.home() / "dev",
         Path.cwd(),
     ):
+        if not root.exists():
+            continue
         cand = root / raw
         if cand.exists():
             return cand.resolve()
+        try:
+            for child in root.iterdir():
+                child_norm = re.sub(r"[\s_\-]+", "", child.name.lower())
+                if target_norm and (target_norm == child_norm or target_norm in child_norm or child_norm in target_norm):
+                    return child.resolve()
+        except Exception:
+            pass
 
     # If it's a simple name like "coding" or "my_project", target Desktop/name
     return (Path.home() / "Desktop" / raw).resolve()
+
 
 
 def resolve(

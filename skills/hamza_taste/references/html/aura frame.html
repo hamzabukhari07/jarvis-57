@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura - Architecting Digital Frontiers</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@100;200;300;400&family=Inter:wght@200;300;400&display=swap" rel="stylesheet">
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        'dm-sans': ['DM Sans', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Icons -->
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+
+    <!-- Animation Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+</head>
+
+<body class="bg-[#050505] text-white font-sans antialiased min-h-screen relative overflow-x-hidden selection:bg-orange-500/30">
+
+    <!-- WebGL Background -->
+    <canvas
+        id="webgl-canvas"
+        class="fixed inset-0 z-0 pointer-events-none w-full h-full">
+    </canvas>
+
+    <!-- Framed Grid Environment -->
+    <div class="fixed inset-0 pointer-events-none z-0 flex justify-center overflow-hidden">
+
+        <!-- Subtle Diagonal Texture -->
+        <div
+            class="absolute inset-0 opacity-[0.02]"
+            style="background-image: repeating-linear-gradient(45deg, #ffffff 0px, #ffffff 1px, transparent 1px, transparent 24px);">
+        </div>
+
+        <!-- Precision Grid Borders -->
+        <div class="w-full max-w-7xl h-full relative">
+
+            <div class="absolute top-0 bottom-0 left-0 w-px bg-white/10"></div>
+            <div class="absolute top-0 bottom-0 left-1/4 w-px bg-white/[0.04] hidden sm:block"></div>
+            <div class="absolute top-0 bottom-0 left-2/4 w-px bg-white/[0.04] hidden sm:block"></div>
+            <div class="absolute top-0 bottom-0 left-3/4 w-px bg-white/[0.04] hidden sm:block"></div>
+            <div class="absolute top-0 bottom-0 right-0 w-px bg-white/10"></div>
+
+            <!-- Grid Coordinates -->
+            <div class="absolute top-32 left-1/4 ml-4 text-xs text-white/30 font-sans tracking-widest hidden sm:block">
+                X-01
+            </div>
+
+            <div class="absolute top-32 left-2/4 ml-4 text-xs text-white/30 font-sans tracking-widest hidden sm:block">
+                X-02
+            </div>
+
+            <div class="absolute top-32 left-3/4 ml-4 text-xs text-white/30 font-sans tracking-widest hidden sm:block">
+                X-03
+            </div>
+
+            <!-- Flow Beams -->
+            <div class="absolute top-0 bottom-0 left-1/4 w-px overflow-hidden hidden sm:block">
+                <div
+                    class="w-full h-[25vh] beam-1"
+                    style="background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.4), transparent);">
+                </div>
+            </div>
+
+            <div class="absolute top-0 bottom-0 right-1/4 w-px overflow-hidden hidden sm:block">
+                <div
+                    class="w-full h-[30vh] beam-2"
+                    style="background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.3), transparent);">
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+
+    <!-- Main Structured Wrapper -->
+    <div class="relative z-10 flex flex-col min-h-screen max-w-7xl mx-auto w-full">
+
+        <!-- Navigation -->
+        <header class="relative w-full px-6 py-6 flex items-center justify-between border-b border-white/10 bg-black/20 backdrop-blur-sm">
+
+            <!-- Frame Corners -->
+            <div class="absolute top-0 left-0 w-2.5 h-2.5 border-t border-l border-white/40 -translate-x-px -translate-y-px"></div>
+            <div class="absolute top-0 right-0 w-2.5 h-2.5 border-t border-r border-white/40 translate-x-px -translate-y-px"></div>
+            <div class="absolute bottom-0 left-0 w-2.5 h-2.5 border-b border-l border-white/40 -translate-x-px translate-y-px"></div>
+            <div class="absolute bottom-0 right-0 w-2.5 h-2.5 border-b border-r border-white/40 translate-x-px translate-y-px"></div>
+
+            <!-- Logo -->
+            <a href="#" class="flex items-center gap-3 group">
+
+                <div class="w-5 h-5 bg-white rounded-sm rotate-45 flex items-center justify-center transition-transform duration-700 group-hover:rotate-[225deg]">
+                    <div class="w-2 h-2 bg-black rounded-sm"></div>
+                </div>
+
+                <span class="text-sm font-normal tracking-tight font-sans">
+                    Aura Frame
+                </span>
+
+            </a>
+
+            <!-- Desktop Links -->
+            <div class="hidden md:flex items-center gap-10 text-xs font-extralight text-white/70">
+
+                <a href="#" class="hover:text-white transition-colors flex items-center gap-1.5 group font-sans">
+                    Modules
+                    <iconify-icon
+                        icon="solar:alt-arrow-down-linear"
+                        class="text-xs opacity-50 group-hover:opacity-100 transition-opacity"
+                        stroke-width="1.5">
+                    </iconify-icon>
+                </a>
+
+                <a href="#" class="hover:text-white transition-colors flex items-center gap-1.5 group font-sans">
+                    Scenarios
+                    <iconify-icon
+                        icon="solar:alt-arrow-down-linear"
+                        class="text-xs opacity-50 group-hover:opacity-100 transition-opacity"
+                        stroke-width="1.5">
+                    </iconify-icon>
+                </a>
+
+                <a href="#" class="hover:text-white transition-colors font-sans">
+                    Story
+                </a>
+
+                <a href="#" class="hover:text-white transition-colors font-sans">
+                    Assets
+                </a>
+
+                <a href="#" class="hover:text-white transition-colors font-sans">
+                    Support
+                </a>
+
+            </div>
+
+            <!-- Access Button -->
+            <div
+                class="hidden md:inline-flex relative group rounded-full"
+                style="background: linear-gradient(135deg, rgba(255,255,255,0.25), rgba(255,255,255,0.02)); padding: 1px;">
+
+                <a
+                    href="#"
+                    class="px-6 py-2 text-xs font-extralight bg-black/60 backdrop-blur-sm rounded-full hover:bg-white/5 transition-all duration-300 font-sans">
+                    Access
+                </a>
+
+            </div>
+
+            <!-- Mobile Menu -->
+            <button class="md:hidden text-white/70 hover:text-white">
+                <iconify-icon
+                    icon="solar:hamburger-menu-linear"
+                    class="text-xl"
+                    stroke-width="1.5">
+                </iconify-icon>
+            </button>
+
+        </header>
+
+
+        <!-- Hero Section -->
+        <main
+            class="relative flex-grow flex flex-col items-center justify-center px-4 pt-24 pb-32 text-center border-b border-white/10"
+            id="main-content">
+
+            <!-- Frame Corners -->
+            <div class="absolute bottom-0 left-0 w-2.5 h-2.5 border-b border-l border-white/40 -translate-x-px translate-y-px"></div>
+
+            <div class="absolute bottom-0 right-0 w-2.5 h-2.5 border-b border-r border-white/40 translate-x-px translate-y-px"></div>
+
+
+            <!-- Headline -->
+            <div class="max-w-4xl mx-auto mb-8 flex flex-col items-center justify-center w-full z-10">
+
+                <h1 class="text-5xl sm:text-6xl md:text-7xl lg:text-8xl leading-none tracking-tight w-full font-dm-sans font-extralight flex flex-wrap justify-center gap-x-4 gap-y-2">
+
+                    <span class="overflow-hidden inline-flex">
+                        <span class="inline-block translate-y-[110%] word-inner">
+                            Architecting
+                        </span>
+                    </span>
+
+                    <span class="overflow-hidden inline-flex">
+                        <span class="inline-block translate-y-[110%] word-inner">
+                            Frontiers
+                        </span>
+                    </span>
+
+                    <span class="w-full basis-full h-0"></span>
+
+                    <span class="overflow-hidden inline-flex text-white/90">
+                        <span class="inline-block translate-y-[110%] word-inner">
+                            for
+                        </span>
+                    </span>
+
+                    <span class="overflow-hidden inline-flex text-white/90">
+                        <span class="inline-block translate-y-[110%] word-inner">
+                            Tomorrow
+                        </span>
+                    </span>
+
+                </h1>
+
+            </div>
+
+
+            <!-- Subheadline -->
+            <p
+                class="max-w-lg mx-auto text-sm sm:text-base text-white/60 font-extralight leading-relaxed mb-12 font-sans z-10"
+                id="hero-sub">
+
+                Designing modular environments with precision-crafted systems that evolve with your vision.
+
+            </p>
+
+
+            <!-- CTA Buttons -->
+            <div class="flex flex-col sm:flex-row items-center gap-5 z-10">
+
+                <!-- Primary Action -->
+                <a
+                    href="#"
+                    class="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 text-xs font-normal bg-[#F5F5F5] text-black rounded-full hover:bg-white transition-colors duration-300 shadow-[0_0_20px_rgba(255,255,255,0.1)] font-sans tracking-wide">
+
+                    Discover Framework
+
+                </a>
+
+
+                <!-- Secondary Action -->
+                <div
+                    class="w-full sm:w-auto relative group rounded-full"
+                    style="background: linear-gradient(to bottom right, rgba(255,255,255,0.3), rgba(255,255,255,0.05)); padding: 1px;">
+
+                    <a
+                        href="#"
+                        class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 text-xs font-extralight bg-[#050505] text-white rounded-full transition-all duration-300 group-hover:bg-[#111] font-sans tracking-wide">
+
+                        Initialize
+
+                        <iconify-icon
+                            icon="solar:arrow-right-linear"
+                            class="text-sm group-hover:translate-x-1 transition-transform duration-300"
+                            stroke-width="1.5">
+                        </iconify-icon>
+
+                    </a>
+
+                </div>
+
+            </div>
+
+        </main>
+
+
+        <!-- Logos Section -->
+        <footer class="relative w-full py-16 flex flex-col items-center justify-center bg-black/10 backdrop-blur-sm">
+
+            <!-- Frame Corners -->
+            <div class="absolute bottom-0 left-0 w-2.5 h-2.5 border-b border-l border-white/40 -translate-x-px translate-y-px"></div>
+
+            <div class="absolute bottom-0 right-0 w-2.5 h-2.5 border-b border-r border-white/40 translate-x-px translate-y-px"></div>
+
+
+            <p class="text-xs font-extralight text-white/40 mb-8 tracking-widest uppercase font-sans">
+                Empowering Visionary Brands
+            </p>
+
+
+            <div class="flex items-center justify-center gap-10 md:gap-20 flex-wrap opacity-50 grayscale hover:grayscale-0 transition-all duration-700">
+
+                <div class="flex items-center gap-2">
+                    <iconify-icon
+                        icon="solar:box-linear"
+                        class="text-xl"
+                        stroke-width="1.5">
+                    </iconify-icon>
+
+                    <span class="text-lg font-normal tracking-tight font-sans">
+                        Pulse
+                    </span>
+                </div>
+
+
+                <div class="flex items-center gap-2">
+                    <iconify-icon
+                        icon="solar:leaf-linear"
+                        class="text-xl"
+                        stroke-width="1.5">
+                    </iconify-icon>
+
+                    <span class="text-lg font-normal tracking-tight font-sans">
+                        Vertex
+                    </span>
+                </div>
+
+
+                <div class="flex items-center gap-2">
+                    <iconify-icon
+                        icon="solar:layers-linear"
+                        class="text-xl"
+                        stroke-width="1.5">
+                    </iconify-icon>
+
+                    <span class="text-lg font-normal tracking-tight font-sans">
+                        Strata
+                    </span>
+                </div>
+
+
+                <div class="flex items-center gap-2">
+                    <iconify-icon
+                        icon="solar:infinity-linear"
+                        class="text-xl"
+                        stroke-width="1.5">
+                    </iconify-icon>
+
+                    <span class="text-lg font-normal tracking-tight font-sans">
+                        Nexis
+                    </span>
+                </div>
+
+            </div>
+
+        </footer>
+
+    </div>
+
+
+    <!-- Scripts -->
+    <script>
+
+        document.addEventListener("DOMContentLoaded", () => {
+
+            gsap.registerPlugin(ScrollTrigger);
+
+
+            /* --- 1. Prepare & Execute Masked Word Reveal --- */
+
+            const sub = document.getElementById('hero-sub');
+
+            if (sub) {
+
+                const words = sub.innerText.trim().split(' ');
+
+                sub.innerHTML = '';
+
+                words.forEach(word => {
+
+                    sub.innerHTML += `
+                        <span class="overflow-hidden inline-flex mr-1.5 align-top">
+                            <span class="inline-block translate-y-[110%] word-inner">
+                                ${word}
+                            </span>
+                        </span>
+                    `;
+
+                });
+
+            }
+
+
+            // Animate all words
+            gsap.to('.word-inner', {
+
+                y: '0%',
+                duration: 1.2,
+                stagger: 0.04,
+                ease: "power4.out",
+                delay: 0.1,
+
+                scrollTrigger: {
+                    trigger: "#main-content",
+                    start: "top 80%"
+                }
+
+            });
+
+
+            /* --- 2. Ambient Beams Animation --- */
+
+            gsap.fromTo(
+                '.beam-1',
+                { y: '-100%' },
+                {
+                    y: '500%',
+                    duration: 4.5,
+                    repeat: -1,
+                    ease: 'none'
+                }
+            );
+
+
+            gsap.fromTo(
+                '.beam-2',
+                { y: '-100%' },
+                {
+                    y: '400%',
+                    duration: 6,
+                    repeat: -1,
+                    ease: 'none',
+                    delay: 2
+                }
+            );
+
+
+            /* --- 3. WebGL Interactive Background --- */
+
+            const canvas = document.getElementById('webgl-canvas');
+
+            const scene = new THREE.Scene();
+
+            const camera = new THREE.OrthographicCamera(
+                -1,
+                1,
+                1,
+                -1,
+                0,
+                1
+            );
+
+            const renderer = new THREE.WebGLRenderer({
+                canvas: canvas,
+                alpha: true,
+                antialias: false
+            });
+
+
+            renderer.setSize(
+                window.innerWidth,
+                window.innerHeight
+            );
+
+            renderer.setPixelRatio(
+                Math.min(window.devicePixelRatio, 2)
+            );
+
+
+            /* Vertex Shader */
+
+            const vertexShader = `
+                varying vec2 vUv;
+
+                void main() {
+                    vUv = uv;
+                    gl_Position = vec4(position, 1.0);
+                }
+            `;
+
+
+            /* Fragment Shader */
+
+            const fragmentShader = `
+                uniform float u_time;
+                uniform vec2 u_resolution;
+                uniform vec2 u_mouse;
+
+                varying vec2 vUv;
+
+                vec3 mod289(vec3 x) {
+                    return x - floor(x * (1.0 / 289.0)) * 289.0;
+                }
+
+                vec2 mod289(vec2 x) {
+                    return x - floor(x * (1.0 / 289.0)) * 289.0;
+                }
+
+                vec3 permute(vec3 x) {
+                    return mod289(((x * 34.0) + 1.0) * x);
+                }
+
+                float snoise(vec2 v) {
+
+                    const vec4 C = vec4(
+                        0.211324865405187,
+                        0.366025403784439,
+                        -0.577350269189626,
+                        0.024390243902439
+                    );
+
+                    vec2 i = floor(v + dot(v, C.yy));
+
+                    vec2 x0 = v - i + dot(i, C.xx);
+
+                    vec2 i1;
+
+                    i1 = (x0.x > x0.y)
+                        ? vec2(1.0, 0.0)
+                        : vec2(0.0, 1.0);
+
+                    vec4 x12 = x0.xyxy + C.xxzz;
+
+                    x12.xy -= i1;
+
+                    i = mod289(i);
+
+                    vec3 p = permute(
+                        permute(
+                            i.y + vec3(0.0, i1.y, 1.0)
+                        )
+                        + i.x
+                        + vec3(0.0, i1.x, 1.0)
+                    );
+
+                    vec3 m = max(
+                        0.5 - vec3(
+                            dot(x0, x0),
+                            dot(x12.xy, x12.xy),
+                            dot(x12.zw, x12.zw)
+                        ),
+                        0.0
+                    );
+
+                    m = m * m;
+                    m = m * m;
+
+                    vec3 x = 2.0 * fract(p * C.www) - 1.0;
+
+                    vec3 h = abs(x) - 0.5;
+
+                    vec3 ox = floor(x + 0.5);
+
+                    vec3 a0 = x - ox;
+
+                    m *= 1.79284291400159 -
+                         0.85373472095314 *
+                         (a0 * a0 + h * h);
+
+                    vec3 g;
+
+                    g.x = a0.x * x0.x + h.x * x0.y;
+
+                    g.yz =
+                        a0.yz * x12.xz +
+                        h.yz * x12.yw;
+
+                    return 130.0 * dot(m, g);
+                }
+
+
+                void main() {
+
+                    vec2 st =
+                        gl_FragCoord.xy /
+                        u_resolution.xy;
+
+
+                    vec3 color =
+                        vec3(0.015, 0.01, 0.01);
+
+
+                    // Mouse-responsive glow center
+
+                    vec2 baseCenter =
+                        vec2(0.5, -0.2);
+
+                    vec2 glowCenter =
+                        mix(baseCenter, u_mouse, 0.35);
+
+
+                    vec2 pos =
+                        st - glowCenter;
+
+                    pos.x *=
+                        u_resolution.x /
+                        u_resolution.y;
+
+
+                    float dist =
+                        length(pos);
+
+
+                    float n =
+                        snoise(
+                            vec2(
+                                st.x * 2.0,
+                                st.y * 2.0 -
+                                u_time * 0.1
+                            )
+                        ) * 0.1;
+
+
+                    dist += n;
+
+
+                    vec3 colorGlowOuter =
+                        vec3(0.15, 0.02, 0.0);
+
+                    vec3 colorGlowMid =
+                        vec3(0.6, 0.15, 0.0);
+
+                    vec3 colorGlowCore =
+                        vec3(0.8, 0.5, 0.2);
+
+
+                    float outerMix =
+                        smoothstep(
+                            1.3,
+                            0.4,
+                            dist
+                        );
+
+                    float midMix =
+                        smoothstep(
+                            0.8,
+                            0.2,
+                            dist
+                        );
+
+                    float coreMix =
+                        smoothstep(
+                            0.4,
+                            0.0,
+                            dist
+                        );
+
+
+                    color =
+                        mix(
+                            color,
+                            colorGlowOuter,
+                            outerMix
+                        );
+
+                    color =
+                        mix(
+                            color,
+                            colorGlowMid,
+                            midMix
+                        );
+
+                    color =
+                        mix(
+                            color,
+                            colorGlowCore,
+                            coreMix
+                        );
+
+
+                    float vignette =
+                        smoothstep(
+                            1.0,
+                            0.2,
+                            st.y
+                        );
+
+
+                    color *=
+                        mix(
+                            0.5,
+                            1.0,
+                            vignette
+                        );
+
+
+                    gl_FragColor =
+                        vec4(color, 1.0);
+
+                }
+            `;
+
+
+            /* Uniforms */
+
+            const uniforms = {
+
+                u_time: {
+                    value: 0.0
+                },
+
+                u_resolution: {
+                    value: new THREE.Vector2(
+                        window.innerWidth,
+                        window.innerHeight
+                    )
+                },
+
+                u_mouse: {
+                    value: new THREE.Vector2(
+                        0.5,
+                        0.5
+                    )
+                }
+
+            };
+
+
+            /* Shader Material */
+
+            const material =
+                new THREE.ShaderMaterial({
+                    vertexShader: vertexShader,
+                    fragmentShader: fragmentShader,
+                    uniforms: uniforms
+                });
+
+
+            /* Plane */
+
+            const geometry =
+                new THREE.PlaneGeometry(2, 2);
+
+            const mesh =
+                new THREE.Mesh(
+                    geometry,
+                    material
+                );
+
+            scene.add(mesh);
+
+
+            /* Animation */
+
+            let time = 0;
+
+            function animate() {
+
+                requestAnimationFrame(animate);
+
+                time += 0.01;
+
+                uniforms.u_time.value = time;
+
+                renderer.render(
+                    scene,
+                    camera
+                );
+
+            }
+
+            animate();
+
+
+            /* Mouse Tracking */
+
+            window.addEventListener(
+                'mousemove',
+                (e) => {
+
+                    gsap.to(
+                        uniforms.u_mouse.value,
+                        {
+                            x: e.clientX / window.innerWidth,
+
+                            y: 1.0 -
+                               (e.clientY / window.innerHeight),
+
+                            duration: 1.5,
+
+                            ease: "power2.out"
+                        }
+                    );
+
+                }
+            );
+
+
+            /* Resize */
+
+            window.addEventListener(
+                'resize',
+                () => {
+
+                    renderer.setSize(
+                        window.innerWidth,
+                        window.innerHeight
+                    );
+
+                    uniforms.u_resolution.value.set(
+                        window.innerWidth,
+                        window.innerHeight
+                    );
+
+                }
+            );
+
+        });
+
+    </script>
+
+</body>
+</html>

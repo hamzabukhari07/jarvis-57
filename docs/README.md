@@ -112,21 +112,28 @@ Volume, brightness, WiFi, keyboard, mouse, windows, applications, browser, files
 
 | File | Purpose |
 |------|---------|
-| `main.py` | Application entry point, core engine |
-| `ui.py` | PyQt6 HUD |
+| `main.py` | Application orchestrator & Gemini Live WebSockets loop |
+| `ui.py` | PyQt6 HUD, holographic avatar, multi-file dropzone & task inspector |
 | `core/prompt.txt` | System prompt template |
-| `core/action_loader.py` | Action auto-discovery |
+| `core/action_loader.py` | Action auto-discovery (23 actions) |
+| `core/skill_loader.py` | Declarative skill loader (10 skills) |
 | `core/plugin_loader.py` | Plugin auto-discovery |
+| `core/task_manager.py` | Background task registry, process watchdog, CPU throttle, cancellation |
+| `core/log_bus.py` | Ring buffer log bus (20,000 lines) with zero-leak secret redaction |
+| `core/design_resolver.py` | Design token resolver & anti-slop preset injector |
+| `core/design_extractor.py` | Deterministic HTML/Tailwind token extractor |
 | `core/viseme.py` | Lip-sync engine |
 | `core/echo.py` | Self-echo guard |
 | `core/wake_word.py` | Wake word detection |
 | `core/undo.py` | Undo stack |
 | `core/confirm.py` | Confirmation gate |
 | `core/audio_devices.py` | Audio device selection |
-| `memory/memory_manager.py` | Memory storage and search |
-| `memory/config_manager.py` | All configuration |
+| `memory/sqlite_memory.py` | SQLite FTS5 database (`zezo_brain.db`) with BM25 search |
+| `memory/memory_manager.py` | Long-term memory storage & session summaries |
+| `memory/config_manager.py` | Configuration manager |
 | `config/api_keys.json` | User configuration (git-ignored) |
-| `actions/*.py` | Built-in tool files |
+| `actions/*.py` | Built-in action files (antigravity_agent, opencode_agent, kilo_agent, etc.) |
+| `skills/*/` | Declarative skill packages (hamza_taste, antigravity_agent, etc.) |
 | `plugins/*.py` | Plugin files |
 | `dashboard/server.py` | Remote dashboard server |
 
@@ -164,6 +171,7 @@ Volume, brightness, WiFi, keyboard, mouse, windows, applications, browser, files
 - [DATA_FLOW.md](DATA_FLOW.md) — Complete data flows
 - [REQUEST_LIFECYCLE.md](REQUEST_LIFECYCLE.md) — Line-by-line request traces
 - [CODEBASE_MAP.md](CODEBASE_MAP.md) — File-by-file map
+- [DESIGN_SYSTEM_ARCHITECTURE.md](DESIGN_SYSTEM_ARCHITECTURE.md) — Hamza Taste 3.0 & Anti-Slop Design System Architecture
 - [DIAGRAMS.md](DIAGRAMS.md) — 17 Mermaid diagrams
 
 ## Quick Start

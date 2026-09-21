@@ -37,6 +37,19 @@ TOOL = {
 
 ## Complete Tool Inventory
 
+### Coding & Autonomous Agents
+
+| Tool | File | Purpose | Parameters |
+|------|------|---------|------------|
+| `antigravity_run` | `actions/antigravity_agent.py` | Full multi-file web app & design synthesis agent via official Antigravity CLI (`agy`) with pure raw HTML reference blueprint injection & adaptive redesign directives | `task`, `project_path`, `model` |
+| `opencode_run` | `actions/opencode_agent.py` | Full autonomous implementation, multi-file code generation & test suite synthesis | `task`, `project_path`, `model` |
+| `kilo_run` | `actions/kilo_agent.py` | Fast refactoring & multi-file editing agent (free tier StepFun / Gemini) | `task`, `project_path`, `model` |
+| `code_helper` | `actions/code_helper.py` | Single function, inline snippet generator, or single-file code review | `task`, `file_path`, `code` |
+| `dev_agent` | `actions/dev_agent.py` | Read-only codebase exploration, architecture analysis, and bug hunting | `task`, `repo_path` |
+| `extract_design_system` | `actions/design_extractor.py` | On-demand design extractor for custom HTML files, URLs, and generating standalone `DESIGN.md` specs | `file_path`, `output_path`, `action`, `force` |
+| `task_status` | `actions/task_status.py` | Query live progress, inspect logs, or cancel/terminate running background tasks | `action` ('status'/'cancel'), `task_id` |
+
+
 ### System Control
 
 | Tool | File | Purpose | Parameters |
@@ -53,42 +66,28 @@ TOOL = {
 | `file_processor` | `actions/file_processor.py` | Read, summarize, answer questions about files |
 | `desktop` | `actions/desktop.py` | Desktop organization |
 
-### Browser
+### Browser & Web
 
 | Tool | File | Purpose |
 |------|------|---------|
 | `browser_control` | `actions/browser_control.py` | Open URLs, navigate tabs, interact with browser |
+| `web_read_page` | `actions/web_reader.py` | Deep web scraping and markdown text extraction |
+| `web_search` | `actions/web_search.py` | Gemini grounded + DDG fallback, modes: news, research, price, compare |
+| `agent_reach` | `actions/agent_reach.py` | Social media research and media scraping (YouTube, Reddit, X) |
+| `flight_finder` | `actions/flight_finder.py` | Live flight price and availability |
 | `youtube_video` | `actions/youtube_video.py` | Search, play, control YouTube |
 
-### Web Search
-
-| Tool | File | Purpose |
-|------|------|---------|
-| `web_search` | `actions/web_search.py` | Gemini grounded + DDG fallback, modes: news, research, price, compare |
-| `flight_finder` | `actions/flight_finder.py` | Live flight price and availability |
-
-### Communication
-
-| Tool | File | Purpose |
-|------|------|---------|
-| `send_message` | `actions/send_message.py` | WhatsApp, Telegram, etc. |
-
-### Media
-
-| Tool | File | Purpose |
-|------|------|---------|
-| `game_updater` | `actions/game_updater.py` | Steam/Epic game updates |
-| `code_helper` | `actions/code_helper.py` | Code review, debugging, generation |
-| `dev_agent` | `actions/dev_agent.py` | Developer task agent |
-
-### OS Controls
+### OS Controls & Media
 
 | Tool | File | Purpose |
 |------|------|---------|
 | `computer_settings` | `actions/computer_settings.py` | Volume, brightness, WiFi, power |
 | `computer_control` | `actions/computer_control.py` | Keyboard, mouse, window management |
-| `open_app` | `actions/open_app.py` | Application launcher |
-| `weather_report` | `actions/weather_report.py` | Live weather data |
+| `open_app` | `actions/open_app.py` | Application launcher and process terminator |
+| `weather_report` | `actions/weather_report.py` | Live weather forecast |
+| `game_updater` | `actions/game_updater.py` | Steam/Epic game updates and patch notes |
+| `reminder` | `actions/reminder.py` | Scheduled alarms, timers, reminders |
+| `send_message` | `actions/send_message.py` | WhatsApp, Telegram messaging |
 
 ### Vision
 

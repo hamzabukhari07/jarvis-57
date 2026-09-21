@@ -114,10 +114,18 @@ flowchart TD
 | `core/plugin_loader.py` | `core/plugin_loader.py` | Auto-discovers plugins/*.py files with PLUGIN dict |
 | `core/gemini.py` | `core/gemini.py` | One-shot Gemini calls (non-live), model ladder, quota management |
 | `core/llm_client.py` | `core/llm_client.py` | Local LLM client (Ollama/OpenAI-compatible) for planning and agent tasks |
-| `memory/memory_manager.py` | `memory/memory_manager.py` | Load/save long_term.json, memory indexing, search, session summaries |
-| `memory/config_manager.py` | `memory/config_manager.py` | api_keys.json read/write, all configuration getters/setters |
-| `actions/*.py` | `actions/` | 19 built-in tool files (web_search, file_controller, computer_settings, etc.) |
-| `plugins/*.py` | `plugins/` | Drop-in plugin files (quiz, document_review, etc.) |
+| `core/log_bus.py` | `core/log_bus.py` | Ring buffer log bus (20,000 lines) with zero-leak secret redaction, level filtering, export, and UI console sink |
+| `core/task_manager.py` | `core/task_manager.py` | Thread-safe background task registry, watchdog, CPU throttling, process tree termination, and ANSI cleansing |
+| `core/design_extractor.py` | `core/design_extractor.py` | On-demand deterministic token extractor for custom HTML files, live URLs, and generating standalone `DESIGN.md` specs |
+| `core/design_resolver.py` | `core/design_resolver.py` | Reference-first design resolver, raw HTML blueprint injector (`skills/hamza_taste/references/html/`), redesign override detector, and domain routing matrix |
+| `core/repo_context.py` | `core/repo_context.py` | Active workspace resolver and persistence (`memory/repo_context.json`) |
+| `memory/sqlite_memory.py` | `memory/sqlite_memory.py` | SQLite FTS5 database (`zezo_brain.db`) with BM25 fast lexical indexing and secret scrubbing |
+| `memory/memory_manager.py` | `memory/memory_manager.py` | Long-term memory storage, indexing, search, and session summaries |
+| `memory/config_manager.py` | `memory/config_manager.py` | api_keys.json read/write, model configurations, and assistant preferences |
+
+| `actions/*.py` | `actions/` | 23 auto-discovered action modules (antigravity_agent, opencode_agent, kilo_agent, design_extractor, task_status, etc.) |
+| `skills/*/` | `skills/` | 10 declarative skill packages (hamza_taste, antigravity_agent, opencode, kilo_code, git_workflow, social_research, etc.) |
+| `plugins/*.py` | `plugins/` | Drop-in user plugin files |
 | `dashboard/server.py` | `dashboard/server.py` | FastAPI HTTP server for remote phone control |
 
 ### External Components (communicate over network)

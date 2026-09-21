@@ -1,9 +1,9 @@
 ---
 name: git_workflow
-description: Professional Git workflow for staging, meaningful commit messages, branch management, and diff reviews.
+description: Professional Git staging, commit authoring, branch lifecycle, and multi-remote sync workflows with safety gates.
 metadata:
-  author: Zezo / FatihMakes
-  version: '1.0'
+  author: ZEZO / Hamza Bukhari
+  version: '2.0'
 ---
 
 # Git Workflow & Source Control Protocol

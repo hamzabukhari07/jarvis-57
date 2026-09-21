@@ -28,10 +28,21 @@ JARVIS/
 │   ├── audio_devices.py             # Mic/speaker enumeration and selection
 │   ├── action_loader.py             # Auto-discovers actions/*.py
 │   ├── plugin_loader.py             # Auto-discovers plugins/*.py
+│   ├── skill_loader.py              # Declarative skill registry & context manager
+│   ├── task_manager.py              # Background task execution & status tracker
+│   ├── log_bus.py                   # In-memory ring buffer with secret redaction
+│   ├── repo_context.py              # Active workspace resolver & persistence
+│   ├── design_resolver.py           # Raw HTML blueprint injector & adaptive resolver
+│   ├── design_extractor.py          # On-demand HTML/CSS token & component extractor
 │   ├── undo.py                      # Shared undo stack
 │   ├── confirm.py                   # Irreversible-action confirmation gate
 │   └── installer.py                 # OS-specific post-install setup
 ├── actions/
+│   ├── antigravity_agent.py         # Google Antigravity autonomous coding agent
+│   ├── opencode_agent.py            # OpenCode CLI multi-file implementation agent
+│   ├── kilo_agent.py                # Kilo Code multi-file refactoring agent
+│   ├── design_extractor.py          # On-demand design system extractor tool
+│   ├── task_status.py               # Background task query and cancellation
 │   ├── background_monitor.py        # Background topic monitoring
 │   ├── browser_control.py           # Web browser automation
 │   ├── code_helper.py               # Code review and generation
@@ -52,12 +63,15 @@ JARVIS/
 │   ├── weather_report.py            # Live weather data
 │   ├── web_search.py                # Gemini + DDG parallel search
 │   └── youtube_video.py             # YouTube playback control
+├── skills/                          # Declarative skill packages (hamza_taste, opencode, kilo_code, etc.)
 ├── memory/
 │   ├── __init__.py
+│   ├── sqlite_memory.py             # SQLite FTS5 database with BM25 indexing
 │   ├── memory_manager.py            # Load/save long_term.json, search
 │   └── config_manager.py            # api_keys.json read/write, all getters/setters
 ├── plugins/
 │   ├── __init__.py
+
 │   ├── _template.py                 # Copy this to create a new plugin
 │   ├── _google_core.py              # Shared OAuth for Gmail/Calendar
 │   ├── _printer_core.py             # Shared printer connectivity

@@ -1,1 +1,12 @@
-/get idea
+# Python
+__pycache__/
+*.pyc
+
+# Config
+/config/api_keys.json
+
+# Test secrets
+/tests/test_secret_redaction_suite.py
+
+# Getting idea folder
+/get idea/

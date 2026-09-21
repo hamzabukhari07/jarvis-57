@@ -27,6 +27,8 @@ from datetime import datetime
 
 # Model choice, timeout and fallback ladder all live in core/gemini.py.
 from core import gemini
+from core.file_reader import read_file, resolve_path
+from core.task_manager import get_task_manager, TaskContext
 
 def _get_api_key() -> str:
     config_path = Path(__file__).resolve().parent.parent / "config" / "api_keys.json"
@@ -95,8 +97,6 @@ def _process_image(path: Path, action: str, params: dict, speak=None) -> str:
 
     if action in ("describe", "ocr", "analyze", "read", "extract_text"):
         try:
-            model  = _gemini_client()
-            img    = Image.open(path)
             prompt = {
                 "describe": "Describe this image in detail.",
                 "ocr":      "Extract all text visible in this image. Return only the text, formatted clearly.",
@@ -108,8 +108,8 @@ def _process_image(path: Path, action: str, params: dict, speak=None) -> str:
             if params.get("instruction"):
                 prompt = params["instruction"]
 
-            response = model.generate_content([prompt, img])
-            result   = response.text.strip()
+            res = read_file(path, instruction=prompt)
+            result = res.text.strip()
 
             if len(result) > 500 and params.get("save", True):
                 out = _output_path(path, "result", ".txt")
@@ -181,22 +181,8 @@ def _process_pdf(path: Path, action: str, params: dict, speak=None) -> str:
     action = action or "summarize"
 
     def _extract_pdf_text(max_chars=50000) -> str:
-        text = ""
-        try:
-            import pdfplumber
-            with pdfplumber.open(path) as pdf:
-                for page in pdf.pages:
-                    text += (page.extract_text() or "") + "\n"
-        except ImportError:
-            try:
-                import PyPDF2
-                with open(path, "rb") as f:
-                    reader = PyPDF2.PdfReader(f)
-                    for page in reader.pages:
-                        text += page.extract_text() + "\n"
-            except ImportError:
-                return ""
-        return text[:max_chars]
+        res = read_file(path, max_chars=max_chars, instruction=params.get("instruction", ""))
+        return res.text
 
     if action in ("summarize", "extract_text", "translate_hint", "analyze", "reformat"):
         text = _extract_pdf_text()
@@ -206,7 +192,7 @@ def _process_pdf(path: Path, action: str, params: dict, speak=None) -> str:
         if action == "extract_text":
             out = _output_path(path, "text", ".txt")
             out.write_text(text, encoding="utf-8")
-            return f"Text extracted ({len(text)} chars). Saved: {out.name}"
+            return text
 
         prompt_map = {
             "summarize":      f"Summarize this PDF document concisely:\n\n{text}",
@@ -221,16 +207,15 @@ def _process_pdf(path: Path, action: str, params: dict, speak=None) -> str:
             if len(result) > 600 and params.get("save", True):
                 out = _output_path(path, action, ".txt")
                 out.write_text(result, encoding="utf-8")
-                return f"{result[:400]}...\n\nFull result saved: {out.name}"
+                return f"{result}\n\n[Full result saved to: {out.name}]"
             return result
         except Exception as e:
             return f"AI analysis failed: {e}"
 
     if action == "info":
         try:
-            import pdfplumber
-            with pdfplumber.open(path) as pdf:
-                pages = len(pdf.pages)
+            from core.file_reader import _get_pdf_page_count
+            pages = _get_pdf_page_count(path)
             return f"PDF: {pages} pages, size: {_file_size_str(path)}"
         except Exception:
             return f"PDF size: {_file_size_str(path)}"
@@ -258,20 +243,11 @@ def _process_text_doc(path: Path, file_type: str, action: str,
                        params: dict, speak=None) -> str:
     action = action or "summarize"
 
-    def _read_content() -> str:
-        if file_type == "docx":
-            try:
-                from docx import Document
-                doc  = Document(path)
-                return "\n".join(p.text for p in doc.paragraphs)
-            except ImportError:
-                return "python-docx not installed."
-            except Exception as e:
-                return f"Read failed: {e}"
-        else:
-            return path.read_text(encoding="utf-8", errors="ignore")
+    read_res = read_file(path, max_chars=50000, instruction=params.get("instruction", ""))
+    if read_res.engine == "legacy_rejection":
+        return read_res.text
 
-    content = _read_content()
+    content = read_res.text
     if not content.strip():
         return "File appears to be empty."
 
@@ -285,8 +261,7 @@ def _process_text_doc(path: Path, file_type: str, action: str,
         if file_type != "txt":
             out = _output_path(path, "extracted", ".txt")
             out.write_text(content, encoding="utf-8")
-            return f"Text extracted. Saved: {out.name}"
-        return content[:2000]
+        return content
 
     instruction = params.get("instruction", "")
     prompt_map  = {
@@ -311,7 +286,7 @@ def _process_text_doc(path: Path, file_type: str, action: str,
         if len(result) > 600 and params.get("save", True):
             out = _output_path(path, action, ".txt")
             out.write_text(result, encoding="utf-8")
-            return f"{result[:400]}...\n\nFull result saved: {out.name}"
+            return f"{result}\n\n[Full result saved to: {out.name}]"
         return result
     except Exception as e:
         return f"AI processing failed: {e}"
@@ -751,19 +726,8 @@ def _process_pptx(path: Path, action: str, params: dict, speak=None) -> str:
     action = action or "summarize"
 
     def _read_pptx_text() -> str:
-        try:
-            from pptx import Presentation
-            prs  = Presentation(path)
-            text = []
-            for i, slide in enumerate(prs.slides, 1):
-                slide_text = f"\n--- Slide {i} ---\n"
-                for shape in slide.shapes:
-                    if hasattr(shape, "text") and shape.text.strip():
-                        slide_text += shape.text.strip() + "\n"
-                text.append(slide_text)
-            return "\n".join(text)
-        except ImportError:
-            return "python-pptx not installed."
+        res = read_file(path, max_chars=50000, instruction=params.get("instruction", ""))
+        return res.text
 
     if action in ("summarize", "extract_text", "analyze"):
         text = _read_pptx_text()
@@ -781,32 +745,15 @@ def _process_pptx(path: Path, action: str, params: dict, speak=None) -> str:
 
     return f"Unknown PPTX action: '{action}'. Try: summarize, extract_text, analyze"
 
-def file_processor(parameters: dict, player=None, speak=None) -> str:
-    file_path_str = parameters.get("file_path", "").strip()
-    if not file_path_str:
-        return "No file path provided."
+SYNC_FAST_ACTIONS = {"info", "word_count", "validate", "list"}
 
-    path = Path(file_path_str)
-    if not path.exists():
-        return f"File not found: {file_path_str}"
-    if not path.is_file():
-        return f"Path is not a file: {file_path_str}"
 
-    file_type   = _detect_type(path)
-    action      = (parameters.get("action") or "").lower().strip()
-    instruction = parameters.get("instruction", "")
-    params      = {**parameters, "instruction": instruction}
-
-    log_msg = f"[FileProcessor] {file_type.upper()} | {path.name} | action={action or 'auto'}"
-    print(log_msg)
-    if player:
-        player.write_log(log_msg)
-
+def _execute_sync(path: Path, file_type: str, action: str, params: dict, speak=None, player=None) -> str:
     if file_type == "unknown":
         try:
             content = path.read_text(encoding="utf-8", errors="ignore")[:10000]
             model   = _gemini_client()
-            prompt  = f"File: {path.name}\nContent preview:\n{content}\n\nTask: {action or instruction or 'Describe what this file contains and what can be done with it.'}"
+            prompt  = f"File: {path.name}\nContent preview:\n{content}\n\nTask: {action or params.get('instruction') or 'Describe what this file contains and what can be done with it.'}"
             response = model.generate_content(prompt)
             return response.text.strip()
         except Exception as e:
@@ -841,10 +788,109 @@ def file_processor(parameters: dict, player=None, speak=None) -> str:
         return f"Processing failed: {e}"
 
 
+# Actions that run locally in < 300ms — execute synchronously so user gets instant 1-turn response
+SYNC_FAST_ACTIONS = {
+    "extract_text", "info", "word_count", "validate", "list", "stats",
+    "to_word", "extract_pages", "to_csv", "format", "translate_hint"
+}
+
+
+def file_processor(parameters: dict, player=None, speak=None) -> str:
+    file_path_str = parameters.get("file_path", "").strip()
+    if not file_path_str:
+        return "No file path provided."
+
+    path = resolve_path(file_path_str)
+    if not path.exists():
+        return f"File not found: {file_path_str}"
+    if not path.is_file():
+        return f"Path is not a file: {file_path_str}"
+
+    file_type   = _detect_type(path)
+    action      = (parameters.get("action") or "").lower().strip()
+    instruction = parameters.get("instruction", "")
+    params      = {**parameters, "instruction": instruction}
+
+    log_msg = f"[FileProcessor] {file_type.upper()} | {path.name} | action={action or 'auto'}"
+    print(log_msg)
+    if player and hasattr(player, "write_log"):
+        player.write_log(log_msg)
+
+    # 1. Fast metadata & extraction actions: Run synchronously (< 300ms) with 0 background queue overhead
+    if action in SYNC_FAST_ACTIONS or not action:
+        res = _execute_sync(path, file_type, action or "extract_text", params, speak, player)
+        if player and hasattr(player, "show_content"):
+            try:
+                player.show_content(f"FILE RESULT · {path.name.upper()}", res)
+            except Exception:
+                pass
+        return res
+
+    # 2. Heavy operations (summarize, ocr, transcribe, analyze, etc.): Run asynchronously in TaskManager
+    tm = get_task_manager()
+
+    def _file_task_worker(task_params: dict, ctx: TaskContext) -> dict:
+        ctx.report(20, f"Processing {path.name}...")
+        try:
+            res = _execute_sync(path, file_type, action, params, speak=None, player=player)
+            ctx.report(100, f"Completed {action or 'processing'}")
+            
+            # Post full content to HUD Activity Log / Content Overlay
+            if player and hasattr(player, "show_content"):
+                try:
+                    player.show_content(f"FILE RESULT · {path.name.upper()}", res)
+                except Exception:
+                    pass
+            if player and hasattr(player, "write_log"):
+                try:
+                    player.write_log(f"[FileProcessor] [OK] Background task completed: {path.name} ({action or 'processed'})")
+                except Exception:
+                    pass
+
+            return {"status": "success", "result": res, "summary": res, "file": path.name, "action": action}
+        except Exception as err:
+            err_msg = str(err)
+            ctx.report(100, f"Failed: {err_msg}")
+            if player and hasattr(player, "write_log"):
+                try:
+                    player.write_log(f"[FileProcessor] [ERROR] Background task failed on {path.name}: {err_msg}")
+                except Exception:
+                    pass
+            return {"status": "failed", "error": err_msg, "file": path.name}
+
+    task_id = tm.submit(
+        "file_processor",
+        _file_task_worker,
+        {"file_path": str(path), "action": action, "instruction": instruction}
+    )
+
+    if player and hasattr(player, "show_content"):
+        player.show_content(
+            "TASK QUEUE · FILE PROCESSING",
+            f"File: {path.name}\nAction: {action or 'processing'}\nTask ID: {task_id}\nStatus: running (background)"
+        )
+
+    return (
+        f"Maine '{path.name}' ko background task queue mein bhej diya hai (Task ID: {task_id}). "
+        f"Main isko process kar raha hoon."
+    )
+
+
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "file_processor",
-    "description": "Processes any file that the user has uploaded or dropped onto the interface. Use this when the user refers to an uploaded file and wants an action on it. Supports: images (describe/ocr/resize/compress/convert), PDFs (summarize/extract_text/to_word), Word docs & text files (summarize/fix/reformat/translate), CSV/Excel (analyze/stats/filter/sort/convert), JSON/XML (validate/format/analyze), code files (explain/review/fix/optimize/run/document/test), audio (transcribe/trim/convert/info), video (trim/extract_audio/extract_frame/compress/transcribe/info), archives (list/extract), presentations (summarize/extract_text). ALWAYS call this tool when a file has been uploaded and the user gives a command about it. If the user's command is ambiguous, pick the most logical action for that file type.",
+    "description": (
+        "Processes any file that the user has uploaded or dropped onto the interface. "
+        "Supports: images (describe/ocr/resize/compress/convert), PDFs (summarize/extract_text/to_word), "
+        "Word docs & text files (summarize/fix/reformat/translate), CSV/Excel (analyze/stats/filter/sort/convert), "
+        "JSON/XML (validate/format/analyze), code files (explain/review/fix/optimize/run/document/test), "
+        "audio (transcribe/trim/convert/info), video (trim/extract_audio/extract_frame/compress/transcribe/info), "
+        "archives (list/extract), presentations (summarize/extract_text). "
+        "Heavy operations (summarize, transcribe, analyze, convert) run asynchronously in the background and return a task_id immediately so conversation is never blocked. "
+        "Fast metadata operations (info, word_count) return immediately."
+    ),
+    "behavior": "NON_BLOCKING",
+    "scheduling": "WHEN_IDLE",
     "parameters": {
         "type": "OBJECT",
         "properties": {

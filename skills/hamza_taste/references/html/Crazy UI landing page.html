@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CrazyUI — Figma Component Library &amp; Framer Templates for Designers</title>
+<meta name="description" content="CrazyUI is a Figma component library and Framer template marketplace — premium hero sections, pricing tables, footers and more.">
+<link rel="icon" href="https://framerusercontent.com/images/WxcrU5RHCcTklj7yKwAyj2PLsQg.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=Onest:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --cream:#f6f4f2;
+  --cream-2:#ede9e4;
+  --cream-3:#edebe9;
+  --cream-4:#e8e6e1;
+  --ink:#0a0a0a;
+  --ink-2:#141414;
+  --muted:#6c6c6c;
+  --muted-2:#a1a1a1;
+  --muted-3:#888;
+  --line:#e5e5e5;
+  --border:#e9e9e9;
+  --white:#fff;
+  --radius:10px;
+  --radius-lg:16px;
+  --radius-pill:999px;
+  --max:1300px;
+  --ff:'Inter','Inter Tight',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --ff-serif:'Instrument Serif','Canela Text Trial','Canela Text',Georgia,serif;
+  --ff-tight:'Inter Tight','Inter',sans-serif;
+}
+html,body{margin:0;padding:0}
+body{
+  background:var(--cream);
+  color:var(--ink);
+  font-family:var(--ff);
+  font-size:16px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  overflow-x:hidden;
+}
+img,svg{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none;padding:0}
+h1,h2,h3,h4,h5,p,ul,ol,figure{margin:0;padding:0}
+ul{list-style:none}
+
+/* ============ TYPOGRAPHY ============ */
+.serif{font-family:var(--ff-serif);font-weight:400;letter-spacing:-.02em;line-height:1.15}
+.serif-i{font-family:var(--ff-serif);font-style:italic;font-weight:400;letter-spacing:-.01em}
+.h1{font-size:clamp(34px,5.5vw,68px);font-family:var(--ff-serif);font-weight:400;letter-spacing:-.025em;line-height:1.05;text-align:center}
+.h2{font-size:clamp(28px,3.6vw,44px);font-family:var(--ff-serif);font-weight:400;letter-spacing:-.02em;line-height:1.15}
+.h3{font-size:clamp(22px,2.4vw,32px);font-family:var(--ff-serif);font-weight:400;letter-spacing:-.02em;line-height:1.2}
+.h4{font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1.2}
+.h5{font-size:clamp(24px,2.2vw,32px);font-family:var(--ff-serif);font-weight:400;letter-spacing:-.02em}
+.body-1{font-size:17px;line-height:1.5;color:var(--muted)}
+.body-2{font-size:15px;line-height:1.5;color:var(--muted)}
+.body-3{font-size:14px;line-height:1.5}
+.eyebrow{font-size:12px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2)}
+
+/* ============ LAYOUT ============ */
+.wrap{width:min(var(--max),100% - 48px);margin-inline:auto}
+.wrap-narrow{width:min(795px,100% - 48px);margin-inline:auto}
+.wrap-mid{width:min(1136px,100% - 48px);margin-inline:auto}
+.section{padding:100px 0}
+.section-sm{padding:60px 0}
+
+/* ============ TOP BANNER ============ */
+.topbar{
+  background:#000;
+  color:#fff;
+  padding:6px 20px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:12px;
+  font-size:14px;
+  font-weight:500;
+  letter-spacing:-.02em;
+  position:relative;
+  z-index:50;
+}
+.topbar-inner{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+.copy-pill{
+  display:inline-flex;align-items:center;gap:6px;
+  background:#fff;color:#000;
+  border-radius:48px;padding:5px 12px;
+  font-size:13px;font-weight:600;letter-spacing:.02em;
+  transition:transform .2s;
+}
+.copy-pill:hover{transform:scale(1.03)}
+.copy-pill.copied{background:#e8f5e9;color:#1b5e20}
+
+/* ============ NAV ============ */
+.nav-wrap{background:#000;padding:0 0 0;position:relative;z-index:40}
+.nav{
+  width:min(var(--max),100% - 64px);
+  margin:0 auto;
+  background:var(--cream);
+  border-radius:12px 12px 0 0;
+  padding:12px 32px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+}
+.nav-left{display:flex;align-items:center;gap:18px;flex:0 0 auto}
+.nav-logo{width:23px;height:25px;display:block}
+.nav-links{display:flex;align-items:center;gap:2px;background:transparent;padding:0;border-radius:10px}
+.nav-link{
+  padding:10px 12px;border-radius:999px;
+  font-size:14px;letter-spacing:-.02em;line-height:1;
+  color:#171717;transition:color .25s,background .25s;
+}
+.nav-link:hover{color:#000}
+.nav-link.muted{color:#6b6b69}
+.nav-link.muted:hover{color:#171717}
+.nav-search{
+  flex:1 0 0;
+  max-width:300px;
+}
+.search-btn{
+  width:100%;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;background:var(--cream-2);border-radius:10px;
+  padding:8px 12px;font-size:15px;letter-spacing:-.01em;
+  color:#000;font-family:'Inter Display',var(--ff);
+}
+.search-btn .left{display:flex;align-items:center;gap:8px;color:#666}
+.search-btn .key{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:22px;height:22px;border-radius:6px;
+  background:var(--cream-2);color:#000;font-size:12px;font-weight:600;
+}
+.nav-actions{display:flex;align-items:center;gap:14px;flex:0 0 auto}
+.nav-pricing{
+  background:var(--cream);border-radius:10px;
+  padding:10px 16px;font-size:15px;font-weight:500;letter-spacing:-.02em;
+  color:#181818;
+}
+.nav-divider{width:1px;height:28px;background:#e8e8e8}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border-radius:10px;padding:10px 20px;
+  font-size:14px;font-weight:500;letter-spacing:-.01em;line-height:1;
+  transition:transform .2s,background .2s,color .2s;
+  white-space:nowrap;
+}
+.btn:hover{transform:translateY(-1px)}
+.btn-dark{background:#000;color:#fff}
+.btn-dark:hover{background:#1a1a1a}
+.btn-light{background:var(--cream-2);color:#000}
+.btn-light:hover{background:var(--cream-4)}
+.btn-outline{background:transparent;border:1px solid #e5e7eb;color:#000}
+.btn-lg{padding:14px 28px;font-size:15px}
+.btn-block{width:100%}
+
+/* ============ HERO ============ */
+.hero{background:var(--cream);padding:150px 0 0;overflow:hidden;position:relative}
+.hero-head{text-align:center;max-width:860px;margin:0 auto;padding:0 16px;position:relative;z-index:2}
+.hero .h1{margin-bottom:20px}
+.hero-sub{font-size:17px;color:var(--muted);max-width:640px;margin:0 auto 32px;line-height:1.5}
+.hero-cta{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-bottom:40px}
+.hero-browser{
+  position:relative;
+  max-width:1100px;
+  margin:0 auto;
+  padding:10px 10px 0;
+  border-radius:20px 20px 0 0;
+  background:var(--cream-3);
+  z-index:1;
+}
+.hero-browser img{width:100%;display:block;border-radius:16px 16px 0 0;box-shadow:0 -2px 40px rgba(0,0,0,.06)}
+.hero-fade{
+  position:absolute;left:0;right:0;bottom:-10px;height:200px;
+  background:linear-gradient(to bottom,transparent,var(--cream));
+  pointer-events:none;z-index:2;
+}
+
+/* ============ CREATORS PILL ============ */
+.creators{display:inline-flex;align-items:center;gap:12px;background:var(--cream-3);border-radius:11px;padding:12px 20px;margin-top:16px}
+.creators .avatars{display:flex}
+.creators .av{
+  width:32px;height:32px;border-radius:50%;background:#fff;
+  display:flex;align-items:center;justify-content:center;
+  padding:2px;box-shadow:0 1px 3px rgba(0,0,0,.08);
+}
+.creators .av+.av{margin-left:-10px}
+.creators .av img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.creators .label{font-size:20px;font-weight:400;letter-spacing:-1px;color:#0f0f0f}
+
+/* ============ ABOUT ============ */
+.about-sec{padding:150px 16px 120px;background:var(--cream);position:relative}
+.about-grid{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+.about-heading{font-family:var(--ff-serif);font-size:clamp(24px,2.6vw,32px);letter-spacing:-.02em;line-height:1.3}
+.about-line{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-family:var(--ff-serif);font-size:clamp(24px,2.6vw,32px);letter-spacing:-.02em;line-height:1.3}
+.toggle{width:52px;height:26px;background:#69686e;border-radius:50px;padding:2px;position:relative;transition:background .3s;flex:none}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:22px;height:22px;background:#fff;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,.18);transition:transform .3s cubic-bezier(.44,0,.56,1)}
+.toggle.on::after{transform:translateX(26px)}
+.about-reveal{
+  background:var(--cream-3);border-radius:16px;padding:20px;
+  display:none;flex-direction:column;gap:0;
+  animation:fadeIn .4s ease;
+}
+.about-reveal.open{display:flex}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.about-item{
+  display:flex;align-items:center;gap:12px;
+  padding:18px 20px;
+  border-bottom:1px solid rgba(255,255,255,.9);
+  font-family:var(--ff);
+  font-size:18px;font-weight:500;letter-spacing:.0125em;
+}
+.about-item:last-child{border-bottom:none}
+.about-item .check{
+  width:20px;height:20px;border-radius:50%;
+  background:rgba(0,0,0,.08);
+  display:flex;align-items:center;justify-content:center;flex:none;
+}
+.about-item .check svg{width:11px;height:11px;stroke:#0a0a0a;stroke-width:2;fill:none}
+
+/* ============ SECTION HEAD ============ */
+.sec-head{text-align:center;margin-bottom:50px}
+.sec-head .h2{margin-bottom:14px}
+.sec-head p{color:var(--muted);font-size:16px}
+.sec-head-row{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:50px;flex-wrap:wrap}
+.sec-head-row .h2{margin:0;text-align:left;flex:1}
+
+/* ============ COMPONENTS GRID ============ */
+.comp-section{padding:100px 32px;background:var(--cream)}
+.comp-toggle{
+  display:inline-flex;align-items:center;gap:0;
+  background:var(--cream);
+  border:1px solid var(--cream-3);
+  border-radius:10px;padding:1px;
+}
+.comp-toggle button{
+  padding:8px 18px;border-radius:10px;
+  font-size:13px;font-weight:500;letter-spacing:.02em;
+  color:#000;background:transparent;transition:background .2s;
+}
+.comp-toggle button.active{background:var(--cream-3)}
+.comp-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:20px 20px;
+  max-width:1136px;margin:0 auto;
+}
+.comp-card{
+  display:flex;flex-direction:column;gap:10px;
+  cursor:pointer;transition:transform .25s;
+}
+.comp-card:hover{transform:translateY(-3px)}
+.comp-card .img{
+  aspect-ratio:1.217;width:100%;
+  border-radius:8px;overflow:hidden;
+  background:var(--cream-3);position:relative;
+}
+.comp-card .img img{width:100%;height:100%;object-fit:cover;transition:transform .5s}
+.comp-card:hover .img img{transform:scale(1.04)}
+.comp-card-foot{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.comp-card-foot .name{font-size:16px;color:var(--muted)}
+.pro-pill{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--cream-3);border-radius:5px;
+  padding:5px 10px;font-size:14px;font-weight:400;
+  letter-spacing:0;color:#0f0f0f;font-family:var(--ff-tight);
+}
+.pro-pill img{width:12px;height:12px}
+.comp-cta{display:flex;justify-content:center;margin-top:40px}
+
+/* ============ TEMPLATES ============ */
+.tpl-section{padding:100px 32px;background:var(--cream)}
+.tpl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;max-width:1100px;margin:0 auto}
+.tpl-card{display:flex;flex-direction:column;gap:12px;cursor:pointer;transition:transform .25s}
+.tpl-card:hover{transform:translateY(-3px)}
+.tpl-card .img{
+  aspect-ratio:1.16;width:100%;border-radius:8px;overflow:hidden;
+  background:var(--cream-3);
+}
+.tpl-card .img img{width:100%;height:100%;object-fit:cover;transition:transform .5s}
+.tpl-card:hover .img img{transform:scale(1.04)}
+.tpl-card-foot{display:flex;align-items:center;justify-content:space-between;gap:12px}
+
+/* ============ PRICING ============ */
+.pricing-section{padding:100px 32px;background:var(--cream-3)}
+.pricing-head{text-align:center;max-width:900px;margin:0 auto 50px}
+.pricing-head .h2{margin-bottom:0}
+.pricing-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:24px;
+  max-width:795px;margin:0 auto;
+}
+.price-card{
+  background:var(--cream);
+  border:1px solid #f1f1f1;
+  border-radius:16px;
+  padding:32px 40px;
+  display:flex;flex-direction:column;gap:24px;
+  position:relative;
+}
+.price-card .tag{
+  position:absolute;top:8px;right:8px;
+  background:#000;color:#fff;
+  padding:3px 10px;border-radius:100px;
+  font-size:12px;font-weight:500;
+}
+.price-head h3{font-family:var(--ff-serif);font-size:38px;font-weight:400;letter-spacing:-.02em;margin-bottom:6px}
+.price-head .sub{font-size:14px;color:#5b5b5b;line-height:1.7}
+.price-row{display:flex;align-items:flex-end;gap:12px}
+.price-now{font-size:42px;font-weight:500;letter-spacing:-1.8px;line-height:1}
+.price-was{font-size:24px;font-weight:600;letter-spacing:-.6px;color:#a1a1a1;position:relative;padding-bottom:4px}
+.price-was::after{content:'';position:absolute;left:0;right:0;top:48%;height:2px;background:#a1a1a1}
+.price-features{display:flex;flex-direction:column;gap:18px}
+.price-features .lbl{font-size:14px;font-weight:500;color:#0a0a0a}
+.price-list{display:flex;flex-direction:column;gap:12px}
+.price-list li{display:flex;align-items:flex-start;gap:10px;font-size:16px;line-height:1.7;color:#5b5b5b}
+.price-list .ic{
+  width:16px;height:16px;border-radius:50%;
+  background:rgba(0,0,0,.08);flex:none;margin-top:5px;
+  display:flex;align-items:center;justify-content:center;
+}
+.price-list .ic svg{width:9px;height:9px;stroke:#0a0a0a;stroke-width:2;fill:none}
+.price-card .btn{width:100%;padding:12px 22px;font-size:14px}
+
+/* ============ FOOTER ============ */
+.footer{
+  background:var(--cream);
+  padding:100px 32px 40px;
+  border-radius:0 0 24px 24px;
+  margin:0 auto;
+  max-width:1300px;
+}
+.footer-main{display:flex;justify-content:space-between;gap:40px;flex-wrap:wrap;margin-bottom:80px}
+.footer-heading{flex:1 1 380px;max-width:600px}
+.footer-heading h2{font-family:var(--ff-serif);font-size:clamp(32px,4vw,50px);letter-spacing:-.02em;line-height:1.15;margin-bottom:30px}
+.footer-cols{display:flex;gap:100px;flex-wrap:wrap}
+.footer-col{display:flex;flex-direction:column;gap:12px}
+.footer-col .title{font-size:14px;color:#6c6c6c;margin-bottom:6px}
+.footer-col a{font-size:14px;color:#0e1c29;transition:color .2s}
+.footer-col a:hover{color:#a6a6a6}
+.footer-bottom{font-size:14px;color:#0e1c29;line-height:1.5}
+
+/* ============ DISCOUNT POPUP ============ */
+.popup{
+  position:fixed;inset:0;z-index:9999;
+  background:rgba(20,18,15,.62);
+  display:none;align-items:center;justify-content:center;
+  padding:24px;
+  opacity:0;transition:opacity .3s;
+}
+.popup.show{display:flex;opacity:1}
+.popup-card{
+  background:#fff;border-radius:20px;
+  width:420px;max-width:100%;
+  padding:50px 20px 21px;
+  position:relative;
+  display:flex;flex-direction:column;align-items:center;gap:22px;
+  transform:translateY(8px);
+  animation:popIn .35s cubic-bezier(.22,1.28,.36,1) forwards;
+}
+@keyframes popIn{to{transform:none}}
+.popup-close{
+  position:absolute;top:14px;right:14px;
+  width:30px;height:30px;border-radius:50%;
+  background:#f3f3f3;display:flex;align-items:center;justify-content:center;
+  color:#14120f;font-size:14px;
+}
+.popup-close:hover{background:#e5e5e5}
+.popup h2{
+  font-family:var(--ff-serif);font-size:32px;letter-spacing:-.02em;line-height:1.1;
+  text-align:center;color:#060612;
+}
+.popup .sub{font-size:14.5px;color:#6c6c6c;text-align:center;max-width:300px;line-height:1.4}
+.popup-stats{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;
+}
+.popup-stat{
+  background:rgba(20,18,15,.05);border-radius:12px;
+  padding:18px 12px;text-align:center;
+}
+.popup-stat .n{font-family:var(--ff-serif);font-size:24px;letter-spacing:-.02em;color:#14120f;line-height:1.1;margin-bottom:4px}
+.popup-stat .l{font-size:12px;color:#6c6c6c;line-height:1.3}
+.popup-code{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:8px;background:rgba(20,18,15,.05);border-radius:12px;
+  padding:12px 8px 12px 18px;width:100%;
+}
+.popup-code .lbl{font-size:14px;font-weight:500;color:#14120f}
+.popup-code .code{
+  background:#fff;border-radius:48px;padding:6px 14px;
+  font-size:14px;font-weight:600;letter-spacing:.02em;
+  transition:transform .2s;
+}
+.popup-code .code:hover{transform:scale(1.05)}
+.popup-cta{width:100%;display:flex;flex-direction:column;gap:12px}
+.popup-cta .btn{
+  width:100%;padding:16px 24px;border-radius:10px;background:#000;color:#fff;
+  font-size:14px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;
+  box-shadow:0 1px 0 0 rgba(0,0,0,.1),0 8px 24px rgba(0,0,0,.1);
+}
+.popup-cta .fineprint{font-size:12px;color:#8c8471;text-align:center}
+
+/* ============ RESPONSIVE ============ */
+@media(max-width:1024px){
+  .wrap,.wrap-narrow,.wrap-mid{width:min(100% - 40px,var(--max))}
+  .nav{width:min(var(--max),100% - 40px);padding:12px 20px}
+  .comp-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .nav-search{max-width:220px}
+  .footer-cols{gap:60px}
+}
+@media(max-width:768px){
+  .section{padding:70px 0}
+  .section-sm{padding:40px 0}
+  .topbar-inner{font-size:13px}
+  .nav{padding:10px 14px;border-radius:12px}
+  .nav-links{display:none}
+  .nav-search{max-width:100%;flex:1 1 100%;order:3}
+  .nav-actions{gap:8px}
+  .nav-pricing,.nav-divider{display:none}
+  .nav-actions .btn{font-size:12px;padding:8px 14px}
+  .hero{padding:80px 0 0}
+  .hero-browser{padding:6px 6px 0;border-radius:14px 14px 0 0}
+  .creators{font-size:16px}
+  .creators .label{font-size:16px}
+  .about-sec{padding:80px 16px}
+  .about-item{font-size:15px;padding:14px 12px}
+  .comp-section,.tpl-section,.pricing-section{padding:70px 20px}
+  .comp-grid{grid-template-columns:1fr}
+  .tpl-grid{grid-template-columns:1fr}
+  .pricing-grid{grid-template-columns:1fr}
+  .price-card{padding:24px}
+  .footer{padding:70px 20px 30px}
+  .footer-heading h2{font-size:32px}
+  .footer-cols{gap:40px}
+  .footer-main{margin-bottom:50px}
+  .popup h2{font-size:26px}
+  .popup{padding:16px}
+}
+@media(max-width:480px){
+  .h1{font-size:34px}
+  .hero-cta{flex-direction:column;align-items:stretch}
+  .hero-cta .btn{width:100%;justify-content:center}
+  .creators .label{font-size:14px;letter-spacing:-.5px}
+  .popup-stats{grid-template-columns:1fr}
+}
+
+/* ============ REVEAL ============ */
+.reveal{opacity:0;transform:translateY(20px);transition:opacity .7s ease,transform .7s cubic-bezier(.22,1,.36,1)}
+.reveal.in{opacity:1;transform:none}
+
+</style>
+</head>
+<body>
+
+<!-- ============ TOP BAR ============ -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <span>CrazyUi 2.0 Launch Offer — 30% OFF</span>
+    <button class="copy-pill" id="topCopy" data-code="CRAZY30">
+      <span>CRAZY30</span>
+    </button>
+  </div>
+</div>
+
+<!-- ============ NAV ============ -->
+<div class="nav-wrap">
+  <nav class="nav">
+    <div class="nav-left">
+      <a href="#" class="nav-logo" aria-label="CrazyUI home">
+        <img src="https://framerusercontent.com/images/wml5weMpN68oT2Klh2z3bmgLEI.png" alt="CrazyUI">
+      </a>
+      <div class="nav-links">
+        <a href="#components" class="nav-link">Components</a>
+        <a href="#templates" class="nav-link muted">Templates</a>
+        <a href="#" class="nav-link muted">Freebies</a>
+      </div>
+    </div>
+    <div class="nav-search">
+      <button class="search-btn">
+        <span class="left">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M16.5 16.5L21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span>Search Component</span>
+        </span>
+        <span class="key">F</span>
+      </button>
+    </div>
+    <div class="nav-actions">
+      <a href="#pricing" class="nav-pricing">Pricing</a>
+      <span class="nav-divider"></span>
+      <a href="#" class="btn btn-light">Login</a>
+      <a href="#pricing" class="btn btn-dark">Get Access</a>
+    </div>
+  </nav>
+</div>
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="hero-head">
+    <h1 class="h1">High-Quality Figma and Framer Components for Designers</h1>
+    <p class="hero-sub">Everything creators need to build beautiful websites.</p>
+    <div class="hero-cta">
+      <a href="#components" class="btn btn-dark btn-lg">Explore Collection</a>
+    </div>
+    <div class="creators">
+      <div class="avatars">
+        <span class="av"><img src="https://framerusercontent.com/images/kPCDtJiotw10ND5dr7TdAnfqAw.jpg?width=1080&height=1080" alt=""></span>
+        <span class="av"><img src="https://framerusercontent.com/images/WJ8r6YuQl12mUd5FdyVNiqWqMv0.jpg?width=966&height=882" alt=""></span>
+        <span class="av"><img src="https://framerusercontent.com/images/hzegUGQ5vTBNFkUd4nLfGs8g.jpg?width=1080&height=1080" alt=""></span>
+      </div>
+      <span class="label">Trusted by 100+ creators</span>
+    </div>
+  </div>
+  <div class="hero-browser">
+    <img src="https://framerusercontent.com/images/8nS8a73uw5Kk6XFgO00MYjavREk.webp?width=3348&height=1947" alt="CrazyUI components preview">
+  </div>
+</section>
+
+<!-- ============ ABOUT ============ -->
+<section class="about-sec" id="about">
+  <div class="about-grid">
+    <h3 class="about-heading">Designing interfaces takes time, and most of it goes into rebuilding the same foundational UI again and again.</h3>
+    <div class="about-line">
+      <span>So we kept things</span>
+      <button class="toggle" id="aboutToggle" aria-label="Toggle details"></button>
+      <span>simple</span>
+      <span>to</span>
+      <span>see why CrazyUI exists and what we're building next.</span>
+    </div>
+    <div class="about-reveal" id="aboutReveal">
+      <div class="about-item">
+        <span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+        Rebuilding basic UI takes too much time
+      </div>
+      <div class="about-item">
+        <span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+        Existing libraries are overcomplicated
+      </div>
+      <div class="about-item">
+        <span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+        Too many styles, not enough practicality
+      </div>
+      <div class="about-item">
+        <span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+        Hard to reuse in real-world layouts
+      </div>
+      <div class="about-item">
+        <span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+        Needed a simpler starting point
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ COMPONENTS ============ -->
+<section class="comp-section" id="components">
+  <div class="sec-head-row" style="max-width:1136px;margin:0 auto 50px">
+    <h2 class="h2">Figma Components</h2>
+    <div class="comp-toggle">
+      <button class="active">Figma</button>
+      <button>Framer</button>
+    </div>
+  </div>
+
+  <div class="comp-grid">
+    <a class="comp-card reveal" href="#">
+      <div class="img"><img src="https://framerusercontent.com/images/pMUCKFrJZpd888W3LODkHTbE.webp?width=5640&height=5532" alt="Herosection"></div>
+      <div class="comp-card-foot">
+        <span class="name">Herosection</span>
+        <span class="pro-pill"><img src="https://framerusercontent.com/images/R4HnwQPaAlJ2XxpgZlYT3DfVRUQ.png" alt=""> Pro</span>
+      </div>
+    </a>
+    <a class="comp-card reveal" href="#">
+      <div class="img"><img src="https://framerusercontent.com/images/JMQ70B2Md4OPXp6kIeFxEriLE.webp?width=1329&height=1304" alt="Footer"></div>
+      <div class="comp-card-foot">
+        <span class="name">Footer</span>
+        <span class="pro-pill"><img src="https://framerusercontent.com/images/R4HnwQPaAlJ2XxpgZlYT3DfVRUQ.png" alt=""> Pro</span>
+      </div>
+    </a>
+    <a class="comp-card reveal" href="#">
+      <div class="img"><img src="https://framerusercontent.com/images/dlWLUgPTPnodgtovslxSkniM.webp?width=1329&height=1305" alt="Pricing"></div>
+      <div class="comp-card-foot">
+        <span class="name">Pricing</span>
+        <span class="pro-pill"><img src="https://framerusercontent.com/images/R4HnwQPaAlJ2XxpgZlYT3DfVRUQ.png" alt=""> Pro</span>
+      </div>
+    </a>
+    <a class="comp-card reveal" href="#">
+      <div class="img"><img src="https://framerusercontent.com/images/UTGqNT9UiFiqbS38E2ci5aH8IA.webp?width=1329&height=1305" alt="Team"></div>
+      <div class="comp-card-foot">
+        <span class="name">Team</span>
+        <span class="pro-pill"><img src="https://framerusercontent.com/images/R4HnwQPaAlJ2XxpgZlYT3DfVRUQ.png" alt=""> Pro</span>
+      </div>
+    </a>
+    <a class="comp-card reveal" href="#">
+      <div class="img"><img src="https://framerusercontent.com/images/BIGgRvLo5BeFAYQyo4kLZZQp2HY.webp?width=1329&height=1305" alt="Services"></div>
+      <div class="comp-card-foot">
+        <span class="name">Services</span>
+        <span class="pro-pill"><img src="https://framerusercontent.com/images/R4HnwQPaAlJ2XxpgZlYT3DfVRUQ.png" alt=""> Pro</span>
+      </div>
+    </a>
+    <a class="comp-card reveal" href="#">
+      <div class="img"><img src="https://framerusercontent.com/images/gr0Zu5Vs8Lgq2IdKJaohBh4EI.webp?width=1329&height=1305" alt="Testimonial"></div>
+      <div class="comp-card-foot">
+        <span class="name">Testimonial</span>
+        <span class="pro-pill"><img src="https://framerusercontent.com/images/R4HnwQPaAlJ2XxpgZlYT3DfVRUQ.png" alt=""> Pro</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="comp-cta">
+    <a href="#" class="btn btn-dark btn-lg">View More</a>
+  </div>
+</section>
+
+<!-- ============ TEMPLATES ============ -->
+<section class="tpl-section" id="templates">
+  <div class="sec-head-row" style="max-width:1100px;margin:0 auto 50px">
+    <h2 class="h2">Framer Templates</h2>
+    <a href="#" class="btn btn-dark">View More</a>
+  </div>
+
+  <div class="tpl-grid">
+    <a class="tpl-card reveal" href="#">
+      <div class="img"><img src="https://framerusercontent.com/images/0G8vVXyixKjQe8pf0GxoGRnE1w.png?width=2010&height=1734" alt="Template/01"></div>
+      <div class="tpl-card-foot">
+        <span class="name">Template/01</span>
+        <span class="pro-pill"><img src="https://framerusercontent.com/images/R4HnwQPaAlJ2XxpgZlYT3DfVRUQ.png" alt=""> Pro Plus</span>
+      </div>
+    </a>
+    <a class="tpl-card reveal" href="#">
+      <div class="img"><img src="https://framerusercontent.com/images/zMs4UBlWx5r3IBJezjTdLjla0.png?width=2010&height=1734" alt="Herosection/49"></div>
+      <div class="tpl-card-foot">
+        <span class="name">Herosection/49</span>
+        <span class="pro-pill"><img src="https://framerusercontent.com/images/R4HnwQPaAlJ2XxpgZlYT3DfVRUQ.png" alt=""> Pro Plus</span>
+      </div>
+    </a>
+  </div>
+</section>
+
+<!-- ============ PRICING ============ -->
+<section class="pricing-section" id="pricing">
+  <div class="pricing-head">
+    <h2 class="h2">Simple pricing. No subscriptions.</h2>
+  </div>
+  <div class="pricing-grid">
+
+    <div class="price-card reveal">
+      <span class="tag">Most Popular</span>
+      <div class="price-head">
+        <h3>Premium</h3>
+        <p class="sub">Perfect for individual designers</p>
+      </div>
+      <div class="price-row">
+        <span class="price-now">$25</span>
+        <span class="price-was">$69</span>
+      </div>
+      <div class="price-features">
+        <span class="lbl">Features Included:</span>
+        <ul class="price-list">
+          <li><span class="ic"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Access all UI components</li>
+          <li><span class="ic"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Figma component library</li>
+          <li><span class="ic"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Basic Framer sections</li>
+          <li><span class="ic"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Commercial usage license</li>
+          <li><span class="ic"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Future component updates</li>
+        </ul>
+      </div>
+      <a href="#" class="btn btn-dark">Get Instant Access</a>
+    </div>
+
+    <div class="price-card reveal">
+      <div class="price-head">
+        <h3>Premium Plus</h3>
+        <p class="sub">Built for growing teams &amp; agencies</p>
+      </div>
+      <div class="price-row">
+        <span class="price-now">$69</span>
+        <span class="price-was">$199</span>
+      </div>
+      <div class="price-features">
+        <span class="lbl">Features Included:</span>
+        <ul class="price-list">
+          <li><span class="ic"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Everything in Premium</li>
+          <li><span class="ic"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Premium Framer templates</li>
+          <li><span class="ic"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Advanced layout sections</li>
+          <li><span class="ic"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Priority support</li>
+          <li><span class="ic"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Lifetime access</li>
+        </ul>
+      </div>
+      <a href="#" class="btn btn-dark">Get Instant Access</a>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="footer-main">
+    <div class="footer-heading">
+      <h2>Build less from scratch. Create more of what matters.</h2>
+      <a href="#components" class="btn btn-dark btn-lg">View More</a>
+    </div>
+    <div class="footer-cols">
+      <div class="footer-col">
+        <span class="title">Product</span>
+        <a href="#components">Components</a>
+        <a href="#templates">Templates</a>
+        <a href="#pricing">Pricing</a>
+      </div>
+      <div class="footer-col">
+        <span class="title">Account</span>
+        <a href="#">Sign In</a>
+        <a href="#">Account</a>
+        <a href="#">Blogs</a>
+      </div>
+      <div class="footer-col">
+        <span class="title">Socials</span>
+        <a href="#">Instagram</a>
+        <a href="#">X (Twitter)</a>
+        <a href="#">Founder</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    © Copyright 2026 Crazyui. All rights reserved.<br>
+    Made in Mumbai, India.
+  </div>
+</footer>
+
+<!-- ============ DISCOUNT POPUP ============ -->
+<div class="popup" id="popup" role="dialog" aria-modal="true">
+  <div class="popup-card">
+    <button class="popup-close" id="popupClose" aria-label="Close">✕</button>
+    <h2>EXCLUSIVE LAUNCH<br>OFFER · 30% OFF</h2>
+    <p class="sub">Everything you need to design and build better websites in Figma &amp; Framer.</p>
+    <div class="popup-stats">
+      <div class="popup-stat"><div class="n">120+</div><div class="l">Curated Figma Designs</div></div>
+      <div class="popup-stat"><div class="n">30+</div><div class="l">Curated Framer Designs</div></div>
+      <div class="popup-stat"><div class="n">02+</div><div class="l">Framer Template</div></div>
+      <div class="popup-stat"><div class="n">04+</div><div class="l">Freebies</div></div>
+    </div>
+    <div class="popup-code">
+      <span class="lbl">Use Code</span>
+      <button class="code" id="popupCopy" data-code="CRAZY30">CRAZY30</button>
+    </div>
+    <div class="popup-cta">
+      <a href="#pricing" class="btn">CLAIM THE LIMITED OFFER</a>
+      <span class="fineprint">One-time payment · Lifetime access · No subscription</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ---------- Copy code buttons ---------- */
+  function copyCode(btn){
+    const code = btn.dataset.code || 'CRAZY30';
+    const done = () => {
+      const prev = btn.innerHTML;
+      btn.classList.add('copied');
+      btn.innerHTML = '<span>Copied!</span>';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.innerHTML = prev;
+      }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(code).then(done).catch(() => fallbackCopy(code, done));
+    } else {
+      fallbackCopy(code, done);
+    }
+  }
+  function fallbackCopy(text, cb){
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); cb(); } catch(e){}
+    document.body.removeChild(ta);
+  }
+  const topCopy = document.getElementById('topCopy');
+  const popupCopy = document.getElementById('popupCopy');
+  if (topCopy) topCopy.addEventListener('click', () => copyCode(topCopy));
+  if (popupCopy) popupCopy.addEventListener('click', () => copyCode(popupCopy));
+
+  /* ---------- Toggle about reveal ---------- */
+  const toggle = document.getElementById('aboutToggle');
+  const reveal = document.getElementById('aboutReveal');
+  if (toggle && reveal){
+    toggle.addEventListener('click', () => {
+      const open = reveal.classList.toggle('open');
+      toggle.classList.toggle('on', open);
+    });
+  }
+
+  /* ---------- Scroll reveal ---------- */
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting){
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  /* ---------- Comp toggle (Figma / Framer) ---------- */
+  document.querySelectorAll('.comp-toggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.comp-toggle button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  /* ---------- Discount popup ---------- */
+  const popup = document.getElementById('popup');
+  const popupClose = document.getElementById('popupClose');
+  let popupShown = false;
+
+  function showPopup(){
+    if (popupShown || !popup) return;
+    popupShown = true;
+    popup.classList.add('show');
+  }
+  function hidePopup(){
+    if (!popup) return;
+    popup.classList.remove('show');
+  }
+
+  /* show after 6 seconds, or after 40% scroll — whichever comes first */
+  setTimeout(showPopup, 6000);
+  window.addEventListener('scroll', () => {
+    const scrolled = (window.scrollY + window.innerHeight) / document.body.scrollHeight;
+    if (scrolled > 0.4) showPopup();
+  }, { passive: true });
+
+  if (popupClose) popupClose.addEventListener('click', hidePopup);
+  if (popup) popup.addEventListener('click', (e) => {
+    if (e.target === popup) hidePopup();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') hidePopup();
+  });
+
+  /* close popup if user clicks the CTA inside */
+  const claim = popup.querySelector('.popup-cta .btn');
+  if (claim) claim.addEventListener('click', hidePopup);
+
+  /* ---------- Smooth anchor scrolling ---------- */
+  document.querySelectorAll('a[href^="#"]').forEach(link => {
+    link.addEventListener('click', (e) => {
+      const href = link.getAttribute('href');
+      if (href.length < 2) return;
+      const target = document.querySelector(href);
+      if (target){
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+
+})();
+</script>
+</body>
+</html>

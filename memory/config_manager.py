@@ -104,6 +104,40 @@ def save_voice(voice_name: str) -> None:
     CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
 
 
+# ── Assistant response language ──────────────────────────────────────────────
+AVAILABLE_LANGUAGES = [
+    "auto",       # Dynamic Language Matching (Matches User's Spoken Language)
+    "English",    # Always English
+    "Urdu",       # Always Urdu
+    "Hindi",      # Always Hindi
+    "Spanish",    # Always Spanish
+    "French",     # Always French
+    "German",     # Always German
+    "Arabic",     # Always Arabic
+    "Turkish",    # Always Turkish
+]
+DEFAULT_RESPONSE_LANGUAGE = "auto"
+
+
+def get_response_language() -> str:
+    """Return configured assistant response language ('auto', 'English', 'Urdu', etc.)."""
+    return load_api_keys().get("response_language", DEFAULT_RESPONSE_LANGUAGE) or DEFAULT_RESPONSE_LANGUAGE
+
+
+def save_response_language(lang: str) -> None:
+    """Persist the chosen response language."""
+    ensure_config_dir()
+    data: dict = {}
+    if CONFIG_FILE.exists():
+        try:
+            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    l = (lang or "").strip()
+    data["response_language"] = l if l in AVAILABLE_LANGUAGES else DEFAULT_RESPONSE_LANGUAGE
+    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+
+
 def get_wake_word_enabled() -> bool:
     """Whether local wake-word gating is on (assistant sleeps until 'Hey Jarvis')."""
     return load_api_keys().get("wake_word_enabled", False)
@@ -486,3 +520,69 @@ def save_kilo_model(model: str) -> None:
         m = f"kilo/{m}"
     data["kilo_model"] = m
     CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+
+
+# ── Antigravity CLI & Model Config ───────────────────────────────────────────
+
+ANTIGRAVITY_CLI_MODELS = [
+    "gemini-3.7-flash-medium",     # Gemini 3.7 Flash Medium (Default Fast & Smart)
+    "gemini-3.8-flash-medium",     # Gemini 3.8 Flash Medium
+    "gemini-3.6-flash-medium",     # Gemini 3.6 Flash Medium
+    "gemini-3.1-pro-high",         # Gemini 3.1 Pro High Reasoning
+    "gemini-3.1-pro-low",          # Gemini 3.1 Pro Fast
+    "claude-sonnet-4-6",           # Claude Sonnet 4.6 (Thinking)
+    "claude-opus-4-6-thinking",    # Claude Opus 4.6 (Deep Thinking)
+    "gpt-oss-120b-medium",         # GPT-OSS 120B Open Weights
+]
+
+DEFAULT_ANTIGRAVITY_MODEL = "gemini-3.7-flash-medium"
+
+
+def get_antigravity_model() -> str:
+    """Return configured Antigravity CLI model (defaults to 'gemini-3.7-flash-medium')."""
+    return load_api_keys().get("antigravity_model", DEFAULT_ANTIGRAVITY_MODEL) or DEFAULT_ANTIGRAVITY_MODEL
+
+
+def save_antigravity_model(model: str) -> None:
+    """Persist chosen Antigravity model to config."""
+    ensure_config_dir()
+    data: dict = {}
+    if CONFIG_FILE.exists():
+        try:
+            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    data["antigravity_model"] = model.strip() or DEFAULT_ANTIGRAVITY_MODEL
+    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+
+
+# ── Groq LPU Coprocessor Config ──────────────────────────────────────────────
+
+DEFAULT_GROQ_MODEL = "qwen/qwen3.8-27b"
+
+
+def get_groq_api_key() -> str | None:
+    """Return the configured Groq API key, or None if not set."""
+    key = load_api_keys().get("groq_api_key", "").strip()
+    return key if key else None
+
+
+def get_groq_model() -> str:
+    """Return configured Groq model (defaults to 'llama-3.3-70b-versatile')."""
+    return load_api_keys().get("groq_model", DEFAULT_GROQ_MODEL) or DEFAULT_GROQ_MODEL
+
+
+def save_groq_config(api_key: str, model: str = DEFAULT_GROQ_MODEL) -> None:
+    """Persist Groq API key and default model to config."""
+    ensure_config_dir()
+    data: dict = {}
+    if CONFIG_FILE.exists():
+        try:
+            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    if api_key:
+        data["groq_api_key"] = api_key.strip()
+    if model:
+        data["groq_model"] = model.strip() or DEFAULT_GROQ_MODEL
+    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")

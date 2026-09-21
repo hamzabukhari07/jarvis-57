@@ -2,7 +2,7 @@
 name: web_scraper
 description: Anti-bot and Cloudflare-bypassing web scraping engine powered by Scrapling. Extracts clean markdown, structured text, and eliminates paywalls/blocks.
 metadata:
-  author: Zezo / FatihMakes
+  author: ZEZO / Hamza Bukhari
   version: '1.0'
 ---
 

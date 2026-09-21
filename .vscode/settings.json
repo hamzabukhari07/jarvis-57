@@ -1,0 +1,10 @@
+{
+  "python.defaultInterpreterPath": "C:\\Users\\Hamza\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}",
+    "${workspaceFolder}/actions",
+    "${workspaceFolder}/core",
+    "${workspaceFolder}/memory",
+    "C:\\Users\\Hamza\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages"
+  ]
+}

@@ -11,6 +11,10 @@ except ImportError:
     _SEND2TRASH = False
 
 from core.undo import push_undo
+from core.file_reader import resolve_path, fuzzy_find_in_dir
+
+_resolve_path = resolve_path
+_fuzzy_find_in_dir = fuzzy_find_in_dir
 
 _OS = platform.system()  # "Windows" | "Darwin" | "Linux"
 
@@ -153,39 +157,6 @@ def _get_videos() -> Path:
             return Path(xdg)
     return Path.home() / "Videos"
 
-
-def _resolve_path(raw: str) -> Path:
-    shortcuts: dict[str, Path] = {
-        "desktop":   _get_desktop(),
-        "downloads": _get_downloads(),
-        "documents": _get_documents(),
-        "pictures":  _get_pictures(),
-        "music":     _get_music(),
-        "videos":    _get_videos(),
-        "home":      Path.home(),
-    }
-    raw   = str(raw or "").strip().strip('"').strip("'")
-    lower = raw.lower()
-    if lower in shortcuts:
-        return shortcuts[lower]
-
-    head, sep, rest = raw.replace("\\", "/").partition("/")
-    if sep and head.lower() in shortcuts:
-        rest = rest.strip("/")
-        return shortcuts[head.lower()] / rest if rest else shortcuts[head.lower()]
-
-    p = Path(raw).expanduser()
-    if not p.exists():
-        # Auto-remap hallucinated Windows usernames (e.g. C:\Users\Administrator\Desktop... -> C:\Users\<Current>\Desktop...)
-        parts = [part.lower() for part in p.parts]
-        for key in ("desktop", "downloads", "documents", "pictures", "music", "videos"):
-            if key in parts:
-                idx = parts.index(key)
-                subpath = Path(*p.parts[idx:])
-                remapped = Path.home() / subpath
-                if remapped.exists():
-                    return remapped
-    return p
 
 def _format_size(b: int) -> str:
     for unit in ["B", "KB", "MB", "GB", "TB"]:
@@ -486,29 +457,38 @@ def find_files(name: str = "", extension: str = "",
         results    = []
         dir_count  = 0
         max_dirs   = 500  # performance + safety limit
+        target_norm = _norm_token(name) if name else ""
 
         for item in search_path.rglob("*"):
             if item.is_dir():
                 dir_count += 1
                 if dir_count > max_dirs:
                     break
+                # Include directory matches if name query matches
+                if target_norm:
+                    item_norm = _norm_token(item.name)
+                    if target_norm == item_norm or target_norm in item_norm or item_norm in target_norm or name.lower() in item.name.lower():
+                        results.append(f"📁 {item.name}/ — {item.parent}")
                 continue
+
             if not item.is_file():
                 continue
             if extension and item.suffix.lower() != extension.lower():
                 continue
-            if name and name.lower() not in item.name.lower():
-                continue
+            if name:
+                item_norm = _norm_token(item.name)
+                if not (name.lower() in item.name.lower() or (target_norm and (target_norm in item_norm or item_norm in target_norm))):
+                    continue
             size = _format_size(item.stat().st_size)
             results.append(f"📄 {item.name} ({size}) — {item.parent}")
             if len(results) >= max_results:
                 break
 
         if not results:
-            query = name or extension or "files"
+            query = name or extension or "items"
             return f"No {query} found in {search_path.name}/"
 
-        return f"Found {len(results)} file(s):\n" + "\n".join(results)
+        return f"Found {len(results)} item(s):\n" + "\n".join(results)
 
     except Exception as e:
         return f"Search error: {e}"
@@ -764,7 +744,7 @@ def file_controller(
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "file_controller",
-    "description": "Manages files and folders: list, create, delete, move, copy, rename, read, write, find, disk usage.",
+    "description": "Manages files and folders: list, create, delete, move, copy, rename, read, write, find (files and folders), disk usage. ALWAYS use to find or check files/folders on desktop or in filesystem instead of vision screen captures.",
     "parameters": {
         "type": "OBJECT",
         "properties": {

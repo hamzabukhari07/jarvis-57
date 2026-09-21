@@ -136,6 +136,62 @@ class VisemeStream:
         # Return (level, openness, width) for avatar
 ```
 
+## Multi-File Upload & Queue System
+
+**Files**: `ui.py` — `FileDropZone`, `_UploadedFilesBar`, `_DropCanvas`
+
+### File Drop Zone (`FileDropZone`)
+- **Visuals**: 100px dashed bounding box with marching-ants animation during hover/drag.
+- **Multi-File Support**: Accepts up to 10 files simultaneously via OS drag-and-drop or multi-select file dialog (`QFileDialog.getOpenFileNames`).
+- **Layout Bands**:
+  - **Row 1 (Y: 12–34px)**: Up to 6 category emoji icons (`🖼`, `🎬`, `🎵`, `📄`, `📝`, `💻`, `📦`, `🔧`) with `+N` overflow counter.
+  - **Row 2 (Y: 40–60px)**: Bold header (`N files loaded`).
+  - **Row 3 (Y: 64–82px)**: Monospace summary (`X MB total · Click to add more`).
+  - **Top-Right (Y: 8–28px, X: W-28px)**: Constrained `(✕)` clear button click box.
+- **Signals**: `file_selected = pyqtSignal(list)` emits full list of paths.
+
+### Upload Queue Bar (`_UploadedFilesBar`)
+- **Scrollable Area**: 120px max height, auto-collapsing when empty.
+- **Per-File Rows**:
+  - Category icon with custom color tint.
+  - Elided filename (up to 25 chars + `...`).
+  - Metadata tag (`{size} · {EXT}`).
+  - Individual `✕` remove button connected to `_on_remove(path)`.
+- **Batch Actions**:
+  - **📋 SELECT ALL**: Visual multi-select highlight.
+  - **🧹 CLEAR ALL**: Clears entire upload queue.
+  - **→ SEND ALL**: Dispatches `[FILES_UPLOADED]` command payload to assistant.
+
+---
+
+## Activity Log & Log Console
+
+**Files**: `ui.py` — `LogWidget`, `LogConsoleOverlay`; `core/log_bus.py`
+
+- **Copy Bar**: 24px button strip above activity log with `📋 COPY ALL` (to system clipboard), `🧹 CLEAR` (wipes widget + `log_bus`), `▼ FOLLOW` toggle, and live line count badge.
+- **Extended Context Menu**: Standard right-click menu supplemented with `Copy All (Activity Log)` and `Clear Activity Log`.
+- **Log Console Overlay (`Ctrl+L`)**: Global debug overlay with level filtering (`ALL`, `INFO`, `WARN`, `ERROR`), pause stream, copy, export, and search.
+- **Secret Redaction**: Integrated with `core/log_bus.py` to ensure API keys (`AQ.*`, `AIzaSy*`), bearer tokens, and credentials are scrubbed before reaching any UI sink.
+
+---
+
+## Task Inspector & Task Queue
+
+**Files**: `ui.py` — `TaskQueueWidget`, `TaskMatrixDrawer`, `_inspect_task_by_id`; `core/task_manager.py`
+
+- **Task Queue Widget**: Real-time slide-out / sidebar cards categorized by `● RUNNING`, `○ QUEUED`, and `✓ DONE`.
+- **Task Inspector Overlay**:
+  - Displays unified agent badge (`⚡ ZEZO CODER`), task ID, PID, elapsed time, and live progress bar.
+  - **100% Saturation on Completion**: When a task reaches DONE status, the progress bar and percentage display instantly saturate to full 100% width.
+  - **Task Cancellation**: Active tasks feature a red `✕ CANCEL` button triggering immediate child process tree termination via `task_manager.cancel()`.
+  - **ANSI Cleansing**: Status strings and log tails are automatically stripped of raw terminal escape sequences (`\x1b[...]`) via `strip_ansi()` for clean readability.
+  - **Task Navigation**: Switch between multiple concurrent/queued tasks with `[TAB]`, `◀`, `▶`.
+- **Slide-Out Telemetry Drawer (`TaskMatrixDrawer`)**:
+  - Live hardware telemetry (Engine, Model, PID, Job Object limits, CPU Affinity, Child Processes, Timestamps).
+  - Quick action buttons: `[🌐 PREVIEW]` (opens browser on `index.html`), `[📁 OPEN FOLDER]` (opens OS explorer), `[✕ CANCEL]`, `[🔍 INSPECT]`, and `[📜 FULL LOG]`.
+
+---
+
 ## State Indicators
 
 | State | Avatar Behavior |
@@ -185,6 +241,9 @@ Rendering: QPainter only (no GPU)
 Face: MediaPipe canonical model (468 vertices, Apache 2.0)
 Animations: Eyes, brows, mouth, jaw, head, blink
 Lip-sync: 50 shapes/sec, dual-source fusion
+Upload: Multi-file drag-and-drop + UploadedFilesBar queue
+Activity Log: Copy Bar + Log Bus ring buffer + Redaction
+Task Inspector: Live PID telemetry + Cancel action + ANSI stripping
 States: Listening, Thinking, Speaking, Sleeping
 HUD styles: Face or Reactor core
 Theming: Hue wheel accent color

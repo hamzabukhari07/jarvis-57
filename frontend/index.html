@@ -1,0 +1,2982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZEZO OS · Autonomous Desktop Operating System (Refined Prototype)</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Scripts -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+<style>
+  /* ── 100% Exact Autonomous Traffic Vectors Design System Tokens ── */
+  :root {
+    --bg-deep: #050505;
+    --bg-surface: #0a0a0a;
+    --bg-elevated: #111111;
+    --border-subtle: rgba(255, 255, 255, 0.05);
+    --border-default: rgba(255, 255, 255, 0.10);
+    --border-strong: rgba(255, 255, 255, 0.20);
+    --text-primary: #f5f5f7;
+    --text-secondary: #a0a0ab;
+    --text-muted: rgba(255, 255, 255, 0.40);
+    --accent: #f24e1e;
+    --accent-dim: rgba(242, 78, 30, 0.15);
+    --radius-sm: 2px;
+    --radius-md: 4px;
+    --radius-lg: 8px;
+    --font-sans: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background-color: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  .mono { font-family: var(--font-mono); }
+  .text-muted { color: var(--text-muted); }
+  .text-secondary { color: var(--text-secondary); }
+  .text-accent { color: var(--accent); }
+
+  /* ── Section framing & Exact Corner Brackets ── */
+  .frame {
+    position: relative;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.10), rgba(255,255,255,0.02), transparent);
+    padding: 1px;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);
+    display: flex;
+    flex-direction: column;
+    transition: flex 0.25s cubic-bezier(0.16, 1, 0.3, 1), height 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .frame-inner {
+    background: rgba(10,10,10,0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
+    padding: 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+  .corner { position: absolute; width: 12px; height: 1px; background: rgba(255,255,255,0.4); z-index: 5; pointer-events: none; }
+  .corner-v { position: absolute; width: 1px; height: 12px; background: rgba(255,255,255,0.4); z-index: 5; pointer-events: none; }
+  .corner-tl { top: 0; left: 0; }
+  .corner-tr { top: 0; right: 0; }
+  .corner-bl { bottom: 0; left: 0; }
+  .corner-br { bottom: 0; right: 0; }
+  .corner-v-tl { top: 0; left: 0; }
+  .corner-v-tr { top: 0; right: 0; }
+  .corner-v-bl { bottom: 0; left: 0; }
+  .corner-v-br { bottom: 0; right: 0; }
+
+  /* ── Section headers ── */
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-subtle);
+  }
+
+  /* ── Typography scale ── */
+  .type-display { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; color: #fff; }
+  .type-heading { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; color: #fff; }
+  .type-body { font-size: 12px; font-weight: 300; line-height: 1.5; color: var(--text-secondary); }
+  .type-label { font-family: var(--font-mono); font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); }
+  .type-code { font-family: var(--font-mono); font-size: 11px; font-weight: 400; color: var(--text-primary); }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 6px 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .btn:hover { border-color: var(--border-strong); background: var(--bg-elevated); color: #fff; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { filter: brightness(1.15); border-color: var(--accent); }
+  .btn-ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
+  .btn-ghost:hover { color: #fff; background: rgba(255,255,255,0.04); }
+  .btn-danger { border-color: rgba(239,68,68,0.4); color: #ef4444; }
+  .btn-danger:hover { background: rgba(239,68,68,0.15); border-color: #ef4444; }
+  .btn-sm { padding: 4px 8px; font-size: 9px; }
+  .btn-icon { width: 28px; height: 28px; padding: 0; border-radius: var(--radius-sm); }
+  .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-icon.active { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+
+  /* ── Badges / Chips ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 2px 7px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+  }
+  .badge-accent { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .badge-success { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.3); color: #22c55e; }
+  .badge-warn { background: rgba(234,179,8,0.1); border-color: rgba(234,179,8,0.3); color: #eab308; }
+
+  /* ── Progress ── */
+  .progress-track {
+    width: 100%;
+    height: 4px;
+    background: var(--bg-elevated);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 999px;
+    transition: width 0.3s ease, background 0.3s ease;
+  }
+
+  /* ── Cards & Data Tables ── */
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+  }
+  .card-interactive {
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .card-interactive:hover, .card-interactive.active {
+    border-color: var(--accent);
+    background: var(--bg-elevated);
+  }
+
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    text-align: left;
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .data-table td {
+    font-size: 11px;
+    color: var(--text-secondary);
+    padding: 5px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+  }
+  .data-table tr:hover td { background: rgba(255,255,255,0.02); color: var(--text-primary); }
+
+  /* ── Tabs ── */
+  .hud-tabs {
+    display: flex;
+    gap: 3px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+    flex-shrink: 0;
+  }
+  .hud-tabs::-webkit-scrollbar { display: none; }
+  .hud-tab {
+    padding: 3px 6px;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .hud-tab:hover {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.03);
+  }
+  .hud-tab.active {
+    color: #ffffff;
+    background: var(--bg-elevated);
+    border-color: var(--accent);
+  }
+
+  /* ── File Dropzone ── */
+  .dropzone {
+    border: 1.5px dashed var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--bg-deep);
+    padding: 12px 10px;
+    text-align: center;
+    transition: all 0.25s ease;
+    cursor: pointer;
+  }
+  .dropzone:hover { border-color: var(--border-strong); background: rgba(255,255,255,0.02); }
+  .dropzone.dragover { border-color: var(--accent); background: var(--accent-dim); }
+
+  /* ── Background & Lines ── */
+  /* ── Background & Lines ── */
+  .container-lines {
+    display: none !important;
+  }
+  #webgl-bg {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.25;
+    mix-blend-mode: screen;
+  }
+
+  /* ── Master App Layout ── */
+  .app-shell {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    padding: 6px;
+    gap: 6px;
+    max-width: 100%;
+    margin: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  /* ── AUTHENTIC NATIVE TOP BAR (Matching ui.py Exact Window Header) ── */
+  .top-navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 48px;
+    padding: 0 14px;
+    background: rgba(10, 10, 10, 0.95);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 20px -6px rgba(0,0,0,0.7);
+    flex-shrink: 0;
+  }
+
+  .header-left-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+  }
+
+  .header-center-branding {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+
+  .header-brand-title {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #ffffff;
+    text-transform: uppercase;
+    position: relative;
+    padding-bottom: 2px;
+  }
+
+  .header-brand-divider {
+    width: 24px;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+    transition: width 0.3s ease;
+  }
+  .header-center-branding:hover .header-brand-divider {
+    width: 48px;
+  }
+
+  .header-right-clock {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    font-family: var(--font-mono);
+  }
+  .header-clock-time {
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 1px;
+    line-height: 1.1;
+  }
+  .header-clock-date {
+    font-size: 8px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+
+  .workspace-grid {
+    display: grid;
+    grid-template-columns: minmax(210px, 250px) minmax(0, 1fr) minmax(260px, 300px);
+    gap: 6px;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    max-width: 100%;
+    height: calc(100vh - 58px);
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  /* ── Interactive Splitter Handle (QSplitter Style) ── */
+  .center-column-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .splitter-bar {
+    height: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: row-resize;
+    user-select: none;
+    margin: 1px 0;
+    position: relative;
+    z-index: 20;
+    transition: background 0.2s ease;
+  }
+  .splitter-bar:hover {
+    background: var(--accent-dim);
+  }
+  .splitter-grip {
+    width: 36px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    transition: all 0.2s ease;
+  }
+  .splitter-bar:hover .splitter-grip {
+    width: 54px;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* ── Full Settings Dropdown Drawer (Anchored Directly Below Settings Trigger) ── */
+  .settings-dropdown-drawer {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: 270px;
+    border-radius: 0 !important;
+    box-shadow: 0 25px 60px -10px rgba(0,0,0,0.98), 0 0 25px var(--accent-dim);
+    z-index: 9999;
+    padding: 0;
+    display: none;
+    flex-direction: column;
+    animation: drawerIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .settings-dropdown-drawer .frame-inner {
+    border-radius: 0 !important;
+  }
+  .settings-dropdown-drawer.open {
+    display: flex;
+  }
+  @keyframes drawerIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .settings-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .settings-row:hover {
+    border-color: var(--border-strong);
+    background: var(--bg-elevated);
+  }
+
+  /* ── Functional Color Dot Pickers ── */
+  .color-dot-picker {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+  }
+  .color-dot-picker:hover {
+    transform: scale(1.25);
+  }
+  .color-dot-picker.active {
+    border-color: #ffffff;
+    box-shadow: 0 0 10px currentColor;
+    transform: scale(1.2);
+  }
+
+  /* ── Fluid Vortex Avatar & States (Full Black Block, No Glow Distortion) ── */
+  #avatar-frame,
+  #avatar-frame .frame-inner {
+    background: #000000 !important;
+  }
+  .vortex-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    pointer-events: none;
+  }
+  .vortex-halo {
+    display: none !important; /* Glow background removed per design specification */
+  }
+  .vortex-gif {
+    position: relative;
+    z-index: 3;
+    width: 290px;
+    height: 290px;
+    max-width: 330px;
+    max-height: 330px;
+    object-fit: contain;
+    filter: none !important; /* No drop shadows or blurry halos */
+    mix-blend-mode: screen; /* Seamless blend on pure black background */
+    transition: width 0.3s ease, height 0.3s ease;
+  }
+
+  /* ── State Selector Pills (State Demonstrator) ── */
+  .state-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 3px 7px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: rgba(10, 10, 10, 0.7);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .state-pill-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+    background: var(--bg-elevated);
+  }
+  .state-pill-btn.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: #ffffff;
+    font-weight: 600;
+  }
+
+  /* ── Sleek Tactical State Capsule (Clean, Engineered Obsidian Bar) ── */
+  .state-telemetry-capsule {
+    background: rgba(8, 8, 10, 0.90);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: var(--radius-sm);
+    padding: 6px 14px 6px 12px;
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition: all 0.25s ease;
+    z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .state-telemetry-capsule:hover {
+    border-color: var(--border-strong);
+    background: rgba(12, 12, 16, 0.98);
+  }
+  .state-beacon-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: beaconBlink 2.4s infinite ease-in-out;
+    flex-shrink: 0;
+  }
+  @keyframes beaconBlink {
+    0%, 100% { opacity: 0.5; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.15); }
+  }
+  .state-heading-text {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #ffffff;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* ── Command Console Container (Refined Obsidian Design) ── */
+  .command-capsule-container {
+    background: rgba(12, 12, 14, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .command-capsule-container:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px -3px var(--accent-dim), inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+
+  .command-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-deep);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-md);
+    padding: 3px 6px 3px 10px;
+  }
+
+  .command-input-element {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: #ffffff;
+  }
+  .command-input-element::placeholder {
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 11px;
+  }
+
+  .command-send-button {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: #ffffff;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+  }
+  .command-send-button:hover {
+    filter: brightness(1.2);
+    transform: translateX(1px);
+  }
+
+  /* ── Stream & Chat Message UI/UX (User vs ZEZO Distinction) ── */
+  .stream-msg {
+    position: relative;
+    padding: 8px 10px;
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: all 0.15s ease;
+    animation: msgFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes msgFadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .stream-msg:hover {
+    border-color: var(--border-default);
+    background: var(--bg-elevated);
+  }
+
+  .stream-msg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    margin-bottom: 2px;
+  }
+  .stream-msg-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .stream-msg-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 700;
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    letter-spacing: 0.5px;
+  }
+
+  /* User Message Card Variant (Distinct Cyan/White styling) */
+  .stream-msg-user {
+    background: rgba(6, 182, 212, 0.03);
+    border-left: 2px solid #06b6d4;
+    border-color: rgba(6, 182, 212, 0.25) var(--border-subtle) var(--border-subtle) #06b6d4;
+  }
+  .stream-msg-user .stream-msg-tag {
+    background: rgba(6, 182, 212, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(6, 182, 212, 0.35);
+  }
+  .stream-msg-user .stream-msg-body {
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  /* ZEZO AI Response Card Variant (Distinct Accent Glow, Warm White text, Quotes) */
+  .stream-msg-zezo {
+    background: var(--accent-dim);
+    border-left: 2px solid var(--accent);
+    border-color: var(--accent) var(--border-subtle) var(--border-subtle) var(--accent);
+    box-shadow: 0 4px 18px -8px var(--accent-dim);
+  }
+  .stream-msg-zezo .stream-msg-tag {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  .stream-msg-zezo .stream-msg-body {
+    color: #f1f5f9;
+    font-size: 11px;
+    line-height: 1.45;
+    font-family: var(--font-sans);
+  }
+  .stream-msg-zezo .stream-msg-quote {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* System Event Log Card Variant */
+  .stream-msg-sys {
+    padding: 5px 8px;
+    background: rgba(8, 8, 10, 0.6);
+    border-left: 2px solid var(--border-default);
+    font-size: 10px;
+    font-family: var(--font-mono);
+  }
+  .stream-msg-sys.ok {
+    border-left-color: #22c55e;
+    background: rgba(34, 197, 94, 0.04);
+  }
+  .stream-msg-sys.interrupt {
+    border-left-color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+  }
+  .stream-msg-sys.state {
+    border-left-color: var(--accent);
+  }
+  .stream-msg-sys.hud {
+    border-left-color: #a855f7;
+    background: rgba(168, 85, 247, 0.04);
+  }
+
+  /* Message Copy Button */
+  .msg-copy-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    padding: 2px 5px;
+    font-size: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .msg-copy-btn:hover {
+    color: #ffffff;
+    border-color: var(--border-default);
+    background: var(--bg-surface);
+  }
+  .msg-copy-btn.copied {
+    color: #22c55e !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+    background: rgba(34, 197, 94, 0.1) !important;
+  }
+
+  /* ── Modal Overlays ── */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(12px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-panel {
+    width: 720px;
+    max-height: 85vh;
+    border-radius: 0 !important;
+    box-shadow: 0 25px 60px -12px rgba(0,0,0,0.98);
+    display: flex;
+    flex-direction: column;
+    animation: modalIn 0.2s ease-out;
+  }
+  .modal-panel .frame-inner {
+    border-radius: 0 !important;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.97) translateY(8px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* Scrollbars */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg-deep); }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+</style>
+</head>
+
+<body>
+
+<!-- Container lines with square corner nodes -->
+<div class="container-lines">
+  <div style="position:absolute;top:0;left:-3px;width:6px;height:6px;background:#050505;border:1px solid rgba(255,255,255,0.2);"></div>
+  <div style="position:absolute;bottom:0;left:-3px;width:6px;height:6px;background:#050505;border:1px solid rgba(255,255,255,0.2);"></div>
+  <div style="position:absolute;top:0;right:-3px;width:6px;height:6px;background:#050505;border:1px solid rgba(255,255,255,0.2);"></div>
+  <div style="position:absolute;bottom:0;right:-3px;width:6px;height:6px;background:#050505;border:1px solid rgba(255,255,255,0.2);"></div>
+</div>
+
+<!-- Three.js WebGL Particle Vector Background -->
+<div id="webgl-bg"></div>
+
+<div class="app-shell">
+  
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 1. TOP NAVBAR (Exact match to ui.py Native Header from Screenshot) -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <header class="top-navbar" style="position: relative; z-index: 100;">
+    <!-- Left: 4 Icon Buttons (Settings ⚙, Logs ⧉, Task Matrix ⊞, Remote QR 📱) -->
+    <div class="header-left-actions" style="position: relative;">
+      
+      <!-- Settings Trigger Wrapper & Anchored Dropdown Drawer -->
+      <div style="position: relative;">
+        <button class="btn btn-icon btn-sm" id="settings-trigger-btn" onclick="toggleSettingsDrawer(event)" title="Full Settings & Quick Controls">
+          <iconify-icon icon="solar:settings-linear" style="font-size: 16px;"></iconify-icon>
+        </button>
+
+        <!-- ── FULL NATIVE CONTROLS DRAWER (Anchored Directly Below Gear Button) ── -->
+        <div class="settings-dropdown-drawer frame" id="settings-drawer" style="width: 270px; max-height: calc(100vh - 70px);">
+          <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+          <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+          <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+          <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+          <div class="frame-inner" style="padding: 10px; overflow-y: auto;">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px; margin-bottom: 6px;">
+              <span class="mono" style="font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: 1.5px;">• CONTROLS</span>
+              <button class="btn btn-ghost btn-sm" onclick="toggleSettingsDrawer(event)" style="padding:2px 6px; font-size:10px;">✕</button>
+            </div>
+
+            <!-- 16 Native Control Buttons -->
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              
+              <!-- 1. Remote Control -->
+              <button class="btn btn-sm btn-primary" onclick="openModal('qr-modal')" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:smartphone-linear" style="font-size: 13px;"></iconify-icon>
+                <span>REMOTE CONTROL</span>
+              </button>
+
+              <!-- 2. Fullscreen [F11] -->
+              <button class="btn btn-sm" onclick="toggleFullScreenMode()" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:maximize-square-linear" style="font-size: 13px;"></iconify-icon>
+                <span>FULLSCREEN [F11]</span>
+              </button>
+
+              <!-- 3. Desktop Shortcut -->
+              <button class="btn btn-sm" onclick="simulateShortcut()" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:widget-add-linear" style="font-size: 13px;"></iconify-icon>
+                <span>CREATE DESKTOP SHORTCUT</span>
+              </button>
+
+              <!-- 4. Autostart Toggle -->
+              <button class="btn btn-sm" id="drawer-autostart-btn" onclick="toggleAutostart()" style="justify-content: space-between; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <span style="display:flex; align-items:center; gap:6px;">
+                  <iconify-icon icon="solar:power-bold" style="font-size: 13px;"></iconify-icon>
+                  <span>AUTO-START:</span>
+                </span>
+                <span class="badge" id="autostart-badge">OFF</span>
+              </button>
+
+              <!-- 5. Customise Assistant -->
+              <button class="btn btn-sm" onclick="openModal('customise-modal')" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:user-hand-up-linear" style="font-size: 13px;"></iconify-icon>
+                <span>CUSTOMISE ASSISTANT</span>
+              </button>
+
+              <!-- 6. Morning Brief Toggle -->
+              <button class="btn btn-sm" id="drawer-brief-btn" onclick="toggleBriefMode()" style="justify-content: space-between; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <span style="display:flex; align-items:center; gap:6px;">
+                  <iconify-icon icon="solar:sun-2-linear" style="font-size: 13px;"></iconify-icon>
+                  <span>MORNING BRIEF:</span>
+                </span>
+                <span class="badge badge-success" id="brief-mode-badge">ON</span>
+              </button>
+
+              <!-- 7. Wake Word Toggle -->
+              <button class="btn btn-sm" id="drawer-wake-btn" onclick="toggleWakeWord()" style="justify-content: space-between; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <span style="display:flex; align-items:center; gap:6px;">
+                  <iconify-icon icon="solar:microphone-3-linear" style="font-size: 13px;"></iconify-icon>
+                  <span>WAKE WORD:</span>
+                </span>
+                <span class="badge badge-accent" id="wake-word-badge">ARMED</span>
+              </button>
+
+              <!-- 8. Push-To-Talk Toggle -->
+              <button class="btn btn-sm" id="drawer-ptt-btn" onclick="togglePtt()" style="justify-content: space-between; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <span style="display:flex; align-items:center; gap:6px;">
+                  <iconify-icon icon="solar:keyboard-linear" style="font-size: 13px;"></iconify-icon>
+                  <span>PUSH-TO-TALK:</span>
+                </span>
+                <span class="badge badge-success" id="ptt-badge">ON</span>
+              </button>
+
+              <!-- 9. HUD Style Cycler -->
+              <button class="btn btn-sm" id="drawer-hud-btn" onclick="cycleHudStyle()" style="justify-content: space-between; text-align: left; font-size: 9px; padding: 5px 8px; border-color: var(--accent);">
+                <span style="display:flex; align-items:center; gap:6px; color: var(--accent);">
+                  <iconify-icon icon="solar:mask-hamsa-linear" style="font-size: 13px;"></iconify-icon>
+                  <span>HUD STYLE:</span>
+                </span>
+                <span class="type-code text-accent" id="hud-style-label" style="font-size: 8px;">FLUID VORTEX</span>
+              </button>
+
+              <!-- 10. Audio Devices -->
+              <button class="btn btn-sm" onclick="openModal('audio-modal')" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:headphones-round-linear" style="font-size: 13px;"></iconify-icon>
+                <span>AUDIO DEVICES</span>
+              </button>
+
+              <!-- 11. Memory Engine -->
+              <button class="btn btn-sm" onclick="openModal('memory-modal')" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:atom-linear" style="font-size: 13px;"></iconify-icon>
+                <span>MEMORY (SQLITE FTS5)</span>
+              </button>
+
+              <!-- 12. Plugins -->
+              <button class="btn btn-sm" onclick="openModal('plugin-modal')" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:box-minimalistic-linear" style="font-size: 13px;"></iconify-icon>
+                <span>PLUGINS</span>
+              </button>
+
+              <!-- 13. Plugin Settings -->
+              <button class="btn btn-sm" onclick="alert('⚙ Plugin Configuration Registry')" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:tuning-square-2-linear" style="font-size: 13px;"></iconify-icon>
+                <span>PLUGIN SETTINGS</span>
+              </button>
+
+              <!-- 14. Coding Agents & Skills -->
+              <button class="btn btn-sm" onclick="openModal('skills-modal')" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:code-file-linear" style="font-size: 13px;"></iconify-icon>
+                <span>CODING AGENTS_SKILLS</span>
+              </button>
+
+              <!-- 15. Skill Hub -->
+              <button class="btn btn-sm" onclick="openModal('skills-modal')" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:bolt-linear" style="font-size: 13px;"></iconify-icon>
+                <span>SKILL HUB (Ctrl+Shift+S)</span>
+              </button>
+
+            </div>
+
+            <!-- ── 16. FUNCTIONAL UI ACCENT COLOR PICKER ── -->
+            <div style="border-top: 1px solid var(--border-subtle); margin-top: 8px; padding-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+              <span class="type-label" style="font-size: 8px;">UI ACCENT COLOR</span>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <!-- Orange -->
+                <div class="color-dot-picker active" id="color-dot-orange" onclick="setAccentColor('#f24e1e', 'orange')" title="Solar Orange (Default)" style="background: #f24e1e;"></div>
+                <!-- Cyan -->
+                <div class="color-dot-picker" id="color-dot-cyan" onclick="setAccentColor('#06b6d4', 'cyan')" title="Neon Cyan" style="background: #06b6d4;"></div>
+                <!-- Emerald -->
+                <div class="color-dot-picker" id="color-dot-emerald" onclick="setAccentColor('#22c55e', 'emerald')" title="Cyber Emerald" style="background: #22c55e;"></div>
+                <!-- Purple -->
+                <div class="color-dot-picker" id="color-dot-purple" onclick="setAccentColor('#a855f7', 'purple')" title="Hyper Purple" style="background: #a855f7;"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-icon btn-sm" onclick="openModal('log-modal')" title="Backend Log Console (Ctrl+L)">
+        <iconify-icon icon="solar:terminal-linear" style="font-size: 16px;"></iconify-icon>
+      </button>
+      <button class="btn btn-icon btn-sm" onclick="openModal('task-modal')" title="Task Matrix & Registry">
+        <iconify-icon icon="solar:layers-minimalistic-linear" style="font-size: 16px;"></iconify-icon>
+      </button>
+      <button class="btn btn-icon btn-sm" onclick="openModal('qr-modal')" title="Mobile Remote Control & Key">
+        <iconify-icon icon="solar:qr-code-linear" style="font-size: 16px;"></iconify-icon>
+      </button>
+    </div>
+
+    <!-- Center: Prominent Bold ZEZO Title with Accent Divider -->
+    <div class="header-center-branding">
+      <div class="header-brand-title">ZEZO</div>
+      <div class="header-brand-divider"></div>
+    </div>
+
+    <!-- Right: Digital Clock & Date (JetBrains Mono) -->
+    <div class="header-right-clock">
+      <div class="header-clock-time" id="header-clock-time">18:50:38</div>
+      <div class="header-clock-date" id="header-clock-date">MON 21 SEP 2026</div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 2. MASTER 3-COLUMN TACTICAL WORKSPACE -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <main class="workspace-grid">
+    
+    <!-- ── LEFT PANEL: Hardware Telemetry & Task Queue ── -->
+    <aside style="display: flex; flex-direction: column; gap: 8px; overflow: hidden; min-width: 0;">
+      
+      <!-- Telemetry Frame -->
+      <div class="frame" style="flex: 0 0 auto;">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        
+        <div class="frame-inner">
+          <div class="section-label">01 · Hardware Telemetry</div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+            <div class="card">
+              <div class="type-label">CPU CORE LOAD</div>
+              <div id="val_cpu" style="font-size:16px;font-weight:600;color:#fff;margin:2px 0;">0%</div>
+              <div class="progress-track"><div class="progress-fill" id="bar_cpu" style="width:0%;"></div></div>
+            </div>
+            <div class="card">
+              <div class="type-label">RAM USAGE</div>
+              <div id="val_mem" style="font-size:16px;font-weight:600;color:#fff;margin:2px 0;">0%</div>
+              <div class="progress-track"><div class="progress-fill" id="bar_mem" style="width:0%;"></div></div>
+            </div>
+            <div class="card">
+              <div class="type-label">SYSTEM GPU</div>
+              <div id="val_gpu" style="font-size:16px;font-weight:600;color:#22c55e;margin:2px 0;">IDLE</div>
+              <div class="progress-track"><div class="progress-fill" id="bar_gpu" style="width:0%;"></div></div>
+            </div>
+            <div class="card">
+              <div class="type-label">NET BANDWIDTH</div>
+              <div id="val_net" style="font-size:16px;font-weight:600;color:var(--accent);margin:2px 0;">0 KB/s</div>
+              <div class="progress-track"><div class="progress-fill" id="bar_net" style="width:0%;"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Autonomous Task Queue Frame -->
+      <div class="frame" style="flex: 1; min-height: 0;">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        
+        <div class="frame-inner">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div class="section-label" style="margin-bottom:0;">02 · Task Queue</div>
+            <span class="badge badge-accent mono" id="task-count-badge">0 ACTIVE</span>
+          </div>
+          
+          <div id="task-queue-list" style="display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex: 1; padding-right: 2px;">
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; color: var(--text-muted); padding: 24px 10px;">
+              <iconify-icon icon="solar:checklist-minimalistic-linear" style="font-size: 28px; margin-bottom: 6px; opacity: 0.35;"></iconify-icon>
+              <div style="font-size: 11px; font-weight: 500;">No Active Tasks</div>
+              <div style="font-size: 9px; font-family: var(--font-mono); margin-top: 2px; color: var(--text-muted);">Tasks dispatched via voice or prompt will appear here.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ── CENTER PANEL: 3D Holographic Viewport + MULTI-VIEW EXPANDABLE INSPECTOR ── -->
+    <section class="center-column-wrapper" id="center-column">
+      
+      <!-- Hologram & Fluid Vortex Avatar Frame -->
+      <div class="frame" id="avatar-frame" style="flex: 1.15; min-height: 140px;">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        
+        <div class="frame-inner" style="position: relative; justify-content: space-between; align-items: center; text-align: center; padding: 10px;">
+
+          <!-- ── 3D HOLOGRAPHIC FLUID VORTEX AVATAR (Pure Pitch Black Frame, No Glow Distortion) ── -->
+          <div id="avatar-container" style="position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; display: flex; align-items: center; justify-content: center;">
+            <div class="vortex-container">
+              <img src="download.gif" onerror="this.src='../References/download.gif'" alt="Holographic Fluid Core" class="vortex-gif" id="vortex-gif" />
+            </div>
+          </div>
+
+          <!-- ── SLEEK TACTICAL STATE CAPSULE & ORGANIC LIVE WAVEFORM ── -->
+          <div class="state-telemetry-capsule" id="state-telemetry-capsule" style="margin-top: auto; z-index: 10;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div class="state-beacon-dot" id="state-beacon-dot"></div>
+              <span class="state-heading-text" id="state-heading-text">LISTENING</span>
+            </div>
+            <div style="width: 1px; height: 14px; background: rgba(255, 255, 255, 0.12);"></div>
+            <canvas id="audio-wave" width="160" height="20" style="display: block;"></canvas>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Interactive Drag Splitter Bar -->
+      <div class="splitter-bar" id="drag-splitter" title="Drag to resize Inspector panel / Double click to reset">
+        <div class="splitter-grip"></div>
+      </div>
+
+      <!-- Center HUD Data Display & MULTI-VIEW EXPANDABLE Inspector Frame -->
+      <div class="frame" id="inspector-frame" style="flex: 1; min-height: 44px;">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        
+        <div class="frame-inner" id="inspector-container">
+          <!-- Inspector Header with Contextual Action Buttons and Sizing Controls -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-shrink: 0; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden;">
+              <div class="section-label" style="margin-bottom:0; font-size: 10px; white-space: nowrap;" id="inspector-header">03 · TASK INSPECTOR</div>
+            </div>
+            
+            <div style="display: flex; gap: 3px; align-items: center; flex-shrink: 0;">
+              <!-- Dynamic Contextual Tab Actions (Switches automatically per tab) -->
+              <div id="inspector-tab-actions" style="display: flex; gap: 3px; align-items: center;">
+                <button class="btn btn-sm btn-primary" onclick="alert('🌐 Opening live web preview...')" style="font-size: 9px; padding: 2px 6px;"><iconify-icon icon="solar:eye-linear"></iconify-icon> PREVIEW</button>
+                <button class="btn btn-sm" onclick="alert('📁 Opening directory in Explorer...')" style="font-size: 9px; padding: 2px 6px;"><iconify-icon icon="solar:folder-linear"></iconify-icon> FOLDER</button>
+              </div>
+              
+              <!-- Quick Sizing Presets (Minimize / Reset / Maximize) -->
+              <div style="width: 1px; height: 12px; background: var(--border-default); margin: 0 1px;"></div>
+              <button class="btn btn-icon btn-sm" onclick="setInspectorState('minimize')" title="Minimize / Collapse HUD" style="padding: 2px 4px;">
+                <iconify-icon icon="solar:minimize-square-linear" style="font-size: 12px;"></iconify-icon>
+              </button>
+              <button class="btn btn-icon btn-sm" onclick="setInspectorState('default')" title="Default Split" style="padding: 2px 4px;">
+                <iconify-icon icon="solar:square-transfer-horizontal-linear" style="font-size: 12px;"></iconify-icon>
+              </button>
+              <button class="btn btn-icon btn-sm" onclick="setInspectorState('maximize')" title="Expand / Maximize HUD" style="padding: 2px 4px;">
+                <iconify-icon icon="solar:maximize-square-linear" style="font-size: 12px;"></iconify-icon>
+              </button>
+            </div>
+          </div>
+
+          <!-- ── HUD MULTI-VIEW TABS (Different Operational Views) ── -->
+          <div class="hud-tabs">
+            <button class="hud-tab active" onclick="switchHudTab('coding')" id="tab-btn-coding"><iconify-icon icon="solar:programming-linear"></iconify-icon> CODING</button>
+            <button class="hud-tab" onclick="switchHudTab('web')" id="tab-btn-web"><iconify-icon icon="solar:magnifer-linear"></iconify-icon> WEB</button>
+            <button class="hud-tab" onclick="switchHudTab('file')" id="tab-btn-file"><iconify-icon icon="solar:document-text-linear"></iconify-icon> FILES</button>
+            <button class="hud-tab" onclick="switchHudTab('social')" id="tab-btn-social"><iconify-icon icon="solar:share-circle-linear"></iconify-icon> SOCIAL</button>
+            <button class="hud-tab" onclick="switchHudTab('system')" id="tab-btn-system"><iconify-icon icon="solar:chart-square-linear"></iconify-icon> TELEMETRY</button>
+            <button class="hud-tab" onclick="switchHudTab('voice')" id="tab-btn-voice"><iconify-icon icon="solar:microphone-3-linear"></iconify-icon> TRANSCRIPT</button>
+          </div>
+
+          <!-- Inspector Dynamic Body Container -->
+          <div id="inspector-body" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px; padding-right: 2px;">
+            
+            <!-- Default View: Coding Agent -->
+            <div id="view-coding" class="hud-view-content">
+              <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 110px; text-align: center; color: var(--text-muted); padding: 16px;">
+                <iconify-icon icon="solar:atom-linear" style="font-size: 30px; color: var(--accent); margin-bottom: 6px; opacity: 0.7;"></iconify-icon>
+                <div style="font-size: 12px; font-weight: 600; color: #fff;">Autonomous Execution Engine Ready</div>
+                <div style="font-size: 10px; font-family: var(--font-mono); max-width: 340px; margin-top: 4px; line-height: 1.4; color: var(--text-secondary);">
+                  Multi-agent workflows (Coding, Web Extraction, File Intelligence, System Telemetry) stream live output here during execution.
+                </div>
+              </div>
+            </div>
+
+            <!-- View: Web Search -->
+            <div id="view-web" class="hud-view-content" style="display: none;">
+              <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 11px;">Awaiting live web search query.</div>
+            </div>
+
+            <!-- View: File Extraction -->
+            <div id="view-file" class="hud-view-content" style="display: none;">
+              <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 11px;">Awaiting document extraction.</div>
+            </div>
+
+            <!-- View: Social Intel -->
+            <div id="view-social" class="hud-view-content" style="display: none;">
+              <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 11px;">Awaiting social intel graph query.</div>
+            </div>
+
+            <!-- View: System Telemetry -->
+            <div id="view-system" class="hud-view-content" style="display: none;">
+              <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 11px;">Hardware telemetry and scheduling matrix online.</div>
+            </div>
+
+            <!-- View: Live Voice Transcript -->
+            <div id="view-voice" class="hud-view-content" style="display: none;">
+              <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 11px;">Live speech stream active.</div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ── RIGHT PANEL: File Dropzone, Live Stream & REDESIGNED COMMAND BAR ── -->
+    <aside style="display: flex; flex-direction: column; gap: 8px; overflow: hidden; min-width: 0;">
+      
+      <!-- Payload Ingestion / File Dropzone Frame -->
+      <div class="frame" style="flex: 0 0 auto;">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        
+        <div class="frame-inner">
+          <div class="section-label">04 · Payload Ingestion</div>
+          
+          <input type="file" id="payload-file-input" style="display: none;" multiple onchange="uploadPayloadFiles(this.files)">
+          <div class="dropzone" id="dropzone-box" onclick="document.getElementById('payload-file-input').click()" title="Click to browse files or drag and drop">
+            <div style="font-size:11px;font-weight:500;color:var(--text-primary);margin-bottom:2px;">
+              <iconify-icon icon="solar:cloud-upload-linear" style="color:var(--accent); vertical-align:middle;"></iconify-icon> Drop documents or images here
+            </div>
+            <div class="type-code text-muted" style="font-size:9px;">PDF, DOCX, CSV, PNG, TXT (Click to load)</div>
+          </div>
+
+          <!-- Active File Item Indicator -->
+          <div id="file-item-box" style="display: none; margin-top: 6px; align-items: center; justify-content: space-between; padding: 5px 8px; background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);">
+            <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
+              <iconify-icon icon="solar:document-text-linear" style="color:var(--accent); font-size: 14px; flex-shrink: 0;"></iconify-icon>
+              <span id="attached-file-name" style="font-size: 10px; font-weight: 500; font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+            </div>
+            <span class="badge badge-accent" id="attached-file-size" style="font-size: 8px; flex-shrink: 0;"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Activity Stream Frame -->
+      <div class="frame" style="flex: 1; min-height: 0;">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        
+        <div class="frame-inner">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <div class="section-label" style="margin-bottom:0;">05 · Activity Stream</div>
+            <div style="display: flex; gap: 4px;">
+              <button id="copy-stream-btn" class="btn btn-ghost btn-sm" onclick="copyEntireStream(this)" style="font-size: 9px; padding: 2px 6px;" title="Copy entire chat & stream transcript">
+                <iconify-icon icon="solar:copy-linear" style="font-size: 11px;"></iconify-icon> COPY ALL
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="clearStream()" style="font-size: 9px; padding: 2px 6px;">CLEAR</button>
+            </div>
+          </div>
+
+          <!-- Activity Stream Messages (High-Tech Structured Cards) -->
+          <div id="stream-box" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px;">
+            
+            <!-- System Boot Log -->
+            <div class="stream-msg stream-msg-sys">
+              <div class="stream-msg-header">
+                <div class="stream-msg-meta">
+                  <span class="mono text-muted" id="initial-sys-time">--:--:--</span>
+                  <span class="stream-msg-tag" style="background: rgba(6,182,212,0.15); color: #06b6d4; border: 1px solid rgba(6,182,212,0.3);">SYS</span>
+                </div>
+              </div>
+              <div class="stream-msg-body" style="color: var(--text-secondary); font-family: var(--font-mono); font-size: 10px;">
+                ZEZO Autonomous OS online · DirectSound stream open.
+              </div>
+            </div>
+
+          </div>
+
+          <!-- ═══════════════════════════════════════════════════════════ -->
+          <!-- REDESIGNED SLEEK OBSIDIAN COMMAND INPUT BAR (Screenshot 2) -->
+          <!-- ═══════════════════════════════════════════════════════════ -->
+          <div class="command-capsule-container" style="margin-top: 6px;">
+            
+            <!-- Sleek Input Field with Prompt Icon and Send Button -->
+            <div class="command-input-row">
+              <iconify-icon icon="solar:compass-linear" style="color: var(--accent); font-size: 15px;"></iconify-icon>
+              <input type="text" class="command-input-element" id="user-input" placeholder="Enter prompt or command..." onkeydown="if(event.key==='Enter') executeCommand()">
+              <button class="command-send-button" onclick="executeCommand()" title="Execute Command (Enter)">
+                <iconify-icon icon="solar:arrow-right-linear" style="font-size: 14px;"></iconify-icon>
+              </button>
+            </div>
+
+            <!-- Status Badges & Push-to-talk info -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; padding: 2px 2px 0 2px;">
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <span class="badge" id="mic-status-pill" onclick="toggleMic()" style="cursor: pointer; font-size: 8.5px; padding: 2px 5px;" title="Toggle Mic">
+                  <iconify-icon icon="solar:microphone-3-linear" style="color: var(--accent); font-size: 11px;"></iconify-icon>
+                  <span id="mic-label">MIC ACTIVE</span>
+                </span>
+                <span class="type-code text-muted" style="font-size: 8px;">CTRL+SPACE</span>
+              </div>
+              <span class="badge badge-accent" style="cursor:pointer; font-size: 8.5px; padding: 2px 5px;" onclick="executeInterrupt()" title="Interrupt current agent action">
+                INTERRUPT [ESC]
+              </span>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- 3. INTERACTIVE MODAL OVERLAYS (Matching ui.py Exact Dialogs) -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+<!-- Modal 1: Slide-Out Task Matrix Drawer -->
+<div class="modal-overlay" id="task-modal" onclick="if(event.target===this) closeModal('task-modal')">
+  <div class="modal-panel frame">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="badge badge-accent mono" style="font-size: 11px;">⚡ ZEZO TASK MANAGER</span>
+          <span class="type-code text-muted">Autonomous Process Registry & Hardware Telemetry</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('task-modal')">✕</button>
+      </div>
+
+      <!-- Summary KPI Row -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+        <div class="card" style="border-color: var(--accent);">
+          <div class="type-label">RUNNING PROCESSES</div>
+          <div style="font-size:20px; font-weight:600; color:var(--accent);" id="task-modal-running-count">0</div>
+        </div>
+        <div class="card">
+          <div class="type-label">QUEUED JOBS</div>
+          <div style="font-size:20px; font-weight:600; color:#fff;" id="task-modal-queued-count">0</div>
+        </div>
+        <div class="card">
+          <div class="type-label">COMPLETED SESSIONS</div>
+          <div style="font-size:20px; font-weight:600; color:#22c55e;" id="task-modal-done-count">0</div>
+        </div>
+      </div>
+
+      <!-- Detailed Task Cards -->
+      <div id="task-modal-list" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 420px;">
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 160px; text-align: center; color: var(--text-muted);">
+          <iconify-icon icon="solar:checklist-minimalistic-linear" style="font-size: 32px; margin-bottom: 8px; opacity: 0.35;"></iconify-icon>
+          <div style="font-size: 12px; font-weight: 500;">No Background Tasks</div>
+          <div style="font-size: 10px; font-family: var(--font-mono); margin-top: 4px; color: var(--text-muted);">All asynchronous agent executions will be registered here.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- Modal 2: AUTHENTIC REMOTE CONTROL MODAL (Screenshot 1 Exact Match) -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="qr-modal" onclick="if(event.target===this) closeModal('qr-modal')">
+  <div class="modal-panel frame" style="max-width: 440px;">
+    <!-- 100% Authentic Corner Brackets -->
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 20px; text-align: center; display: flex; flex-direction: column; align-items: center;">
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 12px;">
+        <span class="badge badge-accent mono" style="font-size: 10px;">📱 MOBILE REMOTE CONTROL</span>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('qr-modal')">✕</button>
+      </div>
+
+      <div class="type-code text-muted" style="font-size: 11px; margin-bottom: 14px; width: 100%; text-align: center;">
+        Direct Local Gateway: <span style="color:var(--text-primary); font-weight:600;">https://192.168.18.50:8000</span>
+      </div>
+
+      <!-- ── PERFECTLY CENTERED TIGHT QR CODE BOX (No Stretched White Background) ── -->
+      <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-bottom: 16px;">
+        <div style="width: 180px; height: 180px; background: #ffffff; padding: 10px; border: 1px solid rgba(255, 255, 255, 0.25); box-shadow: 0 15px 35px rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <img id="remote-qr-img" src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=https://192.168.18.50:8000?key=8F3A-9K2L" alt="Remote QR Code" style="width: 160px; height: 160px; display: block; object-fit: contain;">
+        </div>
+      </div>
+
+      <!-- ── PROMINENT PAIRING KEY (Screenshot 1 Match) ── -->
+      <div style="width: 100%; margin-bottom: 12px;">
+        <div class="type-label" style="margin-bottom: 5px; color: var(--text-muted); letter-spacing: 0.15em;">AUTHENTICATION PAIRING KEY</div>
+        <div id="pairing-key-display" style="font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: var(--accent); background: var(--bg-deep); border: 1px solid var(--border-default); padding: 8px 12px; letter-spacing: 8px; user-select: all; text-align: center;">
+          8F3A-9K2L
+        </div>
+      </div>
+
+      <!-- Countdown Expiry Timer -->
+      <div class="type-code text-muted" id="remote-timer-lbl" style="font-size: 10px; margin-bottom: 14px;">
+        Key expires in <span style="color:#fff; font-weight:600;">09:45</span>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
+        <button class="btn btn-primary btn-sm" onclick="regenerateKey()">
+          <iconify-icon icon="solar:refresh-linear"></iconify-icon> NEW KEY
+        </button>
+        <button class="btn btn-sm" onclick="closeModal('qr-modal')">
+          DISMISS
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 3: Audio Devices & I/O Settings Modal -->
+<div class="modal-overlay" id="audio-modal" onclick="if(event.target===this) closeModal('audio-modal')">
+  <div class="modal-panel frame" style="max-width: 500px;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <span class="badge badge-accent mono">🔊 AUDIO I/O & ENDPOINTS</span>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('audio-modal')">✕</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div>
+          <label class="type-label" style="margin-bottom: 4px; display: block;">Microphone Input Endpoint</label>
+          <div style="background: var(--bg-deep); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 8px 12px; font-family: var(--font-mono); font-size: 11px; color: #fff;">Microphone (3- USB PnP Sound Device) · DirectSound</div>
+        </div>
+
+        <div>
+          <label class="type-label" style="margin-bottom: 4px; display: block;">Speaker Output Endpoint</label>
+          <div style="background: var(--bg-deep); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 8px 12px; font-family: var(--font-mono); font-size: 11px; color: #fff;">Speakers (3- USB PnP Sound Device) · MME Latency 213ms</div>
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span class="type-label">SELF-ECHO FILTER & MIC BLEED SUPPRESSION</span>
+            <span class="type-code text-accent">Active (463ms tail)</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" style="width: 85%;"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 4: Backend Log Console Modal (Ctrl+L) -->
+<div class="modal-overlay" id="log-modal" onclick="if(event.target===this) closeModal('log-modal')">
+  <div class="modal-panel frame" style="width: 840px;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <span class="badge badge-accent mono">📜 BACKEND LOG CONSOLE · RING BUFFER</span>
+        <div style="display: flex; gap: 6px;">
+          <button class="btn btn-sm" onclick="copyLogModalBuffer(this)">COPY ALL</button>
+          <button class="btn btn-ghost btn-sm" onclick="closeModal('log-modal')">✕</button>
+        </div>
+      </div>
+
+      <div style="background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; font-family: var(--font-mono); font-size: 10px; height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;" id="log-modal-buffer">
+        <div style="color:var(--text-muted);">[SYS] Backend Log Ring Buffer ready. Live process telemetry active.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 5: Customise Assistant Modal -->
+<div class="modal-overlay" id="customise-modal" onclick="if(event.target===this) closeModal('customise-modal')">
+  <div class="modal-panel frame" style="max-width: 540px;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <span class="badge badge-accent mono">⚙ CUSTOMISE ASSISTANT</span>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('customise-modal')">✕</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div>
+          <label class="type-label" style="display:block; margin-bottom:4px;">Assistant Identity Name</label>
+          <input type="text" id="customise-asst-name" class="input-field" value="ZEZO" style="width:100%;">
+        </div>
+
+        <div>
+          <label class="type-label" style="display:block; margin-bottom:4px;">Gemini Live Voice Persona</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <select id="customise-voice-select" class="input-field" style="flex: 1; background:var(--bg-deep);">
+              <option value="Puck">Puck (Engaging & Crisp)</option>
+              <option value="Aoede">Aoede (Melodic & Friendly)</option>
+              <option value="Charon">Charon (Authoritative & Deep)</option>
+              <option value="Fenrir">Fenrir (Precise & Fast)</option>
+              <option value="Kore">Kore (Warm & Studio)</option>
+            </select>
+            <button type="button" class="btn btn-sm btn-outline" id="btn-preview-voice" onclick="previewCurrentVoice()" style="display:flex; align-items:center; gap:6px; padding: 6px 12px; white-space:nowrap;">
+              <iconify-icon id="preview-btn-icon" icon="solar:play-circle-bold-duotone" style="font-size:16px; color:var(--accent);"></iconify-icon>
+              <span id="preview-btn-label">PREVIEW VOICE</span>
+            </button>
+          </div>
+          <div id="voice-preview-status" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+            <iconify-icon icon="solar:volume-loud-linear"></iconify-icon> Click Preview to listen to a live sample of this voice persona
+          </div>
+        </div>
+
+        <div>
+          <label class="type-label" style="display:block; margin-bottom:4px;">Assistant Response Language</label>
+          <select id="customise-lang-select" class="input-field" style="width:100%; background:var(--bg-deep);">
+            <option value="auto">Auto-Detect (Matches User's Spoken Language)</option>
+            <option value="English">Always English (Hamesha English mein response kare)</option>
+            <option value="Urdu">Always Urdu (Hamesha Urdu mein response kare)</option>
+            <option value="Hindi">Always Hindi (Hamesha Hindi mein response kare)</option>
+            <option value="Spanish">Always Spanish</option>
+            <option value="French">Always French</option>
+            <option value="German">Always German</option>
+            <option value="Arabic">Always Arabic</option>
+            <option value="Turkish">Always Turkish</option>
+          </select>
+          <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+            Select whether ZEZO dynamically switches languages or always replies in your chosen language (e.g. speak in Urdu/Hindi, get responses in English).
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; border-top: 1px solid var(--border-subtle); padding-top: 12px;">
+          <button class="btn btn-sm" onclick="closeModal('customise-modal')">CANCEL</button>
+          <button class="btn btn-primary btn-sm" onclick="saveCustomiseSettings()">SAVE CHANGES</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 6: SQLite FTS5 Memory Engine Modal -->
+<div class="modal-overlay" id="memory-modal" onclick="if(event.target===this) closeModal('memory-modal')">
+  <div class="modal-panel frame" style="max-width: 640px;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <iconify-icon icon="solar:atom-bold" style="color:var(--accent); font-size:16px;"></iconify-icon>
+          <span class="badge badge-accent mono">🧠 SQLITE FTS5 BRAIN (BM25 SEARCH)</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('memory-modal')">✕</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <input type="text" class="input-field" placeholder="Search long-term semantic memory (e.g. projects, users, design)...">
+        <div style="background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px; max-height: 280px; overflow-y: auto; font-family: var(--font-mono); font-size: 11px;">
+          <div style="color:var(--text-muted); text-align:center; padding: 20px;">SQLite FTS5 Semantic Memory Engine Ready. Query database above.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 7: Plugins & Ecosystem Modal -->
+<div class="modal-overlay" id="plugin-modal" onclick="if(event.target===this) closeModal('plugin-modal')">
+  <div class="modal-panel frame" style="max-width: 600px;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <span class="badge badge-accent mono">🧩 PLUGIN ECOSYSTEM</span>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('plugin-modal')">✕</button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 340px; overflow-y: auto;">
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <b>Git Workflow</b>
+            <span class="badge badge-success">ACTIVE</span>
+          </div>
+          <div class="type-body" style="font-size: 10px; margin-top: 4px;">Automated branch staging, clean semantic commit messages.</div>
+        </div>
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <b>YouTube Intel</b>
+            <span class="badge badge-success">ACTIVE</span>
+          </div>
+          <div class="type-body" style="font-size: 10px; margin-top: 4px;">Video transcription, metadata parsing, playback hooks.</div>
+        </div>
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <b>Design Extractor</b>
+            <span class="badge badge-success">ACTIVE</span>
+          </div>
+          <div class="type-body" style="font-size: 10px; margin-top: 4px;">Deterministic HTML/CSS token & component parser.</div>
+        </div>
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <b>System Telemetry</b>
+            <span class="badge badge-success">ACTIVE</span>
+          </div>
+          <div class="type-body" style="font-size: 10px; margin-top: 4px;">Hardware metrics, thread scheduling, GPU VRAM monitor.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 8: Declarative Skills Hub Modal -->
+<div class="modal-overlay" id="skills-modal" onclick="if(event.target===this) closeModal('skills-modal')">
+  <div class="modal-panel frame" style="max-width: 680px;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <span class="badge badge-accent mono">⚡ SKILL HUB · 10 DISCOVERED PACKAGES</span>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('skills-modal')">✕</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px; max-height: 380px; overflow-y: auto;">
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <b>skills/hamza_taste</b>
+            <div class="type-code text-muted" style="font-size:10px;">Studio UI aesthetic, anti-slop design rules & color tokens</div>
+          </div>
+          <span class="badge badge-accent">DESIGN</span>
+        </div>
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <b>skills/opencode</b>
+            <div class="type-code text-muted" style="font-size:10px;">Full autonomous multi-file coding workflow with feedback loop</div>
+          </div>
+          <span class="badge badge-accent">CODING</span>
+        </div>
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <b>skills/social_research</b>
+            <div class="type-code text-muted" style="font-size:10px;">YouTube, Reddit & GitHub research pipeline</div>
+          </div>
+          <span class="badge">RESEARCH</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- 4. SCRIPTS: Three.js Particles, Avatar & Interactive Logic -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<script>
+  // ── 1. Live Header Clock & Date ──
+  const updateClock = () => {
+    const d = new Date();
+    const timeStr = d.toTimeString().split(' ')[0];
+    const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    const dateStr = `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    
+    const clockEl = document.getElementById('header-clock-time');
+    const dateEl = document.getElementById('header-clock-date');
+    if (clockEl) clockEl.innerText = timeStr;
+    if (dateEl) dateEl.innerText = dateStr;
+  };
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ── 2. Full Three.js WebGL Particle Background Globe ──
+  const initGlobe = () => {
+    const container = document.getElementById('webgl-bg');
+    if (!container) return;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    const geometry = new THREE.BufferGeometry();
+    const particlesCount = 2000;
+    const posArray = new Float32Array(particlesCount * 3);
+    const colorArray = new Float32Array(particlesCount * 3);
+    const colorAccent = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#f24e1e');
+    const colorWhite = new THREE.Color(0xffffff);
+    const colorGray = new THREE.Color(0x333338);
+
+    const updateParticleColors = () => {
+      for (let i = 0; i < particlesCount * 3; i += 3) {
+        const mix = Math.random();
+        let selectedColor = colorAccent;
+        if (mix > 0.8) selectedColor = colorWhite;
+        else if (mix > 0.4) selectedColor = colorGray;
+        colorArray[i] = selectedColor.r;
+        colorArray[i + 1] = selectedColor.g;
+        colorArray[i + 2] = selectedColor.b;
+      }
+      geometry.attributes.color.needsUpdate = true;
+    };
+
+    for (let i = 0; i < particlesCount * 3; i += 3) {
+      const r = 3.5;
+      const theta = 2 * Math.PI * Math.random();
+      const phi = Math.acos(2 * Math.random() - 1);
+      posArray[i] = r * Math.sin(phi) * Math.cos(theta);
+      posArray[i + 1] = r * Math.sin(phi) * Math.sin(theta);
+      posArray[i + 2] = r * Math.cos(phi);
+      const mix = Math.random();
+      let selectedColor = colorAccent;
+      if (mix > 0.8) selectedColor = colorWhite;
+      else if (mix > 0.4) selectedColor = colorGray;
+      colorArray[i] = selectedColor.r;
+      colorArray[i + 1] = selectedColor.g;
+      colorArray[i + 2] = selectedColor.b;
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+    const material = new THREE.PointsMaterial({
+      size: 0.014, vertexColors: true, transparent: true,
+      opacity: 0.5, blending: THREE.AdditiveBlending
+    });
+    const particlesMesh = new THREE.Points(geometry, material);
+    scene.add(particlesMesh);
+    camera.position.z = 6; camera.position.x = 2; camera.position.y = -1;
+
+    window._updateGlobeAccent = (newHex) => {
+      colorAccent.set(newHex);
+      updateParticleColors();
+    };
+
+    const animate = () => {
+      requestAnimationFrame(animate);
+      particlesMesh.rotation.y += 0.0005;
+      particlesMesh.rotation.x += 0.0002;
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  };
+
+  // ── 3. Assistant State Visualizer & Fluid Vortex Engine ──
+  let currentAssistantState = 'listening';
+
+  const STATE_CONFIGS = {
+    standby: {
+      heading: 'STANDBY',
+      sub: 'Awaiting Voice Trigger',
+      color: '#94a3b8',
+      waveSpeed: 0.0006,
+      waveAmp: 3.5,
+      waveType: 'sine'
+    },
+    listening: {
+      heading: 'LISTENING',
+      sub: 'Audio Stream Active',
+      color: '#f24e1e',
+      waveSpeed: 0.0010,
+      waveAmp: 6,
+      waveType: 'sine'
+    },
+    thinking: {
+      heading: 'THINKING',
+      sub: 'Gemini Live Reasoning',
+      color: '#3b82f6',
+      waveSpeed: 0.0014,
+      waveAmp: 7,
+      waveType: 'quantum'
+    },
+    executing: {
+      heading: 'EXECUTING',
+      sub: 'Autonomous Tool Synthesis',
+      color: '#f59e0b',
+      waveSpeed: 0.0016,
+      waveAmp: 6,
+      waveType: 'stepped'
+    },
+    speaking: {
+      heading: 'SPEAKING',
+      sub: 'Vocalizing Output',
+      color: '#f24e1e',
+      waveSpeed: 0.0018,
+      waveAmp: 8,
+      waveType: 'bars'
+    },
+    muted: {
+      heading: 'MUTED',
+      sub: 'Microphone Inactive',
+      color: '#64748b',
+      waveSpeed: 0.0001,
+      waveAmp: 0.5,
+      waveType: 'flat'
+    },
+    interrupted: {
+      heading: 'HALTED',
+      sub: 'Emergency Stop Engaged',
+      color: '#ef4444',
+      waveSpeed: 0.0008,
+      waveAmp: 3.5,
+      waveType: 'sine'
+    }
+  };
+
+  function setAssistantState(stateKey) {
+    if (!STATE_CONFIGS[stateKey]) return;
+    currentAssistantState = stateKey;
+    const cfg = STATE_CONFIGS[stateKey];
+
+    // Update active pill button
+    document.querySelectorAll('.state-pill-btn').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.getElementById(`state-btn-${stateKey}`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    // Update Telemetry Capsule Texts & Beacon
+    const headingEl = document.getElementById('state-heading-text');
+    const beaconEl = document.getElementById('state-beacon-dot');
+    const capsuleEl = document.getElementById('state-telemetry-capsule');
+
+    if (headingEl) {
+      headingEl.innerText = cfg.heading;
+      headingEl.style.color = '#ffffff';
+    }
+    if (beaconEl) {
+      beaconEl.style.background = cfg.color;
+      beaconEl.style.boxShadow = `0 0 8px ${cfg.color}`;
+    }
+    if (capsuleEl) {
+      capsuleEl.style.borderColor = `${cfg.color}33`;
+    }
+  }
+
+  // ── 4. Dynamic Live Audio Waveform & Equalizer Canvas (Silky Smooth, Organic & Calm) ──
+  const initWaveform = () => {
+    const canvas = document.getElementById('audio-wave');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const cfg = STATE_CONFIGS[currentAssistantState] || STATE_CONFIGS.listening;
+      const t = Date.now() * cfg.waveSpeed;
+      const mid = canvas.height / 2;
+
+      if (cfg.waveType === 'bars') {
+        // Smooth Harmonic Voice Spectrum Bars
+        const numBars = 16;
+        const barWidth = 4;
+        const gap = 5;
+        const totalW = numBars * (barWidth + gap) - gap;
+        const startX = (canvas.width - totalW) / 2;
+
+        for (let i = 0; i < numBars; i++) {
+          const normIdx = Math.abs(i - (numBars - 1) / 2) / ((numBars - 1) / 2);
+          const bellCurve = Math.cos(normIdx * Math.PI * 0.45);
+          const h = 3 + (Math.sin(i * 0.4 + t * 2.5) * 0.5 + 0.5) * (canvas.height - 5) * bellCurve;
+          const x = startX + i * (barWidth + gap);
+          const y = mid - h / 2;
+
+          ctx.fillStyle = cfg.color;
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(x, y, barWidth, h, 2);
+          } else {
+            ctx.rect(x, y, barWidth, h);
+          }
+          ctx.fill();
+        }
+      } else if (cfg.waveType === 'quantum') {
+        // Smooth Intertwined Synapse Waveforms
+        ctx.strokeStyle = cfg.color + '44';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        for (let x = 0; x <= canvas.width; x += 3) {
+          const envelope = Math.sin((x / canvas.width) * Math.PI);
+          const y = mid + Math.sin(x * 0.04 + t) * cfg.waveAmp * 0.7 * envelope;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = cfg.color;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        for (let x = 0; x <= canvas.width; x += 3) {
+          const envelope = Math.sin((x / canvas.width) * Math.PI);
+          const y = mid + Math.cos(x * 0.055 - t * 1.1) * cfg.waveAmp * envelope;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      } else if (cfg.waveType === 'stepped') {
+        // Fluid Binary Synthesis Stepped Pulse
+        ctx.strokeStyle = cfg.color;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        const stepWidth = 12;
+        for (let x = 0; x < canvas.width; x += stepWidth) {
+          const envelope = Math.sin((Math.min(canvas.width, x + stepWidth / 2) / canvas.width) * Math.PI);
+          const level = Math.sin((x + t * 25) * 0.08) > 0 ? 1 : -1;
+          const stepY = mid + level * (cfg.waveAmp * 0.8) * envelope;
+          if (x === 0) ctx.moveTo(x, stepY);
+          else {
+            ctx.lineTo(x, stepY);
+            ctx.lineTo(x + stepWidth, stepY);
+          }
+        }
+        ctx.stroke();
+      } else if (cfg.waveType === 'flat') {
+        // Minimal Sleep Line
+        ctx.strokeStyle = cfg.color + '66';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(0, mid);
+        ctx.lineTo(canvas.width, mid);
+        ctx.stroke();
+      } else {
+        // Silky Dual-Harmonic Breathing Sine Wave (Ultra Smooth, Slow & Organic)
+        // Layer 1: Ambient harmonic glow wave
+        ctx.strokeStyle = cfg.color + '40';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        for (let x = 0; x <= canvas.width; x += 2) {
+          const envelope = Math.sin((x / canvas.width) * Math.PI);
+          const y = mid + Math.sin(x * 0.032 - t * 0.7) * cfg.waveAmp * 1.15 * envelope;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Layer 2: Crisp primary voice wave
+        ctx.strokeStyle = cfg.color;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        for (let x = 0; x <= canvas.width; x += 2) {
+          const envelope = Math.sin((x / canvas.width) * Math.PI);
+          const y = mid + Math.sin(x * 0.042 + t) * Math.cos(t * 0.35 + x * 0.012) * cfg.waveAmp * envelope;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+
+      requestAnimationFrame(draw);
+    };
+    draw();
+  };
+
+  // ── 5. Modal & Drawer Control Functions ──
+  function openModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('open');
+    closeSettingsDrawer();
+  }
+  function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('open');
+  }
+
+  function toggleSettingsDrawer(e) {
+    if (e) e.stopPropagation();
+    const drawer = document.getElementById('settings-drawer');
+    const btn = document.getElementById('settings-trigger-btn');
+    if (drawer.classList.contains('open')) {
+      drawer.classList.remove('open');
+      btn.classList.remove('active');
+    } else {
+      drawer.classList.add('open');
+      btn.classList.add('active');
+    }
+  }
+
+  function closeSettingsDrawer() {
+    const drawer = document.getElementById('settings-drawer');
+    const btn = document.getElementById('settings-trigger-btn');
+    if (drawer) drawer.classList.remove('open');
+    if (btn) btn.classList.remove('active');
+  }
+
+  document.addEventListener('click', (e) => {
+    const drawer = document.getElementById('settings-drawer');
+    const btn = document.getElementById('settings-trigger-btn');
+    if (drawer && drawer.classList.contains('open')) {
+      if (!drawer.contains(e.target) && !btn.contains(e.target)) {
+        closeSettingsDrawer();
+      }
+    }
+  });
+
+  // Settings Toggles
+  function toggleBriefMode() {
+    const badge = document.getElementById('brief-mode-badge');
+    if (badge.innerText === 'ON') {
+      badge.innerText = 'OFF';
+      badge.className = 'badge';
+    } else {
+      badge.innerText = 'ON';
+      badge.className = 'badge badge-success';
+    }
+  }
+
+  function toggleWakeWord() {
+    const badge = document.getElementById('wake-word-badge');
+    if (badge.innerText === 'ARMED') {
+      badge.innerText = 'DISABLED';
+      badge.className = 'badge';
+    } else {
+      badge.innerText = 'ARMED';
+      badge.className = 'badge badge-accent';
+    }
+  }
+
+  function toggleAutostart() {
+    const badge = document.getElementById('autostart-badge');
+    if (badge.innerText === 'OFF') {
+      badge.innerText = 'ON';
+      badge.className = 'badge badge-success';
+    } else {
+      badge.innerText = 'OFF';
+      badge.className = 'badge';
+    }
+  }
+
+  function regenerateKey() {
+    const keys = ['4K9P-2X7M', '9D2W-8V4L', '7B5T-1N9Q', '3M8F-6Z0R'];
+    const randomKey = keys[Math.floor(Math.random() * keys.length)];
+    const keyEl = document.getElementById('pairing-key-display');
+    const timerEl = document.getElementById('remote-timer-lbl');
+    const qrImg = document.getElementById('remote-qr-img');
+
+    if (keyEl) keyEl.innerText = randomKey;
+    if (timerEl) timerEl.innerHTML = 'Key expires in <span style="color:#fff; font-weight:600;">10:00</span>';
+    if (qrImg) qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=https://192.168.18.50:8000?key=${randomKey}`;
+  }
+
+  // ── UI Accent Color Switcher Logic ──
+  function setAccentColor(colorHex, colorName) {
+    const root = document.documentElement;
+    root.style.setProperty('--accent', colorHex);
+    root.style.setProperty('--accent-dim', `${colorHex}18`);
+
+    // Update active color picker dot in controls drawer
+    document.querySelectorAll('.color-dot-picker').forEach(dot => dot.classList.remove('active'));
+    const targetDot = document.getElementById(`color-dot-${colorName}`);
+    if (targetDot) targetDot.classList.add('active');
+
+    // Update STATE_CONFIGS listening and speaking to match dynamic accent
+    if (STATE_CONFIGS.listening) {
+      STATE_CONFIGS.listening.color = colorHex;
+      STATE_CONFIGS.listening.haloBg = `radial-gradient(circle, ${colorHex}73 0%, ${colorHex}14 50%, transparent 70%)`;
+      STATE_CONFIGS.listening.glowFilter = `drop-shadow(0 0 25px ${colorHex}8c)`;
+    }
+    if (STATE_CONFIGS.speaking) {
+      STATE_CONFIGS.speaking.color = colorHex;
+      STATE_CONFIGS.speaking.haloBg = `radial-gradient(circle, ${colorHex}8c 0%, ${colorHex}1f 50%, transparent 70%)`;
+      STATE_CONFIGS.speaking.glowFilter = `drop-shadow(0 0 35px ${colorHex}bf)`;
+    }
+
+    // Update Three.js globe particles
+    if (window._updateGlobeAccent) {
+      window._updateGlobeAccent(colorHex);
+    }
+
+    // Immediately re-apply current state to refresh UI visuals
+    setAssistantState(currentAssistantState);
+  }
+
+  // ── Additional Native Control Drawer Functions ──
+  function toggleFullScreenMode() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        alert(`Error enabling fullscreen: ${err.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  }
+
+  function simulateShortcut() {
+    alert('✅ Desktop shortcut created: "ZEZO OS.lnk" added to Desktop.');
+    const box = document.getElementById('stream-box');
+    if (box) {
+      const now = new Date().toTimeString().split(' ')[0];
+      box.innerHTML += `
+        <div class="stream-msg stream-msg-sys ok">
+          <div class="stream-msg-header">
+            <div class="stream-msg-meta">
+              <span class="mono text-muted">${now}</span>
+              <span class="stream-msg-tag" style="background:rgba(34,197,94,0.15); color:#22c55e; border:1px solid rgba(34,197,94,0.35);">SHORTCUT</span>
+            </div>
+            <button class="msg-copy-btn" onclick="copySingleMessage(this, 'Desktop shortcut registered.')">
+              <iconify-icon icon="solar:copy-linear"></iconify-icon>
+            </button>
+          </div>
+          <div class="stream-msg-body" style="color:var(--text-secondary); font-family:var(--font-mono); font-size:10px;">
+            Desktop shortcut "ZEZO OS.lnk" registered.
+          </div>
+        </div>
+      `;
+      box.scrollTop = box.scrollHeight;
+    }
+  }
+
+  let pttActive = true;
+  function togglePtt() {
+    pttActive = !pttActive;
+    const badge = document.getElementById('ptt-badge');
+    if (badge) {
+      if (pttActive) {
+        badge.innerText = 'ON';
+        badge.className = 'badge badge-success';
+      } else {
+        badge.innerText = 'OFF';
+        badge.className = 'badge';
+      }
+    }
+  }
+
+  const HUD_STYLES = ['FLUID VORTEX', 'HOLOGRAPHIC MESH', 'CYBERNETIC CORE'];
+  let currentHudIdx = 0;
+  function cycleHudStyle() {
+    currentHudIdx = (currentHudIdx + 1) % HUD_STYLES.length;
+    const label = document.getElementById('hud-style-label');
+    if (label) {
+      label.innerText = HUD_STYLES[currentHudIdx];
+    }
+    const box = document.getElementById('stream-box');
+    if (box) {
+      const now = new Date().toTimeString().split(' ')[0];
+      box.innerHTML += `
+        <div class="stream-msg stream-msg-sys hud">
+          <div class="stream-msg-header">
+            <div class="stream-msg-meta">
+              <span class="mono text-muted">${now}</span>
+              <span class="stream-msg-tag" style="background:rgba(168,85,247,0.15); color:#c084fc; border:1px solid rgba(168,85,247,0.35);">HUD STYLE</span>
+            </div>
+            <button class="msg-copy-btn" onclick="copySingleMessage(this, 'Switched avatar renderer to ${HUD_STYLES[currentHudIdx]}')">
+              <iconify-icon icon="solar:copy-linear"></iconify-icon>
+            </button>
+          </div>
+          <div class="stream-msg-body" style="color:var(--text-secondary); font-family:var(--font-mono); font-size:10px;">
+            Switched avatar renderer to <b>${HUD_STYLES[currentHudIdx]}</b>
+          </div>
+        </div>
+      `;
+      box.scrollTop = box.scrollHeight;
+    }
+  }
+
+  // ── 6. RESIZABLE INSPECTOR LOGIC ──
+  const avatarFrame = document.getElementById('avatar-frame');
+  const inspectorFrame = document.getElementById('inspector-frame');
+  const splitter = document.getElementById('drag-splitter');
+
+  function setInspectorState(mode) {
+    if (mode === 'minimize') {
+      avatarFrame.style.flex = '5';
+      inspectorFrame.style.flex = '0 0 46px';
+    } else if (mode === 'maximize') {
+      avatarFrame.style.flex = '0 0 130px';
+      inspectorFrame.style.flex = '4';
+    } else { // default
+      avatarFrame.style.flex = '1.1';
+      inspectorFrame.style.flex = '1';
+    }
+    setTimeout(() => {
+      if (window._resizeAvatar) window._resizeAvatar();
+    }, 280);
+  }
+
+  // Draggable Splitter Implementation
+  let isDragging = false;
+  splitter.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const centerCol = document.getElementById('center-column');
+    const rect = centerCol.getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+    const totalHeight = rect.height;
+
+    const topRatio = Math.max(0.15, Math.min(0.85, offsetY / totalHeight));
+    const bottomRatio = 1 - topRatio;
+
+    avatarFrame.style.flex = `${topRatio.toFixed(3)}`;
+    inspectorFrame.style.flex = `${bottomRatio.toFixed(3)}`;
+
+    if (window._resizeAvatar) window._resizeAvatar();
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (isDragging) {
+      isDragging = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      if (window._resizeAvatar) window._resizeAvatar();
+    }
+  });
+
+  // Double click splitter to reset
+  splitter.addEventListener('dblclick', () => setInspectorState('default'));
+
+  // ── 7. HUD Multi-View Tabs Switcher (Context-Aware Action Buttons) ──
+  const TAB_ACTIONS = {
+    coding: `
+      <button class="btn btn-sm btn-primary" onclick="alert('🌐 Opening live web preview...')" style="font-size: 9px; padding: 2px 6px;"><iconify-icon icon="solar:eye-linear"></iconify-icon> PREVIEW</button>
+      <button class="btn btn-sm" onclick="alert('📁 Opening directory in Explorer...')" style="font-size: 9px; padding: 2px 6px;"><iconify-icon icon="solar:folder-linear"></iconify-icon> FOLDER</button>
+    `,
+    web: `
+      <button class="btn btn-sm btn-primary" onclick="alert('🌐 Opening source link in default browser...')" style="font-size: 9px; padding: 2px 6px;"><iconify-icon icon="solar:link-circle-linear"></iconify-icon> OPEN</button>
+      <button class="btn btn-sm" onclick="copyEntireStream()" style="font-size: 9px; padding: 2px 6px;"><iconify-icon icon="solar:copy-linear"></iconify-icon> COPY</button>
+    `,
+    file: `
+      <button class="btn btn-sm btn-primary" onclick="document.getElementById('payload-file-input').click()" style="font-size: 9px; padding: 2px 6px;"><iconify-icon icon="solar:upload-linear"></iconify-icon> UPLOAD</button>
+      <button class="btn btn-sm" onclick="writeToSystemClipboard(document.getElementById('view-file')?.innerText || '')" style="font-size: 9px; padding: 2px 6px;"><iconify-icon icon="solar:copy-linear"></iconify-icon> COPY</button>
+    `,
+    social: `
+      <button class="btn btn-sm btn-primary" onclick="alert('🐙 Opening GitHub Profile...')" style="font-size: 9px; padding: 2px 6px;"><iconify-icon icon="solar:user-linear"></iconify-icon> GITHUB</button>
+      <button class="btn btn-sm" onclick="alert('📊 Social graph exported.')" style="font-size: 9px; padding: 2px 6px;"><iconify-icon icon="solar:diagram-up-linear"></iconify-icon> EXPORT</button>
+    `,
+    system: `
+      <button class="btn btn-sm btn-primary" onclick="openModal('task-modal')" style="font-size: 9px; padding: 2px 6px;"><iconify-icon icon="solar:layers-minimalistic-linear"></iconify-icon> MATRIX</button>
+      <button class="btn btn-sm" onclick="openModal('log-modal')" style="font-size: 9px; padding: 2px 6px;"><iconify-icon icon="solar:terminal-linear"></iconify-icon> LOGS</button>
+    `,
+    voice: `
+      <button class="btn btn-sm btn-primary" onclick="openModal('audio-modal')" style="font-size: 9px; padding: 2px 6px;"><iconify-icon icon="solar:headphones-round-linear"></iconify-icon> AUDIO</button>
+      <button class="btn btn-sm" onclick="copyEntireStream()" style="font-size: 9px; padding: 2px 6px;"><iconify-icon icon="solar:copy-linear"></iconify-icon> COPY</button>
+    `
+  };
+
+  function switchHudTab(viewId) {
+    document.querySelectorAll('.hud-tab').forEach(t => t.classList.remove('active'));
+    const activeBtn = document.getElementById(`tab-btn-${viewId}`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    document.querySelectorAll('.hud-view-content').forEach(v => v.style.display = 'none');
+    const targetView = document.getElementById(`view-${viewId}`);
+    if (targetView) targetView.style.display = 'block';
+
+    const titles = {
+      coding: '03 · TASK INSPECTOR',
+      web: '03 · WEB EXTRACTION',
+      file: '03 · FILE INTELLIGENCE',
+      social: '03 · SOCIAL INTEL',
+      system: '03 · SYSTEM MATRIX',
+      voice: '03 · LIVE TRANSCRIPT'
+    };
+    const hdr = document.getElementById('inspector-header');
+    if (hdr) hdr.innerText = titles[viewId] || '03 · TASK INSPECTOR';
+
+    // Update Contextual Action Buttons
+    const actionsEl = document.getElementById('inspector-tab-actions');
+    if (actionsEl && TAB_ACTIONS[viewId]) {
+      actionsEl.innerHTML = TAB_ACTIONS[viewId];
+    }
+  }
+
+  // ── 9. Interactive Functions & Clipboard / WebSocket Dispatch ──
+  function fallbackExecCopy(text) {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return ok;
+    } catch (e) {
+      console.warn('ExecCommand copy fallback error:', e);
+      return false;
+    }
+  }
+
+  function writeToSystemClipboard(text) {
+    if (!text) return Promise.resolve(false);
+
+    // 1. Dispatch over WebSocket so backend sets Qt / OS clipboard directly
+    try {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'set_clipboard', text: text }));
+      }
+    } catch (e) {
+      console.warn('WS clipboard dispatch failed:', e);
+    }
+
+    // 2. Browser Clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).catch(err => {
+        return fallbackExecCopy(text);
+      });
+    }
+    return Promise.resolve(fallbackExecCopy(text));
+  }
+
+  function copySingleMessage(btn, text) {
+    if (!text) {
+      const parentMsg = btn.closest('.stream-msg');
+      if (parentMsg) {
+        const bodyEl = parentMsg.querySelector('.stream-msg-body');
+        if (bodyEl) text = bodyEl.innerText.trim();
+      }
+    }
+    if (!text) return;
+
+    writeToSystemClipboard(text);
+
+    if (btn) {
+      const originalHtml = btn.innerHTML;
+      btn.classList.add('copied');
+      btn.innerHTML = '<iconify-icon icon="solar:check-circle-linear" style="font-size:12px; color:var(--pri, #22c55e);"></iconify-icon> <span style="font-size:8px; color:var(--pri, #22c55e);">COPIED</span>';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.innerHTML = originalHtml;
+      }, 1600);
+    }
+  }
+
+  function copyEntireStream(btn) {
+    const box = document.getElementById('stream-box');
+    if (!box) return;
+    const messages = box.querySelectorAll('.stream-msg');
+    if (!messages.length) return;
+
+    let transcript = '=== ZEZO OS ACTIVITY & CHAT TRANSCRIPT ===\n\n';
+    messages.forEach(msg => {
+      const time = msg.querySelector('.mono.text-muted')?.innerText || '';
+      const tag = msg.querySelector('.stream-msg-tag')?.innerText.trim() || 'LOG';
+      const body = msg.querySelector('.stream-msg-body')?.innerText.trim() || '';
+      transcript += `[${time}] [${tag}]: ${body}\n`;
+    });
+
+    writeToSystemClipboard(transcript);
+
+    const targetBtn = btn || document.getElementById('copy-stream-btn');
+    if (targetBtn) {
+      const originalHtml = targetBtn.innerHTML;
+      targetBtn.innerHTML = '<iconify-icon icon="solar:check-circle-linear" style="font-size:11px; color:var(--pri, #22c55e);"></iconify-icon> COPIED';
+      targetBtn.style.borderColor = 'var(--pri, #22c55e)';
+      targetBtn.style.color = 'var(--pri, #22c55e)';
+      setTimeout(() => {
+        targetBtn.innerHTML = originalHtml;
+        targetBtn.style.borderColor = '';
+        targetBtn.style.color = '';
+      }, 1600);
+    }
+  }
+
+  function copyLogModalBuffer(btn) {
+    const buf = document.getElementById('log-modal-buffer');
+    if (!buf) return;
+    const text = buf.innerText || '';
+    if (!text.trim()) return;
+
+    writeToSystemClipboard(text);
+
+    if (btn) {
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<iconify-icon icon="solar:check-circle-linear" style="font-size:11px; color:var(--pri, #22c55e);"></iconify-icon> COPIED';
+      setTimeout(() => {
+        btn.innerHTML = originalHtml;
+      }, 1600);
+    }
+  }
+
+  function clearStream() {
+    document.getElementById('stream-box').innerHTML = `
+      <div class="stream-msg stream-msg-sys">
+        <div class="stream-msg-header">
+          <div class="stream-msg-meta">
+            <span class="mono text-muted">--:--:--</span>
+            <span class="stream-msg-tag" style="background:rgba(255,255,255,0.06); color:var(--text-muted);">RESET</span>
+          </div>
+        </div>
+        <div class="stream-msg-body" style="color:var(--text-muted); font-family:var(--font-mono); font-size:10px;">
+          Activity stream reset. Ready for speech or prompt command.
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Keybinding Listeners ──
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && (e.key === 'l' || e.key === 'L')) {
+      e.preventDefault();
+      openModal('log-modal');
+    }
+    if (e.key === 'Escape') {
+      const openModalEl = document.querySelector('.modal-overlay.open');
+      if (openModalEl) {
+        closeModal(openModalEl.id);
+      } else {
+        closeSettingsDrawer();
+        if (typeof window.executeInterrupt === 'function') window.executeInterrupt();
+      }
+    }
+  });
+
+  window.addEventListener('load', () => {
+    initGlobe();
+    initWaveform();
+    setAssistantState('listening');
+  });
+</script>
+
+
+<!-- ── Live WebSocket Engine for Python Backend (ZEZO OS) ── -->
+<script type="module">
+  import { socket } from './js/socket.js';
+
+  function renderTasks(taskList) {
+    const list = Array.isArray(taskList) ? taskList : (taskList && taskList.tasks ? taskList.tasks : []);
+    const queueEl = document.getElementById('task-queue-list');
+    const badgeEl = document.getElementById('task-count-badge');
+    const modalListEl = document.getElementById('task-modal-list');
+    const runningCountEl = document.getElementById('task-modal-running-count');
+    const queuedCountEl = document.getElementById('task-modal-queued-count');
+    const doneCountEl = document.getElementById('task-modal-done-count');
+
+    const activeTasks = list.filter(t => t.status === 'running' || t.status === 'queued');
+    const runningTasks = list.filter(t => t.status === 'running');
+    const queuedTasks = list.filter(t => t.status === 'queued');
+    const doneTasks = list.filter(t => t.status === 'done' || t.status === 'completed');
+
+    if (badgeEl) badgeEl.innerText = `${activeTasks.length} ACTIVE`;
+    if (runningCountEl) runningCountEl.innerText = runningTasks.length;
+    if (queuedCountEl) queuedCountEl.innerText = queuedTasks.length;
+    if (doneCountEl) doneCountEl.innerText = doneTasks.length;
+
+    // Render 02 Task Queue (Left Sidebar)
+    if (queueEl) {
+      if (activeTasks.length === 0) {
+        queueEl.innerHTML = `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; color: var(--text-muted); padding: 24px 10px;">
+            <iconify-icon icon="solar:checklist-minimalistic-linear" style="font-size: 28px; margin-bottom: 6px; opacity: 0.35;"></iconify-icon>
+            <div style="font-size: 11px; font-weight: 500;">No Active Tasks</div>
+            <div style="font-size: 9px; font-family: var(--font-mono); margin-top: 2px; color: var(--text-muted);">Tasks dispatched via voice or prompt will appear here.</div>
+          </div>
+        `;
+      } else {
+        queueEl.innerHTML = activeTasks.map(t => {
+          const isRunning = t.status === 'running';
+          const badgeClass = isRunning ? 'badge-accent' : 'badge';
+          const prog = t.progress || (isRunning ? 50 : 0);
+          const toolLabel = (t.tool || 'TASK').replace(/_/g, ' ').toUpperCase();
+          const target = (t.params && (t.params.repo || t.params.file_path || t.params.path || t.params.project_path)) || '';
+          return `
+            <div class="card" style="background: var(--bg-elevated); border-left: 2px solid ${isRunning ? 'var(--accent)' : 'var(--border-default)'};">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <span class="badge ${badgeClass}">${toolLabel}</span>
+                <span class="mono text-muted" style="font-size: 9px;">#${t.id}</span>
+              </div>
+              <div style="font-weight: 600; font-size: 11px; color: #fff; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${t.message || t.tool || 'Task Execution'}
+              </div>
+              ${target ? `<div class="type-code text-muted" style="font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Target: ${target}</div>` : ''}
+              <div class="progress-track" style="margin-top: 6px;">
+                <div class="progress-fill" style="width: ${prog}%;"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // Render Task Matrix Modal
+    if (modalListEl) {
+      if (list.length === 0) {
+        modalListEl.innerHTML = `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 160px; text-align: center; color: var(--text-muted);">
+            <iconify-icon icon="solar:checklist-minimalistic-linear" style="font-size: 32px; margin-bottom: 8px; opacity: 0.35;"></iconify-icon>
+            <div style="font-size: 12px; font-weight: 500;">No Background Tasks</div>
+            <div style="font-size: 10px; font-family: var(--font-mono); margin-top: 4px; color: var(--text-muted);">All asynchronous agent executions will be registered here.</div>
+          </div>
+        `;
+      } else {
+        modalListEl.innerHTML = list.map(t => {
+          const isRunning = t.status === 'running';
+          const isDone = t.status === 'done' || t.status === 'completed';
+          const isFailed = t.status === 'failed';
+          const statusBadge = isRunning ? 'badge-accent' : (isDone ? 'badge-success' : (isFailed ? 'badge' : 'badge'));
+          const prog = isDone ? 100 : (t.progress || 0);
+          const toolLabel = (t.tool || 'TASK').replace(/_/g, ' ').toUpperCase();
+          return `
+            <div class="card" style="background: var(--bg-elevated);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="badge ${isRunning ? 'badge-accent' : ''}">${toolLabel}</span>
+                  <span class="mono text-muted">#${t.id}</span>
+                </div>
+                <span class="badge ${statusBadge}">● ${t.status.toUpperCase()} (${prog}%)</span>
+              </div>
+              <div style="font-weight: 600; margin-bottom: 2px;">${t.message || 'Task Execution'}</div>
+              ${t.params ? `<div class="type-code text-muted">${JSON.stringify(t.params)}</div>` : ''}
+              <div class="progress-track" style="margin-top: 6px;">
+                <div class="progress-fill" style="width: ${prog}%;"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+  }
+
+  socket.on('connect', () => {
+    console.log('[ZEZO-UI] Real-time WebSocket connection active');
+    socket.send('get_initial_state');
+  });
+
+  socket.on('init', (data) => {
+    if (!data) return;
+    if (data.state && typeof setAssistantState === 'function') {
+      setAssistantState(data.state.toLowerCase());
+    }
+    if (data.tasks) {
+      renderTasks(data.tasks);
+    }
+    if (data.assistant_name) {
+      const nameEl = document.getElementById('customise-asst-name');
+      if (nameEl) nameEl.value = data.assistant_name;
+    }
+    if (data.voice_name) {
+      const voiceEl = document.getElementById('customise-voice-select');
+      if (voiceEl) voiceEl.value = data.voice_name;
+    }
+    if (data.response_language) {
+      const langEl = document.getElementById('customise-lang-select');
+      if (langEl) langEl.value = data.response_language;
+    }
+  });
+
+  socket.on('assistant_settings_updated', (data) => {
+    if (!data) return;
+    if (data.assistant_name) {
+      const nameEl = document.getElementById('customise-asst-name');
+      if (nameEl) nameEl.value = data.assistant_name;
+      const titleEl = document.querySelector('.window-title span');
+      if (titleEl) {
+        titleEl.innerText = `${data.assistant_name.toUpperCase()} · AUTONOMOUS DESKTOP OS`;
+      }
+    }
+    if (data.voice_name) {
+      const voiceEl = document.getElementById('customise-voice-select');
+      if (voiceEl) voiceEl.value = data.voice_name;
+    }
+    if (data.response_language) {
+      const langEl = document.getElementById('customise-lang-select');
+      if (langEl) langEl.value = data.response_language;
+    }
+  });
+
+  socket.on('task_list', (data) => {
+    renderTasks(data);
+  });
+
+  socket.on('state_change', (data) => {
+    if (data && data.state) {
+      if (typeof setAssistantState === 'function') {
+        setAssistantState(data.state.toLowerCase());
+      }
+    }
+  });
+
+  socket.on('telemetry_update', (m) => {
+    if (!m) return;
+    const updateBar = (id, val, text) => {
+      const fill = document.getElementById(`bar_${id}`);
+      const lbl = document.getElementById(`val_${id}`);
+      if (fill) fill.style.width = `${Math.min(100, Math.max(0, val))}%`;
+      if (lbl) lbl.textContent = text;
+    };
+    if (m.cpu !== undefined) updateBar('cpu', m.cpu, `${m.cpu.toFixed(0)}%`);
+    if (m.mem !== undefined) updateBar('mem', m.mem, `${m.mem.toFixed(0)}%`);
+    if (m.gpu !== undefined) updateBar('gpu', m.gpu >= 0 ? m.gpu : 0, m.gpu >= 0 ? `${m.gpu.toFixed(0)}%` : 'N/A');
+    if (m.net !== undefined) {
+      const netStr = m.net < 1.0 ? `${(m.net * 1024).toFixed(0)}KB/s` : `${m.net.toFixed(1)}MB/s`;
+      updateBar('net', Math.min(100, m.net * 10), netStr);
+    }
+    if (m.tmp !== undefined) updateBar('tmp', m.tmp >= 0 ? m.tmp : 0, m.tmp >= 0 ? `${m.tmp.toFixed(0)}°C` : 'N/A');
+  });
+
+  socket.on('log_entry', (entry) => {
+    if (!entry || !entry.message) return;
+    const tag = (entry.tag || 'SYS').toUpperCase();
+    const msg = entry.message;
+    const box = document.getElementById('stream-box');
+    if (!box) return;
+
+    // Suppress internal state transitions
+    if (msg.startsWith('State changed to') || msg.startsWith('SYS: State changed to')) return;
+
+    const now = new Date().toTimeString().split(' ')[0];
+    const safeMsg = msg.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const copyMsg = safeMsg.replace(/'/g, "\\'");
+
+    let cardHtml = '';
+    if (tag === 'USER') {
+      cardHtml = `
+        <div class="stream-msg stream-msg-user">
+          <div class="stream-msg-header">
+            <div class="stream-msg-meta">
+              <span class="mono text-muted">${now}</span>
+              <span class="stream-msg-tag"><iconify-icon icon="solar:user-linear" style="font-size: 10px;"></iconify-icon> USER</span>
+            </div>
+            <button class="msg-copy-btn" onclick="copySingleMessage(this, '${copyMsg}')"><iconify-icon icon="solar:copy-linear"></iconify-icon></button>
+          </div>
+          <div class="stream-msg-body">${safeMsg}</div>
+        </div>
+      `;
+    } else if (tag === 'AI' || tag === 'ZEZO') {
+      cardHtml = `
+        <div class="stream-msg stream-msg-zezo">
+          <div class="stream-msg-header">
+            <div class="stream-msg-meta">
+              <span class="mono text-muted">${now}</span>
+              <span class="stream-msg-tag"><iconify-icon icon="solar:atom-bold" style="font-size: 10px;"></iconify-icon> ZEZO AI</span>
+            </div>
+            <button class="msg-copy-btn" onclick="copySingleMessage(this, '${copyMsg}')"><iconify-icon icon="solar:copy-linear"></iconify-icon></button>
+          </div>
+          <div class="stream-msg-body"><span class="stream-msg-quote">"</span>${safeMsg}<span class="stream-msg-quote">"</span></div>
+        </div>
+      `;
+    } else {
+      let extraClass = '';
+      if (tag === 'ERR') extraClass = 'interrupt';
+      if (tag === 'FILE') extraClass = 'ok';
+      cardHtml = `
+        <div class="stream-msg stream-msg-sys ${extraClass}">
+          <div class="stream-msg-header">
+            <div class="stream-msg-meta">
+              <span class="mono text-muted">${now}</span>
+              <span class="stream-msg-tag">[${tag}]</span>
+            </div>
+            <button class="msg-copy-btn" onclick="copySingleMessage(this, '${copyMsg}')"><iconify-icon icon="solar:copy-linear"></iconify-icon></button>
+          </div>
+          <div class="stream-msg-body">${safeMsg}</div>
+        </div>
+      `;
+    }
+    box.innerHTML += cardHtml;
+    box.scrollTop = box.scrollHeight;
+
+    const logModalBuf = document.getElementById('log-modal-buffer');
+    if (logModalBuf) {
+      logModalBuf.innerHTML += `<div style="color:${tag==='ERR'?'#ef4444':(tag==='USER'?'#38bdf8':(tag==='AI'?'var(--accent)':'var(--text-secondary)'))};">[${now}] [${tag}] ${safeMsg}</div>`;
+      logModalBuf.scrollTop = logModalBuf.scrollHeight;
+    }
+  });
+
+  socket.on('content_display', (payload) => {
+    if (!payload) return;
+    const body = document.querySelector('#view-coding .type-code') || document.getElementById('view-coding');
+    if (body) body.innerText = payload.text || '';
+    const hdr = document.getElementById('inspector-header');
+    if (hdr) hdr.innerText = `03 · ${payload.title || 'Task Inspection'}`;
+  });
+
+  // Real Command Execution
+  window.executeCommand = function() {
+    const input = document.getElementById('user-input');
+    if (!input) return;
+    const val = input.value.trim();
+    if (!val) return;
+
+    socket.send('user_message', { text: val });
+    input.value = '';
+  };
+
+  // Real Emergency Interrupt
+  window.executeInterrupt = function() {
+    socket.send('interrupt', {});
+  };
+
+  // Real Mic Toggle
+  window.toggleMic = function() {
+    const label = document.getElementById('mic-label');
+    const pill = document.getElementById('mic-status-pill');
+    const isCurrentlyActive = (label && label.innerText === 'MIC ACTIVE');
+    const setMuted = isCurrentlyActive;
+
+    if (label && pill) {
+      if (setMuted) {
+        label.innerText = 'MIC MUTED';
+        pill.style.borderColor = 'rgba(239,68,68,0.4)';
+        pill.style.color = '#ef4444';
+      } else {
+        label.innerText = 'MIC ACTIVE';
+        pill.style.borderColor = 'var(--border-subtle)';
+        pill.style.color = 'var(--text-secondary)';
+      }
+    }
+    socket.send('mute_toggle', { muted: setMuted });
+  };
+
+  // Real Desktop Shortcut
+  window.simulateShortcut = function() {
+    socket.send('create_shortcut', {});
+    alert('⚡ Desktop shortcut creation requested from Python backend.');
+  };
+
+  // Real Wake Word Toggle
+  window.toggleWakeWord = function() {
+    if (typeof wakeActive === 'undefined') window.wakeActive = true;
+    window.wakeActive = !window.wakeActive;
+    const badge = document.getElementById('wake-word-badge');
+    if (badge) {
+      badge.innerText = window.wakeActive ? 'ARMED' : 'OFF';
+      badge.className = window.wakeActive ? 'badge badge-accent' : 'badge';
+    }
+    socket.send('wake_toggle', { enable: window.wakeActive });
+  };
+
+  // Real PTT Toggle
+  window.togglePtt = function() {
+    if (typeof pttActive === 'undefined') window.pttActive = true;
+    window.pttActive = !window.pttActive;
+    const badge = document.getElementById('ptt-badge');
+    if (badge) {
+      badge.innerText = window.pttActive ? 'ON' : 'OFF';
+      badge.className = window.pttActive ? 'badge badge-success' : 'badge';
+    }
+    socket.send('ptt_toggle', { enable: window.pttActive });
+  };
+
+  // Real Theme Accent Persistence
+  const origSetColor = window.setCustomColor;
+  window.setCustomColor = function(hex, name) {
+    if (typeof origSetColor === 'function') origSetColor(hex, name);
+    socket.send('set_accent', { color: hex });
+  };
+
+  // ── Real Payload File Ingestion & Drag-Drop ──
+  window.displayIngestedFile = function(fileInfo) {
+    if (!fileInfo) return;
+    const fileItemBox = document.getElementById('file-item-box');
+    const fileNameEl = document.getElementById('attached-file-name');
+    const fileSizeEl = document.getElementById('attached-file-size');
+
+    if (fileItemBox && fileNameEl && fileSizeEl) {
+      fileItemBox.style.display = 'flex';
+      fileNameEl.innerText = fileInfo.name || 'document';
+      const sizeKb = fileInfo.size ? (fileInfo.size / 1024).toFixed(1) : '0';
+      fileSizeEl.innerText = `${sizeKb} KB`;
+    }
+
+    // Switch HUD Tab to 'file' view
+    if (typeof switchHudTab === 'function') {
+      switchHudTab('file');
+    }
+
+    const viewFile = document.getElementById('view-file');
+    if (viewFile && fileInfo.text) {
+      const safeText = fileInfo.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      viewFile.innerHTML = `
+        <div style="padding: 12px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; color: var(--text-primary); white-space: pre-wrap; word-break: break-word;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
+            <span style="font-weight: 600; color: var(--accent);">📄 ${fileInfo.name}</span>
+            <span class="badge badge-accent">${fileInfo.engine || 'Direct Read'} · ${(fileInfo.size / 1024).toFixed(1)} KB</span>
+          </div>
+          <div>${safeText}</div>
+        </div>
+      `;
+    }
+
+    // Add activity stream card
+    const box = document.getElementById('stream-box');
+    if (box) {
+      const now = new Date().toTimeString().split(' ')[0];
+      const preview = fileInfo.text ? (fileInfo.text.substring(0, 160).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '...') : 'Payload ready for agent execution.';
+      const safeName = (fileInfo.name || 'document').replace(/'/g, "\\'");
+      box.innerHTML += `
+        <div class="stream-msg stream-msg-sys ok">
+          <div class="stream-msg-header">
+            <div class="stream-msg-meta">
+              <span class="mono text-muted">${now}</span>
+              <span class="stream-msg-tag">[FILE INGEST]</span>
+            </div>
+            <button class="msg-copy-btn" onclick="copySingleMessage(this, '${safeName}')"><iconify-icon icon="solar:copy-linear"></iconify-icon></button>
+          </div>
+          <div class="stream-msg-body">
+            <strong>${fileInfo.name}</strong> (${(fileInfo.size / 1024).toFixed(1)} KB) ingested via ${fileInfo.engine || 'engine'}.<br>
+            <span style="color: var(--text-muted); font-size: 10px;">${preview}</span>
+          </div>
+        </div>
+      `;
+      box.scrollTop = box.scrollHeight;
+    }
+  };
+
+  window.uploadPayloadFiles = async function(fileList) {
+    if (!fileList || !fileList.length) return;
+    const fileItemBox = document.getElementById('file-item-box');
+    const fileNameEl = document.getElementById('attached-file-name');
+    const fileSizeEl = document.getElementById('attached-file-size');
+
+    const firstFile = fileList[0];
+    if (fileItemBox && fileNameEl && fileSizeEl) {
+      fileItemBox.style.display = 'flex';
+      fileNameEl.innerText = firstFile.name;
+      const sizeKb = (firstFile.size / 1024).toFixed(1);
+      fileSizeEl.innerText = `${sizeKb} KB · Ingesting...`;
+    }
+
+    const formData = new FormData();
+    for (let i = 0; i < fileList.length; i++) {
+      formData.append('file', fileList[i]);
+    }
+
+    try {
+      const resp = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await resp.json();
+      if (data.status === 'success' && data.files && data.files.length) {
+        displayIngestedFile(data.files[0]);
+      }
+    } catch (err) {
+      console.warn('Payload upload error:', err);
+    }
+  };
+
+  socket.on('file_ingested', (fileInfo) => {
+    displayIngestedFile(fileInfo);
+  });
+
+  // Setup drag and drop on dropzone
+  const dropBox = document.getElementById('dropzone-box');
+  if (dropBox) {
+    dropBox.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropBox.classList.add('dragover');
+    });
+    dropBox.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dropBox.classList.remove('dragover');
+    });
+    dropBox.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropBox.classList.remove('dragover');
+      if (e.dataTransfer && e.dataTransfer.files) {
+        uploadPayloadFiles(e.dataTransfer.files);
+      }
+    });
+  }
+
+  // ── Voice Preview Player ──
+  let _voiceAudio = null;
+  window.previewCurrentVoice = function() {
+    const voiceSelect = document.getElementById('customise-voice-select');
+    const btn = document.getElementById('btn-preview-voice');
+    const label = document.getElementById('preview-btn-label');
+    const icon = document.getElementById('preview-btn-icon');
+    const status = document.getElementById('voice-preview-status');
+    const voice = (voiceSelect ? voiceSelect.value : 'Puck').toLowerCase();
+
+    if (_voiceAudio) {
+      _voiceAudio.pause();
+      _voiceAudio = null;
+    }
+
+    if (btn) btn.classList.add('btn-primary');
+    if (label) label.innerText = 'PLAYING...';
+    if (icon) icon.setAttribute('icon', 'solar:soundwave-bold');
+    if (status) status.innerHTML = `<iconify-icon icon="solar:soundwave-bold" style="color:var(--accent);"></iconify-icon> Playing ${voiceSelect ? voiceSelect.value : ''} sample audio...`;
+
+    _voiceAudio = new Audio(`/assets/voices/${voice}.mp3`);
+    _voiceAudio.onended = function() {
+      if (btn) btn.classList.remove('btn-primary');
+      if (label) label.innerText = 'PREVIEW VOICE';
+      if (icon) icon.setAttribute('icon', 'solar:play-circle-bold-duotone');
+      if (status) status.innerHTML = `<iconify-icon icon="solar:volume-loud-linear"></iconify-icon> Click Preview to listen to a live sample of this voice persona`;
+      _voiceAudio = null;
+    };
+    _voiceAudio.onerror = function() {
+      if (btn) btn.classList.remove('btn-primary');
+      if (label) label.innerText = 'PREVIEW VOICE';
+      if (icon) icon.setAttribute('icon', 'solar:play-circle-bold-duotone');
+      if (status) status.innerHTML = `<span style="color:#ef4444;">Preview unavailable for this voice</span>`;
+      _voiceAudio = null;
+    };
+    _voiceAudio.play().catch(e => {
+      console.warn('Audio play failed:', e);
+      if (btn) btn.classList.remove('btn-primary');
+      if (label) label.innerText = 'PREVIEW VOICE';
+      if (icon) icon.setAttribute('icon', 'solar:play-circle-bold-duotone');
+    });
+  };
+
+  // ── Save Customise Assistant Settings ──
+  window.saveCustomiseSettings = async function() {
+    const nameEl = document.getElementById('customise-asst-name');
+    const voiceEl = document.getElementById('customise-voice-select');
+    const langEl = document.getElementById('customise-lang-select');
+
+    const name = nameEl ? nameEl.value.trim() : 'ZEZO';
+    const voice = voiceEl ? voiceEl.value : 'Charon';
+    const lang = langEl ? langEl.value : 'auto';
+
+    try {
+      const resp = await fetch('/api/settings/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assistant_name: name,
+          voice_name: voice,
+          response_language: lang,
+        })
+      });
+      const data = await resp.json();
+      if (data.status === 'success') {
+        const titleEl = document.querySelector('.window-title span');
+        if (titleEl && name) {
+          titleEl.innerText = `${name.toUpperCase()} · AUTONOMOUS DESKTOP OS`;
+        }
+        closeModal('customise-modal');
+        const box = document.getElementById('stream-box');
+        if (box) {
+          const now = new Date().toTimeString().split(' ')[0];
+          box.innerHTML += `
+            <div class="stream-msg stream-msg-sys ok">
+              <div class="stream-msg-header">
+                <div class="stream-msg-meta"><span class="mono text-muted">${now}</span><span class="stream-msg-tag">[CONFIG]</span></div>
+              </div>
+              <div class="stream-msg-body">Assistant settings updated: Name: <strong>${name}</strong>, Voice: <strong>${voice}</strong>, Language: <strong>${lang}</strong>.</div>
+            </div>
+          `;
+          box.scrollTop = box.scrollHeight;
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to save assistant settings via HTTP:', err);
+      socket.send('save_assistant_settings', {
+        assistant_name: name,
+        voice_name: voice,
+        response_language: lang,
+      });
+      closeModal('customise-modal');
+    }
+  };
+
+  socket.connect();
+</script>
+
+</body>
+</html>

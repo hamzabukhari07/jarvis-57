@@ -114,12 +114,12 @@ SEARCH = "search"  # grounded search — REST only, see below
 LIVE = "live"
 
 _LADDERS = {
-    FAST: (LIVE, "gemini-2.0-flash", "gemini-1.5-flash"),
-    SMART: (LIVE, "gemini-2.0-flash", "gemini-1.5-pro"),
+    FAST: (LIVE, "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"),
+    SMART: (LIVE, "gemini-3.6-flash", "gemini-3.1-pro-preview", "gemini-pro-latest"),
     # Grounded search needs response.candidates[...].grounding_metadata, which a
     # Live turn does not produce. REST only, and it says so rather than silently
     # returning an answer with no sources behind it.
-    SEARCH: ("gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"),
+    SEARCH: ("gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"),
 }
 
 # The Live model to use for one-shot calls. main.py owns the real one; this is
@@ -289,7 +289,7 @@ async def _live_turn(parts: list, system: str, key: str, timeout_s: float) -> st
     session = await asyncio.wait_for(cm.__aenter__(), 30)
     try:
         await session.send_client_content(
-            turns={"role": "user", "parts": parts}, turn_complete=True)
+            turns=[{"role": "user", "parts": parts}], turn_complete=True)
         chunks: list[str] = []
 
         async def drain():

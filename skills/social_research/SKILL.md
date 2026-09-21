@@ -2,7 +2,7 @@
 name: social_research
 description: Multi-platform social, video, and code research powered by Agent-Reach. Fetches YouTube transcripts, Reddit discussions, and GitHub repository trees.
 metadata:
-  author: Zezo / FatihMakes
+  author: ZEZO / Hamza Bukhari
   version: '1.0'
 ---
 

@@ -35,12 +35,34 @@ _db_lock = threading.Lock()
 _current_session_id = f"sess_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
 # ── Secret Redaction Patterns ───────────────────────────────────────────────
+# Each entry is (compiled pattern, replacement). Most replacements are the
+# blanket token, but credential-bearing HEADERS keep their name so a scrubbed
+# log line still says which credential was removed.
+_REDACT = "[REDACTED_SECRET]"
+
 _SECRET_PATTERNS = [
-    re.compile(r"(AIzaSy[A-Za-z0-9_-]{33})", re.IGNORECASE),                         # Google API Key
-    re.compile(r"(sk-[A-Za-z0-9_-]{20,64})", re.IGNORECASE),                        # OpenAI / Generic Secret
-    re.compile(r"(Bearer\s+)[A-Za-z0-9\._\-]{20,}", re.IGNORECASE),                 # Bearer Tokens
-    re.compile(r"(ghp_[A-Za-z0-9]{36})", re.IGNORECASE),                            # GitHub Personal Access Token
-    re.compile(r"(password\s*(?:[:=]|is)\s*['\"][^'\"]+['\"])", re.IGNORECASE),   # Password expressions
+    # ── Known key shapes ────────────────────────────────────────────────────
+    (re.compile(r"AIzaSy[A-Za-z0-9_-]{33}", re.IGNORECASE),                      _REDACT),  # Google API Key (legacy AIzaSy)
+    (re.compile(r"AQ\.[A-Za-z0-9_-]{20,}", re.IGNORECASE),                       _REDACT),  # Google API Key (current AQ. format)
+    (re.compile(r"sk-[A-Za-z0-9_-]{20,64}", re.IGNORECASE),                      _REDACT),  # OpenAI / Generic Secret
+    (re.compile(r"ghp_[A-Za-z0-9]{20,}", re.IGNORECASE),                         _REDACT),  # GitHub Personal Access Token
+    (re.compile(r"(Bearer\s+)[A-Za-z0-9\._\-]{20,}", re.IGNORECASE),      r"\1" + _REDACT),  # Bearer Tokens
+
+    # ── Format-agnostic: redact by header NAME ──────────────────────────────
+    # Matching the credential's shape only protects against formats we already
+    # know about. The Gemini Live handshake prints `x-goog-api-key: AQ.…` in the
+    # websockets DEBUG stream, and AQ.-prefixed keys were invisible to every
+    # shape rule above. Matching the header name instead means any current or
+    # future key format behind a known header is scrubbed without a new pattern.
+    # The optional `bearer` is consumed here so an Authorization line gets one
+    # clean redaction rather than a doubled label.
+    (re.compile(r"((?:x-goog-api-key|x-api-key|api[-_]?key|authorization|x-auth-token)"
+                r"\s*[:=]\s*(?:bearer\s+)?)\S+", re.IGNORECASE),            r"\1" + _REDACT),
+
+    # ── Session artefacts ───────────────────────────────────────────────────
+    (re.compile(r"(set-cookie\s*:\s*)\S+", re.IGNORECASE),                  r"\1" + _REDACT),  # Session cookies
+    (re.compile(r"(password\s*(?:[:=]|is)\s*['\"])[^'\"]+(['\"])", re.IGNORECASE),
+     r"\1" + _REDACT + r"\2"),                                                                  # Password expressions
 ]
 
 
@@ -49,8 +71,8 @@ def redact_secrets(text: str) -> str:
     if not text or not isinstance(text, str):
         return ""
     scrubbed = text
-    for pattern in _SECRET_PATTERNS:
-        scrubbed = pattern.sub("[REDACTED_SECRET]", scrubbed)
+    for pattern, replacement in _SECRET_PATTERNS:
+        scrubbed = pattern.sub(replacement, scrubbed)
     return scrubbed
 
 
@@ -187,6 +209,7 @@ def sync_facts_from_dict(memory_dict: dict) -> None:
         try:
             conn = _get_connection()
             with conn:
+                valid_pairs = set()
                 for cat, items in memory_dict.items():
                     if not isinstance(items, dict):
                         continue
@@ -194,6 +217,7 @@ def sync_facts_from_dict(memory_dict: dict) -> None:
                         val = entry.get("value", "") if isinstance(entry, dict) else str(entry or "")
                         updated = (entry.get("updated", "") if isinstance(entry, dict) else "") or now_str
                         if val:
+                            valid_pairs.add((cat, key))
                             conn.execute(
                                 """
                                 INSERT INTO facts (category, key, value, updated_at)
@@ -204,6 +228,14 @@ def sync_facts_from_dict(memory_dict: dict) -> None:
                                 """,
                                 (cat, key, str(val), str(updated)),
                             )
+                # Purge facts that no longer exist in memory_dict
+                cursor = conn.execute("SELECT category, key FROM facts")
+                for row in cursor.fetchall():
+                    if (row["category"], row["key"]) not in valid_pairs:
+                        conn.execute(
+                            "DELETE FROM facts WHERE category = ? AND key = ?",
+                            (row["category"], row["key"]),
+                        )
             conn.close()
         except Exception as e:
             print(f"[SQLite Memory] ⚠️ sync_facts error: {e}")
@@ -311,7 +343,7 @@ def search_unified_memory(query: str, limit: int = 8) -> str:
             ts_short = t["timestamp"][:16] if t["timestamp"] else ""
             if t["role"] == "tool" and t["tool_name"]:
                 res_preview = (t["tool_result"] or "")[:120].replace("\n", " ")
-                turn_lines.append(f"[{ts_short}] [Tool Action] {t['tool_name']} → {res_preview}")
+                turn_lines.append(f"[{ts_short}] [Tool Action] {t['tool_name']} -> {res_preview}")
             else:
                 cnt_preview = (t["content"] or "")[:140].replace("\n", " ")
                 speaker = "User" if t["role"] == "user" else "Assistant"

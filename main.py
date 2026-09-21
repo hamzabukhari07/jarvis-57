@@ -48,7 +48,7 @@ import sounddevice as sd
 import numpy as np
 from google import genai
 from google.genai import types
-from ui import JarvisUI
+from ui import ZezoUI
 from memory.memory_manager import (
     load_memory, update_memory, format_memory_for_prompt,
     save_session_summary, pop_last_session,
@@ -60,8 +60,8 @@ from memory import sqlite_memory
 # imported or declared here — they self-describe via a TOOL dict in their own
 # actions/*.py file and are auto-discovered by core.action_loader at startup.
 # Only tools that are tied to live-session state stay inline in this file
-# (screen_process, close_camera, save_memory, manage_monitor, shutdown_jarvis,
-# system_status).
+    # (screen_process, close_camera, save_memory, manage_monitor, shutdown_zezo,
+    # system_status).
 from actions.screen_processor  import _capture_camera, _capture_screen
 from actions.system_monitor    import SystemMonitor, get_system_status
 from actions.proactive         import ProactiveEngine
@@ -295,7 +295,8 @@ def _load_system_prompt() -> str:
         return PROMPT_PATH.read_text(encoding="utf-8")
     except Exception:
         return (
-            "You are JARVIS, Tony Stark's AI assistant. "
+            "You are ZEZO, a voice assistant running as a native desktop "
+            "application on this machine. "
             "Be concise, direct, and always use the provided tools to complete tasks. "
             "Never simulate or guess results — always call the appropriate tool."
         )
@@ -329,7 +330,7 @@ TOOL_DECLARATIONS = [
     # handling is woven into live-session state — vision capture/injection,
     # camera stream, memory writes, the monitor engine, and shutdown. All other
     # tools live in their own action file and are auto-discovered by
-    # core.action_loader (see JarvisLive.__init__).
+    # core.action_loader (see ZezoLive.__init__).
     {
         "name": "system_status",
         "description": (
@@ -374,7 +375,7 @@ TOOL_DECLARATIONS = [
         "name": "manage_monitor",
         "description": (
             "Add, remove, or list background monitoring topics. "
-            "JARVIS checks these topics once a day and alerts the user when there is a new development. "
+            "Zezo checks these topics once a day and alerts the user when there is a new development. "
             "Use 'add' when the user says 'monitor X', 'track X', 'follow X'. "
             "Use 'remove' when the user says 'stop monitoring X'. "
             "Use 'list' when the user asks what is being monitored. "
@@ -396,11 +397,11 @@ TOOL_DECLARATIONS = [
         },
     },
     {
-        "name": "shutdown_jarvis",
+        "name": "shutdown_zezo",
         "description": (
             "Shuts down the assistant completely. "
             "Call this when the user expresses intent to end the conversation, "
-            "close the assistant, say goodbye, or stop Jarvis. "
+            "close the assistant, say goodbye, or stop Zezo. "
             "The user can say this in ANY language."
         ),
         "parameters": {
@@ -562,10 +563,10 @@ def _keep_context_of(exc: BaseException) -> bool:
     return True
 
 
-class JarvisLive:
-    def __init__(self, ui: JarvisUI):
+class ZezoLive:
+    def __init__(self, ui: ZezoUI):
         self.ui             = ui
-        self._asst_name     = "JARVI    S"   # updated each session from config
+        self._asst_name     = "ZEZO"   # updated each session from config
         self.session              = None
         self.audio_in_queue       = None
         self.out_queue            = None
@@ -604,6 +605,7 @@ class JarvisLive:
         self.ui.on_push_to_talk   = self.set_push_to_talk
         self.ui.ptt_hold          = self._on_ptt
         self.ui.on_text_command   = self._on_text_command
+        self.ui.on_file_uploaded  = self._on_ui_file_uploaded
         self.ui.on_remote_clicked = self._make_remote_key
         self.ui.on_interrupt      = self.interrupt
         self.ui.on_voice_change   = self._on_voice_change     # voice picker → rebuild session
@@ -636,9 +638,9 @@ class JarvisLive:
         try:
             sqlite_memory.init_db()
             sqlite_memory.sync_facts_from_dict(load_memory())
-            print("[JARVIS] 🧠 SQLite FTS5 Memory Engine initialized")
+            print("[Zezo] 🧠 SQLite FTS5 Memory Engine initialized")
         except Exception as _e:
-            print(f"[JARVIS] ⚠️ SQLite memory init warning: {_e}")
+            print(f"[Zezo] ⚠️ SQLite memory init warning: {_e}")
 
         self._skill_registry = get_skill_registry()
         print(f"[Skills] Discovered {len(self._skill_registry.list_skills())} declarative skills")
@@ -688,7 +690,7 @@ class JarvisLive:
             try:
                 self.set_push_to_talk(True)
             except Exception as e:
-                print(f"[JARVIS] ⚠ Push-to-talk unavailable: {e}")
+                print(f"[Zezo] ⚠ Push-to-talk unavailable: {e}")
         # UI control surface for the Wake Word settings section.
         self.ui.wake_is_ready    = wake_is_ready          # () -> bool
         self.ui.wake_get_state   = self._wake_state       # () -> dict
@@ -717,7 +719,7 @@ class JarvisLive:
         return True
 
     def _on_wake_detected(self) -> None:
-        """Called from the detector thread when 'Hey Jarvis' is heard."""
+        """Called from the detector thread when 'Hey Zezo' is heard."""
         self.wake(reason="wake word")
 
     def wake(self, reason: str = "wake word") -> None:
@@ -735,7 +737,7 @@ class JarvisLive:
         self._awake = False
         self.set_speaking(False)
         self.ui.set_state("SLEEPING")
-        self.ui.write_log(f"SYS: Sleeping — {reason}. Say 'Hey Jarvis' to wake me.")
+        self.ui.write_log(f"SYS: Sleeping — {reason}. Say 'Hey Zezo' to wake me.")
 
     async def _run_sleep_watch(self) -> None:
         """Auto-sleep after the configured silence window (wake-word mode only)."""
@@ -787,7 +789,7 @@ class JarvisLive:
 
     def plugin_say(self, instruction: str) -> None:
         """
-        Thread-safe speech channel for plugins: lets a plugin ask JARVIS to
+        Thread-safe speech channel for plugins: lets a plugin ask ZEZO to
         say something short WHILE its run() is still executing (plugins block
         their executor thread, so they can't speak through the tool response
         until they finish). The instruction is injected into the Live session
@@ -801,7 +803,7 @@ class JarvisLive:
         async def _say():
             try:
                 await self.session.send_client_content(
-                    turns={"role": "user", "parts": [{"text": instruction}]},
+                    turns=[{"role": "user", "parts": [{"text": instruction}]}],
                     turn_complete=True,
                 )
             except Exception as e:
@@ -877,13 +879,13 @@ class JarvisLive:
             return
         # Respect wake-word sleep: a typed command must not be answered while
         # asleep either (the sleep gate is not just for the mic). Wake first with
-        # "Hey Jarvis" or the WAKE NOW button.
+            # "Hey Zezo" or the WAKE NOW button.
         if self._wake_enabled and not self._awake:
-            self.ui.write_log("SYS: I'm asleep — say 'Hey Jarvis' or tap WAKE NOW first.")
+            self.ui.write_log("SYS: I'm asleep — say 'Hey Zezo' or tap WAKE NOW first.")
             return
         asyncio.run_coroutine_threadsafe(
             self.session.send_client_content(
-                turns={"role": "user", "parts": [{"text": text}]},
+                turns=[{"role": "user", "parts": [{"text": text}]}],
                 turn_complete=True
             ),
             self._loop
@@ -963,7 +965,7 @@ class JarvisLive:
                 pass
 
     def interrupt(self) -> None:
-        """Stop JARVIS mid-speech: drain queued audio and open mic immediately."""
+        """Stop ZEZO mid-speech: drain queued audio and open mic immediately."""
         self._interrupted = True
         q = self.audio_in_queue
         if q:
@@ -975,7 +977,7 @@ class JarvisLive:
                 except Exception:
                     break
             if drained:
-                print(f"[JARVIS] ✋ Interrupted — {drained} audio chunks discarded")
+                print(f"[Zezo] ✋ Interrupted — {drained} audio chunks discarded")
         self.set_speaking(False)
         # The words we were about to mouth are never going to be spoken now.
         self._visemes.reset()
@@ -989,7 +991,7 @@ class JarvisLive:
             return
         asyncio.run_coroutine_threadsafe(
             self.session.send_client_content(
-                turns={"role": "user", "parts": [{"text": text}]},
+                turns=[{"role": "user", "parts": [{"text": text}]}],
                 turn_complete=True
             ),
             self._loop
@@ -1006,10 +1008,10 @@ class JarvisLive:
         # Load customization from config
         try:
             _cfg = json.loads(open(API_CONFIG_PATH, encoding="utf-8").read())
-            self._asst_name = (_cfg.get("assistant_name") or "JARVIS").strip()
+            self._asst_name = (_cfg.get("assistant_name") or "Zezo").strip()
             _user_name = (_cfg.get("user_name") or "").strip()
         except Exception:
-            self._asst_name = "JARVIS"
+            self._asst_name = "Zezo"
             _user_name = ""
 
         memory     = load_memory()
@@ -1055,6 +1057,25 @@ class JarvisLive:
                       + self._plugin_registry.get_tool_declarations())
         _names = {(d.get("name") if isinstance(d, dict) else getattr(d, "name", ""))
                   for d in _all_decls}
+        from memory.config_manager import get_response_language
+        resp_lang = get_response_language()
+        if resp_lang and resp_lang.lower() != "auto":
+            lang_dir = (
+                f"STRICT FIXED RESPONSE LANGUAGE DIRECTIVE:\n"
+                f"- You MUST ALWAYS speak and reply to the user in {resp_lang}, regardless of what language the user speaks in (whether they speak Urdu, Hindi, English, Punjabi, or any other language).\n"
+                f"- Understand their intent in whatever language they speak, but deliver 100% of your voice answers and spoken sentences in {resp_lang} only.\n"
+                f"- Tool parameters and code are in English, but your spoken sentences MUST BE in {resp_lang}."
+            )
+        else:
+            lang_dir = (
+                "Dynamic Language Matching:\n"
+                "- The language of your reply is the language of the user's MOST RECENT message.\n"
+                "- Nothing else decides it — not what is stored in memory, not the language of these instructions, not the language a tool answered in.\n"
+                "- Memory may record which language this person has used before. That is history, not an instruction: if they speak another language today, answer in that one.\n"
+                "- Tool results, log lines and this prompt are English because that is what code is written in. None of them is a reason to switch.\n"
+                "- Never answer in a language the user has not used in this conversation."
+            )
+
         sys_prompt = _render_prompt(sys_prompt, {
             "assistant_name": self._asst_name,
             "platform": f"{_platform.system()} {_platform.release()}".strip(),
@@ -1063,6 +1084,7 @@ class JarvisLive:
                 has_vision="screen_process" in _names,
                 has_mic=True,
             ),
+            "language_directive": lang_dir,
         })
 
         parts = [time_ctx, identity_ctx]
@@ -1086,7 +1108,7 @@ class JarvisLive:
                 handle=self._resume_handle
             ),
             # Sliding-window compression: session never dies from a full context
-            # window — JARVIS can stay in one conversation for hours
+            # window — ZEZO can stay in one conversation for hours
             context_window_compression=types.ContextWindowCompressionConfig(
                 sliding_window=types.SlidingWindow(),
             ),
@@ -1099,7 +1121,7 @@ class JarvisLive:
             ),
         )
         if self._enhanced_live:
-            # Proactive audio: JARVIS stays silent when speech isn't addressed
+            # Proactive audio: ZEZO stays silent when speech isn't addressed
             # to it (background chatter, talking to someone else in the room).
             # (Affective dialog was dropped: gemini-3.1-flash-live does not
             #  support it, and it never reliably detected tone in practice.
@@ -1170,7 +1192,7 @@ class JarvisLive:
         name = fc.name
         args = dict(fc.args or {})
 
-        print(f"[JARVIS] 🔧 {name}  {args}")
+        print(f"[Zezo] 🔧 {name}  {args}")
         self.ui.set_state("THINKING")
 
 
@@ -1314,14 +1336,14 @@ class JarvisLive:
                     lambda: self._skill_registry.save_learned_skill(s_name, s_desc, s_inst, author="auto_learned")
                 )
 
-            elif name == "shutdown_jarvis":
+            elif name == "shutdown_zezo":
                 self.ui.write_log("SYS: Shutdown requested.")
                 async def _do_shutdown():
                     await self._save_session_summary()
                     if self.session:
                         try:
                             await self.session.send_client_content(
-                                turns={"role": "user", "parts": [{"text": "Say a brief natural goodbye to the user."}]},
+                                turns=[{"role": "user", "parts": [{"text": "Say a brief natural goodbye to the user."}]}],
                                 turn_complete=True,
                             )
                         except Exception:
@@ -1366,7 +1388,7 @@ class JarvisLive:
         if not self.ui.muted:
             self.ui.set_state("LISTENING")
 
-        print(f"[JARVIS] 📤 {name} → {str(result)[:80]}")
+        print(f"[Zezo] 📤 {name} → {str(result)[:80]}")
         try:
             sqlite_memory.log_turn("tool", str(result), tool_name=name, tool_args=args, tool_result=str(result))
         except Exception:
@@ -1403,13 +1425,13 @@ class JarvisLive:
             )
 
     async def _listen_audio(self):
-        print("[JARVIS] 🎤 Mic started")
+        print("[Zezo] 🎤 Mic started")
         loop = asyncio.get_event_loop()
 
         def callback(indata, frames, time_info, status):
             # ── Wake-word gate ───────────────────────────────────────────────
             # While asleep, the mic audio NEVER goes to Gemini (nothing is
-            # streamed, so JARVIS can't respond to speech not addressed to it and
+            # streamed, so ZEZO can't respond to speech not addressed to it and
             # nothing leaves the machine). Frames are instead handed to the local
             # detector, which runs its model in ITS OWN thread — the cost here is
             # only a queue push, so the audio path is never slowed. When wake word
@@ -1420,19 +1442,19 @@ class JarvisLive:
                     det.feed(indata)
                 return
             with self._speaking_lock:
-                jarvis_speaking = self._is_speaking
+                zezo_speaking = self._is_speaking  # noqa: F841
 
             # ── Barge-in ─────────────────────────────────────────────────────
-            # While JARVIS talks the mic is not streamed, but it is still worth
+            # While ZEZO talks the mic is not streamed, but it is still worth
             # listening to locally: if the user starts speaking, cut the answer
             # short the way a person would stop when interrupted.
             #
-            # The whole difficulty is echo — on speakers the mic hears JARVIS.
+            # The whole difficulty is echo — on speakers the mic hears ZEZO.
             # So the test is not "is the mic loud" but "is the mic louder than
             # the echo of what we are playing right now", sustained long enough
             # that a cough or a keystroke cannot trigger it.
-            if jarvis_speaking:
-                # Nothing is streamed while JARVIS talks.
+            if zezo_speaking:
+                # Nothing is streamed while ZEZO talks.
                 #
                 # Interrupting by voice used to live here: `EchoGuard` can pick a
                 # user out from under our own echo, and `core/echo.py` still does
@@ -1498,7 +1520,7 @@ class JarvisLive:
             _mic_name = get_input_device()
             _mic_dev  = audio_devices.resolve(_mic_name, "input")
             if _mic_dev is not None:
-                print(f"[JARVIS] 🎤 Input device: {_mic_name}")
+                print(f"[Zezo] 🎤 Input device: {_mic_name}")
             try:
                 _mic_stream = _open_mic(_mic_dev)
             except Exception as _e:
@@ -1508,18 +1530,18 @@ class JarvisLive:
                 # mean the assistant cannot hear at all.
                 if _mic_dev is None:
                     raise
-                print(f"[JARVIS] ⚠️  Mic '{_mic_name}' failed: {_e} — using default")
+                print(f"[Zezo] ⚠️  Mic '{_mic_name}' failed: {_e} — using default")
                 self.ui.write_log(
                     f"SYS: Microphone '{_mic_name}' unavailable — using system default."
                 )
                 _mic_stream = _open_mic(None)
 
             with _mic_stream:
-                print("[JARVIS] 🎤 Mic stream open")
+                print("[Zezo] 🎤 Mic stream open")
                 while True:
                     await asyncio.sleep(0.1)
         except Exception as e:
-            print(f"[JARVIS] ❌ Mic: {e}")
+            print(f"[Zezo] ❌ Mic: {e}")
             raise
 
     async def _flush_pending_vision(self) -> bool:
@@ -1549,10 +1571,10 @@ class JarvisLive:
         src = ("[IMAGE SOURCE: WEBCAM]" if angle == "camera"
                else "[IMAGE SOURCE: SCREEN CAPTURE]")
         await self.session.send_client_content(
-            turns={"role": "user", "parts": [
+            turns=[{"role": "user", "parts": [
                 {"inline_data": {"mime_type": mime_t, "data": b64}},
                 {"text": f"{src}\n\n{question}"},
-            ]},
+            ]}],
             turn_complete=True,
         )
 
@@ -1562,7 +1584,7 @@ class JarvisLive:
         return True
 
     async def _receive_audio(self):
-        print("[JARVIS] 👂 Recv started")
+        print("[Zezo] 👂 Recv started")
         out_buf, in_buf = [], []
         in_logged = False
 
@@ -1580,7 +1602,7 @@ class JarvisLive:
                     if _sru is not None:
                         if getattr(_sru, "resumable", False) and getattr(_sru, "new_handle", None):
                             if self._resume_handle is None:
-                                print("[JARVIS] 🔗 Session resumption armed")
+                                print("[Zezo] 🔗 Session resumption armed")
                             self._resume_handle = _sru.new_handle
 
                     if response.data:
@@ -1677,7 +1699,7 @@ class JarvisLive:
                                     pass
                                 if self._dashboard:
                                     asyncio.create_task(self._dashboard.broadcast({
-                                        "type": "log", "speaker": "jarvis",
+                                        "type": "log", "speaker": "zezo",
                                         "text": full_out,
                                         "ts": datetime.now().isoformat(),
                                     }))
@@ -1695,7 +1717,7 @@ class JarvisLive:
                     if response.tool_call:
                         fn_responses = []
                         for fc in response.tool_call.function_calls:
-                            print(f"[JARVIS] 📞 {fc.name}")
+                            print(f"[Zezo] 📞 {fc.name}")
                             fr = await self._execute_tool(fc)
                             fn_responses.append(fr)
                         await self.session.send_tool_response(
@@ -1703,17 +1725,21 @@ class JarvisLive:
                         )
                         await self._flush_pending_vision()
         except Exception as e:
-            print(f"[JARVIS] ❌ Recv: {e}")
+            err_str = str(e).lower()
+            if "1008" in err_str or "goaway" in err_str or "connection closed" in err_str or "policy violation" in err_str:
+                print(f"[Zezo] 🔄 Session renewal signal received: {e}")
+                raise _ReconnectSignal(keep_context=True)
+            print(f"[Zezo] ❌ Recv: {e}")
             traceback.print_exc()
             raise
 
     async def _play_audio(self):
-        print("[JARVIS] 🔊 Play started")
+        print("[Zezo] 🔊 Play started")
 
         _spk_name = get_output_device()
         _spk_dev  = audio_devices.resolve(_spk_name, "output")
         if _spk_dev is not None:
-            print(f"[JARVIS] 🔊 Output device: {_spk_name}")
+            print(f"[Zezo] 🔊 Output device: {_spk_name}")
 
         def _open_spk(dev):
             st = sd.RawOutputStream(
@@ -1734,7 +1760,7 @@ class JarvisLive:
             # cost the user their voice. Fall back to the default and say so.
             if _spk_dev is None:
                 raise
-            print(f"[JARVIS] ⚠️  Output device '{_spk_name}' failed: {_e} — using default")
+            print(f"[Zezo] ⚠️  Output device '{_spk_name}' failed: {_e} — using default")
             self.ui.write_log(f"SYS: Speaker '{_spk_name}' unavailable — using system default.")
             stream = _open_spk(None)
 
@@ -1746,7 +1772,7 @@ class JarvisLive:
             lat = float(getattr(stream, "latency", 0.0) or 0.0)
             if 0.0 < lat < 1.0:
                 self._out_latency = lat
-            print(f"[JARVIS] 🔊 Output latency {self._out_latency*1000:.0f} ms "
+            print(f"[Zezo] 🔊 Output latency {self._out_latency*1000:.0f} ms "
                   f"→ echo tail {(self._out_latency + _TAIL_MARGIN)*1000:.0f} ms")
         except Exception:
             pass
@@ -1780,7 +1806,7 @@ class JarvisLive:
                     except asyncio.QueueEmpty:
                         break
 
-                # Drive the HUD waveform and the avatar's mouth from JARVIS's
+                 # Drive the HUD waveform and the avatar's mouth from ZEZO's
                 # own voice. The batch is up to 200 ms long, so we hand over a
                 # *schedule* of 20 ms viseme frames instead of a single averaged
                 # level and let the HUD play it out in step with the audio.
@@ -1835,7 +1861,7 @@ class JarvisLive:
                 except (RuntimeError, asyncio.CancelledError):
                     break   # executor shutting down — exit cleanly
         except Exception as e:
-            print(f"[JARVIS] ❌ Play: {e}")
+            print(f"[Zezo] ❌ Play: {e}")
             raise
         finally:
             self.set_speaking(False)
@@ -1904,10 +1930,10 @@ class JarvisLive:
             self._turn_done_event.clear()
 
         await self.session.send_client_content(
-            turns={"role": "user", "parts": [{"text": p1}]},
+            turns=[{"role": "user", "parts": [{"text": p1}]}],
             turn_complete=True,
         )
-        print("[JARVIS] Briefing phase 1 (greeting) sent.")
+        print("[Zezo] Briefing phase 1 (greeting) sent.")
 
         # ── Phase 2: fire as soon as Phase 1 audio is done ───────────────────
         async def _deliver_news():
@@ -1967,13 +1993,13 @@ class JarvisLive:
                     )
 
                 await self.session.send_client_content(
-                    turns={"role": "user", "parts": [{"text": p2}]},
+                    turns=[{"role": "user", "parts": [{"text": p2}]}],
                     turn_complete=True,
                 )
-                print("[JARVIS] Briefing phase 2 (news) sent.")
+                print("[Zezo] Briefing phase 2 (news) sent.")
             except Exception as e:
                 print(f"[Briefing] Phase 2 error: {e}")
-                print(f"[JARVIS] Briefing phase 2 failed: {e}")
+                print(f"[Zezo] Briefing phase 2 failed: {e}")
                 self.ui.write_log("SYS: Could not fetch the news for the briefing.")
 
         asyncio.create_task(_deliver_news())
@@ -2024,11 +2050,108 @@ class JarvisLive:
                 continue
             try:
                 await self.session.send_client_content(
-                    turns={"role": "user", "parts": [{"text": alert}]},
+                    turns=[{"role": "user", "parts": [{"text": alert}]}],
                     turn_complete=True,
                 )
             except Exception as e:
                 print(f"[Monitor] ⚠️ Could not send alert: {e}")
+
+    # ── Task completion watcher ──────────────────────────────────────────────────
+
+    async def _run_task_completion_watcher(self) -> None:
+        """Watch for background coding agent tasks (OpenCode/Kilo) finishing and notify the user."""
+        from core.task_manager import get_task_manager
+        mgr = get_task_manager()
+        while True:
+            await asyncio.sleep(2)
+            if not self.session or not self._awake:
+                continue
+            with self._speaking_lock:
+                speaking = self._is_speaking
+            if speaking or (time.monotonic() - self._last_user_speech) < 3:
+                continue
+
+            finished = mgr.get_unnotified_finished_tasks()
+            for task in finished:
+                task.notified = True
+                tool_raw = task.tool or ""
+                if tool_raw == "file_processor":
+                    tool_label = "File Processor"
+                    repo_path = (task.params.get("file_path", "") if task.params else "") or ""
+                    task_prompt = (task.params.get("action", "") if task.params else "") or "File Process"
+                    task_kind = "document/file processing"
+                elif tool_raw == "agent_reach":
+                    tool_label = "Social Intelligence"
+                    repo_path = (task.params.get("platform", "") if task.params else "") or ""
+                    task_prompt = (task.params.get("query") or task.params.get("username", "") if task.params else "") or "Social Query"
+                    task_kind = "social research"
+                elif any(k in tool_raw.lower() for k in ("opencode", "kilo", "antigravity", "coder", "dev_agent", "code_helper")):
+                    tool_label = "ZEZO Coder"
+                    repo_path = (task.params.get("project_path") or task.params.get("repo", "") if task.params else "") or ""
+                    task_prompt = (task.params.get("task", "") if task.params else "") or "Coding Task"
+                    task_kind = "background coding"
+                else:
+                    tool_label = tool_raw.replace("_", " ").title() if tool_raw else "Task"
+                    repo_path = (task.params.get("project_path") or task.params.get("file_path") or task.params.get("repo", "") if task.params else "") or ""
+                    task_prompt = (task.params.get("task", "") if task.params else "") or "Task"
+                    task_kind = "background"
+
+                current_model = task.params.get("model", "") if task.params else ""
+
+                res = task.result if isinstance(task.result, dict) else {}
+                summary = res.get("summary") or res.get("result") or res.get("message") or task.message or ""
+                files_mod = res.get("files_modified") or res.get("files_created") or []
+                files_str = f"Modified files: {', '.join(files_mod[:3])}" if files_mod else ""
+
+                if task.status.value == "failed":
+                    err_msg = task.error or summary or "Execution failed"
+                    msg = (
+                        f"[TASK_FAILURE_NOTIFICATION]\n"
+                        f"Background task {task.id} ({tool_label}) FAILED for '{repo_path}'.\n"
+                        f"Original Task: {task_prompt}\n"
+                        f"Error Reason: {err_msg}\n"
+                        f"Current Model: {current_model or 'default'}\n\n"
+                        f"PROTOCOL DIRECTIVE: Tell the user in 1 short sentence why {tool_label} failed. "
+                        f"Then proactively ask them: 'Kya main iska model change karke try karoon, ya doosre engine se run karoon?' "
+                        f"When the user answers, immediately call the selected tool for the same task without making them repeat the prompt."
+                    )
+                    log_text = f"SYS: Task #{task.id} failed."
+                elif task.status.value == "cancelled":
+                    msg = (
+                        f"[TASK_CANCELLED_NOTIFICATION]\n"
+                        f"Background task {task.id} ({tool_label}) was CANCELLED by the user for '{repo_path}'.\n\n"
+                        f"PROTOCOL DIRECTIVE: Acknowledge in 1 short conversational sentence in the user's language that the task has been cancelled / stopped. "
+                        f"DO NOT say the task completed."
+                    )
+                    log_text = f"SYS: Task #{task.id} cancelled."
+                else:
+                    if repo_path and tool_label == "ZEZO Coder":
+                        try:
+                            from core.repo_context import remember_repo
+                            remember_repo(repo_path)
+                        except Exception:
+                            pass
+                    msg = (
+                        f"[TASK_NOTIFICATION]\n"
+                        f"Background task {task.id} ({tool_label}) is completed successfully for '{repo_path}'.\n"
+                        f"{files_str}\n"
+                        f"Target / Resource: {repo_path}\n"
+                        f"Result / Summary Content:\n{summary or 'Done'}\n\n"
+                        f"PROTOCOL DIRECTIVE: Inform the user naturally and concisely in 1 sentence in their language that their {task_kind} task is complete for '{repo_path}'. "
+                        f"If the user asks to save, write, or export this summary into a file (e.g. 'summary text file me save karo' or 'desktop pr txt bana do'), "
+                        f"ALWAYS use the exact 'Result / Summary Content' text above as the `content` parameter for `file_controller(action='create_file')` — NEVER invent placeholder text."
+                    )
+                    log_text = f"SYS: Task #{task.id} finished successfully."
+                try:
+                    await self.session.send_client_content(
+                        turns=[{"role": "user", "parts": [{"text": msg}]}],
+                        turn_complete=True,
+                    )
+                    print(f"[Zezo] 🔔 Task notification sent for {task.id} (status: {task.status.value})")
+                    self.ui.write_log(log_text)
+                    await asyncio.sleep(4)
+                except Exception as e:
+                    print(f"[Zezo] ⚠️ Task notification error: {e}")
 
     # ── Background monitor ──────────────────────────────────────────────────────
 
@@ -2037,7 +2160,7 @@ class JarvisLive:
         await asyncio.sleep(300)          # wait 5 min after startup before first check
         while True:
             if self.session and self._awake:
-                # Don't interrupt if user spoke recently or JARVIS is mid-sentence
+                # Don't interrupt if user spoke recently or ZEZO is mid-sentence
                 with self._speaking_lock:
                     speaking = self._is_speaking
                 recent_speech = (time.monotonic() - self._last_user_speech) < 30
@@ -2054,10 +2177,10 @@ class JarvisLive:
                                 "One brief sentence only."
                             )
                             await self.session.send_client_content(
-                                turns={"role": "user", "parts": [{"text": msg}]},
+                                turns=[{"role": "user", "parts": [{"text": msg}]}],
                                 turn_complete=True,
                             )
-                            print("[JARVIS] Monitor alert sent.")
+                            print("[Zezo] Monitor alert sent.")
                             await asyncio.sleep(6)   # gap between consecutive alerts
                     except Exception as e:
                         print(f"[Monitor] ⚠️ Background check error: {e}")
@@ -2097,10 +2220,10 @@ class JarvisLive:
                     recent_turns = recent_turns or None,
                 )
                 await self.session.send_client_content(
-                    turns={"role": "user", "parts": [{"text": prompt}]},
+                    turns=[{"role": "user", "parts": [{"text": prompt}]}],
                     turn_complete=True,
                 )
-                print("[JARVIS] Proactive check-in.")
+                print("[Zezo] Proactive check-in.")
             except Exception as e:
                 print(f"[Proactive] ⚠️ {e}")
 
@@ -2146,11 +2269,11 @@ class JarvisLive:
                     await asyncio.sleep(0.1)
                 if self.session:
                     # A remote command is deliberate control and the phone user
-                    # has no desktop WAKE button — so it wakes JARVIS if asleep.
+                    # has no desktop WAKE button — so it wakes ZEZO if asleep.
                     if self._wake_enabled and not self._awake:
                         self.wake(reason="remote command")
                     await self.session.send_client_content(
-                        turns={"role": "user", "parts": [{"text": text}]},
+                        turns=[{"role": "user", "parts": [{"text": text}]}],
                         turn_complete=True,
                     )
                     self.ui.write_log(f"[Web]: {text}")
@@ -2161,6 +2284,154 @@ class JarvisLive:
             except Exception as e:
                 print(f"[Dashboard] Command error: {e}")
                 await asyncio.sleep(0.5)
+
+    async def _on_dashboard_file_uploaded(self, path) -> None:
+        """Process an image or file uploaded from the remote mobile dashboard."""
+        try:
+            from pathlib import Path
+            p = Path(path)
+            p_str = str(p)
+            
+            # Update Desktop GUI FileBar & state safely
+            try:
+                if hasattr(self.ui, "_on_file_selected"):
+                    self.ui._on_file_selected([p_str])
+                else:
+                    self.ui._current_file = p_str
+            except Exception:
+                self.ui._current_file = p_str
+
+            self.ui.write_log(f"FILE: {p.name} uploaded from mobile remote access.")
+
+            # Wake ZEZO if asleep
+            if self._wake_enabled and not self._awake:
+                self.wake(reason="mobile file upload")
+
+            # Wait for session to be ready
+            for _ in range(80):
+                if self.session:
+                    break
+                await asyncio.sleep(0.1)
+
+            if not self.session:
+                print(f"[Dashboard] Dropped file upload (no session): {p.name}")
+                return
+
+            ext = p.suffix.lower()
+            is_image = ext in ('.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp')
+
+            if is_image:
+                import base64
+                import mimetypes
+                img_bytes = p.read_bytes()
+                b64 = base64.b64encode(img_bytes).decode("ascii")
+                mime = mimetypes.guess_type(p_str)[0] or "image/jpeg"
+                prompt_text = (
+                    f"[IMAGE SOURCE: MOBILE UPLOAD]\n\n"
+                    f"The user uploaded an image from their mobile remote device: '{p.name}' ({len(img_bytes):,} bytes).\n"
+                    f"Saved path: {p}\n"
+                    f"Analyze this image and describe what you see, and ask the user what they would like to do with it."
+                )
+                await self.session.send_client_content(
+                    turns=[{"role": "user", "parts": [
+                        {"inline_data": {"mime_type": mime, "data": b64}},
+                        {"text": prompt_text},
+                    ]}],
+                    turn_complete=True,
+                )
+            else:
+                prompt_text = (
+                    f"[FILE SOURCE: MOBILE UPLOAD]\n\n"
+                    f"The user uploaded a file from their mobile remote device: '{p.name}' ({p.stat().st_size:,} bytes).\n"
+                    f"Saved path: {p}\n"
+                    f"Acknowledge the upload to the user and offer to inspect, read, or process it."
+                )
+                await self.session.send_client_content(
+                    turns=[{"role": "user", "parts": [{"text": prompt_text}]}],
+                    turn_complete=True,
+                )
+        except Exception as e:
+            print(f"[Dashboard] Error processing mobile file upload: {e}")
+
+    def _on_ui_file_uploaded(self, file_info: dict) -> None:
+        """Called from UI server thread when a file is dropped/uploaded in desktop UI."""
+        loop = getattr(self, "_loop", None)
+        if not loop:
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(self._handle_ui_file_uploaded(file_info), loop)
+        except Exception as e:
+            print(f"[DesktopUpload] Dispatch error: {e}")
+
+    async def _handle_ui_file_uploaded(self, file_info: dict) -> None:
+        try:
+            name = file_info.get("name", "document")
+            path = file_info.get("path", "")
+            size = file_info.get("size", 0)
+            text = file_info.get("text", "") or ""
+            engine = file_info.get("engine", "file_reader")
+            if path:
+                self.ui.current_file = str(path)
+
+            # Wake ZEZO if asleep
+            if self._wake_enabled and not self._awake:
+                self.wake(reason="desktop file upload")
+
+            # Wait up to 8s for session to become ready
+            for _ in range(80):
+                if self.session:
+                    break
+                await asyncio.sleep(0.1)
+
+            if not self.session:
+                print(f"[DesktopUpload] Dropped upload (no session): {name}")
+                return
+
+            ext = Path(path).suffix.lower() if path else ""
+            is_image = ext in ('.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp')
+
+            if is_image and path:
+                import base64
+                import mimetypes
+                p = Path(path)
+                img_bytes = p.read_bytes()
+                b64 = base64.b64encode(img_bytes).decode("ascii")
+                mime = mimetypes.guess_type(str(p))[0] or "image/jpeg"
+                prompt_text = (
+                    f"[IMAGE SOURCE: DESKTOP DROPZONE]\n\n"
+                    f"The user attached an image via the desktop dropzone: '{name}' ({len(img_bytes):,} bytes).\n"
+                    f"Saved path: {path}\n"
+                    f"Analyze this image and describe what you see, and ask the user what they would like to do with it."
+                )
+                await self.session.send_client_content(
+                    turns=[{"role": "user", "parts": [
+                        {"inline_data": {"mime_type": mime, "data": b64}},
+                        {"text": prompt_text},
+                    ]}],
+                    turn_complete=True,
+                )
+            else:
+                preview_text = text[:4000] if text else "No direct text extracted."
+                prompt_text = (
+                    f"[PAYLOAD INGESTION: FILE ATTACHED VIA DESKTOP DROPZONE]\n\n"
+                    f"File: '{name}' ({size:,} bytes) ingested via {engine}.\n"
+                    f"Saved Path: {path}\n"
+                    f"Extracted Content:\n"
+                    f"```text\n{preview_text}\n```\n\n"
+                    f"CRITICAL PROTOCOL DIRECTIVE:\n"
+                    f"- The user just dropped/uploaded this document.\n"
+                    f"- If the user asks to build, create, or code a portfolio, landing page, resume website, or web app based on this file/resume: "
+                    f"DO NOT stall, DO NOT say you are extracting or summarizing details, DO NOT ask clarifying questions. "
+                    f"IMMEDIATELY dispatch `antigravity_run` with the task description and resume details in the VERY FIRST TURN.\n"
+                    f"- If the user asks to inspect, summarize, or extract links, answer immediately using the extracted content above."
+                )
+                await self.session.send_client_content(
+                    turns=[{"role": "user", "parts": [{"text": prompt_text}]}],
+                    turn_complete=True,
+                )
+            self.ui.write_log(f"FILE: {name} ({size:,} bytes) attached & ingested into session context.")
+        except Exception as e:
+            print(f"[DesktopUpload] Error processing file upload: {e}")
 
     # ── main loop ───────────────────────────────────────────────────────────
 
@@ -2193,6 +2464,7 @@ class JarvisLive:
             from dashboard.server import DashboardServer
             self._dashboard = DashboardServer()
             self._dashboard.set_connect_callback(self._on_phone_connected)
+            self._dashboard.set_file_callback(self._on_dashboard_file_uploaded)
             asyncio.create_task(self._dashboard.serve())
             # Runs for the whole lifetime, not just inside an active session
             asyncio.create_task(self._process_dashboard_commands())
@@ -2202,7 +2474,7 @@ class JarvisLive:
 
         while True:
             try:
-                print("[JARVIS] Connecting...")
+                print("[Zezo] Connecting...")
                 self.ui.set_state("THINKING")
                 _resumed_with = self._resume_handle is not None
                 config = self._build_config()
@@ -2232,7 +2504,7 @@ class JarvisLive:
                     self._vision_last_time     = 0.0
                     self._interrupted          = False
 
-                    print("[JARVIS] Connected.")
+                    print("[Zezo] Connected.")
                     if _resumed_with:
                         # Say it plainly: the difference between "it reconnected"
                         # and "it reconnected and still knows what we were doing"
@@ -2240,16 +2512,16 @@ class JarvisLive:
                         self.ui.write_log("SYS: Reconnected — conversation restored.")
 
                     # Wake word: if enabled, come up ASLEEP (mic gated, silent)
-                    # until the user says "Hey Jarvis" or taps wake in the UI.
+                    # until the user says "Hey Zezo" or taps wake in the UI.
                     if self._wake_enabled:
                         self._ensure_wake_detector()
                         self._awake = False
                         self.ui.set_state("SLEEPING")
-                        self.ui.write_log("SYS: JARVIS online — sleeping. Say 'Hey Jarvis' to wake me.")
+                        self.ui.write_log("SYS: ZEZO online — sleeping. Say 'Hey Zezo' to wake me.")
                     else:
                         self._awake = True
                         self.ui.set_state("LISTENING")
-                        self.ui.write_log("SYS: JARVIS online.")
+                        self.ui.write_log("SYS: ZEZO online.")
 
                     if self._dashboard:
                         await self._dashboard.broadcast({"type": "status", "state": "active"})
@@ -2261,6 +2533,7 @@ class JarvisLive:
                     tg.create_task(self._receive_audio())
                     tg.create_task(self._play_audio())
                     tg.create_task(self._run_system_monitor())
+                    tg.create_task(self._run_task_completion_watcher())
                     tg.create_task(self._run_background_monitor())
                     tg.create_task(self._run_proactive_mode())
                     tg.create_task(self._run_sleep_watch())
@@ -2287,7 +2560,7 @@ class JarvisLive:
                 # Voluntary reconnect (voice change) — not an error. Rebuild the
                 # session immediately with no backoff and no scary logs.
                 if _is_reconnect_signal(e):
-                    print("[JARVIS] Voluntary reconnect requested.")
+                    print("[Zezo] Voluntary reconnect requested.")
                     if not _keep_context_of(e):
                         # A deliberate clean slate (voice change) — drop the
                         # handle so the next connect really does start empty.
@@ -2307,14 +2580,14 @@ class JarvisLive:
                     or "INVALID_ARGUMENT" in str(e)
                     or "NOT_FOUND" in str(e)
                 ):
-                    print("[JARVIS] 🔗 Resumption handle rejected — starting a fresh session")
+                    print("[Zezo] 🔗 Resumption handle rejected — starting a fresh session")
                     self.ui.write_log("SYS: Could not restore the conversation — starting fresh.")
                     self._resume_handle = None
                     self._conn_backoff = 0
                     continue
 
                 err_str = str(e)
-                print(f"[JARVIS] Error ({type(e).__name__}): {e}")
+                print(f"[Zezo] Error ({type(e).__name__}): {e}")
                 traceback.print_exc()
 
                 # Turn-taking / media / thinking knobs rejected by the server
@@ -2330,7 +2603,7 @@ class JarvisLive:
                     or "thinking" in err_str.lower()
                 ):
                     self._tuned_live = False
-                    print("[JARVIS] Live tuning rejected — reconnecting without it.")
+                    print("[Zezo] Live tuning rejected — reconnecting without it.")
                     continue
 
                 # Proactive audio rejected by the server (preview API drift) —
@@ -2354,7 +2627,7 @@ class JarvisLive:
                     self.ui.prompt_reconfig()
                     while not self.ui._win._ready:
                         await asyncio.sleep(1)
-                    print("[JARVIS] New API key saved — reconnecting...")
+                    print("[Zezo] New API key saved — reconnecting...")
                     _conn_backoff = 3
                     continue
 
@@ -2385,17 +2658,17 @@ class JarvisLive:
                 await self._dashboard.broadcast({"type": "status", "state": "sleeping"})
 
             delay = getattr(self, "_conn_backoff", 3)
-            print(f"[JARVIS] Reconnecting in {delay}s...")
+            print(f"[Zezo] Reconnecting in {delay}s...")
             await asyncio.sleep(delay)
 
 def main():
-    ui = JarvisUI("face.png")
+    ui = ZezoUI("face.png")
 
     def runner():
         ui.wait_for_api_key()
-        jarvis = JarvisLive(ui)
+        zezo = ZezoLive(ui)
         try:
-            asyncio.run(jarvis.run())
+            asyncio.run(zezo.run())
         except KeyboardInterrupt:
             print("\n🔴 Shutting down...")
 

@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digital Business Card | Top Rated & Free | Blinq</title>
+<meta name="description" content="Blinq's digital business cards let you share your details with a QR code and make a great first impression.">
+<link rel="icon" href="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69e81ab4cdde557f373d3e86_Frame%202147227128.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============ BASE ============ */
+*, *::before, *::after { box-sizing: border-box; }
+html {
+  font-size: clamp(0.7rem, 0.45rem + 0.46vw, 0.9rem);
+  scroll-behavior: smooth;
+  overscroll-behavior: none;
+}
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1f1511;
+  background: #f5f2ea;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+::selection { background: #ff6552; color: #fff; }
+img, video { display: block; max-width: 100%; }
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+h1, h2, h3, h4, p, figure, ul, ol { margin: 0; padding: 0; }
+ul, ol { list-style: none; }
+
+:root {
+  --ink: #1f1511;
+  --cream: #f5f2ea;
+  --cream-2: #ede7d9;
+  --cream-3: #e5e0d3;
+  --cream-4: #faf8f3;
+  --red: #ff6552;
+  --red-dark: #e04a37;
+  --white: #fffdfa;
+  --muted: #6b5f57;
+  --border: rgba(31, 21, 17, .1);
+  --border-2: rgba(31, 21, 17, .18);
+  --radius: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --max-w: 1200px;
+}
+
+/* ============ TYPOGRAPHY ============ */
+.h-1 { font-size: clamp(2.5rem, 5vw, 4.5rem); font-weight: 700; letter-spacing: -.03em; line-height: 1.05; }
+.h-2 { font-size: clamp(2rem, 4vw, 3.25rem); font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
+.h-3 { font-size: clamp(1.5rem, 2.5vw, 2.25rem); font-weight: 700; letter-spacing: -.02em; line-height: 1.2; }
+.h-4 { font-size: clamp(1.25rem, 2vw, 1.75rem); font-weight: 600; letter-spacing: -.02em; line-height: 1.25; }
+.h-5 { font-size: clamp(1.1rem, 1.6vw, 1.4rem); font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
+.h-6 { font-size: 1.1rem; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
+.body-1 { font-size: 1.05rem; font-weight: 400; line-height: 1.55; }
+.body-2 { font-size: .95rem; font-weight: 400; line-height: 1.55; }
+.body-3 { font-size: .85rem; font-weight: 400; line-height: 1.5; color: var(--muted); }
+.body-4 { font-size: .75rem; font-weight: 500; line-height: 1.4; }
+.body-0 { font-size: 1.4rem; font-weight: 600; color: var(--red); }
+.t-center { text-align: center; }
+.muted { color: var(--muted); }
+
+/* ============ BUTTONS ============ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  padding: .75rem 1.5rem;
+  border-radius: 999px;
+  font-size: .95rem;
+  font-weight: 600;
+  line-height: 1;
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+  border: 1.5px solid transparent;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-primary {
+  background: var(--red);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(255, 101, 82, .3);
+}
+.btn-primary:hover { background: var(--red-dark); }
+.btn-dark {
+  background: var(--ink);
+  color: var(--white);
+}
+.btn-dark:hover { background: #2e2118; }
+.btn-outline {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.btn-outline:hover { background: var(--ink); color: var(--white); }
+.btn-lg { padding: 1rem 1.75rem; font-size: 1rem; }
+.btn-sm { padding: .55rem 1.1rem; font-size: .85rem; }
+
+/* ============ LAYOUT ============ */
+.container {
+  width: 100%;
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+.section {
+  padding: 4rem 0;
+  position: relative;
+}
+.section-lg { padding: 5rem 0; }
+.rounded-top {
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+.bg-cream { background: var(--cream); }
+.bg-cream-2 { background: var(--cream-2); }
+.bg-cream-3 { background: var(--cream-3); }
+.bg-white { background: var(--white); }
+.z-2 { position: relative; z-index: 2; }
+
+/* ============ NAV ============ */
+.nav-wrap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.nav {
+  width: 100%;
+  max-width: var(--max-w);
+  background: var(--white);
+  border-radius: 999px;
+  box-shadow: 0 4px 24px rgba(31, 21, 17, .08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .5rem .5rem .5rem 1.25rem;
+  pointer-events: auto;
+  position: relative;
+}
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -.03em;
+  flex: none;
+}
+.nav-logo img { height: 1.75rem; width: auto; }
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+  flex: 1;
+  justify-content: center;
+}
+.nav-link {
+  padding: .55rem .9rem;
+  border-radius: 999px;
+  font-size: .9rem;
+  font-weight: 500;
+  color: var(--ink);
+  transition: background .2s;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  cursor: pointer;
+}
+.nav-link:hover { background: var(--cream-2); }
+.nav-link .caret {
+  width: 10px;
+  height: 6px;
+  transition: transform .3s;
+}
+.nav-dropdown {
+  position: relative;
+}
+.nav-dropdown-menu {
+  position: absolute;
+  top: calc(100% + .75rem);
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 48px rgba(31, 21, 17, .14);
+  padding: .75rem;
+  min-width: 240px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .25s, transform .25s, visibility .25s;
+  display: grid;
+  gap: .15rem;
+}
+.nav-dropdown:hover .nav-dropdown-menu,
+.nav-dropdown:focus-within .nav-dropdown-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+.nav-dropdown:hover .caret { transform: rotate(180deg); }
+.nav-dropdown-menu a {
+  padding: .55rem .85rem;
+  border-radius: 10px;
+  font-size: .88rem;
+  font-weight: 500;
+  color: var(--ink);
+  transition: background .2s;
+  display: block;
+}
+.nav-dropdown-menu a:hover { background: var(--cream-2); }
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex: none;
+}
+.burger {
+  display: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+}
+.burger span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--ink);
+  border-radius: 2px;
+  transition: transform .3s, opacity .3s;
+}
+.burger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.burger.open span:nth-child(2) { opacity: 0; }
+.burger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+@media (max-width: 991px) {
+  .nav { border-radius: 20px; padding: .5rem .75rem; }
+  .nav-links { display: none; position: absolute; top: calc(100% + .5rem); left: 0; right: 0; background: var(--white); border-radius: var(--radius-lg); box-shadow: 0 12px 48px rgba(31, 21, 17, .14); flex-direction: column; align-items: stretch; padding: .75rem; gap: .15rem; }
+  .nav-links.open { display: flex; }
+  .nav-links .nav-link { justify-content: space-between; padding: .8rem 1rem; }
+  .nav-dropdown-menu {
+    position: static;
+    transform: none;
+    opacity: 1;
+    visibility: visible;
+    box-shadow: none;
+    padding: 0 0 0 1rem;
+    display: none;
+    min-width: 0;
+  }
+  .nav-dropdown.open .nav-dropdown-menu { display: grid; }
+  .nav-dropdown.open .caret { transform: rotate(180deg); }
+  .nav-actions .btn:not(.burger-cta) { display: none; }
+  .burger { display: flex; }
+}
+
+/* ============ HERO ============ */
+.hero {
+  padding: 9rem 0 3rem;
+  background: var(--cream);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.hero-inner {
+  position: relative;
+  z-index: 2;
+  max-width: 760px;
+  margin: 0 auto;
+}
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  background: var(--white);
+  border-radius: 999px;
+  padding: .35rem .9rem .35rem .35rem;
+  font-size: .78rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 12px rgba(31, 21, 17, .06);
+}
+.hero-badge .dot {
+  width: .5rem;
+  height: .5rem;
+  border-radius: 50%;
+  background: #2ecc71;
+  box-shadow: 0 0 0 3px rgba(46, 204, 113, .2);
+  margin-left: .35rem;
+}
+.hero h1 { margin-bottom: 1.25rem; }
+.hero-sub {
+  max-width: 560px;
+  margin: 0 auto 2rem;
+  font-size: 1.1rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+.hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: .75rem;
+  margin-bottom: 2rem;
+}
+.hero-ratings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  font-size: .85rem;
+  font-weight: 500;
+}
+.hero-stars {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+}
+.hero-stars svg { width: 14px; height: 14px; fill: var(--red); }
+.hero-app-icons {
+  display: flex;
+  gap: .4rem;
+}
+.hero-app-icons img { width: 26px; height: 26px; border-radius: 6px; }
+
+.hero-video {
+  margin-top: 3rem;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+  aspect-ratio: 1 / 1;
+  background: var(--cream-2);
+  position: relative;
+}
+.hero-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+@media (max-width: 767px) {
+  .hero { padding: 7rem 0 2rem; }
+  .hero-video { aspect-ratio: 4 / 5; }
+}
+
+/* ============ LOGOS MARQUEE ============ */
+.logos-section {
+  padding: 3rem 0;
+  background: var(--cream);
+  overflow: hidden;
+}
+.logos-heading {
+  text-align: center;
+  font-size: 1.15rem;
+  font-weight: 600;
+  max-width: 640px;
+  margin: 0 auto 2.5rem;
+  letter-spacing: -.01em;
+}
+.marquee {
+  overflow: hidden;
+  position: relative;
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.marquee-track {
+  display: flex;
+  gap: 3rem;
+  width: max-content;
+  animation: marquee-left 45s linear infinite;
+}
+.marquee.reverse .marquee-track { animation: marquee-right 50s linear infinite; }
+.marquee:hover .marquee-track { animation-play-state: paused; }
+@keyframes marquee-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes marquee-right {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
+}
+.marquee-track img {
+  width: 140px;
+  height: 60px;
+  object-fit: contain;
+  flex: none;
+  opacity: .75;
+  transition: opacity .3s, transform .3s;
+}
+.marquee-track img:hover { opacity: 1; transform: scale(1.05); }
+
+/* ============ SMART CONNECT STICKY ============ */
+.smart-section { padding: 5rem 0; background: var(--cream); }
+.smart-head { text-align: center; margin-bottom: 3rem; }
+.sticky-cards { display: flex; flex-direction: column; gap: 2rem; }
+.sticky-card {
+  background: var(--white);
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+  box-shadow: 0 4px 24px rgba(31, 21, 17, .05);
+}
+.sticky-card.reverse { grid-template-columns: 1fr 1.1fr; }
+.sticky-card.reverse .sticky-text { order: 2; }
+.sticky-card.reverse .sticky-media { order: 1; }
+.sticky-text h2 { margin-bottom: 1rem; }
+.sticky-text > p { color: var(--muted); margin-bottom: 1.5rem; font-size: 1.05rem; }
+.sticky-list { display: flex; flex-direction: column; gap: .75rem; margin-bottom: 1.75rem; }
+.sticky-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  font-size: .95rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.sticky-list li::before {
+  content: "";
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--cream-3);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231f1511' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+  background-size: 12px;
+  background-position: center;
+  background-repeat: no-repeat;
+  margin-top: 2px;
+}
+.sticky-media {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  aspect-ratio: 1 / 1;
+  background: var(--cream-2);
+}
+.sticky-media video, .sticky-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+@media (max-width: 767px) {
+  .sticky-card, .sticky-card.reverse {
+    grid-template-columns: 1fr;
+    padding: 1.25rem;
+    gap: 1.5rem;
+  }
+  .sticky-card.reverse .sticky-text { order: 1; }
+  .sticky-card.reverse .sticky-media { order: 2; }
+}
+
+/* ============ FEATURE GRID ============ */
+.features-section { padding: 5rem 0; background: var(--cream); }
+.features-head { text-align: center; margin-bottom: 3rem; }
+.features-head p { color: var(--muted); margin-top: .75rem; }
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+.feature-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform .3s, box-shadow .3s;
+  cursor: pointer;
+}
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(31, 21, 17, .1);
+}
+.feature-img {
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: var(--cream-2);
+}
+.feature-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform .5s;
+}
+.feature-card:hover .feature-img img { transform: scale(1.04); }
+.feature-body {
+  padding: 1.25rem 1.25rem 1.5rem;
+}
+.feature-body h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: .5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+.feature-body h3 svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  transition: transform .3s;
+}
+.feature-card:hover .feature-body h3 svg { transform: translateX(4px); }
+.feature-body p {
+  font-size: .88rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.feature-card-cta {
+  background: var(--ink);
+  color: var(--white);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+  gap: 1rem;
+  aspect-ratio: 1 / 1;
+}
+.feature-card-cta h3 { color: var(--white); font-size: 1.5rem; }
+.feature-card-cta svg { width: 40px; height: 40px; fill: var(--red); }
+@media (max-width: 991px) {
+  .features-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .features-grid { grid-template-columns: 1fr; }
+}
+
+/* ============ G2 RATING ============ */
+.g2-section { padding: 5rem 0; background: var(--cream-2); }
+.g2-card {
+  background: var(--white);
+  border-radius: var(--radius-xl);
+  padding: 3rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.g2-card h2 { margin-bottom: 2rem; }
+.g2-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+.g2-badges img {
+  width: 110px;
+  height: auto;
+  transition: transform .3s;
+}
+.g2-badges img:hover { transform: scale(1.08); }
+.g2-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  font-size: .9rem;
+  font-weight: 500;
+}
+.g2-stats .star { color: var(--red); font-size: 1.1rem; }
+
+/* ============ FORTUNE FAN CARDS ============ */
+.fortune-section { padding: 5rem 0; background: var(--cream-2); }
+.fortune-head { text-align: center; margin-bottom: 3rem; }
+.fan-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  position: relative;
+  height: 320px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+.fan-card {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 180px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(31, 21, 17, .15);
+  transition: transform .35s cubic-bezier(.44, 0, .56, 1);
+  cursor: pointer;
+  background: var(--white);
+}
+.fan-card img { width: 100%; display: block; }
+.fan-card:nth-child(1) { transform: translateX(-50%) rotate(-12deg) translateY(20px); z-index: 1; }
+.fan-card:nth-child(2) { transform: translateX(-50%) rotate(-6deg) translateY(5px); z-index: 2; }
+.fan-card:nth-child(3) { transform: translateX(-50%) rotate(0deg) translateY(0); z-index: 3; }
+.fan-card:nth-child(4) { transform: translateX(-50%) rotate(6deg) translateY(5px); z-index: 2; }
+.fan-card:nth-child(5) { transform: translateX(-50%) rotate(12deg) translateY(20px); z-index: 1; }
+.fan-card:hover { z-index: 10; }
+.fan-card:nth-child(1):hover { transform: translateX(-50%) rotate(-15deg) translateY(0) scale(1.05); }
+.fan-card:nth-child(2):hover { transform: translateX(-50%) rotate(-7deg) translateY(-15px) scale(1.05); }
+.fan-card:nth-child(3):hover { transform: translateX(-50%) rotate(0deg) translateY(-20px) scale(1.08); }
+.fan-card:nth-child(4):hover { transform: translateX(-50%) rotate(7deg) translateY(-15px) scale(1.05); }
+.fan-card:nth-child(5):hover { transform: translateX(-50%) rotate(15deg) translateY(0) scale(1.05); }
+
+/* ============ HOW TO ============ */
+.how-section { padding: 5rem 0; background: var(--cream); }
+.how-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 4rem;
+  align-items: start;
+}
+.how-head { position: sticky; top: 8rem; }
+.how-head h2 { margin-bottom: 1.5rem; }
+.how-steps { display: flex; flex-direction: column; gap: 1.25rem; }
+.how-step {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  gap: 1.5rem;
+  align-items: center;
+  transition: transform .3s, box-shadow .3s;
+}
+.how-step:hover { transform: translateX(4px); box-shadow: 0 8px 24px rgba(31, 21, 17, .06); }
+.how-step-num { font-size: 1.5rem; font-weight: 700; color: var(--red); margin-bottom: .35rem; }
+.how-step h3 { margin-bottom: .35rem; }
+.how-step-img {
+  border-radius: var(--radius);
+  overflow: hidden;
+  aspect-ratio: 1 / 1;
+  background: var(--cream-2);
+}
+.how-step-img img { width: 100%; height: 100%; object-fit: cover; }
+@media (max-width: 991px) {
+  .how-grid { grid-template-columns: 1fr; gap: 2rem; }
+  .how-head { position: static; }
+}
+@media (max-width: 600px) {
+  .how-step { grid-template-columns: 1fr; gap: 1rem; padding: 1.25rem; }
+  .how-step-img { aspect-ratio: 16 / 9; }
+}
+
+/* ============ TEAMS SECTION ============ */
+.teams-section { padding: 5rem 0; background: var(--cream-2); }
+.teams-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 3rem;
+  align-items: center;
+}
+.teams-text h2 { margin-bottom: 1.5rem; }
+.g2-widget {
+  background: var(--white);
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  aspect-ratio: 1 / 1;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--muted);
+  font-size: .9rem;
+  box-shadow: 0 8px 32px rgba(31, 21, 17, .06);
+  overflow: hidden;
+}
+.g2-widget img { width: 100%; height: 100%; object-fit: contain; }
+@media (max-width: 991px) {
+  .teams-grid { grid-template-columns: 1fr; gap: 2rem; }
+}
+
+/* ============ TESTIMONIALS ============ */
+.testi-section { padding: 5rem 0; background: var(--cream); overflow: hidden; }
+.testi-head { text-align: center; margin-bottom: 2.5rem; }
+.testi-head .stat {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .9rem;
+  font-weight: 500;
+  margin-top: .75rem;
+}
+.testi-head .stat .star { color: var(--red); }
+.testi-marquee { display: flex; gap: 1.25rem; width: max-content; padding: 0 .625rem; }
+.testi-card {
+  width: 320px;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.testi-stars { display: flex; gap: 2px; margin-bottom: .75rem; }
+.testi-stars svg { width: 14px; height: 14px; fill: #f5a623; }
+.testi-card p { font-size: .9rem; line-height: 1.5; }
+.testi-author {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: .85rem;
+}
+.testi-author img { width: 22px; height: 22px; }
+
+/* ============ FAQ ============ */
+.faq-section { padding: 5rem 0; background: var(--cream); }
+.faq-head { text-align: center; margin-bottom: 3rem; }
+.faq-container { max-width: 820px; margin: 0 auto; }
+.faq-item {
+  border-bottom: 1px solid var(--border);
+}
+.faq-q {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem .25rem;
+  text-align: left;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.4;
+}
+.faq-icon {
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--cream-3);
+  position: relative;
+  transition: background .3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.faq-q:hover .faq-icon { background: var(--ink); }
+.faq-icon::before, .faq-icon::after {
+  content: "";
+  position: absolute;
+  background: var(--ink);
+  border-radius: 2px;
+  transition: transform .35s, background .3s;
+}
+.faq-icon::before { width: 12px; height: 2px; }
+.faq-icon::after { width: 2px; height: 12px; }
+.faq-q:hover .faq-icon::before,
+.faq-q:hover .faq-icon::after { background: var(--white); }
+.faq-item.open .faq-icon { background: var(--ink); }
+.faq-item.open .faq-icon::before,
+.faq-item.open .faq-icon::after { background: var(--white); }
+.faq-item.open .faq-icon::after { transform: rotate(90deg) scaleY(0); }
+.faq-a {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .45s cubic-bezier(.44, 0, .56, 1);
+}
+.faq-a-inner {
+  padding: 0 .25rem 1.5rem;
+  color: var(--muted);
+  font-size: .95rem;
+  line-height: 1.65;
+}
+.faq-a-inner p + p { margin-top: .75rem; }
+
+/* ============ CTA ============ */
+.cta-section {
+  background: var(--cream-2);
+  padding: 5rem 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+.cta-card {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 2rem;
+  align-items: center;
+  background: var(--white);
+  border-radius: var(--radius-xl);
+  padding: 3rem;
+  overflow: hidden;
+  position: relative;
+}
+.cta-text h2 { margin-bottom: 1rem; }
+.cta-text p { color: var(--muted); margin-bottom: 1.75rem; font-size: 1.05rem; }
+.cta-img {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  background: var(--cream-2);
+}
+.cta-img img { width: 100%; height: 100%; object-fit: cover; }
+@media (max-width: 767px) {
+  .cta-card { grid-template-columns: 1fr; padding: 1.5rem; }
+  .cta-img { order: -1; }
+}
+
+/* ============ FOOTER ============ */
+.footer {
+  background: var(--cream);
+  padding: 5rem 0 2rem;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  margin-top: -2rem;
+  position: relative;
+  z-index: 2;
+}
+.footer-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 3rem;
+}
+.footer-ctas { display: flex; gap: .75rem; flex-wrap: wrap; }
+.footer-links {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+  padding-bottom: 3rem;
+  border-bottom: 1px solid var(--border);
+}
+.footer-col h4 {
+  font-size: .8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 1rem;
+  color: var(--ink);
+}
+.footer-col ul { display: flex; flex-direction: column; gap: .6rem; }
+.footer-col a {
+  font-size: .88rem;
+  color: var(--muted);
+  transition: color .2s;
+}
+.footer-col a:hover { color: var(--red); }
+.footer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  padding-top: 2rem;
+}
+.footer-logo {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -.03em;
+}
+.footer-logo img { height: 1.75rem; }
+.footer-socials { display: flex; gap: .75rem; }
+.footer-socials a {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--cream-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .25s, transform .25s;
+}
+.footer-socials a:hover { background: var(--ink); transform: translateY(-2px); }
+.footer-socials svg { width: 18px; height: 18px; fill: var(--ink); transition: fill .25s; }
+.footer-socials a:hover svg { fill: var(--white); }
+.footer-copy {
+  font-size: .82rem;
+  color: var(--muted);
+  width: 100%;
+  text-align: center;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  margin-top: 2rem;
+}
+@media (max-width: 767px) {
+  .footer-links { grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+  .footer-bottom { flex-direction: column; text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<div class="nav-wrap">
+  <nav class="nav">
+    <a href="#" class="nav-logo">
+      <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/698ea4124eb49a21590736ca_BLINQ%20INLINE%20LOGO%20ARTWORKED.svg" alt="Blinq">
+    </a>
+    <div class="nav-links" id="navLinks">
+      <div class="nav-dropdown">
+        <span class="nav-link">Solutions <svg class="caret" viewBox="0 0 12 7" fill="none"><path d="M10.98 .8L5.98 5.8.98.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <div class="nav-dropdown-menu">
+          <a href="#">Digital Business Card</a>
+          <a href="#">Event Lead Capture</a>
+          <a href="#">AI Notetaker</a>
+          <a href="#">Contact Enrichment</a>
+          <a href="#">NFC Business Cards</a>
+          <a href="#">Email Signature</a>
+          <a href="#">Virtual Meeting Backgrounds</a>
+          <a href="#">Apple Watch</a>
+        </div>
+      </div>
+      <div class="nav-dropdown">
+        <span class="nav-link">For Teams <svg class="caret" viewBox="0 0 12 7" fill="none"><path d="M10.98 .8L5.98 5.8.98.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <div class="nav-dropdown-menu">
+          <a href="#">Business &amp; Teams</a>
+          <a href="#">Enterprise</a>
+          <a href="#">Integrations</a>
+          <a href="#">Book a demo</a>
+        </div>
+      </div>
+      <a href="#" class="nav-link">Pricing</a>
+      <a href="#" class="nav-link">Shop NFC</a>
+    </div>
+    <div class="nav-actions">
+      <a href="#" class="btn btn-outline btn-sm">Login</a>
+      <a href="#" class="btn btn-primary btn-sm">Create my card</a>
+      <button class="burger" id="burger" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+</div>
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="container hero-inner">
+    <div class="hero-badge">
+      <span class="dot"></span> Free forever for individuals
+    </div>
+    <h1 class="h-1">Your digital <br>business card</h1>
+    <p class="hero-sub">The world's most popular digital business card platform. Free forever for individuals, trusted by enterprises worldwide.</p>
+    <div class="hero-cta">
+      <a href="#" class="btn btn-primary btn-lg">Create my card</a>
+      <a href="#" class="btn btn-dark btn-lg">For teams</a>
+    </div>
+    <div class="hero-ratings">
+      <div class="hero-app-icons">
+        <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/696f00f623d1725a823f9641_Capa_1.webp" alt="App Store">
+        <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/696f00f6b0caf87f5b3b1de8_Capa_1-1.webp" alt="Google Play">
+        <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/68afa6e872b7e10827eaccb2_G2.svg" alt="G2">
+        <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/68afa6e835c373bdeeb2c46a_96dc2cdc5186fdc4b42258bf5d595643_Capterra.svg" alt="Capterra">
+        <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69e6cdd8dfd98f010670cba6_download.png" alt="Trustpilot">
+      </div>
+      <div class="hero-stars">
+        <span><strong>4.9/5</strong> on 200,000+ reviews</span>
+      </div>
+    </div>
+    <div class="hero-video">
+      <video autoplay loop muted playsinline preload="auto" poster="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69eed237b195babd07b5320e_BLQ_Web_2026_DBC_Hero_1440x1440_R01_V04_holdingframe.png">
+        <source src="https://storage.googleapis.com/blinq-frontpage-webflow-video-assets/DBC%20Launch/BLQ_Web_2026_DBC_Hero_1440x1440_R01_V04%20(1).mp4" type="video/mp4">
+      </video>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LOGOS ============ -->
+<section class="logos-section">
+  <div class="container">
+    <p class="logos-heading">Blinq is the virtual business card trusted by more than 4 million people across 500,000 companies</p>
+  </div>
+  <div class="marquee">
+    <div class="marquee-track" id="logosTrack">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</section>
+
+<!-- ============ SMART CONNECT (STICKY CARDS) ============ -->
+<section class="smart-section">
+  <div class="container">
+    <div class="smart-head">
+      <h2 class="h-2">The smarter way to connect <br>and grow your network</h2>
+    </div>
+    <div class="sticky-cards">
+
+      <div class="sticky-card">
+        <div class="sticky-text">
+          <h2 class="h-4">Blinq makes sure your digital business card is always on-brand</h2>
+          <p>Blinq gives you the power to build a customizable virtual business card that turns first meetings into lasting connections.</p>
+          <ul class="sticky-list">
+            <li>Fully customize your card</li>
+            <li>Add unlimited links</li>
+            <li>Create multiple digital business cards</li>
+            <li>Make instant updates</li>
+          </ul>
+          <a href="#" class="btn btn-primary">Create my free digital business card</a>
+        </div>
+        <div class="sticky-media">
+          <video autoplay loop muted playsinline preload="auto">
+            <source src="https://storage.googleapis.com/blinq-frontpage-webflow-video-assets/DBC%20Launch/BLQ_Web_2026_DBC_OnBrand_1440x1440_R03_V01.mp4" type="video/mp4">
+          </video>
+        </div>
+      </div>
+
+      <div class="sticky-card reverse">
+        <div class="sticky-media">
+          <video autoplay loop muted playsinline preload="auto">
+            <source src="https://storage.googleapis.com/blinq-frontpage-webflow-video-assets/DBC%20Launch/BLQ_Web_2026_DBC_Share_1440x1440_R03_V01.mp4" type="video/mp4">
+          </video>
+        </div>
+        <div class="sticky-text">
+          <h2 class="h-4">Share your card with anyone, any way</h2>
+          <p>Blinq ensures you're able to exchange details quickly and efficiently, opening the door to new opportunities.</p>
+          <ul class="sticky-list">
+            <li>Available via iOS, Android and web</li>
+            <li>Share using QR code, NFC card, widget, smart watch, text, email or personal link</li>
+            <li>Share online or offline, your card is always available</li>
+            <li>Make lead capture painless with the best-in-class sharing experience</li>
+          </ul>
+          <a href="#" class="btn btn-primary">Create my card</a>
+        </div>
+      </div>
+
+      <div class="sticky-card">
+        <div class="sticky-text">
+          <h2 class="h-4">Sync your digital business card with your existing tech</h2>
+          <p>Blinq integrates seamlessly with your existing tools and workflows, enabling smart business and automated solutions.</p>
+          <ul class="sticky-list">
+            <li>Native CRM integrations with Salesforce, HubSpot, Microsoft Dynamics, Zoho, Pipedrive and more</li>
+            <li>Enriched contact data and event tags that flow directly into your sales funnel</li>
+            <li>Transform your digital business card into email signatures</li>
+            <li>Create professional virtual backgrounds for Zoom, Teams, and Google Meet</li>
+          </ul>
+          <a href="#" class="btn btn-primary">Get started</a>
+        </div>
+        <div class="sticky-media">
+          <video autoplay loop muted playsinline preload="auto">
+            <source src="https://storage.googleapis.com/blinq-frontpage-webflow-video-assets/DBC%20Launch/BLQ_Web_2026_DBC_Sync_1440x1440_R03_V01.mp4" type="video/mp4">
+          </video>
+        </div>
+      </div>
+
+      <div class="sticky-card reverse">
+        <div class="sticky-media">
+          <video autoplay loop muted playsinline preload="auto">
+            <source src="https://storage.googleapis.com/blinq-frontpage-webflow-video-assets/DBC/BLQ_Web_2026_DBC_Secure_1440x1440_WIP_R03_V02.mp4" type="video/mp4">
+          </video>
+        </div>
+        <div class="sticky-text">
+          <h2 class="h-4">The most secure digital business card</h2>
+          <p>Blinq is built with enterprise-grade privacy and security, keeping your data protected.</p>
+          <ul class="sticky-list">
+            <li>Blinq is SOC 2 Type II Certified and GDPR-ready</li>
+            <li>Single Sign-On (SSO) integration ensures secure access management</li>
+            <li>Enforced SSO via SAML available</li>
+            <li>Annual testing and third-party audits</li>
+          </ul>
+          <a href="#" class="btn btn-primary">Create my card</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEATURES GRID ============ -->
+<section class="features-section">
+  <div class="container">
+    <div class="features-head">
+      <h2 class="h-2">Blinq makes it easy to share who you are</h2>
+      <p>How you share your digital business card is up to you.</p>
+    </div>
+    <div class="features-grid">
+
+      <div class="feature-card">
+        <div class="feature-img">
+          <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69a0e1a5f8696e800ca713af_5114769cfe260a7c85d47f735912f93a_Carousel_QR_880px.avif" alt="QR Code">
+        </div>
+        <div class="feature-body">
+          <h3>QR Code <svg viewBox="0 0 14 14" fill="currentColor"><path d="M9.69 6.58h1.65c-.4-.35-.75-.65-1.09-.99L7.48 2.95h2.1l4.38 4.37-4.36 4.36H7.48l2.74-2.63c.35-.33.7-.68 1.1-1.03H.7V6.58h8.99z"/></svg></h3>
+          <p>Share cards with a quick QR scan across any digital surface.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-img">
+          <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69a0e1a5c5ab8c78e07a7c82_0e2d20d77c496c2f5fd34bf91d100a15_Carousel_NFC_880px.avif" alt="NFC Cards">
+        </div>
+        <div class="feature-body">
+          <h3>NFC Cards <svg viewBox="0 0 14 14" fill="currentColor"><path d="M9.69 6.58h1.65c-.4-.35-.75-.65-1.09-.99L7.48 2.95h2.1l4.38 4.37-4.36 4.36H7.48l2.74-2.63c.35-.33.7-.68 1.1-1.03H.7V6.58h8.99z"/></svg></h3>
+          <p>Match your Blinq digital card with physical NFC business cards.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-img">
+          <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69a0e1a54f003fe8f3328ae5_68f56feeaa59b9ff065868c7ac3e49e9_Carousel_EmailSignature_880px.avif" alt="Email Signatures">
+        </div>
+        <div class="feature-body">
+          <h3>Email Signatures <svg viewBox="0 0 14 14" fill="currentColor"><path d="M9.69 6.58h1.65c-.4-.35-.75-.65-1.09-.99L7.48 2.95h2.1l4.38 4.37-4.36 4.36H7.48l2.74-2.63c.35-.33.7-.68 1.1-1.03H.7V6.58h8.99z"/></svg></h3>
+          <p>Extend your brand into every email with logos, links and more.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-img">
+          <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69a0e1a58da2929e1cb6fd2c_70fc5a7167d2f44f9acd0c235c509c83_Carousel_Widget_880px.avif" alt="Widgets">
+        </div>
+        <div class="feature-body">
+          <h3>Widgets <svg viewBox="0 0 14 14" fill="currentColor"><path d="M9.69 6.58h1.65c-.4-.35-.75-.65-1.09-.99L7.48 2.95h2.1l4.38 4.37-4.36 4.36H7.48l2.74-2.63c.35-.33.7-.68 1.1-1.03H.7V6.58h8.99z"/></svg></h3>
+          <p>Add a Blinq widget to your lock screen and always be one swipe away.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-img">
+          <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69a0e1a578b1c9c7ada28392_5e8d2d33464ea41020a3a9af8c00146c_Carousel_VirtualBackground_880px.avif" alt="Virtual Backgrounds">
+        </div>
+        <div class="feature-body">
+          <h3>Virtual Backgrounds <svg viewBox="0 0 14 14" fill="currentColor"><path d="M9.69 6.58h1.65c-.4-.35-.75-.65-1.09-.99L7.48 2.95h2.1l4.38 4.37-4.36 4.36H7.48l2.74-2.63c.35-.33.7-.68 1.1-1.03H.7V6.58h8.99z"/></svg></h3>
+          <p>Place your brand as a video call backdrop for people to easily capture your details.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-img">
+          <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69b367f7e42317f4aefbc602_Wallet.png" alt="Wallet">
+        </div>
+        <div class="feature-body">
+          <h3>Wallet <svg viewBox="0 0 14 14" fill="currentColor"><path d="M9.69 6.58h1.65c-.4-.35-.75-.65-1.09-.99L7.48 2.95h2.1l4.38 4.37-4.36 4.36H7.48l2.74-2.63c.35-.33.7-.68 1.1-1.03H.7V6.58h8.99z"/></svg></h3>
+          <p>Add Blinq to Apple Wallet or Google Wallet for one-tap access.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-img">
+          <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69a0e1a58da2929e1cb6fd41_1339d827491bc2449288b65b6dff8d22_Carousel_Watch_880px.avif" alt="Apple Watch">
+        </div>
+        <div class="feature-body">
+          <h3>Apple Watch <svg viewBox="0 0 14 14" fill="currentColor"><path d="M9.69 6.58h1.65c-.4-.35-.75-.65-1.09-.99L7.48 2.95h2.1l4.38 4.37-4.36 4.36H7.48l2.74-2.63c.35-.33.7-.68 1.1-1.03H.7V6.58h8.99z"/></svg></h3>
+          <p>The world's top rated digital business card app has a free Apple Watch integration.</p>
+        </div>
+      </div>
+
+      <a href="#" class="feature-card feature-card-cta">
+        <h3>Create my card</h3>
+        <svg viewBox="0 0 14 14" fill="currentColor"><path d="M9.69 6.58h1.65c-.4-.35-.75-.65-1.09-.99L7.48 2.95h2.1l4.38 4.37-4.36 4.36H7.48l2.74-2.63c.35-.33.7-.68 1.1-1.03H.7V6.58h8.99z"/></svg>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ G2 RATING ============ -->
+<section class="g2-section">
+  <div class="container">
+    <div class="g2-card">
+      <h2 class="h-2">Rated the #1 Digital Business Card</h2>
+      <div class="g2-badges">
+        <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69bca93d86438b849e88c1bf_G2BestSoftware2026-Badge-CoreSegment-BestSoftwareProducts%201.webp" alt="G2 Best Software">
+        <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69bca93df4f0fb02daf50176_G2BestSoftware2026-Badge-CoreSegment-HighestSatisfaction%201.webp" alt="G2 Highest Satisfaction">
+        <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69bca93ddf6e0def70cd5000_LeadCapture_Leader_Enterprise_Leader%201.webp" alt="G2 Enterprise Leader">
+        <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69bca93dbcedae78837503c7_DigitalBusinessCard_BestUsability_Total%201.webp" alt="G2 Best Usability">
+      </div>
+      <div class="g2-stats">
+        <span><strong>4.9/5</strong> <span class="star">★</span> on 200,000+ reviews</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FORTUNE 500 FAN CARDS ============ -->
+<section class="fortune-section">
+  <div class="container">
+    <div class="fortune-head">
+      <h2 class="h-3" style="max-width: 720px; margin: 0 auto;">Blinq is used by employees at more than 93% of Fortune 500 companies</h2>
+    </div>
+    <div class="fan-wrap">
+      <div class="fan-card"><img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/697c2c6b0c74d11011dc916a_2b482061541cb883628fa9ae75edf32a_Sophie.avif" alt="Digital business card"></div>
+      <div class="fan-card"><img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/697c2c660626679bb522f243_44b8b37ce22d271d97fd2b3343951ddf_Corporate%20-%20Green%20-%20Common%20Earth.avif" alt="Digital business card"></div>
+      <div class="fan-card"><img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/697c2c66115e8b3a19bbd6e9_53c9dc85b11ed0c864ae2485a856e4c4_Corporate%20-%20Pink%20-%20Harvey.avif" alt="Digital business card"></div>
+      <div class="fan-card"><img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/697c2c66acfe92afd2d4f74c_b678c99981177292233c8bca105c1a33_B_Default_Red.avif" alt="Digital business card"></div>
+      <div class="fan-card"><img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69ee0c8f4c6c7b73ea2ec996_DBC_StephKim_Card.avif" alt="Digital business card"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW TO ============ -->
+<section class="how-section">
+  <div class="container">
+    <div class="how-grid">
+      <div class="how-head">
+        <h2 class="h-2">How to make a digital business card</h2>
+        <a href="#" class="btn btn-primary">Create my free card</a>
+      </div>
+      <div class="how-steps">
+        <div class="how-step">
+          <div>
+            <div class="how-step-num">1.</div>
+            <h3 class="h-5">Download</h3>
+            <p class="body-3">Get the Blinq mobile app in the Apple App Store or Google Play Store.</p>
+          </div>
+          <div class="how-step-img">
+            <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/697c2bf7274ae49561ed8045_d82dbadd4e3d2065ec1a13f29a7c9b2b_Frame%202136140391.avif" alt="Download">
+          </div>
+        </div>
+        <div class="how-step">
+          <div>
+            <div class="how-step-num">2.</div>
+            <h3 class="h-5">Create</h3>
+            <p class="body-3">Add your contact details, socials, website, and more to your free Blinq card.</p>
+          </div>
+          <div class="how-step-img">
+            <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/697c2bf7e0d7d5d1d04dc067_6b44aa9c91d2919fb63ce02493fd4052_Frame%202147226875.avif" alt="Create">
+          </div>
+        </div>
+        <div class="how-step">
+          <div>
+            <div class="how-step-num">3.</div>
+            <h3 class="h-5">Share</h3>
+            <p class="body-3">Open your Blinq app and get your prospects to scan the QR code. This will share your details instantly, without the need for your recipient to have the Blinq app.</p>
+          </div>
+          <div class="how-step-img">
+            <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/697c2bf7267ce9dbff294d38_ceddbc9b3870ce0abbf2f411ad7533dc_Frame%202147226874.avif" alt="Share">
+          </div>
+        </div>
+        <div class="how-step">
+          <div>
+            <div class="how-step-num">4.</div>
+            <h3 class="h-5">Save</h3>
+            <p class="body-3">When your prospect opens your card, they'll be given the option to save your contact details quickly and directly to their phone.</p>
+          </div>
+          <div class="how-step-img">
+            <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/697c2bf712922789c579e44b_71579b796e6dde30e5e36fee828622b5_Frame%202136140392.avif" alt="Save">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TEAMS / G2 ============ -->
+<section class="teams-section">
+  <div class="container">
+    <div class="teams-grid">
+      <div class="teams-text">
+        <h2 class="h-2">The choice for teams: <br>Rated #1 on G2</h2>
+        <a href="#" class="btn btn-dark">Book a demo</a>
+      </div>
+      <div class="g2-widget">
+        <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/69ddeda87490e9fa07213a39_Logo_Block_MLB.avif" alt="G2 Grid" style="opacity:.4; max-width: 60%;">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TESTIMONIALS ============ -->
+<section class="testi-section">
+  <div class="container">
+    <div class="testi-head">
+      <h2 class="h-2">Trusted by millions of users around the world</h2>
+      <div class="stat">
+        <span class="star">★</span> <strong>4.9/5</strong> · 200,000+ reviews
+      </div>
+    </div>
+  </div>
+  <div class="marquee" style="margin-bottom: 1.25rem;">
+    <div class="marquee-track" id="testiTrack1">
+      <!-- filled by JS -->
+    </div>
+  </div>
+  <div class="marquee reverse">
+    <div class="marquee-track" id="testiTrack2">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="faq-section">
+  <div class="container">
+    <div class="faq-head">
+      <h2 class="h-2">Frequently asked questions</h2>
+    </div>
+    <div class="faq-container" id="faqContainer">
+
+      <div class="faq-item">
+        <button class="faq-q">
+          What is a digital business card?
+          <span class="faq-icon"></span>
+        </button>
+        <div class="faq-a">
+          <div class="faq-a-inner">
+            <p>A digital business card transforms how professionals exchange contact information by replacing static paper with dynamic, always-current profiles that live on your phone.</p>
+            <p>Digital business cards allow you to share your details in the way that works for you, whether that is using your QR code, NFC tap, from Apple Wallet, smart watch or a home screen widget. If you're networking at conferences, joining video meetings, or connecting through social platforms, Blinq makes sharing your professional information seamless.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">
+          What is a virtual business card?
+          <span class="faq-icon"></span>
+        </button>
+        <div class="faq-a">
+          <div class="faq-a-inner">
+            <p>A virtual business card is just another name for digital business card or business card app. It's a digital version of traditional paper business cards that can be shared electronically. Unlike paper cards that get lost or forgotten, digital cards are instantly saved to your recipient's phone and can include interactive elements like clickable email addresses, website links, and social profiles.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">
+          How do I create a digital business card?
+          <span class="faq-icon"></span>
+        </button>
+        <div class="faq-a">
+          <div class="faq-a-inner">
+            <p>To create a digital business card: Sign up on web or mobile, add your name, title, and contact details, upload a photo or logo, choose your design, enable Wallet/NFC, and share via QR, Wallet, link, or NFC — no app needed. Blinq lets you do this free in under two minutes.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">
+          What is the best digital business card?
+          <span class="faq-icon"></span>
+        </button>
+        <div class="faq-a">
+          <div class="faq-a-inner">
+            <p>We believe that the best digital business card is one that helps you make a connection that lasts well beyond the first meeting. We reviewed 6 popular digital business card apps focusing on customer sentiment, usability, branding, scalability, security and more.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">
+          How do I share a digital business card?
+          <span class="faq-icon"></span>
+        </button>
+        <div class="faq-a">
+          <div class="faq-a-inner">
+            <p>To share your Blinq card: Open your card on web or mobile, pick QR, Wallet, link, NFC, or Apple Watch, and recipients scan or tap to save your details instantly. No app is needed for recipients.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">
+          Are digital business cards secure?
+          <span class="faq-icon"></span>
+        </button>
+        <div class="faq-a">
+          <div class="faq-a-inner">
+            <p>Yes. Most digital business cards use encryption and secure hosting. Blinq adds SOC 2 Type II compliance, SSO, field locking, and access logs so businesses can control and protect contact data at scale.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">
+          Can I use a digital business card without the app?
+          <span class="faq-icon"></span>
+        </button>
+        <div class="faq-a">
+          <div class="faq-a-inner">
+            <p>Yes. Recipients don't need an app to view or save your card. With Blinq, links, QR codes, Wallet, or NFC open in a mobile-friendly page for one-tap saving to contacts.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">
+          Are digital business cards free?
+          <span class="faq-icon"></span>
+        </button>
+        <div class="faq-a">
+          <div class="faq-a-inner">
+            <p>Many providers offer free plans for individuals. Blinq's free plan covers personal use, while Premium and Business plans add branding, CRM integrations, analytics, and team management features.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">
+          Do digital business cards work with Apple and Google Wallet?
+          <span class="faq-icon"></span>
+        </button>
+        <div class="faq-a">
+          <div class="faq-a-inner">
+            <p>Yes. Digital business cards can be saved to Apple Wallet or Google Wallet for instant access. Blinq users can double-tap their phone to bring up their card instantly, even offline.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">
+          What are the benefits of a digital business card?
+          <span class="faq-icon"></span>
+        </button>
+        <div class="faq-a">
+          <div class="faq-a-inner">
+            <p>Digital business cards save printing costs, update in real time, and never run out. They integrate with CRMs, support instant sharing, provide analytics, and reduce environmental impact compared to paper cards.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">
+          Can teams and enterprises use digital business cards?
+          <span class="faq-icon"></span>
+        </button>
+        <div class="faq-a">
+          <div class="faq-a-inner">
+            <p>Yes. Many companies use digital cards for branding and integrations. Blinq Business lets organizations create cards for employees, manage access with SSO, integrate with HR/CRM systems, and track engagement across the team.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">
+          Do digital business cards work with NFC cards?
+          <span class="faq-icon"></span>
+        </button>
+        <div class="faq-a">
+          <div class="faq-a-inner">
+            <p>Yes. Digital business cards can link to physical NFC cards so people tap once to open your profile. Blinq offers customizable NFC cards connected to your account for instant sharing.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA ============ -->
+<section class="cta-section">
+  <div class="container">
+    <div class="cta-card">
+      <div class="cta-text">
+        <h2 class="h-2">Create your digital business card today</h2>
+        <p>Get started for free with Blinq and grow your network.</p>
+        <a href="#" class="btn btn-primary btn-lg">Create my card</a>
+      </div>
+      <div class="cta-img">
+        <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/696ef0d995f64ab38eab38ff_925489faebb7b68f5049a9256c729a3d_Frame%202136140384.webp" alt="Create your digital business card">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-ctas">
+        <a href="#" class="btn btn-dark">Start for free</a>
+        <a href="#" class="btn btn-outline">Login</a>
+      </div>
+    </div>
+
+    <div class="footer-links">
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="#">Careers</a></li>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">Contact us</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="#">Log in</a></li>
+          <li><a href="#">Sign up free</a></li>
+          <li><a href="#">Help Center</a></li>
+          <li><a href="#">Book a demo</a></li>
+          <li><a href="#">Docs</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#">Pricing</a></li>
+          <li><a href="#">Digital Business Cards</a></li>
+          <li><a href="#">Event Lead Capture</a></li>
+          <li><a href="#">Contact Enrichment</a></li>
+          <li><a href="#">NFC Business Cards</a></li>
+          <li><a href="#">Integrations</a></li>
+          <li><a href="#">Business &amp; Teams</a></li>
+          <li><a href="#">Event Badges</a></li>
+          <li><a href="#">AI Notetaker</a></li>
+          <li><a href="#">Accessories</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Trust &amp; Legal</h4>
+        <ul>
+          <li><a href="#">Trust Center</a></li>
+          <li><a href="#">Security</a></li>
+          <li><a href="#">Cookie Policy</a></li>
+          <li><a href="#">Terms &amp; Conditions</a></li>
+          <li><a href="#">Terms of Use</a></li>
+          <li><a href="#">Partner Program</a></li>
+          <li><a href="#">Responsible Disclosure</a></li>
+          <li><a href="#">Privacy Policy</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div class="footer-logo">
+        <img src="https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/698ea4124eb49a21590736ca_BLINQ%20INLINE%20LOGO%20ARTWORKED.svg" alt="Blinq">
+        Blinq
+      </div>
+      <div class="footer-socials">
+        <a href="#" aria-label="Instagram">
+          <svg viewBox="0 0 24 24"><path d="M12 2.2c3.2 0 3.6 0 4.8.1 1.2.1 1.8.2 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.4 1 .4 2.2.1 1.2.1 1.6.1 4.8s0 3.6-.1 4.8c-.1 1.2-.2 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .4-2.2.4-1.2.1-1.6.1-4.8.1s-3.6 0-4.8-.1c-1.2-.1-1.8-.2-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.4-1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.8c.1-1.2.2-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.4 2.2-.4C8.4 2.2 8.8 2.2 12 2.2zm0 3.2a6.6 6.6 0 100 13.2 6.6 6.6 0 000-13.2zm0 10.9a4.3 4.3 0 110-8.6 4.3 4.3 0 010 8.6zm6.8-11.2a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/></svg>
+        </a>
+        <a href="#" aria-label="YouTube">
+          <svg viewBox="0 0 24 24"><path d="M23.5 6.2c-.3-1-.9-1.8-1.9-2.1C19.9 3.6 12 3.6 12 3.6s-7.9 0-9.6.5C1.4 4.4.8 5.2.5 6.2 0 7.9 0 12 0 12s0 4.1.5 5.8c.3 1 .9 1.8 1.9 2.1 1.7.5 9.6.5 9.6.5s7.9 0 9.6-.5c1-.3 1.6-1.1 1.9-2.1.5-1.7.5-5.8.5-5.8s0-4.1-.5-5.8zM9.6 15.6V8.4l6.4 3.6-6.4 3.6z"/></svg>
+        </a>
+        <a href="#" aria-label="TikTok">
+          <svg viewBox="0 0 24 24"><path d="M19.6 6.3c-1.1-.7-1.9-1.9-2.1-3.3h-3.3v13.5c0 1.6-1.3 2.8-2.9 2.8-1.6 0-2.9-1.3-2.9-2.8 0-1.6 1.3-2.8 2.9-2.8.3 0 .6 0 .9.1V10.4c-.3 0-.6-.1-.9-.1-3.5 0-6.3 2.8-6.3 6.3s2.8 6.3 6.3 6.3 6.3-2.8 6.3-6.3V9.4c1.2.9 2.7 1.4 4.3 1.4V7.5c-.7 0-1.4-.2-2.1-.5-.1-.3-.2-.5-.2-.7z"/></svg>
+        </a>
+        <a href="#" aria-label="LinkedIn">
+          <svg viewBox="0 0 24 24"><path d="M20.5 2h-17C2.7 2 2 2.7 2 3.5v17c0 .8.7 1.5 1.5 1.5h17c.8 0 1.5-.7 1.5-1.5v-17c0-.8-.7-1.5-1.5-1.5zM8.3 18.6H5.4V9.5h2.9v9.1zM6.8 8.2c-.9 0-1.7-.8-1.7-1.7S5.9 4.8 6.8 4.8s1.7.8 1.7 1.7-.8 1.7-1.7 1.7zM19 18.6h-2.9v-4.8c0-1.1 0-2.6-1.6-2.6s-1.8 1.2-1.8 2.5v4.9h-2.9V9.5h2.8v1.2h.1c.4-.7 1.3-1.5 2.8-1.5 3 0 3.5 2 3.5 4.5v4.9z"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="footer-copy">
+      US patent pending. © 2026 Blinq Technologies Pty Ltd.
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ============ NAV MOBILE ============ */
+(function() {
+  const burger = document.getElementById('burger');
+  const navLinks = document.getElementById('navLinks');
+  if (burger && navLinks) {
+    burger.addEventListener('click', function() {
+      burger.classList.toggle('open');
+      navLinks.classList.toggle('open');
+    });
+    // Mobile dropdown toggles
+    document.querySelectorAll('.nav-dropdown').forEach(function(dd) {
+      const trigger = dd.querySelector('.nav-link');
+      trigger.addEventListener('click', function(e) {
+        if (window.innerWidth <= 991) {
+          e.preventDefault();
+          dd.classList.toggle('open');
+        }
+      });
+    });
+  }
+})();
+
+/* ============ LOGOS MARQUEE ============ */
+(function() {
+  const logos = [
+    '69ddeda87490e9fa07213a39_Logo_Block_MLB.avif',
+    '69ddeda83b3e0710f7875563_Logo_Block_Hubspot.avif',
+    '69ddeda8a343355970d63e45_Logo_Block_Google.avif',
+    '69ddeda8a3dc7ddf1a3194c6_Logo_Block_Nike.avif',
+    '69ddeda83fb3785cba4c2fe8_Logo_Block_Canva.avif',
+    '69ddeda817c5825741d2b464_Logo_Block_Deloitte.avif',
+    '69ddeda88809dfed53c1817e_Logo_Block_Gong.avif',
+    '69ddeda88b4e4047618c89b2_Logo_Block_Cartier.avif',
+    '69ddeda9c18a26ba915141d6_af94d11f1b549940b104ae9463d1e8c6_Logo_Block_OpenAI.avif',
+    '69ddedae1adeb7c2d74c0a94_Logo_Block_GoldmanSachs.avif',
+    '69ddeda9ec5c557baee57377_Logo_Block_Salesforce.avif',
+    '69ddeda909acac632ab2b434_Logo_Block_Tesla.avif',
+    '69ddeda9fb6c9ac3c3680ee0_Logo_Block_Stripe.avif',
+    '69ddeda9f27d9135c30d3311_Logo_Block_Philips.avif',
+    '69ddeda94d37ebc5bdb8977c_Logo_Block_Stanford.avif',
+    '69ddedaf3a74b094333f11ae_Logo_Block_Pepsico.avif'
+  ];
+  const base = 'https://cdn.prod.website-files.com/617ac0d059899a9a3c8216e9/';
+  const track = document.getElementById('logosTrack');
+  if (track) {
+    const html = logos.map(function(f) {
+      return '<img src="' + base + f + '" alt="Logo" loading="lazy">';
+    }).join('');
+    track.innerHTML = html + html; // duplicate for seamless loop
+  }
+})();
+
+/* ============ TESTIMONIALS ============ */
+(function() {
+  const testimonials1 = [
+    { text: "I've used it for two years! Everyone who I introduce Blinq to — at any live event — is thoroughly impressed.", author: 'Martha C.', platform: 'Capterra' },
+    { text: "I love this app so much. Every time I meet someone at an event, and I give them my Blinq card, they end up downloading it immediately too.", author: 'Bat-Sheva', platform: 'Google Play' },
+    { text: "So convenient! Not only for my business; recently I was in an accident and I was able to share my contact when I needed the most! Great tool! 10 stars.", author: 'Liz Realtor Florida', platform: 'Trustpilot' },
+    { text: "I just share one QR code or link and everything is there... my phone number, email and other details in one place. It makes things easier and saves time.", author: 'Ishan S.', platform: 'G2' },
+    { text: "Seamless integration and reliable performance. It has never failed me when it counts, and the offline mode is a total lifesaver.", author: 'John J.', platform: 'G2' },
+    { text: "I absolutely LOVE that I can make myself accessible via all of the channels that are connected to me with just a share!", author: 'Leigha', platform: 'Google Play' }
+  ];
+  const testimonials2 = [
+    { text: "Set up 2 business cards for 2 businesses in less than 10 minutes. Definitely recommend to anyone starting a business.", author: 'CoCo_withLove', platform: 'App Store' },
+    { text: "Every client I've gotten has given me compliments on using this app… they've also started using the app.", author: 'KD432', platform: 'App Store' },
+    { text: "Was skeptical at first but the ease to create and share sold me. Have shared this hundreds of times in personal settings, not just business!", author: 'SusanVette', platform: 'App Store' },
+    { text: "Such a game-changer! Wow! I've been told by several top realtors to get Blinq a while ago. Now I wish I would have gotten it much sooner!", author: 'Kaeci Carter', platform: 'Google Play' },
+    { text: "Had it for a week. Waaay more responses than I've had with paper business cards. Highly recommend.", author: 'The Att Boy', platform: 'App Store' },
+    { text: "Blinq connects seamlessly with my CRM and updates contacts automatically. That's been a huge time-saver.", author: 'Keshia W.', platform: 'G2' }
+  ];
+
+  function renderTrack(el, items) {
+    if (!el) return;
+    const html = items.map(function(t) {
+      return '<div class="testi-card">' +
+        '<div class="testi-stars">' +
+        '<svg viewBox="0 0 14 14"><path d="M7 0l2 5h5l-4 3 1.5 5L7 10l-4.5 3L4 8 0 5h5z"/></svg>'.repeat(5) +
+        '</div>' +
+        '<p>' + t.text + '</p>' +
+        '<div class="testi-author">★★★★★ · ' + t.author + ' · ' + t.platform + '</div>' +
+        '</div>';
+    }).join('');
+    el.innerHTML = html + html;
+  }
+  renderTrack(document.getElementById('testiTrack1'), testimonials1);
+  renderTrack(document.getElementById('testiTrack2'), testimonials2);
+})();
+
+/* ============ FAQ ACCORDION ============ */
+(function() {
+  document.querySelectorAll('.faq-item').forEach(function(item) {
+    const q = item.querySelector('.faq-q');
+    const a = item.querySelector('.faq-a');
+    q.addEventListener('click', function() {
+      const isOpen = item.classList.contains('open');
+      // Close all
+      document.querySelectorAll('.faq-item').forEach(function(other) {
+        other.classList.remove('open');
+        const oa = other.querySelector('.faq-a');
+        if (oa) oa.style.maxHeight = null;
+      });
+      // Open clicked
+      if (!isOpen) {
+        item.classList.add('open');
+        a.style.maxHeight = a.scrollHeight + 'px';
+      }
+    });
+  });
+})();
+
+/* ============ VIDEO AUTOPLAY FALLBACK ============ */
+(function() {
+  document.querySelectorAll('video[autoplay]').forEach(function(video) {
+    video.muted = true;
+    video.setAttribute('muted', '');
+    video.setAttribute('playsinline', '');
+    video.setAttribute('webkit-playsinline', '');
+    const playPromise = video.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(function() {
+        function retry() {
+          video.play();
+          document.removeEventListener('touchstart', retry);
+          document.removeEventListener('click', retry);
+        }
+        document.addEventListener('touchstart', retry, { once: true });
+        document.addEventListener('click', retry, { once: true });
+      });
+    }
+  });
+})();
+
+/* ============ SMOOTH SCROLL ============ */
+(function() {
+  document.querySelectorAll('a[href^="#"]').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      const href = this.getAttribute('href');
+      if (href.length > 1) {
+        const target = document.querySelector(href);
+        if (target) {
+          e.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

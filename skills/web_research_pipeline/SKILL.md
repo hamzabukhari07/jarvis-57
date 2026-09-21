@@ -2,7 +2,7 @@
 name: web_research_pipeline
 description: In-depth web investigation protocol featuring query decomposition, ground-truth cross-referencing, and concise bullet summaries.
 metadata:
-  author: Zezo / FatihMakes
+  author: ZEZO / Hamza Bukhari
   version: '1.0'
 ---
 

@@ -901,11 +901,26 @@ class _SessionRegistry:
         with self._lock:
             sess = self._sessions.pop(browser_name, None)
         if sess:
-            sess.close()
+            try:
+                sess.close()
+            except Exception:
+                pass
             if self._active_browser == browser_name:
                 self._active_browser = ""
-            return f"{browser_name} closed."
-        return f"No active session for: {browser_name}"
+
+        from actions.open_app import close_application_by_name
+        closed_proc = close_application_by_name(browser_name)
+
+        if not closed_proc and not sess:
+            try:
+                import pyautogui
+                modifier = "command" if platform.system() == "Darwin" else "ctrl"
+                pyautogui.hotkey(modifier, "w")
+                return f"Closed active tab in {browser_name}."
+            except Exception:
+                pass
+
+        return f"Closed {browser_name}."
 
     def close_all(self) -> str:
         with self._lock:
@@ -918,7 +933,25 @@ class _SessionRegistry:
                 s.close()
             except Exception:
                 pass
-        return "All browsers closed: " + (", ".join(names) if names else "none")
+
+        from actions.open_app import close_application_by_name
+        closed_any = False
+        for b in ("chrome", "msedge", "firefox", "opera", "brave"):
+            if close_application_by_name(b):
+                closed_any = True
+                if b not in names:
+                    names.append(b)
+
+        if not closed_any and not sessions:
+            try:
+                import pyautogui
+                modifier = "command" if platform.system() == "Darwin" else "ctrl"
+                pyautogui.hotkey(modifier, "w")
+                return "Closed active browser tab."
+            except Exception:
+                pass
+
+        return "All browsers closed: " + (", ".join(names) if names else "closed active browser tab.")
 
     def list_sessions(self) -> str:
         with self._lock:
@@ -932,6 +965,9 @@ class _SessionRegistry:
 
 
 _registry = _SessionRegistry()
+_last_nav_lock = threading.Lock()
+_last_nav: dict = {"key": "", "time": 0.0, "result": ""}
+_NAV_DEBOUNCE_SEC = 4.0
 
 def browser_control(
     parameters:    dict = None,
@@ -973,6 +1009,24 @@ def browser_control(
     # opens here. The only exception: if an automation flow is already running,
     # navigation continues in that window (so multi-step tasks aren't split).
     if action in ("go_to", "search", "new_tab"):
+        if action == "search":
+            base    = _SEARCH_ENGINES.get(params.get("engine", "google").lower(),
+                                          _SEARCH_ENGINES["google"])
+            nav_url = base + params.get("query", "").replace(" ", "+")
+        else:
+            nav_url = params.get("url", "").strip()
+
+        # Deduplication / debounce guard against duplicate Live API tool calls
+        import time as _t
+        dedup_key = f"{action}:{browser or ''}:{nav_url}"
+        now_ts = _t.time()
+        with _last_nav_lock:
+            if dedup_key and dedup_key == _last_nav.get("key") and (now_ts - _last_nav.get("time", 0.0)) < _NAV_DEBOUNCE_SEC:
+                cached_res = _last_nav.get("result") or f"Opened {nav_url}"
+                print(f"[Browser] Duplicate {action} request for '{nav_url}' ignored (debounced within {_NAV_DEBOUNCE_SEC}s).")
+                _log(player, cached_res)
+                return cached_res
+
         if _registry.has(browser):
             sess = _registry.get(browser)
             try:
@@ -987,21 +1041,23 @@ def browser_control(
                 result = f"Browser action '{action}' timed out (60s)."
             except Exception as e:
                 result = f"Browser error ({action}): {e}"
+            with _last_nav_lock:
+                _last_nav["key"] = dedup_key
+                _last_nav["time"] = _t.time()
+                _last_nav["result"] = result
             _log(player, result)
             return result
-
-        if action == "search":
-            base    = _SEARCH_ENGINES.get(params.get("engine", "google").lower(),
-                                          _SEARCH_ENGINES["google"])
-            nav_url = base + params.get("query", "").replace(" ", "+")
-        else:
-            nav_url = params.get("url", "").strip()
 
         result = _open_native(nav_url, browser)
         if result.startswith("Opened") and nav_url:
             _registry.note_native_url(_normalize_url(nav_url))
+        with _last_nav_lock:
+            _last_nav["key"] = dedup_key
+            _last_nav["time"] = _t.time()
+            _last_nav["result"] = result
         _log(player, result)
         return result
+
 
     # ── Interactive actions (click/type/read…) ───────────────────────────────
     # These require a physically controllable browser; the automation window
@@ -1073,7 +1129,7 @@ def _log(player, text: str):
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "browser_control",
-    "description": "Controls any web browser. Use for: opening websites, searching the web, clicking elements, filling forms, scrolling, screenshots, navigation, any web-based task. Simple open/search requests launch the user's own browser normally (their real profile and logged-in accounts); interactive actions (click, type, fill_form...) attach an automation browser. Always pass the 'browser' parameter when the user specifies a browser (e.g. 'open in Edge', 'use Firefox', 'open Chrome'). Multiple browsers can run simultaneously.",
+    "description": "Controls any web browser. Use for: opening websites, searching the web, clicking elements, filling forms, scrolling, screenshots, navigation, any web-based task. Simple open/search requests launch the user's own browser normally (their real profile and logged-in accounts); interactive actions (click, type, fill_form...) attach an automation browser. Always pass the 'browser' parameter when the user specifies a browser (e.g. 'open in Edge', 'use Firefox', 'open Chrome'). Multiple browsers can run simultaneously. Call each action exactly once per turn.",
     "parameters": {
         "type": "OBJECT",
         "properties": {

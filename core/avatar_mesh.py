@@ -34,15 +34,13 @@ import numpy as np
 _OBJ = Path(__file__).resolve().parent / "face_model.obj"
 
 # Cranium shape, in the model's own units (chin ≈ -9.4, forehead ≈ +8.3).
-# Tuned so that brow→crown is ~0.36 of the head's height, which is the real
-# proportion; a taller cranium than that immediately reads as a long face even
-# though the face itself is untouched measured geometry.
-_SKULL_C = (0.0, 2.0, -1.0)      # centre of the cranial ellipsoid
-_SKULL_R = (8.4, 12.4, 8.2)      # its radii
-_SKULL_POLE = (0.0, 0.42, -1.0)  # direction of the occiput, where the sweep closes
+# Compact, athletic human proportions (brow to crown is ~0.35 of head height).
+_SKULL_C = (0.0, 1.1, -1.2)      # centre of the cranial ellipsoid
+_SKULL_R = (7.8, 9.3, 7.8)       # its radii
+_SKULL_POLE = (0.0, 0.40, -1.0)  # direction of the occiput, where the sweep closes
 _SKULL_RINGS = 6
-_SKULL_BLEND = 1.7               # how fast the sweep leaves the face border
-_SKULL_BULGE = 1.04
+_SKULL_BLEND = 1.8               # how fast the sweep leaves the face border
+_SKULL_BULGE = 1.01
 
 _NECK_RINGS, _NECK_SEGS = 9, 14
 _NECK_Z = -1.6                   # the neck tube's axis, in model units
@@ -177,13 +175,72 @@ def _add_cranium(verts: np.ndarray, faces: np.ndarray):
     return np.vstack(out_v), np.array(out_f, dtype=np.int64)
 
 
+def _add_ears(verts: np.ndarray, faces: np.ndarray):
+    """Add sculpted anatomical ear meshes (helix, antihelix, concha, lobe) to both sides."""
+    ear_verts = []
+    ear_faces = []
+    
+    # Profile of an ear: (y_rel, z_rel, flare_x)
+    # y spans top of ear (~ +1.0) to lobe (~ -2.8) in model coordinates
+    pts = [
+        # Helix outer rim (flared outward for clear front visibility)
+        (0.8, -1.6, 1.85),
+        (0.5, -1.0, 2.10),
+        (-0.2, -0.7, 2.25),
+        (-1.1, -0.8, 2.15),
+        (-2.0, -1.1, 1.95),
+        (-2.7, -1.6, 1.45),   # lobe
+        # Concha / antihelix inner ridge
+        (-2.1, -1.9, 0.70),
+        (-1.4, -1.5, 0.90),
+        (-0.8, -1.3, 0.95),
+        (-0.2, -1.3, 0.85),
+        (0.3, -1.7, 0.55),
+        # Base attachment ring along cranium
+        (0.6, -2.2, 0.0),
+        (0.2, -2.3, 0.0),
+        (-0.7, -2.3, 0.0),
+        (-1.6, -2.3, 0.0),
+        (-2.3, -2.2, 0.0),
+    ]
+    
+    for side, sign in (("left", -1.0), ("right", 1.0)):
+        base_x = sign * 6.6
+        base_idx = len(verts) + len(ear_verts)
+        
+        v_list = []
+        for y, z, fx in pts:
+            vx = base_x + sign * fx
+            vy = y
+            vz = z
+            v_list.append([vx, vy, vz])
+        ear_verts.extend(v_list)
+        
+        # Triangulate outer ring to inner ridge, and inner ridge to base
+        f = [
+            [0, 1, 10], [1, 2, 9], [2, 3, 8], [3, 4, 7], [4, 5, 6],
+            [1, 9, 10], [2, 8, 9], [3, 7, 8], [4, 6, 7],
+            [10, 9, 12], [10, 12, 11],
+            [9, 8, 13], [9, 13, 12],
+            [8, 7, 14], [8, 14, 13],
+            [7, 6, 15], [7, 15, 14],
+        ]
+        for tri in f:
+            t = [base_idx + idx for idx in tri]
+            if sign < 0:
+                ear_faces.append([t[0], t[2], t[1]])
+            else:
+                ear_faces.append(t)
+                
+    if not ear_verts:
+        return verts, faces
+        
+    return np.vstack([verts, np.array(ear_verts, dtype=np.float64)]), np.vstack([faces, np.array(ear_faces, dtype=np.int64)])
+
+
 def _add_neck(verts: np.ndarray, faces: np.ndarray):
     """A tapering tube dropped from inside the jaw; it fades out, so no shoulders."""
     ph = np.linspace(0.0, 2.0 * np.pi, _NECK_SEGS, endpoint=False)
-    # Short, and flaring hard at the bottom: a straight vertical tube reads as
-    # a pedestal, whereas a neck that widens into the top of the shoulders
-    # reads as a bust — and the shorter it is, the larger the head can be drawn
-    # in the same HUD band.
     ys = np.linspace(-5.5, -13.0, _NECK_RINGS)
     d = (ys + 5.5) / -7.5
 
@@ -205,10 +262,6 @@ def _add_neck(verts: np.ndarray, faces: np.ndarray):
             nf.append([a, b, c])
             nf.append([a, c, e])
 
-    # Enough rings that the fade steps stay small. Each quad splits into one
-    # triangle with two top vertices and one with two bottom vertices, so a
-    # steep per-vertex fade gradient makes the pair land on visibly different
-    # brightnesses and the neck grows a sawtooth edge.
     fade = np.ones(base)
     nd = np.repeat(d, _NECK_SEGS)
     fade = np.concatenate([fade, 1.0 - 0.72 * np.clip(nd, 0.0, 1.0) ** 1.5])
@@ -217,17 +270,9 @@ def _add_neck(verts: np.ndarray, faces: np.ndarray):
 
 def _vertex_normals(verts: np.ndarray, faces: np.ndarray,
                     outward: np.ndarray) -> np.ndarray:
-    """Area-weighted vertex normals, flipped to agree with `outward`.
-
-    `outward` must be a per-vertex direction that genuinely points out of the
-    surface. A single "away from the mesh centroid" rule is NOT good enough:
-    down at the base of the neck that vector points almost straight down while
-    the real normal is horizontal, so the dot product hovers around zero and
-    the sign flips at random — which tears the neck into an asymmetric slab of
-    half-culled, half-lit triangles.
-    """
+    """Area-weighted vertex normals, flipped to agree with `outward`."""
     a, b, c = verts[faces[:, 0]], verts[faces[:, 1]], verts[faces[:, 2]]
-    fn = np.cross(b - a, c - a)          # length carries the area — the weighting
+    fn = np.cross(b - a, c - a)
 
     n = np.zeros_like(verts)
     for k in range(3):
@@ -267,6 +312,7 @@ def build_head() -> dict:
 
     n_face = len(verts)
     verts, faces = _add_cranium(verts, faces)
+    verts, faces = _add_ears(verts, faces)
     n_head = len(verts)
     verts, faces, fade = _add_neck(verts, faces)
 
@@ -337,6 +383,43 @@ def build_head() -> dict:
         "n_face": n_face,
         "n_head": n_head,
         "span": (1.0, float(verts[:, 1].min())),        # crown, bottom of the neck
+    }
+
+
+_CACHE: dict | None = None
+
+
+def get_head_mesh() -> dict:
+    """Process-wide cached mesh — every HudCanvas shares the same arrays."""
+    global _CACHE
+    if _CACHE is None:
+        _CACHE = build_head()
+    return _CACHE
+    jaw[n_head:] = 0.0
+    brow_y = verts[LANDMARKS["brow_l"] + LANDMARKS["brow_r"], 1].mean()
+    brow = np.exp(-((verts[:, 1] - brow_y) / 0.115) ** 2) * np.clip(verts[:, 2] / 0.35, 0.0, 1.0)
+    brow[n_head:] = 0.0
+    lip_c = verts[LANDMARKS["lips_out"]].mean(axis=0)
+    lips = np.exp(-((verts[:, 1] - lip_c[1]) / 0.155) ** 2) * np.exp(-(verts[:, 0] / 0.30) ** 2)
+    lips[n_head:] = 0.0
+    edges = _unique_edges(faces)[::_WIRE_STRIDE]
+    face_group = (faces >= n_head).all(axis=1).astype(np.int32)
+
+    return {
+        "face_group": np.ascontiguousarray(1 - face_group, dtype=np.float32),
+        "brow": np.ascontiguousarray(brow, dtype=np.float32),
+        "lips": np.ascontiguousarray(lips, dtype=np.float32),
+        "lip_centre": np.ascontiguousarray(lip_c, dtype=np.float32),
+        "verts": np.ascontiguousarray(verts, dtype=np.float32),
+        "normals": np.ascontiguousarray(normals, dtype=np.float32),
+        "faces": np.ascontiguousarray(faces, dtype=np.int32),
+        "edges": np.ascontiguousarray(edges, dtype=np.int32),
+        "jaw": np.ascontiguousarray(jaw, dtype=np.float32),
+        "fade": np.ascontiguousarray(fade, dtype=np.float32),
+        "landmarks": {k: np.array(v, dtype=np.int32) for k, v in LANDMARKS.items()},
+        "n_face": n_face,
+        "n_head": n_head,
+        "span": (1.0, float(verts[:, 1].min())),
     }
 
 

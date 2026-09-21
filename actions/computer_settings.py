@@ -9,7 +9,7 @@ from pathlib import Path
 
 try:
     import pyautogui
-    pyautogui.FAILSAFE = True
+    pyautogui.FAILSAFE = False
     pyautogui.PAUSE    = 0.05
     _PYAUTOGUI = True
 except ImportError:
@@ -280,21 +280,52 @@ def close_app(app_name: str = ""):
             subprocess.run(["pkill", "-f", target], capture_output=True)
             return f"Closed {app_name}."
 
-    if _OS == "Darwin": pyautogui.hotkey("command", "q")
-    else:               pyautogui.hotkey("alt", "f4")
-    return "Closed active window."
+    try:
+        from actions.computer_control import _safe_close_window
+        return _safe_close_window(app_name)
+    except Exception:
+        if _OS == "Darwin":
+            pyautogui.hotkey("command", "q")
+        else:
+            pyautogui.hotkey("alt", "f4")
+        return "Closed active window."
 
 def close_window():
-    if _OS == "Darwin": pyautogui.hotkey("command", "w")
-    else:               pyautogui.hotkey("ctrl", "w")
+    try:
+        from actions.computer_control import _safe_close_tab
+        return _safe_close_tab()
+    except Exception:
+        if _OS == "Darwin":
+            pyautogui.hotkey("command", "w")
+        else:
+            pyautogui.hotkey("ctrl", "w")
+        return "Closed tab."
 
 def full_screen():
     if _OS == "Darwin": pyautogui.hotkey("ctrl", "command", "f")
     else:               pyautogui.press("f11")
 
 def minimize_window():
-    if _OS == "Darwin": pyautogui.hotkey("command", "m")
-    else:               pyautogui.hotkey("win", "down")
+    if _OS == "Darwin":
+        pyautogui.hotkey("command", "m")
+    elif _OS == "Windows":
+        minimized = False
+        try:
+            import ctypes
+            hwnd = ctypes.windll.user32.GetForegroundWindow()
+            if hwnd:
+                # 6 = SW_MINIMIZE, 11 = SW_FORCEMINIMIZE
+                ctypes.windll.user32.ShowWindow(hwnd, 6)
+                minimized = True
+        except Exception:
+            pass
+        if not minimized:
+            # On Windows, win+down once restores a maximized window; twice minimizes it
+            pyautogui.hotkey("win", "down")
+            time.sleep(0.05)
+            pyautogui.hotkey("win", "down")
+    else:
+        pyautogui.hotkey("super", "h")
 
 def maximize_window():
     if _OS == "Darwin":
@@ -303,13 +334,25 @@ def maximize_window():
             'using {control down, command down}'],
             capture_output=True)
     elif _OS == "Windows":
-        pyautogui.hotkey("win", "up")
+        maximized = False
+        try:
+            import ctypes
+            hwnd = ctypes.windll.user32.GetForegroundWindow()
+            if hwnd:
+                # 3 = SW_MAXIMIZE
+                ctypes.windll.user32.ShowWindow(hwnd, 3)
+                maximized = True
+        except Exception:
+            pass
+        if not maximized:
+            pyautogui.hotkey("win", "up")
     else:
         try:
             subprocess.run(["wmctrl", "-r", ":ACTIVE:", "-b", "add,maximized_vert,maximized_horz"],
                 capture_output=True)
         except Exception:
             pyautogui.hotkey("super", "up")
+
 
 def snap_left():
     if _OS == "Windows":

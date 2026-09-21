@@ -1,10 +1,5 @@
----
-name: antigravity_agent
-description: Autonomous pair-programming and full-stack software generation engine powered by Google Antigravity. Architect multi-file applications with rich aesthetics, zero placeholders, and verified syntax.
-metadata:
-  author: Zezo / Google DeepMind
-  version: '2.0'
----
+# SKILL: antigravity_agent (CODING)
+**Description:** Autonomous pair-programming and full-stack software generation engine powered by Google Antigravity. Architect multi-file applications with rich aesthetics, zero placeholders, and verified syntax.
 
 # Antigravity Developer Agent
 
@@ -13,8 +8,9 @@ Use this skill whenever the user asks Antigravity to write code, design an appli
 ## Core Capabilities:
 - **`antigravity_run` Tool:**
   - Plans complete file structures and dependency graphs.
-  - Generates stunning web applications (HTML5/CSS3/Vanilla JS with glassmorphism, responsive layout, dark themes).
+  - Generates stunning web applications or website or landing page using D:\anitgravity\zezo work\zezo latest\skills\hamza_taste\references\html
   - Generates complete Python, FastAPI, CLI, or backend modules.
+  - Build Fullstack apps using any framework the user wants
   - Automatically verifies syntax and exports complete project reports to the Zezo HUD screen.
 
 ## Usage Rules:

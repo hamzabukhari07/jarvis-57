@@ -15,6 +15,7 @@ import re
 import secrets
 import socket
 import string
+import threading
 import time
 from pathlib import Path
 
@@ -465,6 +466,7 @@ class DashboardServer:
         self._command_queue               = asyncio.Queue()
         self._wake_callback               = None
         self._connect_callback            = None
+        self._file_callback               = None
         self._pending_keys: dict[str, float] = {}
         self._device_sessions: dict[str, dict] = {}  # device_token → {session_key}
         self._phone_audio_queue: asyncio.Queue    = asyncio.Queue(maxsize=200)
@@ -518,6 +520,9 @@ class DashboardServer:
 
     def set_connect_callback(self, fn) -> None:
         self._connect_callback = fn
+
+    def set_file_callback(self, fn) -> None:
+        self._file_callback = fn
 
     # ── broadcast ────────────────────────────────────────────────────────
 
@@ -700,6 +705,8 @@ class DashboardServer:
                 await websocket.close(code=4001)
                 return
             await websocket.accept()
+            if self._wake_callback:
+                self._wake_callback()
             asyncio.create_task(self.broadcast(
                 {"type": "sys", "text": "Phone microphone live."}
             ))
@@ -770,6 +777,14 @@ class DashboardServer:
                     "size": size,
                     "saved_to": str(self._uploads_dir),
                 }))
+                if self._file_callback:
+                    try:
+                        if asyncio.iscoroutinefunction(self._file_callback):
+                            asyncio.create_task(self._file_callback(dest))
+                        else:
+                            asyncio.get_event_loop().run_in_executor(None, self._file_callback, dest)
+                    except Exception as cb_err:
+                        print(f"[Dashboard] File callback error: {cb_err}")
                 return JSONResponse({"ok": True, "name": dest.name, "size": size})
         else:
             @app.post("/api/upload")
@@ -807,6 +822,18 @@ class DashboardServer:
                 return JSONResponse({"error": "Not found"}, status_code=404)
             return FileResponse(str(path), filename=safe)
 
+        @app.get("/api/system-telemetry")
+        async def system_telemetry_ep(req: Request):
+            if not _auth(req):
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            import psutil
+            try:
+                cpu = round(psutil.cpu_percent(interval=None))
+                ram = round(psutil.virtual_memory().percent)
+                return JSONResponse({"ok": True, "cpu": cpu, "ram": ram})
+            except Exception as e:
+                return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
         @app.websocket("/ws")
         async def ws_ep(websocket: WebSocket, token: str = ""):
             tok = token.strip()
@@ -815,6 +842,16 @@ class DashboardServer:
                 return
             await websocket.accept()
             self._clients.add(websocket)
+            
+            # Send initial telemetry snapshot immediately
+            try:
+                import psutil
+                init_cpu = round(psutil.cpu_percent(interval=None))
+                init_ram = round(psutil.virtual_memory().percent)
+                await websocket.send_json({"type": "telemetry", "cpu": init_cpu, "ram": init_ram})
+            except Exception:
+                pass
+
             for entry in self._history[-50:]:
                 try:
                     await websocket.send_json(entry)
@@ -836,6 +873,29 @@ class DashboardServer:
                 self._clients.discard(websocket)
 
         return app
+
+    # ── telemetry broadcast loop ──────────────────────────────────────────
+
+    async def _telemetry_broadcast_loop(self) -> None:
+        """Periodically broadcast real CPU and RAM metrics to all connected clients."""
+        try:
+            import psutil
+        except ImportError:
+            return
+        
+        while True:
+            try:
+                if self._clients:
+                    cpu = round(psutil.cpu_percent(interval=None))
+                    ram = round(psutil.virtual_memory().percent)
+                    await self.broadcast({
+                        "type": "telemetry",
+                        "cpu": cpu,
+                        "ram": ram,
+                    })
+            except Exception:
+                pass
+            await asyncio.sleep(2.0)
 
     # ── serve ─────────────────────────────────────────────────────────────
 
@@ -866,6 +926,9 @@ class DashboardServer:
         # Generate the TLS pair on first run so no private key ships in the repo.
         _ensure_certs()
 
+        # Start background real-time telemetry broadcaster
+        asyncio.create_task(self._telemetry_broadcast_loop())
+
         use_ssl  = self._ssl_enabled()
         ssl_key  = BASE_DIR / "config" / "certs" / "jarvis.key"
         ssl_cert = BASE_DIR / "config" / "certs" / "jarvis.crt"
@@ -882,3 +945,27 @@ class DashboardServer:
         print(f"[Dashboard] {proto}://{self._ip}:{PORT}")
         print("[Dashboard] Press 'Remote Control' in JARVIS UI to get the QR code.")
         await uvicorn.Server(cfg).serve()
+
+
+_default_server: DashboardServer | None = None
+_server_lock = threading.Lock()
+
+
+def get_server() -> DashboardServer:
+    global _default_server
+    if _default_server is None:
+        with _server_lock:
+            if _default_server is None:
+                _default_server = DashboardServer()
+    return _default_server
+
+
+def start_server(host: str = "0.0.0.0", port: int = PORT, blocking: bool = True):
+    srv = get_server()
+    if blocking:
+        asyncio.run(srv.serve())
+    else:
+        t = threading.Thread(target=lambda: asyncio.run(srv.serve()), daemon=True, name="zezo-dashboard")
+        t.start()
+        return t
+

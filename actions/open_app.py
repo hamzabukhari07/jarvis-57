@@ -242,6 +242,26 @@ _OS_LAUNCHERS = {
 def close_application_by_name(app_name: str) -> bool:
     target = _normalize(app_name).lower()
     clean_name = app_name.lower().strip()
+
+    # Never allow closing self through open_app
+    if clean_name in ("zezo", "jarvis", "zezo os"):
+        return False
+
+    my_pid = os.getpid()
+
+    # Special handling for Windows Explorer to avoid killing Windows Desktop Shell
+    if _SYSTEM == "Windows" and clean_name in ("explorer", "file explorer", "folder"):
+        try:
+            script = "(New-Object -ComObject Shell.Application).Windows() | ForEach-Object { $_.Quit() }"
+            res = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW if _SYSTEM == "Windows" else 0,
+            )
+            return True
+        except Exception:
+            return False
+
     if _SYSTEM == "Windows":
         exe_name = target if target.endswith(".exe") else f"{target}.exe"
         try:
@@ -253,13 +273,15 @@ def close_application_by_name(app_name: str) -> bool:
         if _PSUTIL:
             try:
                 killed = False
-                for p in psutil.process_iter(['name']):
+                for p in psutil.process_iter(['name', 'pid']):
+                    if p.info.get('pid') == my_pid:
+                        continue
                     pname = (p.info.get('name') or '').lower()
                     if clean_name in pname or target in pname:
                         p.kill()
                         killed = True
-                if killed:
-                    return True
+                    if killed:
+                        return True
             except Exception:
                 pass
     elif _SYSTEM in ("Darwin", "Linux"):

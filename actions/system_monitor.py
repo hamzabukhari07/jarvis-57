@@ -153,24 +153,47 @@ class SystemMonitor:
 
     def check(self) -> str | None:
         try:
-            cpu  = psutil.cpu_percent(interval=None)
-            ram  = psutil.virtual_memory().percent
-            temp = _get_cpu_temp()
-            gpu  = _get_gpu_usage()
+            try:
+                from ui import _metrics
+                snap = _metrics.snapshot()
+                cpu = snap.get("cpu", 0.0)
+                ram = snap.get("mem", 0.0)
+                temp = snap.get("tmp", -1.0)
+                gpu = snap.get("gpu", -1.0)
+            except Exception:
+                cpu  = psutil.cpu_percent(interval=0.1)
+                ram  = psutil.virtual_memory().percent
+                temp = _get_cpu_temp()
+                gpu  = _get_gpu_usage()
         except Exception:
             return None
 
         alerts: list[str] = []
 
+        # Check active coding agent tasks and their CPU contribution
+        task_cpu = 0.0
+        try:
+            from core.task_manager import get_task_manager
+            task_cpu = get_task_manager().get_active_tasks_cpu_percent()
+        except Exception:
+            pass
+
+        # If task subprocesses account for >= 50% of the CPU spike, suppress alert (known build load)
+        # If external/rogue processes are driving the spike, alert normally
+        is_task_driven = (task_cpu > 0.0 and task_cpu >= (cpu * 0.5))
+
         if cpu >= self.thresholds["cpu"]:
-            self._cpu_streak += 1
-            if self._cpu_streak >= _CPU_STREAK and self._can_alert("cpu"):
-                alerts.append(
-                    f"[SYSTEM_ALERT] CPU usage has been critically high ({cpu:.0f}%) "
-                    "for several seconds. Warn the user in their language and suggest "
-                    "closing heavy applications."
-                )
-                self._record("cpu")
+            if not is_task_driven:
+                self._cpu_streak += 1
+                if self._cpu_streak >= _CPU_STREAK and self._can_alert("cpu"):
+                    alerts.append(
+                        f"[SYSTEM_ALERT] CPU usage has been critically high ({cpu:.0f}%) "
+                        "for several seconds. Warn the user in their language and suggest "
+                        "closing heavy applications."
+                    )
+                    self._record("cpu")
+                    self._cpu_streak = 0
+            else:
                 self._cpu_streak = 0
         else:
             self._cpu_streak = 0

@@ -1,0 +1,18 @@
+🚀 How to Use in Future AI Sessions:
+
+
+
+Jab bhi aap kisi naye task par kaam shuru karein, aap simply AI ko prompt mein ye reference de sakte hain:
+
+D:\anitgravity\zezo work\zezo latest\AGENTS.md 
+D:\anitgravity\zezo work\zezo latest\decisions.md
+D:\anitgravity\zezo work\zezo latest\.antigravity\skills\develop.md
+Task: [Aapka Naya Feature Ya Task]
+Follow the develop skill checklist strictly before writing any code.
+
+
+
+Aur task complete hone par:
+
+D:\anitgravity\zezo work\zezo latest\.antigravity\skills\verify.md
+Verify the changes using the verification pipeline and report the results.

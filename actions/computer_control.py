@@ -29,6 +29,12 @@ try:
 except ImportError:
     _PYPERCLIP = False
 
+try:
+    import psutil
+    _PSUTIL = True
+except ImportError:
+    _PSUTIL = False
+
 def _base_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent
@@ -355,6 +361,142 @@ def _screen_find(description: str) -> tuple[int, int] | None:
 
     return None
 
+def _is_self_or_console_window(hwnd=None) -> bool:
+    if platform.system() != "Windows":
+        return False
+    try:
+        import ctypes
+        if not hwnd:
+            hwnd = ctypes.windll.user32.GetForegroundWindow()
+        if not hwnd:
+            return False
+        pid = ctypes.c_ulong()
+        ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        target_pid = pid.value
+        my_pid = os.getpid()
+        if target_pid == my_pid:
+            return True
+        if _PSUTIL:
+            try:
+                proc = psutil.Process(my_pid)
+                for parent in proc.parents():
+                    if parent.pid == target_pid:
+                        return True
+            except Exception:
+                pass
+        length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
+        if length > 0:
+            buff = ctypes.create_unicode_buffer(length + 1)
+            ctypes.windll.user32.GetWindowTextW(hwnd, buff, length + 1)
+            t = buff.value.lower().strip()
+            if any(k in t for k in ("zezo", "jarvis", "antigravity", "powershell", "cmd.exe", "windowsterminal")):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _safe_close_window(title: str = "") -> str:
+    _require_pyautogui()
+    sys_name = platform.system()
+
+    if sys_name == "Windows":
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+
+            # If a specific title or app is requested to be closed
+            if title:
+                cleaned_title = title.lower().strip()
+                # Special handling for explorer / folders
+                if cleaned_title in ("explorer", "file explorer", "folder") or "/" in cleaned_title or "\\" in cleaned_title:
+                    try:
+                        script = "(New-Object -ComObject Shell.Application).Windows() | ForEach-Object { $_.Quit() }"
+                        subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script], capture_output=True, **_WIN_HIDE)
+                        return "Closed Explorer window(s)."
+                    except Exception:
+                        pass
+
+                matched_hwnd = None
+                matched_title = ""
+
+                def _enum_cb(hwnd, _):
+                    nonlocal matched_hwnd, matched_title
+                    if user32.IsWindowVisible(hwnd) and not _is_self_or_console_window(hwnd):
+                        length = user32.GetWindowTextLengthW(hwnd)
+                        if length > 0:
+                            buff = ctypes.create_unicode_buffer(length + 1)
+                            user32.GetWindowTextW(hwnd, buff, length + 1)
+                            w_title = buff.value
+                            if cleaned_title in w_title.lower():
+                                matched_hwnd = hwnd
+                                matched_title = w_title
+
+                WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+                user32.EnumWindows(WNDENUMPROC(_enum_cb), 0)
+
+                if matched_hwnd:
+                    user32.PostMessageW(matched_hwnd, 0x0010, 0, 0)
+                    return f"Closed window: {matched_title}"
+
+            # Generic active window closing
+            fg_hwnd = user32.GetForegroundWindow()
+            if _is_self_or_console_window(fg_hwnd):
+                # Foreground is ZEZO or terminal! NEVER press Alt+F4 on self.
+                target_hwnd = None
+                target_title = ""
+
+                def _enum_non_self(hwnd, _):
+                    nonlocal target_hwnd, target_title
+                    if target_hwnd is None and user32.IsWindowVisible(hwnd) and not _is_self_or_console_window(hwnd):
+                        length = user32.GetWindowTextLengthW(hwnd)
+                        if length > 0:
+                            buff = ctypes.create_unicode_buffer(length + 1)
+                            user32.GetWindowTextW(hwnd, buff, length + 1)
+                            w_title = buff.value
+                            if w_title and w_title not in ("Program Manager", "Settings", "Default IME", "MSCTFIME UI"):
+                                target_hwnd = hwnd
+                                target_title = w_title
+
+                WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+                user32.EnumWindows(WNDENUMPROC(_enum_non_self), 0)
+
+                if target_hwnd:
+                    user32.PostMessageW(target_hwnd, 0x0010, 0, 0)
+                    return f"Closed window: {target_title}"
+
+                return "ZEZO window is protected. No other application window found to close."
+
+            # Foreground is an external application window
+            length = user32.GetWindowTextLengthW(fg_hwnd)
+            w_title = "active window"
+            if length > 0:
+                buff = ctypes.create_unicode_buffer(length + 1)
+                user32.GetWindowTextW(fg_hwnd, buff, length + 1)
+                w_title = buff.value or "active window"
+
+            user32.PostMessageW(fg_hwnd, 0x0010, 0, 0)
+            return f"Closed window: {w_title}"
+
+        except Exception as e:
+            if not _is_self_or_console_window():
+                return _hotkey("alt", "f4")
+            return f"ZEZO window is protected from closing: {e}"
+
+    elif sys_name == "Darwin":
+        return _hotkey("command", "w")
+    else:
+        return _hotkey("ctrl", "q")
+
+
+def _safe_close_tab() -> str:
+    _require_pyautogui()
+    if _is_self_or_console_window():
+        return "ZEZO window is protected. Skipped closing tab on self."
+    modifier = "command" if platform.system() == "Darwin" else "ctrl"
+    return _hotkey(modifier, "w")
+
+
 def computer_control(
     parameters: dict,
     response=None,
@@ -374,7 +516,7 @@ def computer_control(
       direction     : 'up' | 'down' | 'left' | 'right'
       amount        : scroll amount (default: 3)
       seconds       : wait duration
-      title         : window title fragment for focus_window
+      title         : window title fragment for focus_window or close_window
       description   : natural-language element description for screen_find/click
       type          : data type for random_data
       field         : memory field name for user_data
@@ -398,6 +540,8 @@ def computer_control(
       wait          — sleep N seconds
       clear_field   — select-all + delete
       focus_window  — bring window to foreground
+      close_window  — close target or active window safely (self-protected)
+      close_tab     — close active browser/app tab (self-protected)
       screen_find   — AI element finder (returns x,y)
       screen_click  — AI element finder + click
       random_data   — generate fake form data
@@ -449,16 +593,11 @@ def computer_control(
             return _hotkey(*keys)
 
         if action in ("close_tab", "close_current_tab", "close_browser_tab"):
-            modifier = "command" if platform.system() == "Darwin" else "ctrl"
-            return _hotkey(modifier, "w")
+            return _safe_close_tab()
 
         if action in ("close_window", "close_active_window", "close_current_window"):
-            if platform.system() == "Windows":
-                return _hotkey("alt", "f4")
-            elif platform.system() == "Darwin":
-                return _hotkey("command", "w")
-            else:
-                return _hotkey("ctrl", "q")
+            target_t = params.get("title") or params.get("text") or params.get("app") or ""
+            return _safe_close_window(target_t)
 
         if action in ("press", "key", "press_key"):
             return _press(params.get("key") or params.get("text", "enter"))
@@ -552,7 +691,7 @@ TOOL = {
         "properties": {
             "action": {
                 "type": "STRING",
-                "description": "type | smart_type | click | double_click | right_click | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | screen_find | screen_click | random_data | user_data"
+                "description": "type | smart_type | click | double_click | right_click | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | close_window | close_tab | screen_find | screen_click | random_data | user_data"
             },
             "text": {
                 "type": "STRING",
@@ -588,7 +727,7 @@ TOOL = {
             },
             "title": {
                 "type": "STRING",
-                "description": "Window title for focus_window"
+                "description": "Window title for focus_window or close_window"
             },
             "description": {
                 "type": "STRING",

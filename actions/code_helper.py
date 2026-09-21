@@ -5,6 +5,14 @@ import re
 import time
 from pathlib import Path
 
+for _stream in ("stdout", "stderr"):
+    try:
+        _s = getattr(sys, _stream, None)
+        if _s is not None and hasattr(_s, "reconfigure"):
+            _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 
 def get_base_dir():
     if getattr(sys, "frozen", False):
@@ -39,6 +47,21 @@ def _get_gemini(tier: str = gemini.SMART):
     return _W()
 
 
+def _generate_text(prompt: str, system: str | None = None) -> str:
+    """Generate text/code using Groq LPU if configured; transparently fallback to Gemini REST."""
+    from memory.config_manager import get_groq_api_key
+    if get_groq_api_key():
+        try:
+            from core.llm_client import call_groq_text
+            return call_groq_text(prompt, system=system)
+        except Exception as e:
+            print(f"[Code] ⚠️ Groq LPU call failed ({e}) — falling back to Gemini REST")
+
+    full_prompt = f"{system}\n\n{prompt}" if system else prompt
+    resp = _get_gemini().generate_content(full_prompt)
+    return resp.text or ""
+
+
 def _clean_code(text: str) -> str:
     text = text.strip()
     text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
@@ -46,7 +69,8 @@ def _clean_code(text: str) -> str:
     return text.strip()
 
 
-def _resolve_save_path(output_path: str, language: str) -> Path:
+def _resolve_path(raw_path: str, language: str = "") -> Path:
+    """Intelligently resolve any file or save path without duplicate Desktop/ nesting."""
     ext_map = {
         "python": ".py", "py": ".py",
         "javascript": ".js", "js": ".js",
@@ -56,17 +80,54 @@ def _resolve_save_path(output_path: str, language: str) -> Path:
         "bash": ".sh", "shell": ".sh", "powershell": ".ps1",
         "sql": ".sql", "json": ".json", "rust": ".rs", "go": ".go",
     }
-    if output_path:
-        p = Path(output_path)
-        return p if p.is_absolute() else DESKTOP / p
-    ext = ext_map.get((language or "python").lower(), ".py")
-    return DESKTOP / f"jarvis_code{ext}"
+    raw = (raw_path or "").strip().strip("'\"`")
+    if not raw:
+        ext = ext_map.get((language or "python").lower(), ".py")
+        return DESKTOP / f"jarvis_code{ext}"
+
+    # Handle ~
+    if raw.startswith("~"):
+        return Path(raw).expanduser().resolve()
+
+    p = Path(raw)
+    if p.is_absolute():
+        return p
+
+    # Strip redundant "desktop/" or "desktop\" prefixes
+    norm = raw.replace("\\", "/")
+    if norm.lower().startswith("desktop/"):
+        rel_sub = norm[8:].lstrip("/")
+        return DESKTOP / rel_sub
+
+    # If file exists directly on Desktop, return it
+    if (DESKTOP / raw).exists():
+        return DESKTOP / raw
+
+    # If file exists in a nested Desktop/ subfolder from previous runs
+    if (DESKTOP / "Desktop" / raw).exists():
+        return DESKTOP / "Desktop" / raw
+
+    # If repo context exists and file is in repo
+    try:
+        from core.repo_context import get_last_repo
+        last_repo = get_last_repo()
+        if last_repo and (Path(last_repo) / raw).exists():
+            return Path(last_repo) / raw
+    except Exception:
+        pass
+
+    # If file exists relative to CWD
+    if p.exists():
+        return p.resolve()
+
+    # Default for new files: save directly on Desktop
+    return DESKTOP / raw
 
 
 def _read_file(file_path: str) -> tuple[str, str]:
     if not file_path:
         return "", "No file path provided."
-    p = Path(file_path)
+    p = _resolve_path(file_path)
     if not p.exists():
         return "", f"File not found: {file_path}"
     try:
@@ -150,7 +211,7 @@ def _detect_intent(description: str, file_path: str, code: str) -> str:
                 "  optimize     = refactor / clean up / speed up existing code\n\n"
                 "Reply with ONLY the intent word, nothing else."
             )
-            ans = _get_gemini().generate_content(prompt).text.strip().lower()
+            ans = _generate_text(prompt).strip().lower()
             ans = ans.strip("`'\". \n")
             if ans in _VALID_INTENTS:
                 return ans
@@ -165,8 +226,7 @@ def _detect_intent(description: str, file_path: str, code: str) -> str:
     return "write"
 
 def _write(description: str, language: str, output_path: str, player=None) -> tuple[str, Path]:
-    lang  = language or "python"
-    model = _get_gemini()
+    lang = language or "python"
 
     prompt = f"""You are an expert {lang} developer.
 Write clean, working, well-commented {lang} code for the description below.
@@ -181,15 +241,14 @@ Description: {description}
 
 Code:"""
 
-    response = model.generate_content(prompt)
-    code     = _clean_code(response.text)
-    path     = _resolve_save_path(output_path, lang)
+    raw_code = _generate_text(prompt)
+    code = _clean_code(raw_code)
+    path = _resolve_path(output_path, lang)
     _save_file(path, code)
     return code, path
 
 
 def _fix_code(code: str, error_output: str, description: str) -> str:
-    model  = _get_gemini()
     prompt = f"""You are an expert debugger.
 The code below failed with the following error. Fix it.
 Return ONLY the corrected code — no explanation, no markdown, no backticks.
@@ -204,8 +263,8 @@ Broken code:
 
 Fixed code:"""
 
-    response = model.generate_content(prompt)
-    return _clean_code(response.text)
+    raw_code = _generate_text(prompt)
+    return _clean_code(raw_code)
 
 
 def _run_file(path: Path, args: list, timeout: int) -> str:
@@ -323,7 +382,6 @@ def _edit_action(file_path, instruction, player) -> str:
     if player:
         player.write_log("[Code] Editing file...")
 
-    model  = _get_gemini()
     prompt = f"""You are an expert code editor.
 Apply the following change to the code below.
 Return ONLY the complete updated code — no explanation, no markdown, no backticks.
@@ -336,8 +394,8 @@ Original code:
 Updated code:"""
 
     try:
-        response = model.generate_content(prompt)
-        edited   = _clean_code(response.text)
+        raw_code = _generate_text(prompt)
+        edited   = _clean_code(raw_code)
     except Exception as e:
         return f"Could not edit code: {e}"
 
@@ -357,7 +415,6 @@ def _explain_action(file_path, code, player) -> str:
     if player:
         player.write_log("[Code] Analyzing code...")
 
-    model  = _get_gemini()
     prompt = f"""Explain what this code does in simple, clear language.
 Focus on: what it does, how it works, and any important details.
 Be concise — 3 to 6 sentences maximum.
@@ -368,8 +425,7 @@ Code:
 Explanation:"""
 
     try:
-        response = model.generate_content(prompt)
-        return response.text.strip()
+        return _generate_text(prompt).strip()
     except Exception as e:
         return f"Could not explain code: {e}"
 
@@ -377,7 +433,7 @@ Explanation:"""
 def _run_action(file_path, args, timeout, player) -> str:
     if not file_path:
         return "Please provide a file path to run, sir."
-    p = Path(file_path)
+    p = _resolve_path(file_path)
     if not p.exists():
         return f"File not found: {file_path}"
     if player:
@@ -398,8 +454,6 @@ def _optimize_action(file_path, code, language, output_path, player) -> str:
         player.write_log("[Code] Optimizing code...")
 
     lang  = language or "python"
-    model = _get_gemini()
-
     prompt = f"""You are an expert {lang} developer and code reviewer.
 Optimize the following code for:
 1. Performance — eliminate unnecessary operations, use efficient data structures
@@ -415,17 +469,13 @@ Original code:
 Optimized code:"""
 
     try:
-        response  = model.generate_content(prompt)
-        optimized = _clean_code(response.text)
+        raw_code  = _generate_text(prompt)
+        optimized = _clean_code(raw_code)
     except Exception as e:
         return f"Could not optimize code: {e}"
 
-    # Kaydet
-    if file_path:
-        save_path = Path(file_path)
-    else:
-        save_path = _resolve_save_path(output_path, lang)
-
+    # Save
+    save_path = _resolve_path(file_path or output_path, lang)
     status = _save_file(save_path, optimized)
     print(f"[Code] ✅ Optimized: {save_path}")
 

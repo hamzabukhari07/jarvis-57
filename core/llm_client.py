@@ -369,6 +369,68 @@ def call_llm_text(
         raise RuntimeError(f"LLM text call failed: {e}")
 
 
+def call_groq_text(
+    prompt:  str,
+    system:  str | None = None,
+    model:   str | None = None,
+    timeout: int = 30,
+) -> str:
+    """High-speed text and code completion on Groq LPU (500+ tokens/sec).
+
+    Uses OpenAI-compatible endpoint with Bearer authentication.
+    """
+    from memory.config_manager import get_groq_api_key, get_groq_model
+
+    api_key = get_groq_api_key()
+    if not api_key:
+        raise ValueError("Groq API key not configured in config/api_keys.json")
+
+    primary_model = model or get_groq_model()
+    candidates = [
+        primary_model,
+        "qwen/qwen3.8-27b",
+        "openai/gpt-oss-120b",
+        "groq/compound-mini",
+        "openai/gpt-oss-20b",
+        "llama-3.3-70b-versatile",
+    ]
+    # Deduplicate preserving order
+    models_to_try = list(dict.fromkeys(candidates))
+
+    endpoint = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    messages: list[dict] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
+    last_err = None
+    for candidate in models_to_try:
+        payload = {
+            "model": candidate,
+            "messages": messages,
+            "temperature": 0.2,
+            "max_tokens": 4096,
+        }
+        try:
+            resp = requests.post(endpoint, json=payload, headers=headers, timeout=timeout)
+            if resp.status_code == 200:
+                data = resp.json()
+                return (data.get("choices", [{}])[0].get("message", {}).get("content") or "").strip()
+            last_err = f"Groq HTTP {resp.status_code}: {resp.text[:120]}"
+        except Exception as e:
+            last_err = str(e)
+            continue
+
+    raise RuntimeError(f"All Groq candidate models failed. Last error: {last_err}")
+
+
+
+
 def _stream_openai(
     messages: list,
     tools:    list | None,

@@ -1,0 +1,132 @@
+/* Apex Luxury Studio Stylesheet */
+:root {
+  --bg-canvas: #0b0f19;
+  --bg-card: #111827;
+  --text-main: #ffffff;
+  --text-muted: #9ca3af;
+  --accent-gold: #f59e0b;
+  --border-subtle: #1f2937;
+  --font-main: 'Plus Jakarta Sans', sans-serif;
+
+  /* New Studio Tokens */
+  --bg-void: #09090b;
+  --bg-surface: #18181b;
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+  --border-line: #27272a;
+  --glass-surface: rgba(24, 24, 27, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background-color: var(--bg-canvas); color: var(--text-main); font-family: var(--font-main); scroll-behavior: smooth; }
+
+.hero-luxury { min-height: 80vh; padding: 40px 24px; display: flex; flex-direction: column; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); }
+.navbar-luxury { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto; width: 100%; }
+.logo { font-size: 20px; font-weight: 700; letter-spacing: 0.1em; color: var(--accent-gold); text-decoration: none; }
+.nav-links a { color: var(--text-muted); margin-left: 24px; text-decoration: none; font-size: 14px; transition: color 0.15s ease; }
+.nav-links a:hover { color: var(--text-main); }
+.hero-content { max-width: 900px; margin: 60px auto; text-align: center; }
+.gold-badge { display: inline-block; padding: 6px 14px; background: rgba(245, 158, 11, 0.12); color: var(--accent-gold); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; margin-bottom: 24px; }
+.hero-title { font-size: 52px; font-weight: 700; line-height: 1.1; margin-bottom: 20px; letter-spacing: -0.02em; }
+.hero-subtitle { font-size: 18px; color: var(--text-muted); max-width: 650px; margin: 0 auto 32px auto; line-height: 1.6; }
+.hero-buttons { display: flex; justify-content: center; gap: 16px; }
+.btn-gold { background: var(--accent-gold); color: #000000; padding: 12px 28px; border-radius: 8px; font-weight: 600; text-decoration: none; transition: transform 0.15s ease, brightness 0.15s ease; }
+.btn-gold:hover { transform: translateY(-1px); brightness: 1.1; }
+.btn-outline { background: transparent; border: 1px solid var(--border-subtle); color: var(--text-main); padding: 12px 28px; border-radius: 8px; font-weight: 600; text-decoration: none; transition: background 0.15s ease; }
+.btn-outline:hover { background: rgba(255,255,255,0.05); }
+
+/* --- NEW SECTION STYLES --- */
+
+/* Structural Prefabs */
+.container { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
+.container_narrow { max-width: 768px; margin: 0 auto; padding: 0 24px; }
+.container_fluid { width: 100%; padding: 0; }
+
+section { padding: 80px 0; background-color: var(--bg-void); border-bottom: 1px solid var(--border-line); }
+
+.section-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px; }
+.section-title { font-size: 36px; font-weight: 600; color: var(--text-primary); margin-bottom: 48px; letter-spacing: -0.02em; }
+.section-title_center { .section-title; text-align: center; margin-bottom: 48px; }
+.section-header_center { text-align: center; margin-bottom: 64px; display: flex; flex-direction: column; align-items: center; }
+
+/* Grid Systems */
+.grid-services, .grid-pricing, .grid-testimonials {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+/* Card Styling */
+.service-card, .pricing-card, .testimonial-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-line);
+  border-radius: 16px;
+  padding: 32px;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.service-card:hover, .pricing-card:hover { border-color: rgba(255,255,255,0.2); }
+
+/* Services Breakdown */
+.card-icon { font-size: 24px; color: var(--text-primary); margin-bottom: 20px; }
+.card-title { font-size: 20px; color: var(--text-primary); font-weight: 600; margin-bottom: 12px; }
+.card-body { font-size: 15px; color: var(--text-secondary); line-height: 1.6; }
+
+/* Architecture Showcase */
+.section-architecture { position: relative; overflow: hidden; background-color: var(--bg-void); }
+.architecture-display { width: 100%; max-width: 1440px; margin: 0 auto; padding: 0 24px; }
+.showcase-image { width: 100%; height: auto; border-radius: 16px; border: 1px solid var(--border-line); filter: grayscale(100%); transition: filter 0.4s ease; display: block; }
+.showcase-image:hover { filter: grayscale(0%); }
+
+/* Transparent Pricing Grid */
+.grid-pricing { align-items: stretch; }
+.pricing-card { display: flex; flex-direction: column; position: relative; }
+.pricing-card.featured { border-color: var(--accent-gold); background: rgba(245, 158, 11, 0.03); }
+.plan-badge { position: absolute; top: 16px; right: 16px; font-size: 10px; padding: 4px 8px; background: var(--accent-gold); color: #000; border-radius: 4px; font-weight: 700; }
+.plan-name { font-size: 16px; font-weight: 500; color: var(--text-secondary); margin-bottom: 8px; }
+.plan-price { font-size: 32px; font-weight: 700; color: var(--text-primary); margin-bottom: 24px; }
+.plan-price span { font-size: 14px; color: var(--text-secondary); font-weight: 400; }
+.plan-features { list-style: none; margin-bottom: auto; }
+.plan-features li { font-size: 14px; color: var(--text-secondary); padding: 8px 0; border-bottom: 1px solid var(--border-line); display: flex; align-items: center; }
+.plan-features li::before { content: "✓"; margin-right: 12px; color: var(--accent-gold); }
+.btn-glass_full, .btn-gold_full { width: 100%; margin-top: 32px; display: block; text-align: center; text-decoration: none; padding: 12px 0; border-radius: 8px; font-size: 14px; font-weight: 600; transition: brightness 0.15s ease; }
+.btn-glass_full { background: var(--glass-surface); border: 1px solid var(--border-line); color: var(--text-primary); backdrop-filter: blur(8px); }
+.btn-glass_full:hover { background: rgba(255,255,255,0.1); }
+.btn-gold_full { background: var(--accent-gold); color: #000; }
+.btn-gold_full:hover { brightness: 1.1; }
+
+/* Client Testimonials */
+.grid-testimonials { grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); }
+.testimonial-card .quote { font-size: 18px; line-height: 1.6; color: var(--text-primary); font-family: serif; font-style: italic; margin-bottom: 24px; position: relative; }
+.testimonial-card .quote::before { content: "“"; font-size: 40px; position: absolute; top: -10px; left: -20px; opacity: 0.1; }
+.client-info { display: flex; flex-direction: column; }
+.client-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.client-org { font-size: 12px; color: var(--text-secondary); }
+
+/* FAQ */
+.faq-list { display: flex; flex-direction: column; gap: 16px; }
+.faq-item { background: var(--bg-surface); border: 1px solid var(--border-line); border-radius: 8px; overflow: hidden; }
+.faq-question { padding: 18px; font-size: 15px; font-weight: 500; color: var(--text-primary); cursor: pointer; user-select: none; transition: background 0.15s ease; }
+.faq-question:hover { background: rgba(255,255,255,0.03); }
+.faq-answer { padding: 0 18px 18px 18px; font-size: 14px; color: var(--text-secondary); line-height: 1.6; display: none; }
+.faq-item[open] .faq-answer { display: block; border-top: 1px solid var(--border-line); padding-top: 18px; }
+
+/* Footer */
+.studio-footer { background-color: var(--bg-void); padding: 48px 0; border-top: 1px solid var(--border-line); font-size: 13px; }
+.footer-core .logo { font-size: 24px; margin-bottom: 8px; }
+.footer-tagline { color: var(--text-secondary); margin-bottom: 24px; }
+.footer-links { display: flex; gap: 24px; margin-bottom: 24px; }
+.footer-links a { color: var(--text-secondary); text-decoration: none; transition: color 0.15s ease; }
+.footer-links a:hover { color: var(--text-primary); }
+.footer-legal { color: #52525b; font-family: 'JetBrains Mono', monospace; font-size: 11px; margin-top: auto; padding-top: 24px; border-top: 1px solid var(--border-line); text-align: center; }
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .hero-title { font-size: 36px; }
+  .grid-services, .grid-pricing, .grid-testimonials { grid-template-columns: 1fr; }
+  .nav-links { display: none; }
+  .hero-buttons { flex-direction: column; gap: 12px; align-items: center; }
+  .section-title { font-size: 28px; }
+  .container, .container_narrow { padding: 0 16px; }
+}

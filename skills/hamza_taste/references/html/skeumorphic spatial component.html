@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skeuomorphic Spatial Component</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+</head>
+
+<body class="bg-[#0C0C0C] text-[#E7E7E7] font-sans min-h-screen flex items-center justify-center p-4 md overflow-x-hidden selection:bg-[#FF7A6E]/30 selection:text-[#FF7A6E]" style="background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.02) 10px, rgba(255,255,255,0.02) 11px), #0C0C0C;">
+
+<!-- Outer Framed Grid Layout Container -->
+<div class="relative w-full max-w-[1120px] mx-auto py-8">
+
+<!-- Grid Boundary Lines & Corner Elements -->
+<div class="absolute inset-y-0 left-0 w-px bg-[#333333]/60 pointer-events-none"></div>
+<div class="absolute inset-y-0 right-0 w-px bg-[#333333]/60 pointer-events-none"></div>
+
+<div class="absolute top-0 -left-[3px] w-1.5 h-1.5 border border-[#757575] bg-[#0C0C0C] z-10 pointer-events-none"></div>
+<div class="absolute top-0 -right-[3px] w-1.5 h-1.5 border border-[#757575] bg-[#0C0C0C] z-10 pointer-events-none"></div>
+<div class="absolute bottom-0 -left-[3px] w-1.5 h-1.5 border border-[#757575] bg-[#0C0C0C] z-10 pointer-events-none"></div>
+<div class="absolute bottom-0 -right-[3px] w-1.5 h-1.5 border border-[#757575] bg-[#0C0C0C] z-10 pointer-events-none"></div>
+
+<div class="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#757575] pointer-events-none"></div>
+<div class="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#757575] pointer-events-none"></div>
+<div class="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#757575] pointer-events-none"></div>
+<div class="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#757575] pointer-events-none"></div>
+
+<!-- Inner Content Wrapper -->
+<main class="w-full px-4 md:px-8">
+  
+  <!-- Header -->
+  <header class="header flex flex-col md:flex-row md:items-end justify-between gap-7 mb-10 pt-4 relative">
+    <div class="w-full">
+      <div class="text-xs font-semibold tracking-widest uppercase text-[#FF7A6E] mb-3 gsap-fade">Spatial Engine</div>
+      
+      <!-- Masked Reveal H1 -->
+      <h1 class="max-w-[650px] text-4xl md:text-5xl lg:text-7xl font-normal tracking-tight leading-[0.88] flex flex-wrap gap-x-3 gap-y-1">
+        <span class="overflow-hidden inline-flex"><span class="gsap-word inline-block translate-y-[120%] opacity-0">A</span></span>
+        <span class="overflow-hidden inline-flex"><span class="gsap-word inline-block translate-y-[120%] opacity-0">kinetic</span></span>
+        <span class="overflow-hidden inline-flex"><span class="gsap-word inline-block translate-y-[120%] opacity-0">rendering</span></span>
+        <span class="overflow-hidden inline-flex"><span class="gsap-word inline-block translate-y-[120%] opacity-0">matrix</span></span>
+        <span class="overflow-hidden inline-flex"><span class="gsap-word inline-block translate-y-[120%] opacity-0">for</span></span>
+        <span class="overflow-hidden inline-flex"><span class="gsap-word inline-block translate-y-[120%] opacity-0">digital</span></span>
+        <span class="overflow-hidden inline-flex"><span class="gsap-word inline-block translate-y-[120%] opacity-0">environments.</span></span>
+      </h1>
+    </div>
+    <p class="max-w-[280px] text-[#757575] text-sm leading-relaxed gsap-fade md:mt-0 mt-4">
+      An advanced structural framework utilizing layered surfaces, grid metrics, and simulated light dynamics.
+    </p>
+
+    <!-- Horizontal Divider Line -->
+    <div class="absolute bottom-[-20px] left-[-2rem] right-[-2rem] h-px bg-[#333333]/60 hidden md:block pointer-events-none"></div>
+  </header>
+
+  <!-- Main Desk Section -->
+  <section class="desk grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-5 min-h-[520px] relative z-10 pt-4">
+    
+    <!-- Left Side Panel (Skeuomorphic) -->
+    <aside class="side-panel relative p-6 overflow-hidden rounded-[34px] backdrop-blur-xl gsap-panel flex flex-col" style="background: linear-gradient(180deg, rgba(28,28,28,0.8), rgba(12,12,12,0.9)) padding-box, linear-gradient(135deg, #4A4A4A, #0C0C0C) border-box; border: 1px solid transparent; box-shadow: 0 24px 70px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.05), inset 0 -1px 2px rgba(0,0,0,0.5);">
+      
+      <div class="flex justify-between items-center mb-7">
+        <div class="flex items-center gap-2 text-[#757575] text-xs font-semibold">
+          <span class="w-2 h-2 rounded-full bg-[#FF7A6E] shadow-[0_0_0_5px_rgba(255,122,110,0.12)]"></span>
+          Grid stable
+        </div>
+        <button class="px-3 py-2 text-xs font-semibold text-[#E7E7E7] rounded-full cursor-pointer hover:bg-[#1F1F1F] transition-colors" style="background: linear-gradient(180deg, #2A2A2A, #1A1A1A) padding-box, linear-gradient(180deg, #4A4A4A, #0C0C0C) border-box; border: 1px solid transparent; box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.12);">
+          View logs
+        </button>
+      </div>
+
+      <div class="grid gap-3 z-10 relative">
+        
+        <!-- Note 1 -->
+        <div class="group relative py-[18px] pr-[18px] pl-[52px] rounded-[22px] transition-all duration-300 hover:translate-x-2" style="background: linear-gradient(180deg, #1F1F1F, #121212) padding-box, linear-gradient(180deg, #333333, #0C0C0C) border-box; border: 1px solid transparent; box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08); hover:box-shadow: 0 16px 38px rgba(0,0,0,0.6);">
+          <img src="https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/c92852bb-a510-405a-85ab-ffa0fde136a4_1600w.jpg" class="absolute left-[18px] top-[21px] w-[18px] h-[18px] rounded-[6px] object-cover shadow-sm pointer-events-none" alt="Avatar 1">
+          <strong class="block mb-1 text-base font-normal tracking-tight text-[#E7E7E7]">Asset Library</strong>
+          <span class="text-[#757575] text-sm leading-relaxed block">Aggregated textures and reference points.</span>
+        </div>
+
+        <!-- Note 2 -->
+        <div class="group relative py-[18px] pr-[18px] pl-[52px] rounded-[22px] transition-all duration-300 hover:translate-x-2" style="background: linear-gradient(180deg, #1F1F1F, #121212) padding-box, linear-gradient(180deg, #333333, #0C0C0C) border-box; border: 1px solid transparent; box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08); hover:box-shadow: 0 16px 38px rgba(0,0,0,0.6);">
+          <img src="https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/77415a2e-dcbc-4748-a29d-fced4821881a_1600w.jpg" class="absolute left-[18px] top-[21px] w-[18px] h-[18px] rounded-[6px] object-cover shadow-sm pointer-events-none" alt="Avatar 2">
+          <strong class="block mb-1 text-base font-normal tracking-tight text-[#E7E7E7]">Surface Data</strong>
+          <span class="text-[#757575] text-sm leading-relaxed block">Calculate friction, depth, and shadow rendering.</span>
+        </div>
+
+        <!-- Note 3 -->
+        <div class="group relative py-[18px] pr-[18px] pl-[52px] rounded-[22px] transition-all duration-300 hover:translate-x-2" style="background: linear-gradient(180deg, #1F1F1F, #121212) padding-box, linear-gradient(180deg, #333333, #0C0C0C) border-box; border: 1px solid transparent; box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08); hover:box-shadow: 0 16px 38px rgba(0,0,0,0.6);">
+          <img src="https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/4f5668c5-fc4a-44e0-bc5e-a664189d3c31_1600w.jpg" class="absolute left-[18px] top-[21px] w-[18px] h-[18px] rounded-[6px] object-cover shadow-sm pointer-events-none" alt="Avatar 3">
+          <strong class="block mb-1 text-base font-normal tracking-tight text-[#E7E7E7]">Motion Sequence</strong>
+          <span class="text-[#757575] text-sm leading-relaxed block">Programmed transitions and scroll behaviors.</span>
+        </div>
+
+      </div>
+
+      <!-- Aura Abstract Sticker -->
+      <div class="absolute right-[22px] bottom-[22px] w-[115px] h-[115px] md:w-[145px] md:h-[145px] grid place-items-center rounded-full bg-cover bg-center text-[#E7E7E7] text-xs font-semibold tracking-widest uppercase -rotate-12 shadow-[0_12px_24px_rgba(0,0,0,0.5)] z-20" style="background-image: url('https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/e534354d-c5f2-4399-a1d9-2f50338e8c47_1600w.jpg'); border: 2px solid rgba(255,255,255,0.15);">
+        <div class="absolute inset-0 rounded-full bg-[#0C0C0C]/30"></div>
+        <span class="relative z-10 text-center drop-shadow-md leading-tight">V.3.1<br>Core</span>
+      </div>
+    </aside>
+
+    <!-- Right Folder Stage (3D interaction) -->
+    <div class="folder-stage group relative min-h-[480px] md:min-h-[520px] perspective-[1200px] gsap-panel">
+      
+      <!-- Floating UI Chips -->
+      <div class="chip-one absolute z-20 top-4 right-[55px] px-4 py-3 text-xs font-semibold text-[#E7E7E7] bg-[#1A1A1A]/90 backdrop-blur-md rounded-full shadow-[0_12px_24px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.12)] border border-[#333333] pointer-events-none">
+        128 active nodes
+      </div>
+      <div class="chip-two absolute z-20 left-5 bottom-[125px] px-4 py-3 text-xs font-semibold text-[#E7E7E7] bg-[#1A1A1A]/90 backdrop-blur-md rounded-full shadow-[0_12px_24px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.12)] border border-[#333333] pointer-events-none">
+        Drag to inspect
+      </div>
+
+      <!-- The Folder 3D Container -->
+      <div class="folder absolute inset-0 rounded-[36px] preserve-3d transition-transform duration-300 ease-out">
+        
+        <!-- Folder Back & Tab (Aura Architecture Image) -->
+        <div class="absolute inset-x-0 bottom-0 top-[44px] rounded-[30px] shadow-[0_38px_100px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.1)] bg-cover bg-center border border-[#333333]" style="background-image: url('https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/724142aa-44a6-48d3-9cf3-761e00d05b78_1600w.jpg');">
+             <div class="absolute inset-0 rounded-[30px] bg-[#0C0C0C]/50"></div>
+             
+             <!-- Tab -->
+             <div class="absolute -top-[35px] left-[34px] w-[210px] h-[36px] bg-[#1A1A1A] border border-[#333333] border-b-0 rounded-t-[24px] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] z-0 overflow-hidden">
+               <div class="absolute inset-0 bg-cover bg-center opacity-40 mix-blend-overlay" style="background-image: url('https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/724142aa-44a6-48d3-9cf3-761e00d05b78_1600w.jpg');"></div>
+             </div>
+        </div>
+
+        <!-- Paper Stack Container -->
+        <div class="paper-stack absolute top-[32px] inset-x-[30px] bottom-[64px] preserve-3d">
+          
+          <!-- Paper 1 -->
+          <article class="paper absolute inset-0 p-6 md:p-[30px] bg-[#141414] rounded-[28px] origin-bottom transition-transform group-hover:-translate-x-[46px] group-hover:translate-y-[2px] group-hover:-rotate-[12deg]" style="transition-duration: 650ms; transition-timing-function: cubic-bezier(.2,.8,.2,1); transform: translateY(28px) rotate(-5deg); border: 1px solid rgba(51,51,51,1); box-shadow: 0 18px 45px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);">
+            <div class="flex justify-between items-center mb-8">
+              <span class="text-xs font-semibold tracking-widest uppercase text-[#E7E7E7]">Material</span>
+              <span class="text-xs text-[#757575]">MTR / 08</span>
+            </div>
+          </article>
+
+          <!-- Paper 2 -->
+          <article class="paper absolute inset-0 p-6 md:p-[30px] bg-[#141414] rounded-[28px] origin-bottom transition-transform group-hover:translate-x-[42px] group-hover:-translate-y-[8px] group-hover:rotate-[10deg]" style="transition-duration: 650ms; transition-timing-function: cubic-bezier(.2,.8,.2,1); transform: translateY(14px) rotate(4deg); border: 1px solid rgba(51,51,51,1); box-shadow: 0 18px 45px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);">
+            <div class="flex justify-between items-center mb-8">
+              <span class="text-xs font-semibold tracking-widest uppercase text-[#E7E7E7]">Illumination</span>
+              <span class="text-xs text-[#757575]">LUM / 16</span>
+            </div>
+          </article>
+
+          <!-- Paper 3 (Top Active Paper) -->
+          <article class="paper absolute inset-0 p-6 md:p-[30px] bg-[#141414] rounded-[28px] origin-bottom transition-transform group-hover:-translate-y-[28px] group-hover:rotate-0" style="transition-duration: 650ms; transition-timing-function: cubic-bezier(.2,.8,.2,1); transform: translateY(0) rotate(0); border: 1px solid rgba(51,51,51,1); box-shadow: 0 18px 45px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);">
+            <div class="flex justify-between items-center mb-[34px]">
+              <span class="text-xs font-semibold tracking-widest uppercase text-[#FF7A6E]">Primary View</span>
+              <span class="text-xs text-[#757575]">PRV / 32</span>
+            </div>
+
+            <h2 class="max-w-[420px] mb-4 text-3xl md:text-5xl lg:text-6xl font-normal tracking-tight leading-[0.88] text-[#E7E7E7]">
+              Construct, align, and simulate forms.
+            </h2>
+            <p class="max-w-[360px] text-sm text-[#757575] leading-relaxed">
+              Deploy this architectural widget to evaluate surface properties, generate test environments, or map intricate object clusters.
+            </p>
+
+            <!-- Status Stamp -->
+            <div class="absolute right-[20px] bottom-[20px] md:right-[34px] md:bottom-[34px] w-[96px] h-[96px] md:w-[130px] md:h-[130px] grid place-items-center rounded-full text-[10px] md:text-xs font-semibold tracking-widest uppercase rotate-[-14deg] text-[#FF7A6E] border-2 border-[#FF7A6E]/80 bg-[#FF7A6E]/10 backdrop-blur-sm z-10">
+              Rendered
+            </div>
+          </article>
+        </div>
+
+        <!-- Folder Front Cover (Skeuomorphic Gradient Surface) -->
+        <div class="folder-front absolute inset-x-0 bottom-0 h-[245px] rounded-b-[34px] origin-bottom transition-transform group-hover:-rotate-x-[18deg] z-30" style="transition-duration: 700ms; transition-timing-function: cubic-bezier(.2,.8,.2,1); background: linear-gradient(160deg, #1A1A1A, #0C0C0C) padding-box, linear-gradient(180deg, #4A4A4A, #0C0C0C) border-box; border: 1px solid transparent; box-shadow: inset 0 2px 5px rgba(255,255,255,0.12), 0 -6px 20px rgba(0,0,0,0.6);">
+          
+          <div class="absolute right-[26px] bottom-[24px] left-[26px] flex justify-between items-end gap-5">
+            <h3 class="max-w-[300px] text-2xl md:text-3xl font-normal tracking-tight leading-[0.95] text-[#E7E7E7] drop-shadow-sm">
+              Initialize the digital archive.
+            </h3>
+            
+            <div class="w-[48px] h-[48px] md:w-[54px] md:h-[54px] grid place-items-center rounded-full border border-[#4A4A4A] bg-transparent text-[#E7E7E7] transition-all duration-350 ease-out group-hover:rotate-45 group-hover:bg-[#E7E7E7] group-hover:text-[#0C0C0C] shadow-[0_2px_8px_rgba(0,0,0,0.4)] cursor-pointer">
+              <iconify-icon icon="solar:arrow-right-up-linear" width="24" height="24" style="stroke-width: 1.5px;"></iconify-icon>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </section>
+</main>
+
+</div>
+
+<style>
+/* Essential inline utilities required to map GSAP physics and preserve-3d natively */
+.preserve-3d { transform-style: preserve-3d; }
+.rotate-x-[-18deg] { transform: rotateX(-18deg); }
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+// Check reduced motion preference
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// 1) GSAP Time-Based Animation Arc
+if (!prefersReducedMotion && typeof gsap !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+
+  const tl = gsap.timeline({
+    scrollTrigger: {
+      trigger: ".header",
+      start: "top 85%",
+    }
+  });
+
+  // Masked Staggered Word Reveal
+  tl.to(".gsap-word", {
+    y: "0%",
+    opacity: 1,
+    duration: 0.85,
+    stagger: 0.04,
+    ease: "power4.out"
+  }, 0);
+
+  // Fade in secondary text
+  tl.fromTo(".gsap-fade", 
+    { y: 15, opacity: 0 },
+    { y: 0, opacity: 1, duration: 0.8, stagger: 0.1, ease: "power3.out" },
+    "-=0.6"
+  );
+
+  // Stagger Panels (Side panel, Folder stage)
+  tl.fromTo(".gsap-panel",
+    { y: 40, opacity: 0 },
+    { y: 0, opacity: 1, duration: 1, stagger: 0.15, ease: "power3.out" },
+    "-=0.6"
+  );
+
+  // Continuous Floating Animation for UI Chips
+  gsap.to(".chip-one", {
+    y: "-12px",
+    rotation: 3,
+    duration: 2.2,
+    yoyo: true,
+    repeat: -1,
+    ease: "sine.inOut"
+  });
+
+  gsap.to(".chip-two", {
+    y: "-10px",
+    rotation: -2,
+    duration: 2.4,
+    yoyo: true,
+    repeat: -1,
+    ease: "sine.inOut",
+    delay: 0.6
+  });
+} else if (prefersReducedMotion && typeof gsap !== "undefined") {
+  // Fallback for reduced motion (just set opacity/transforms)
+  gsap.set(".gsap-word, .gsap-fade, .gsap-panel", { y: "0%", opacity: 1 });
+}
+
+// 2) 3D Mouse Movement for Folder Stage
+const stage = document.querySelector(".folder-stage");
+const folder = document.querySelector(".folder");
+
+if (stage && folder && !prefersReducedMotion) {
+  stage.addEventListener("pointermove", (event) => {
+    const rect = stage.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width - 0.5;
+    const y = (event.clientY - rect.top) / rect.height - 0.5;
+
+    // Apply physical skeuomorphic rotation tilt
+    folder.style.transform = `
+      rotateY(${x * 6}deg)
+      rotateX(${-y * 6}deg)
+    `;
+  });
+
+  stage.addEventListener("pointerleave", () => {
+    folder.style.transform = `rotateY(0deg) rotateX(0deg)`;
+  });
+}
+
+});
+</script>
+
+</body>
+</html>

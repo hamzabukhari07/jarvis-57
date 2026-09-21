@@ -119,3 +119,102 @@ def clear() -> None:
     file contents do not outlive the session."""
     with _lock:
         _stack.clear()
+
+
+# ── Repo Level Undo for Coding Agents (OpenCode / Kilo) ───────────────────────
+
+IGNORED_DIRS = {
+    ".git", "node_modules", ".venv", "venv", "__pycache__",
+    ".next", "dist", "build", ".pytest_cache", ".idea", ".vscode",
+    "target", "vendor", ".antigravity"
+}
+MAX_FILE_SIZE = 2_000_000  # 2MB per file snapshot
+
+
+def capture_repo_snapshot(repo_path: str | Path) -> dict[str, bytes]:
+    """Snapshots all relative file paths and their byte contents in a repository."""
+    from pathlib import Path
+    root = Path(repo_path).resolve()
+    if not root.exists() or not root.is_dir():
+        return {}
+
+    snapshot: dict[str, bytes] = {}
+    total_bytes = 0
+    max_total_bytes = 25_000_000  # 25MB total cap
+
+    try:
+        for p in root.rglob("*"):
+            if p.is_dir():
+                continue
+            try:
+                rel_parts = p.relative_to(root).parts
+                if any(part in IGNORED_DIRS or part.startswith(".git") for part in rel_parts):
+                    continue
+                if p.is_file() and p.stat().st_size <= MAX_FILE_SIZE:
+                    content = p.read_bytes()
+                    if total_bytes + len(content) > max_total_bytes:
+                        break
+                    rel_str = str(p.relative_to(root).as_posix())
+                    snapshot[rel_str] = content
+                    total_bytes += len(content)
+            except Exception:
+                continue
+    except Exception as e:
+        print(f"[Undo] capture_repo_snapshot error: {e}")
+
+    return snapshot
+
+
+def register_repo_undo(repo_path: str | Path, snapshot: dict[str, bytes], tool_label: str = "Coding agent") -> int:
+    """Compares current repo state with snapshot and registers an undo callback if files changed.
+    Returns the number of changed files detected."""
+    from pathlib import Path
+    root = Path(repo_path).resolve()
+    if not root.exists() or not root.is_dir() or not snapshot:
+        return 0
+
+    current_snapshot = capture_repo_snapshot(root)
+
+    created = [rel for rel in current_snapshot if rel not in snapshot]
+    deleted = [rel for rel in snapshot if rel not in current_snapshot]
+    modified = [rel for rel in current_snapshot if rel in snapshot and current_snapshot[rel] != snapshot[rel]]
+
+    total_changed = len(created) + len(deleted) + len(modified)
+    if total_changed == 0:
+        return 0
+
+    def _undo_repo() -> str:
+        reverted_count = 0
+        for rel in created:
+            try:
+                target = root / rel
+                if target.exists():
+                    target.unlink()
+                    reverted_count += 1
+            except Exception as e:
+                print(f"[Undo] Could not remove created file {rel}: {e}")
+
+        for rel in deleted:
+            try:
+                target = root / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(snapshot[rel])
+                reverted_count += 1
+            except Exception as e:
+                print(f"[Undo] Could not restore deleted file {rel}: {e}")
+
+        for rel in modified:
+            try:
+                target = root / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(snapshot[rel])
+                reverted_count += 1
+            except Exception as e:
+                print(f"[Undo] Could not restore modified file {rel}: {e}")
+
+        return f"Reverted {reverted_count} files."
+
+    label = f"{tool_label} changes in {root.name}"
+    push_undo(label, _undo_repo)
+    return total_changed
+
