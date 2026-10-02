@@ -1,0 +1,138 @@
+/* ZEZO Commercial Real Estate & Portfolio Intelligence - Master Stylesheet */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --color-gold: #f59e0b;
+  --color-gold-light: #fbbf24;
+  --color-gold-dark: #d97706;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #ececee;
+  color: #27272a;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Keyframe Animations from Blueprint */
+@keyframes blob-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(30px, -20px) scale(1.08); }
+  33% { transform: translate(50px, -30px) scale(1.12); }
+  66% { transform: translate(-25px, 30px) scale(.94); }
+  80% { transform: translate(-12px, 15px) scale(.97); }
+}
+
+@keyframes blob-b {
+  0%, 100% { transform: translate(0, 0) rotate(45deg) scale(1); }
+  25% { transform: translate(18px, 22px) rotate(52deg) scale(1.05); }
+  50% { transform: translate(35px, 45px) rotate(60deg) scale(1.1); }
+  75% { transform: translate(16px, 20px) rotate(52deg) scale(1.04); }
+}
+
+@keyframes blob-c {
+  0%, 100% { transform: translate(0, 0) rotate(12deg) scale(1); }
+  25% { transform: translate(-20px, 18px) rotate(7deg) scale(1.04); }
+  50% { transform: translate(-40px, 35px) rotate(2deg) scale(1.08); }
+  75% { transform: translate(-18px, 16px) rotate(7deg) scale(1.03); }
+}
+
+@keyframes blob-d {
+  0%, 100% { transform: translate(0, 0) rotate(20deg) scale(1); }
+  25% { transform: translate(-10px, -20px) rotate(25deg) scale(1.07); }
+  50% { transform: translate(-20px, -40px) rotate(30deg) scale(1.15); }
+  75% { transform: translate(-9px, -18px) rotate(24deg) scale(1.06); }
+}
+
+@keyframes blob-e {
+  0%, 100% { transform: translate(0, 0) rotate(18deg); }
+  25% { transform: translate(9px, 14px) rotate(13deg); }
+  50% { transform: translate(18px, 28px) rotate(8deg); }
+  75% { transform: translate(8px, 12px) rotate(13deg); }
+}
+
+@keyframes mesh-shift {
+  0%, 100% { background-position: 0% 0%; }
+  25% { background-position: 100% 0%; }
+  50% { background-position: 100% 100%; }
+  75% { background-position: 0% 100%; }
+}
+
+@keyframes float-1 {
+  0%, 100% { transform: rotate(-12deg) translateY(0); }
+  50% { transform: rotate(-7deg) translateY(-10px); }
+}
+
+@keyframes float-2 {
+  0%, 100% { transform: rotate(12deg) translateY(0); }
+  50% { transform: rotate(17deg) translateY(-8px); }
+}
+
+@keyframes float-3 {
+  0%, 100% { transform: translate(-50%, 0) rotate(-6deg); }
+  50% { transform: translate(-50%, 8px) rotate(-1deg); }
+}
+
+/* Interactive Card Mouse Glow Effects */
+.cap-card {
+  transition:
+    transform .5s cubic-bezier(.22, 1, .36, 1),
+    box-shadow .5s cubic-bezier(.22, 1, .36, 1),
+    border-color .3s ease,
+    opacity .7s ease;
+  will-change: transform;
+}
+
+.cap-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 32px 64px rgba(0, 0, 0, 0.55);
+}
+
+.cap-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--glow-o, 0);
+  background:
+    radial-gradient(
+      var(--glow-s, 280px) circle at var(--mx, 50%) var(--my, 50%),
+      rgba(245, 158, 11, 0.28),
+      rgba(239, 68, 68, 0.14) 45%,
+      transparent 70%
+    );
+  transition: opacity .25s ease;
+  mix-blend-mode: screen;
+}
+
+/* Word Reveal Animations */
+.word-reveal {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(12px);
+  filter: blur(4px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), filter 0.6s ease;
+}
+
+.word-reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #090c12;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}

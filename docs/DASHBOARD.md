@@ -64,6 +64,22 @@ def get_manual_url() -> str:
 6. Remote control active
 ```
 
+### Desktop Pairing Modal (`frontend/index.html`)
+
+The desktop QR modal (`#qr-modal`) is **backend-driven**, not a static mockup:
+
+- Opening the modal (or pressing **NEW KEY**) sends `get_remote_key` over the UI
+  WebSocket. `core/ui_server.py` replies with `remote_key_data { url, key }`,
+  where `key` is a real one-time 6-character key minted by
+  `DashboardServer.new_key()` (valid 600 s / 10 min).
+- The modal renders the real key, the real gateway URL, a **COPY** button
+  (`copyPairingKey()` → system clipboard) and a QR encoding
+  `{url}/auto-login?key={key}`.
+- A live countdown shows `MM:SS` from 10:00 and switches to `EXPIRED` at 0.
+- The key charset excludes `O I L 0 1` (`dashboard/server.py`), so the 6-char
+  key passes the remote login page's `[^A-Z2-9]` filter and its `maxlength="6"`
+  input in full.
+
 ## API Endpoints
 
 ### Remote Commands

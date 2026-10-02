@@ -7,12 +7,22 @@ main.py
   ↓
 main() function (top-level script)
   ↓
+QLockFile single-instance guard (second launch exits immediately)
+  ↓
 JarvisLive.__init__(ui)
+  ↓
+runner(): dependency bootstrap thread (requirements.txt + Playwright browser)
+  ↓
+provider health-check (core/provider_health.py — verifies Gemini + Groq models)
   ↓
 [Initialization sequence below]
 ```
 
-The application has **no `if __name__ == "__main__":` block at the very bottom of main.py that calls a `main()` function explicitly** — rather, the top-level code in `main.py` executes directly when Python runs the file. The `JarvisLive` class constructor contains all initialization logic.
+> `main()` acquires a `QLockFile` at `%TEMP%/zezo_instance.lock` before building
+> the UI. A second launch prints `Another instance is already running` and returns
+> instead of starting a duplicate audio engine, WebEngine renderer and dashboard.
+
+`main.py` defines `main()` and calls it from an `if __name__ == "__main__":` block at the bottom. `main()` acquires the single-instance lock, builds the UI, then starts `runner()` on a daemon thread. `runner()` waits for the API key, starts the dependency bootstrap **and** the provider health-check in the background, and runs the `JarvisLive` live loop.
 
 ## Detailed Startup Sequence
 
@@ -38,7 +48,7 @@ Import all modules
 ```
 main.py
   ↓
-LIVE_MODEL = "models/gemini-3.1-flash-live-preview"
+LIVE_MODEL = GEMINI_LIVE_MODEL    # "models/gemini-3.1-flash-live-preview" (core/models.py)
   ↓
 CHANNELS = 1, SEND_SAMPLE_RATE = 16000, RECEIVE_SAMPLE_RATE = 24000
   ↓
@@ -48,7 +58,7 @@ _LEVEL_FLOOR = 60.0, _LEVEL_FULL = 2600.0
 ```
 
 **What it initializes:**
-- **AI Model**: `models/gemini-3.1-flash-live-preview` — the Gemini Live model identifier
+- **AI Model**: `models/gemini-3.1-flash-live-preview` — the Gemini Live model identifier, sourced from `core/models.py` (single source of truth); models are verified at startup by `core/provider_health.py`
 - **Audio parameters**: Mono, 16kHz input, 24kHz output, 1024-frame chunks
 - **Level thresholds**: For waveform display and silence detection
 

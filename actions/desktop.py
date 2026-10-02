@@ -141,11 +141,8 @@ Output ONLY the Python code. No explanation, no markdown, no backticks.
 Task: {task}"""
 
     try:
-        from core import gemini
-        response = gemini.call(prompt, tier=gemini.SMART, timeout_ms=30_000)
-        if response is None:
-            return "ERROR: every Gemini model on the ladder failed"
-        code = (response.text or "").strip()
+        from core.llm_router import generate_text
+        code = generate_text(prompt, tier="smart", timeout_ms=30_000).strip()
         if code.startswith("```"):
             lines = code.split("\n")
             code  = "\n".join(lines[1:-1]).strip()

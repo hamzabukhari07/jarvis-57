@@ -79,6 +79,25 @@ def resolve(name: str, kind: str):
     # Falls back to system default if saved device is gone
 ```
 
+### AUDIO I/O Panel (Settings UI)
+
+**Files:** `frontend/index.html` (panel + JS), `core/ui_server.py` (state + WS), `ui.py` (reconnect wiring)
+
+The **Settings → Audio Devices** panel is live, not static:
+
+- `core/ui_server._collect_audio_state()` reports the saved device names, the devices the app can actually open at 16 kHz / 24 kHz (`audio_devices.list_devices`), and `input_available` / `output_available`.
+- `input_available: false` means the saved device could **not** be opened, so the app is using the system default. The panel shows an inline warning instead of pretending the saved endpoint is in use.
+- The panel sends `get_audio_devices` when opened and `save_audio_devices` on **APPLY & RECONNECT**. The server persists via `save_input_device()` / `save_output_device()`, then calls `on_audio_devices_changed`.
+- `ui.py` maps that to the existing `on_audio_device_change` callback, which `main.py` handles by rebuilding the session (`request_reconnect(keep_context=True)`) — the new device takes effect without losing the conversation.
+
+**Auto-follow the active device (default behaviour):** `input_device` / `output_device` are **empty by default**, which means "use whatever the OS currently calls the default" (`resolve()` returns `None` → the stream opens on `device=None`). At startup `main.py` checks any saved name with `audio_devices.resolve()`; if it is gone or cannot open at 16/24 kHz it is **cleared to `""`** so the active default is used automatically — the user does not have to re-pick after unplugging/plugging hardware. Picking a working device in the panel pins it again. The panel shows the active default in the first option (`System default — <device name>`) so it is clear which mic/speaker is really in use.
+
+**Live microphone meter:** the panel shows a live level bar + `MIC: hearing you / no signal` text. `main.py` calls `ui.set_mic_level()` from the sounddevice callback with the **raw** level (computed before any gate), and `ZezoUI.set_mic_level` throttles and broadcasts `mic_level` (~12 Hz). `set_mic_level` is deliberately separate from `set_audio_level` (which the playback path uses for the output waveform) so ZEZO's own voice can never appear as "microphone".
+
+**Mic-path diagnostic (used, then removed):** during the latency investigation `_listen_audio` logged a per-2 s `[MicDiag] rx=<frames> sent=<forwarded> peak=<0..1> | asleep=… speaking=… tail=… ptt=… muted=…` line. It proved the microphone delivered frames (`rx=32` every window) while the echo tail was permanently active (`tail ≈ rx`), which located the bug. The instrument was removed once the tail fix was confirmed end-to-end; the live mic meter above remains.
+
+**Echo tail must be armed on the transition only.** `set_speaking(False)` arms the ~273 ms echo tail **only when it was actually speaking** (`was_speaking`). The idle playback loop calls `set_speaking(False)` every ~200 ms; arming on every one of those polls made the tail outlast the poll interval, so it was permanently active and the microphone spent every block in the "our own voice" guard — dropping the user's quieter speech and fragmenting each spoken turn. Regression test: `scratch/verify_speaking_tail.py`.
+
 ### Host API Selection
 
 **File:** `core/audio_devices.py`
@@ -120,6 +139,8 @@ def callback(indata, frames, time_info, status):
 ```
 
 **Thread safety:** `loop.call_soon_threadsafe()` is used to push to the asyncio queue from the sounddevice thread.
+
+**Bounded queue + drop-oldest (2026-09-26):** `out_queue` is `asyncio.Queue(maxsize=200)`. The callback schedules `ZezoLive._enqueue_out_audio` (not a raw `put_nowait`), which catches `asyncio.QueueFull`, discards the stalest blob, and re-inserts the newest. Without this guard, a lagging `_send_realtime` (e.g. mid-reconnect) made every mic block raise `QueueFull` inside the `call_soon_threadsafe` callback, and asyncio logged `Exception in callback Queue.put_nowait()` thousands of times, flooding the log bus. Dropping oldest keeps the model on the most recent speech and turns a stuck queue into silent back-pressure instead of an error storm.
 
 ### Output Stream
 
@@ -237,21 +258,48 @@ Mic callback → set_audio_level() → HUD waveform (cosmetic)
 Speaker output: sounddevice.OutputStream ← audio bytes from session.receive()
 ```
 
-## Latency Management
+## Cascade / Offline Audio Architecture
 
-| Source | Latency | Mitigation |
-|--------|---------|------------|
+When running in **Cascade Mode** or during **Voice Fallback**:
+
+```
+Microphone (sounddevice.InputStream 16kHz)
+    ↓
+Non-blocking streaming loop (core/voice_fallback.py)
+    ↓
+[During Assistant Speech] ── RMS >= energy * 1.4 ──► sounddevice.stop() (Instant Barge-in <20ms)
+    ↓                                                 ↓
+UtteranceSegmenter (180ms pause detection)     _interrupted.set() (Cancels LLM & TTS)
+    ↓
+Background Utterance Worker Thread ──► STT ──► Fast Intent / Streaming LLM ──► TTS
+```
+
+- **Non-blocking Input Stream:** The mic stream reads 512-frame chunks (~32ms) continuously on a dedicated thread, preventing audio buffer starvation or lost frames while TTS is active.
+- **Instant Barge-In Stop:** When speech energy exceeds the acoustic threshold during playback, `sounddevice.stop()` halts speaker output in `<20ms` and signals cancellation across all active pipeline stages.
+
+## Latency Management & Low-Latency Turn Tuning
+
+| Mode / Source | Latency | Mitigation / Configuration |
+|---------------|---------|----------------------------|
+| Live Server-side VAD | ~450ms | `turn_tuning.silence_ms = 450`, `end_sensitivity = "high"` |
+| Cascade VAD Pause | ~180ms | `DEFAULT_SILENCE_MS = 180`, `DEFAULT_MIN_MS = 200` |
+| Cascade TTFA (First Sentence) | ~150-250ms | `call_groq_stream` sentence-level token accumulation + concurrent TTS |
+| Cascade Fast Intent | 0ms | `_try_fast_intent` deterministic device command bypass |
 | Sound device buffer | ~43ms (1024 frames @ 24kHz) | Playback cursor tracks actual sound time |
-| Gemini Live processing | ~200-500ms | Proactive audio: say something while waiting |
-| Network round-trip | ~50-200ms | WebSocket, low-latency connection |
+| Network round-trip | ~50-200ms | Real-time WebSocket connection / Groq Cloud endpoint |
 | Viseme processing | ~20ms per frame | 20ms step matches audio chunk |
-| Echo tail | ~475ms | Measured from device latency + margin |
+| Echo tail guard | ~270ms | Device latency + `_TAIL_MARGIN` (0.06s), instant break on speech level > 0.08 |
+| Proactive Audio | Disabled (`false`) | Prevents classifier hesitation or dropped turns on multilingual speech |
 
 ## Audio File References
 
 | File | Purpose |
 |------|---------|
 | `core/audio_devices.py` | Device enumeration, filtering, measurement, resolution |
+| `frontend/index.html` | AUDIO I/O panel markup + live device dropdowns |
+| `core/ui_server.py` | `_collect_audio_state`, `get_audio_devices` / `save_audio_devices` |
+| `ui.py` | `_handle_audio_devices_changed` → session reconnect |
+| `ui.py` (`set_mic_level`) | Raw mic level → `mic_level` broadcast for the panel meter |
 | `main.py` (constants) | Sample rates, chunk sizes, channel config |
 | `main.py` (_listen_audio) | Mic input callback, gating, streaming |
 | `main.py` (_play_audio) | Speaker output, playback cursor |

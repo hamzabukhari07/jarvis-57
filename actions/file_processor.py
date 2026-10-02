@@ -509,6 +509,21 @@ def _process_audio(path: Path, action: str, params: dict, speak=None) -> str:
             return f"Info failed: {e}"
 
     if action == "transcribe":
+        # Free tier first: Groq Whisper (fast, free), then paid Gemini multimodal.
+        try:
+            from memory.config_manager import get_groq_api_key
+            if get_groq_api_key():
+                from core.llm_client import transcribe_groq_whisper
+                result = transcribe_groq_whisper(path)
+                if result:
+                    if params.get("save", True):
+                        out = _output_path(path, "transcript", ".txt")
+                        out.write_text(result, encoding="utf-8")
+                        return f"Transcription saved: {out.name} (Groq Whisper)\n\nPreview: {result[:300]}"
+                    return result
+        except Exception as e:
+            print(f"[FileProcessor] Groq Whisper failed ({e}) — falling back to Gemini")
+
         try:
             model   = _gemini_client()
             content = path.read_bytes()
@@ -795,8 +810,42 @@ SYNC_FAST_ACTIONS = {
 }
 
 
+def _resolve_attachment(file_path_str: str) -> tuple[str, str | None]:
+    """Resolve a lazily-attached (dropped/uploaded) file when no usable path is given.
+
+    Attachments live in the UI server registry (path only, not read). An empty
+    file_path means "the most recent attachment"; a bare name that is not an
+    existing path is matched against the registry by name (multi-file drops).
+    Returns (path_or_name, error_message).
+    """
+    try:
+        from core.ui_server import get_ui_server
+        srv = get_ui_server()
+    except Exception:
+        return file_path_str, None
+
+    if not file_path_str:
+        info = srv.latest_attachment()
+        if not info:
+            return "", "No file is attached yet. Drop a file into the payload area, or give me a file path."
+        if info.get("is_folder"):
+            return "", (f"'{info.get('name')}' is a workspace folder, not a single file. "
+                        f"Tell me which file inside it to read.")
+        return str(info.get("path", "")), None
+
+    # A bare name (not an existing path) -> try to match a registered attachment.
+    if not Path(file_path_str).exists():
+        info = srv.find_attachment(file_path_str)
+        if info and info.get("path") and not info.get("is_folder"):
+            return str(info["path"]), None
+    return file_path_str, None
+
+
 def file_processor(parameters: dict, player=None, speak=None) -> str:
     file_path_str = parameters.get("file_path", "").strip()
+    file_path_str, attach_err = _resolve_attachment(file_path_str)
+    if attach_err:
+        return attach_err
     if not file_path_str:
         return "No file path provided."
 
@@ -870,10 +919,7 @@ def file_processor(parameters: dict, player=None, speak=None) -> str:
             f"File: {path.name}\nAction: {action or 'processing'}\nTask ID: {task_id}\nStatus: running (background)"
         )
 
-    return (
-        f"Maine '{path.name}' ko background task queue mein bhej diya hai (Task ID: {task_id}). "
-        f"Main isko process kar raha hoon."
-    )
+    return f"Processing '{path.name}' in the background (Task ID: {task_id})."
 
 
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────

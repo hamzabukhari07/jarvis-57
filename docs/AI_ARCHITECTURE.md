@@ -312,11 +312,35 @@ UI activity log → _on_text_command handling
 
 ```python
 _LADDERS = {
-    "fast":  ("live", "gemini-2.5-flash-lite", "gemini-2.5-flash"),
-    "smart": ("live", "gemini-2.5-flash", "gemini-2.5-flash-lite"),
-    "search": ("gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"),
+    "FAST":   ("LIVE", "gemini-3.6-flash", "gemini-3.5-flash",
+               "gemini-3-flash-preview", "gemini-3.7-flash", "gemini-flash-latest"),
+    "SMART":  ("LIVE", "gemini-3.6-flash", "gemini-3.5-flash",
+               "gemini-3-flash-preview", "gemini-3.7-flash", "gemini-3.8-flash",
+               "gemini-flash-latest"),
+    "SEARCH": ("gemini-3.6-flash", "gemini-3.5-flash", "gemini-3-flash-preview",
+               "gemini-flash-latest"),
 }
 ```
+
+> **Single source:** every model name lives in `core/models.py`
+> (`GEMINI_LIVE_MODEL`, `GEMINI_FAST/SMART/SEARCH_MODELS`). `core/gemini.py`
+> builds `_LADDERS` from it, and `main.py`'s `LIVE_MODEL` comes from it too —
+> change a name there and the whole app follows. The old `gemini-2.5-*` / `2.0` /
+> `1.5` names are **404 for new keys**. Verify names live before editing.
+
+### Provider Health Check (`core/provider_health.py`)
+
+At startup (off the GUI thread, from `main.py:_bootstrap_deps`) ZEZO pings every
+configured model once:
+
+- **Gemini** — a cheap `client.models.get()` per ladder model + the Live model
+  (no generation, no quota spent). A `404` marks that model **retired** via
+  `core.gemini.mark_unavailable()`, so the one-shot ladder skips it.
+- **Groq** — `GET /openai/v1/models` (with a non-urllib `User-Agent`; Groq's edge
+  returns `403` to the default urllib agent).
+
+It logs a one-line summary (`Gemini 7/7 ok | Groq: reachable`) and stores the
+result in `get_status()`. It never blocks or raises into the caller.
 
 The Live model is always first because it draws on a different quota pool than text models. On the free tier, the text pool runs out; Live is unaffected.
 
@@ -360,10 +384,11 @@ On reconnect:
 - `proactivity.proactive_audio=True` — Gemini stays silent when speech isn't addressed to it
 - Auto-disabled if the server rejects it
 - Controlled by `get_proactive_audio_enabled()` from config
+- **Default: disabled (`false`)** — the proactivity classifier hesitates/drops single utterances on multilingual speech, which made turns feel late
 
 ### Turn Tuning
 - `AutomaticActivityDetection` with configurable `silence_ms`, `prefix_ms`, `end_sensitivity`, `start_sensitivity`
-- Off by default (conservative defaults work best for most setups)
+- **Enabled by default** (`silence_ms=450`, `prefix_ms=100`, `end_sensitivity="high"`) so turns complete promptly on user silence
 - Controlled by `get_turn_tuning()` from config
 
 ### Media Resolution

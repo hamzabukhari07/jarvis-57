@@ -77,6 +77,21 @@ Built from: `TOOL_DECLARATIONS + action_registry + plugin_registry`
 - Settle WHO or WHAT the request is about before answering
 - When ambiguous, take the most reasonable reading and act
 
+### [REAL-TIME FACTS & TEMPORAL GROUNDING] — No Stale-Memory Answers
+
+The Live model's training knowledge is frozen; the injected `[SYSTEM LOCAL DATE & TIME]` is the
+real date. This section (added 2026-09-25) closes a failure where the model answered an
+iPhone 18 comparison with "we're still on iPhone 16" — from memory — and silently rewrote the
+user's product name in the `web_search` call.
+
+- Any question about products, releases, versions, availability, prices, specs, events, or
+  "latest / newest / current / today" → **must** call `web_search` and answer only from its result.
+- **Search the exact entity the user named.** Never substitute or "correct" it with an older
+  model/version from memory (e.g. iPhone 18 Pro Max must not become iPhone 16 Pro Max).
+- Never assert "hasn't been released / isn't out / doesn't exist" unless the search says so; if
+  the search returns nothing usable, say the data was unavailable — never fall back to memory.
+- If memory disagrees with the user or the search result on a current fact, the user/search wins.
+
 ### [VOICE] — Speaking Style
 
 - Have a view; assessment in the first sentence

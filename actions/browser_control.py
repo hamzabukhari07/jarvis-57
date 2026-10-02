@@ -1129,13 +1129,13 @@ def _log(player, text: str):
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "browser_control",
-    "description": "Controls any web browser. Use for: opening websites, searching the web, clicking elements, filling forms, scrolling, screenshots, navigation, any web-based task. Simple open/search requests launch the user's own browser normally (their real profile and logged-in accounts); interactive actions (click, type, fill_form...) attach an automation browser. Always pass the 'browser' parameter when the user specifies a browser (e.g. 'open in Edge', 'use Firefox', 'open Chrome'). Multiple browsers can run simultaneously. Call each action exactly once per turn.",
+    "description": "Controls any web browser on the desktop. Use ONLY when the user explicitly asks to open a website on screen, preview a webpage, click elements, fill forms, scroll, or interact with a desktop browser window (e.g. 'open this in Chrome', 'go to example.com', 'click the login button'). NEVER use for answering general factual questions or silent background web searches — use web_search instead so searches run quietly in the background without opening the user's browser window. Always pass the 'browser' parameter when the user specifies a browser (e.g. 'open in Edge', 'use Firefox'). Call each action exactly once per turn.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
             "action": {
                 "type": "STRING",
-                "description": "go_to | search | click | type | scroll | fill_form | smart_click | smart_type | get_text | get_url | press | new_tab | close_tab | screenshot | back | forward | reload | switch | list_browsers | close | close_all"
+                "description": "go_to | search (open search in browser) | click | type | scroll | fill_form | smart_click | smart_type | get_text | get_url | press | new_tab | close_tab | screenshot | back | forward | reload | switch | list_browsers | close | close_all"
             },
             "browser": {
                 "type": "STRING",

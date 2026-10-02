@@ -179,13 +179,21 @@ def _assign_pid_to_job(hJob, pid: int) -> bool:
 
 def _run_worker(params: dict, ctx: TaskContext) -> dict:
     """Runs in the background thread. Streams progress, respects cancel."""
-    repo = params["repo"]
-    task = params["task"]
-    model = params["model"]
-    opencode_bin = params["bin"]
+    repo_val = params.get("repo") or params.get("project_path") or params.get("repo_path")
+    if not repo_val:
+        from core.repo_context import resolve
+        resolved_p, _ = resolve()
+        repo = str(resolved_p or (Path.home() / "Desktop" / "website").resolve())
+    else:
+        repo = str(Path(repo_val).resolve())
+
+    task = params.get("task", "")
+    model = params.get("model") or get_opencode_model()
+    opencode_bin = params.get("bin") or _find_opencode_bin()
 
     _ensure_gitignore(Path(repo))
     snapshot = capture_repo_snapshot(repo)
+
 
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"

@@ -4,9 +4,19 @@ __pycache__/
 
 # Config
 /config/api_keys.json
+/config/.deps_stamp
 
 # Test secrets
 /tests/test_secret_redaction_suite.py
 
 # Getting idea folder
 /get idea/
+# Auto-added ignore rules
+node_modules/
+.venv/
+venv/
+.next/
+dist/
+build/
+*.log
+/tools/uncage/

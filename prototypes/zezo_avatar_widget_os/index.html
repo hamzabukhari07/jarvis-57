@@ -1,0 +1,2430 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZEZO OS · Minimal Voice Avatar & Floating Widget OS</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Iconify Icons -->
+  <script src="https://code.iconify.design/iconify-icon/1.0.8/iconify-icon.min.js"></script>
+
+  <!-- Google MediaPipe Hands & Camera Utils -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <style>
+    :root {
+      --bg-deep: #050505;
+      --bg-surface: #0a0a0c;
+      --bg-elevated: #121217;
+      --bg-panel: #0d0d12;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-default: rgba(255, 255, 255, 0.15);
+      --border-strong: rgba(255, 255, 255, 0.30);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: rgba(255, 255, 255, 0.40);
+      --accent: #f24e1e;
+      --accent-glow: rgba(242, 78, 30, 0.45);
+      --accent-dim: rgba(242, 78, 30, 0.14);
+      --accent-ghost: rgba(242, 78, 30, 0.06);
+      --green: #22c55e;
+      --green-dim: rgba(34, 197, 94, 0.15);
+      --cyan: #38bdf8;
+      --cyan-dim: rgba(56, 189, 248, 0.15);
+      --amber: #f59e0b;
+      --purple: #a855f7;
+      --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      font-family: var(--font-ui);
+      font-size: 13px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .mono { font-family: var(--font-mono); }
+
+    /* Ambient Subtle Grid & Vignette */
+    .viewport-canvas {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 50% 48%, rgba(20, 20, 28, 0.65) 0%, #050505 85%);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .ambient-grid {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    /* Container corner nodes */
+    .corner-node {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: #050505;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      z-index: 90;
+      pointer-events: none;
+    }
+    .node-tl { top: 0; left: 0; }
+    .node-tr { top: 0; right: 0; }
+    .node-bl { bottom: 0; left: 0; }
+    .node-br { bottom: 0; right: 0; }
+
+    /* ── 1. CLEAN TOP NAVBAR ── */
+    .top-navbar {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(10, 10, 12, 0.9);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .header-left-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 0px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+      font-size: 15px;
+    }
+
+    .btn-icon:hover, .btn-icon.air-hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--cyan);
+      color: #fff;
+    }
+
+    .btn-icon.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Hand Gesture Mode Toggle Button */
+    .hand-gesture-toggle-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-default);
+      color: var(--text-secondary);
+      border-radius: 0px;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+    }
+
+    .hand-gesture-toggle-btn:hover, .hand-gesture-toggle-btn.air-hover {
+      border-color: var(--cyan);
+      color: #fff;
+      background: var(--cyan-dim);
+    }
+
+    .hand-gesture-toggle-btn.tracking-on {
+      border-color: var(--cyan);
+      background: var(--cyan-dim);
+      color: var(--cyan);
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.35);
+    }
+
+    .header-center-branding {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .header-brand-title {
+      font-family: var(--font-ui);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.28em;
+      color: #ffffff;
+      text-transform: uppercase;
+    }
+
+    .header-brand-divider {
+      width: 28px;
+      height: 2px;
+      background: var(--accent);
+      margin-top: 2px;
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    .header-right-clock {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--font-mono);
+    }
+
+    .header-clock-time {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.05em;
+    }
+
+    .header-clock-date {
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    /* ── 2. CENTER STAGE: VORTEX AVATAR & TRANSCRIPTION ── */
+    .center-stage {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      padding-bottom: 20px;
+    }
+
+    .avatar-halo-wrapper {
+      position: relative;
+      width: 240px;
+      height: 240px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    .voice-pulse-ring {
+      position: absolute;
+      inset: -14px;
+      border-radius: 50%;
+      border: 1px dashed rgba(242, 78, 30, 0.2);
+      animation: pulseSpin 20s linear infinite;
+      pointer-events: none;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .voice-pulse-ring.active {
+      border-color: rgba(56, 189, 248, 0.6);
+      box-shadow: 0 0 35px rgba(56, 189, 248, 0.25);
+    }
+
+    @keyframes pulseSpin {
+      from { transform: rotate(0deg) scale(1); }
+      50% { transform: rotate(180deg) scale(1.04); }
+      to { transform: rotate(360deg) scale(1); }
+    }
+
+    .vortex-media {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      object-fit: cover;
+      filter: contrast(1.15) brightness(1.05);
+      border: 2px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 0 45px rgba(0, 0, 0, 0.95), 0 0 25px rgba(242, 78, 30, 0.2);
+      transition: transform 0.25s ease, filter 0.25s ease;
+    }
+
+    .avatar-halo-wrapper:hover .vortex-media, .avatar-halo-wrapper.air-hover .vortex-media {
+      transform: scale(1.03);
+      filter: contrast(1.25) brightness(1.15) drop-shadow(0 0 16px var(--accent-glow));
+    }
+
+    /* ── REAL-TIME TRANSCRIPTION SUBTITLE BOX ── */
+    .transcription-frame {
+      margin-top: 24px;
+      width: 600px;
+      max-width: 90vw;
+      background: #0a0a0c;
+      border: 1px solid var(--border-default);
+      border-radius: 0px !important;
+      position: relative;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.85);
+      pointer-events: auto;
+      overflow: hidden;
+    }
+
+    .corner { position: absolute; width: 12px; height: 1px; background: rgba(255,255,255,0.4); z-index: 5; pointer-events: none; }
+    .corner-v { position: absolute; width: 1px; height: 12px; background: rgba(255,255,255,0.4); z-index: 5; pointer-events: none; }
+    .corner-tl { top: 0; left: 0; }
+    .corner-tr { top: 0; right: 0; }
+    .corner-bl { bottom: 0; left: 0; }
+    .corner-br { bottom: 0; right: 0; }
+    .corner-v-tl { top: 0; left: 0; }
+    .corner-v-tr { top: 0; right: 0; }
+    .corner-v-bl { bottom: 0; left: 0; }
+    .corner-v-br { bottom: 0; right: 0; }
+
+    .transcription-inner {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .transcription-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 6px;
+    }
+
+    .speaker-tag-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .speaker-badge {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      padding: 2px 7px;
+      border-radius: 0px;
+      text-transform: uppercase;
+    }
+
+    .speaker-badge.agent {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid rgba(242, 78, 30, 0.3);
+    }
+
+    .speaker-badge.user {
+      background: var(--cyan-dim);
+      color: var(--cyan);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    .stream-status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 0px;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: blinkDot 1.2s infinite alternate;
+    }
+
+    @keyframes blinkDot {
+      from { opacity: 0.3; }
+      to { opacity: 1; }
+    }
+
+    .transcription-body {
+      font-family: var(--font-ui);
+      font-size: 13px;
+      font-weight: 400;
+      line-height: 1.6;
+      color: #f1f5f9;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+    }
+
+    .typewriter-cursor {
+      display: inline-block;
+      width: 6px;
+      height: 13px;
+      background: var(--accent);
+      margin-left: 4px;
+      vertical-align: middle;
+      animation: blinkCursor 0.8s infinite;
+    }
+
+    @keyframes blinkCursor {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .transcription-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 4px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .audio-bars-sim {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 12px;
+    }
+
+    .audio-bar {
+      width: 2px;
+      background: var(--accent);
+      border-radius: 0px;
+      animation: waveBar 0.9s ease-in-out infinite alternate;
+    }
+
+    .audio-bar:nth-child(1) { height: 4px; animation-delay: 0.1s; }
+    .audio-bar:nth-child(2) { height: 10px; animation-delay: 0.25s; }
+    .audio-bar:nth-child(3) { height: 7px; animation-delay: 0.4s; }
+    .audio-bar:nth-child(4) { height: 12px; animation-delay: 0.15s; }
+    .audio-bar:nth-child(5) { height: 5px; animation-delay: 0.3s; }
+
+    @keyframes waveBar {
+      0% { height: 3px; }
+      100% { height: 12px; }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════ */
+    /* ── 3. SHARP 90-DEGREE TACTICAL WIDGETS ── */
+    /* ═══════════════════════════════════════════════════════════════════ */
+    .widget-window {
+      position: absolute;
+      background: rgba(10, 10, 14, 0.98);
+      border: 1px solid var(--border-default);
+      border-radius: 0px !important;
+      box-shadow: 0 30px 60px -10px rgba(0, 0, 0, 0.95);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 10;
+      min-width: 280px;
+      animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: left, top;
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.97) translateY(6px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .widget-window.hand-target-lock {
+      border-color: var(--cyan) !important;
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.98), 0 0 25px rgba(56, 189, 248, 0.35) !important;
+    }
+
+    .widget-window.hand-pinched-active {
+      border-color: var(--accent) !important;
+      box-shadow: 0 35px 80px rgba(0, 0, 0, 0.98), 0 0 30px var(--accent-glow) !important;
+      z-index: 990 !important;
+      transition: none !important;
+      pointer-events: none;
+    }
+
+    .widget-window.active-focus {
+      border-color: var(--accent);
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.98), 0 0 20px var(--accent-dim);
+      z-index: 50;
+    }
+
+    .widget-header {
+      height: 36px;
+      background: #0e0e13;
+      border-bottom: 1px solid var(--border-subtle);
+      border-radius: 0px !important;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: grab;
+      position: relative;
+    }
+
+    .widget-header:active {
+      cursor: grabbing;
+    }
+
+    .widget-title-area {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .drag-grip {
+      color: var(--text-muted);
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      opacity: 0.6;
+    }
+
+    .widget-title-text {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.04em;
+    }
+
+    .widget-category-badge {
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      padding: 1px 6px;
+      border-radius: 0px;
+      text-transform: uppercase;
+    }
+
+    .badge-red { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-cyan { background: var(--cyan-dim); color: var(--cyan); border: 1px solid rgba(56, 189, 248, 0.3); }
+    .badge-green { background: var(--green-dim); color: var(--green); border: 1px solid rgba(34, 197, 94, 0.3); }
+    .badge-amber { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-purple { background: rgba(168, 85, 247, 0.15); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.3); }
+
+    .widget-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .win-btn {
+      width: 20px;
+      height: 20px;
+      border-radius: 0px !important;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .win-btn:hover, .win-btn.air-hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: var(--border-default);
+      color: #fff;
+    }
+
+    .win-btn.close-btn:hover, .win-btn.close-btn.air-hover {
+      background: #ef4444;
+      border-color: #ef4444;
+      color: #fff;
+    }
+
+    .widget-body {
+      flex: 1;
+      overflow: auto;
+      padding: 12px;
+      font-size: 12px;
+      color: var(--text-primary);
+      scrollbar-width: none;
+    }
+
+    .widget-body::-webkit-scrollbar {
+      display: none;
+    }
+
+    .widget-footer {
+      height: 26px;
+      background: #08080b;
+      border-top: 1px solid var(--border-subtle);
+      border-radius: 0px !important;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+    }
+
+    /* ── A. HIGH-END MEDIA PLAYER ── */
+    .media-player-canvas-box {
+      width: 100%;
+      height: 140px;
+      background: #040406;
+      border: 1px solid var(--border-subtle);
+      border-radius: 0px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .spectrum-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .track-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding: 8px 10px;
+      background: #111116;
+      border: 1px solid var(--border-subtle);
+      border-radius: 0px;
+    }
+
+    .track-info-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    .track-icon-badge {
+      width: 28px;
+      height: 28px;
+      background: var(--accent-dim);
+      border: 1px solid rgba(242, 78, 30, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    .track-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-artist {
+      font-size: 9.5px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .audio-scrub-bar {
+      margin-top: 8px;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      position: relative;
+      cursor: pointer;
+    }
+
+    .audio-scrub-fill {
+      height: 100%;
+      width: 62%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent-glow);
+    }
+
+    .media-ctrl-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+      padding: 6px 12px;
+      background: #111116;
+      border-radius: 0px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .media-btn {
+      background: transparent;
+      border: none;
+      color: #cbd5e1;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      transition: color 0.15s ease;
+    }
+
+    .media-btn:hover, .media-btn.air-hover {
+      color: var(--accent);
+    }
+
+    .media-play-pill {
+      width: 28px;
+      height: 28px;
+      border-radius: 0px;
+      background: var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 0 10px var(--accent-glow);
+      font-size: 14px;
+    }
+
+    .media-play-pill:hover, .media-play-pill.air-hover {
+      transform: scale(1.1);
+    }
+
+    /* ── B. WORKSPACE FILES EXPLORER ── */
+    .fs-breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      background: #08080a;
+      padding: 6px 10px;
+      border-radius: 0px;
+      border: 1px solid var(--border-subtle);
+      margin-bottom: 8px;
+    }
+
+    .file-item-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 10px;
+      border-radius: 0px;
+      background: #111116;
+      border: 1px solid var(--border-subtle);
+      margin-bottom: 5px;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .file-item-card:hover, .file-item-card.air-hover {
+      border-color: var(--cyan);
+      background: #15151e;
+    }
+
+    .file-item-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ext-badge {
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 0px;
+    }
+
+    .file-name {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .file-desc {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .git-diff-badge {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--green);
+      background: var(--green-dim);
+      padding: 2px 6px;
+      border-radius: 0px;
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    /* ── C. SYSTEM TELEMETRY HUD ── */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .telemetry-card {
+      background: #111116;
+      border: 1px solid var(--border-subtle);
+      border-radius: 0px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .telemetry-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .telemetry-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .telemetry-val {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .telemetry-meter-bar {
+      height: 3px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 0px;
+      overflow: hidden;
+    }
+
+    .telemetry-meter-fill {
+      height: 100%;
+      border-radius: 0px;
+    }
+
+    .telemetry-sub {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+    }
+
+    /* ── D. OPENCODE TERMINAL ── */
+    .terminal-window {
+      background: #060608;
+      border: 1px solid var(--border-subtle);
+      border-radius: 0px;
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      line-height: 1.6;
+      color: #e2e8f0;
+    }
+
+    .term-line-prompt { color: var(--text-muted); }
+    .term-line-cmd { color: #fff; font-weight: 600; }
+    .term-line-success { color: var(--green); }
+    .term-line-info { color: var(--cyan); }
+    .term-line-warn { color: #f59e0b; }
+    .term-line-diff-add { color: #4ade80; background: rgba(74, 222, 128, 0.08); padding: 0 4px; }
+    .term-line-diff-del { color: #f87171; background: rgba(248, 113, 113, 0.08); padding: 0 4px; }
+
+    /* ── E. WEATHER HUD ── */
+    .weather-container {
+      background: #111116;
+      border: 1px solid var(--border-subtle);
+      border-radius: 0px;
+      padding: 12px;
+    }
+
+    .weather-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .weather-temp-huge {
+      font-family: var(--font-mono);
+      font-size: 32px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .weather-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .weather-mini-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      gap: 2px;
+    }
+
+    /* ── 4. BOTTOM COMMAND DOCK ── */
+    .bottom-command-dock {
+      height: 64px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      background: rgba(10, 10, 12, 0.95);
+      border-top: 1px solid var(--border-subtle);
+      z-index: 100;
+      flex-shrink: 0;
+    }
+
+    .voice-chips-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .voice-chips-row::-webkit-scrollbar {
+      display: none;
+    }
+
+    .intent-chip {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-default);
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 5px 12px;
+      border-radius: 0px;
+      cursor: pointer;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .intent-chip:hover, .intent-chip.air-hover {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+      color: #fff;
+    }
+
+    .voice-input-box {
+      flex: 1;
+      max-width: 440px;
+      background: #111115;
+      border: 1px solid var(--border-default);
+      border-radius: 0px;
+      padding: 4px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: border-color 0.15s ease;
+    }
+
+    .voice-input-box:focus-within {
+      border-color: var(--accent);
+    }
+
+    .voice-input-field {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .voice-input-field::placeholder {
+      color: var(--text-muted);
+    }
+
+    .mic-record-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 0px;
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 0 10px var(--accent-glow);
+      font-size: 13px;
+      transition: transform 0.15s ease;
+    }
+
+    .mic-record-btn:hover, .mic-record-btn.air-hover {
+      transform: scale(1.1);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════ */
+    /* ── 5. AIR MOUSE POINTER & CLICK RIPPLE BURST ── */
+    /* ═══════════════════════════════════════════════════════════════════ */
+
+    #handCursorRing {
+      position: fixed;
+      width: 32px;
+      height: 32px;
+      border: 2px solid var(--cyan);
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.65), inset 0 0 8px rgba(56, 189, 248, 0.3);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%);
+      display: none;
+      will-change: left, top, transform;
+      transition: width 0.12s cubic-bezier(0.16, 1, 0.3, 1), height 0.12s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.12s ease, background-color 0.12s ease;
+    }
+
+    #handCursorRing.hovering-clickable {
+      border-color: #22c55e;
+      box-shadow: 0 0 24px rgba(34, 197, 94, 0.85), inset 0 0 12px rgba(34, 197, 94, 0.4);
+      background: rgba(34, 197, 94, 0.18);
+      width: 46px;
+      height: 46px;
+    }
+
+    #handCursorRing.pinching {
+      border-color: var(--accent);
+      box-shadow: 0 0 30px var(--accent-glow), inset 0 0 16px var(--accent);
+      width: 20px;
+      height: 20px;
+      background: rgba(242, 78, 30, 0.6);
+      transform: translate(-50%, -50%) scale(0.9);
+    }
+
+    #handCursorCrosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 6px;
+      height: 6px;
+      background: #fff;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 8px #fff;
+    }
+
+    .cursor-label-tag {
+      position: absolute;
+      top: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10, 10, 14, 0.9);
+      border: 1px solid var(--border-default);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 2px 6px;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    /* Holographic Click Ripple Wave */
+    .air-click-ripple {
+      position: fixed;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--accent);
+      box-shadow: 0 0 15px var(--accent);
+      border-radius: 50%;
+      transform: translate(-50%, -50%) scale(1);
+      pointer-events: none;
+      z-index: 10000;
+      animation: rippleBurst 0.4s ease-out forwards;
+    }
+
+    @keyframes rippleBurst {
+      0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; }
+    }
+
+    .air-click-active {
+      transform: scale(0.94) !important;
+      filter: brightness(1.3) !important;
+      transition: transform 0.08s ease, filter 0.08s ease !important;
+    }
+
+    /* Floating Vision PiP HUD Card */
+    #cameraPipBox {
+      position: fixed;
+      top: 60px;
+      right: 24px;
+      width: 190px;
+      background: #0a0a0c;
+      border: 1px solid var(--border-strong);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.9);
+      z-index: 999;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #cameraPipHeader {
+      height: 26px;
+      background: #111116;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 8px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--cyan);
+      letter-spacing: 0.08em;
+    }
+
+    #webcamVideo {
+      display: none;
+    }
+
+    #cameraLandmarkCanvas {
+      width: 100%;
+      height: 100px;
+      background: #000;
+      transform: scaleX(-1);
+    }
+
+    #gestureStatusFooter {
+      background: #08080b;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      padding: 6px 8px;
+      gap: 3px;
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+    }
+
+    .gesture-hint-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="viewport-canvas" id="viewportCanvas">
+    <div class="ambient-grid"></div>
+
+    <!-- Container corner nodes -->
+    <div class="corner-node node-tl"></div>
+    <div class="corner-node node-tr"></div>
+    <div class="corner-node node-bl"></div>
+    <div class="corner-node node-br"></div>
+
+    <!-- ── 1. CLEAN TOP NAVBAR ── -->
+    <header class="top-navbar">
+      <div class="header-left-actions">
+        <button class="btn-icon active" title="Voice Avatar OS">
+          <iconify-icon icon="solar:atom-bold"></iconify-icon>
+        </button>
+        <button class="btn-icon" onclick="switchView('office')" title="Scranton Office Fleet View">
+          <iconify-icon icon="solar:users-group-two-rounded-linear"></iconify-icon>
+        </button>
+        <button class="btn-icon" onclick="switchView('hud')" title="Tactical HUD Workspace">
+          <iconify-icon icon="solar:layers-minimalistic-linear"></iconify-icon>
+        </button>
+
+        <!-- Hand Gesture Mode Toggle Button -->
+        <button class="hand-gesture-toggle-btn" id="handToggleBtn" onclick="toggleHandTracking()" title="Control & Click everything in air with your physical hand!">
+          <iconify-icon icon="solar:hand-shake-bold" style="font-size: 15px; color: var(--cyan);"></iconify-icon>
+          <span id="handToggleLabel">60FPS AIR MOUSE: OFF</span>
+        </button>
+      </div>
+
+      <!-- Center: ZEZO Branding -->
+      <div class="header-center-branding">
+        <div class="header-brand-title">ZEZO</div>
+        <div class="header-brand-divider"></div>
+      </div>
+
+      <!-- Right: Live Clock & Date -->
+      <div class="header-right-clock">
+        <div class="header-clock-time" id="headerTime">15:15:00</div>
+        <div class="header-clock-date" id="headerDate">FRI 02 OCT 2026</div>
+      </div>
+    </header>
+
+    <!-- ── 2. CENTER STAGE: VORTEX AVATAR & LIVE REAL-TIME TRANSCRIPTION ── -->
+    <main class="center-stage" id="centerStage">
+      <div class="avatar-halo-wrapper" onclick="toggleSimulatedListening()" title="Click to speak with ZEZO">
+        <div class="voice-pulse-ring" id="pulseRing"></div>
+        <img src="download.gif" alt="ZEZO Holographic Vortex" class="vortex-media" id="vortexGif" />
+      </div>
+
+      <!-- Realtime Agent & User Transcription Subtitle Box (Sharp Corners) -->
+      <div class="transcription-frame" id="transcriptionBox">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+        <div class="transcription-inner">
+          <div class="transcription-header">
+            <div class="speaker-tag-group">
+              <span class="speaker-badge agent" id="speakerBadge">ZEZO AI</span>
+              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);" id="speakerModeText">VOICE AGENT</span>
+            </div>
+            <div class="stream-status-pill">
+              <span class="pulse-dot" id="liveDot"></span>
+              <span id="streamStateLabel">LIVE TRANSCRIBING</span>
+            </div>
+          </div>
+
+          <div class="transcription-body">
+            <span id="transcriptionText">Ready. I am listening... Say "Play YouTube music", "Open workspace files", or activate 60FPS Air Mouse above.</span>
+            <span class="typewriter-cursor" id="typeCursor"></span>
+          </div>
+
+          <div class="transcription-footer">
+            <span id="transcriptionMeta">LATENCY: 118ms · AIR MOUSE: READY</span>
+            <div class="audio-bars-sim">
+              <div class="audio-bar"></div>
+              <div class="audio-bar"></div>
+              <div class="audio-bar"></div>
+              <div class="audio-bar"></div>
+              <div class="audio-bar"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ── 3. FLOATING WINDOW MANAGER LAYER ── -->
+    <div id="widgetLayer" style="position: absolute; inset: 0; pointer-events: none;"></div>
+
+    <!-- ── 4. BOTTOM COMMAND DOCK ── -->
+    <footer class="bottom-command-dock">
+      <div class="voice-chips-row">
+        <button class="intent-chip" onclick="triggerVoiceIntent('youtube')">
+          <iconify-icon icon="solar:play-circle-bold" style="color: #ef4444;"></iconify-icon>
+          "Play lofi music on YouTube"
+        </button>
+        <button class="intent-chip" onclick="triggerVoiceIntent('files')">
+          <iconify-icon icon="solar:folder-with-files-bold" style="color: var(--cyan);"></iconify-icon>
+          "Show workspace files"
+        </button>
+        <button class="intent-chip" onclick="triggerVoiceIntent('telemetry')">
+          <iconify-icon icon="solar:chart-square-bold" style="color: var(--green);"></iconify-icon>
+          "Check system status"
+        </button>
+        <button class="intent-chip" onclick="triggerVoiceIntent('weather')">
+          <iconify-icon icon="solar:sun-cloud-bold" style="color: #f59e0b;"></iconify-icon>
+          "What is the weather?"
+        </button>
+        <button class="intent-chip" onclick="triggerVoiceIntent('coding')">
+          <iconify-icon icon="solar:code-2-bold" style="color: #a855f7;"></iconify-icon>
+          "Start OpenCode agent"
+        </button>
+      </div>
+
+      <div class="voice-input-box">
+        <input type="text" class="voice-input-field" id="textPromptInput" placeholder="Speak or type instruction (e.g. 'Play YouTube', 'Open files')..." onkeydown="handleInputKey(event)">
+        <button class="mic-record-btn" onclick="toggleSimulatedListening()" title="Push-to-Talk">
+          <iconify-icon icon="solar:microphone-3-bold"></iconify-icon>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ── 5. AIR MOUSE HOLOGRAPHIC CURSOR & WEBCAM PIP ── -->
+  <div id="handCursorRing">
+    <div id="handCursorCrosshair"></div>
+    <div class="cursor-label-tag" id="cursorLabelTag">AIR CURSOR</div>
+  </div>
+
+  <!-- Hidden Webcam Video Source -->
+  <video id="webcamVideo" autoplay playsinline muted></video>
+
+  <!-- PiP Camera Feed Preview -->
+  <div id="cameraPipBox">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div id="cameraPipHeader">
+      <span>🖐️ AIR MOUSE ENGINE</span>
+      <span id="fpsCount" style="color: var(--green);">60 FPS</span>
+    </div>
+    <canvas id="cameraLandmarkCanvas"></canvas>
+    <div id="gestureStatusFooter">
+      <div class="gesture-hint-row">
+        <span id="gestureActionLabel" style="color: var(--cyan); font-weight: 700;">AIMING</span>
+        <span id="proximityTargetLabel" style="color: #fff;">READY</span>
+      </div>
+      <div class="gesture-hint-row" style="margin-top: 2px;">
+        <span>🤏 PINCH = CLICK / DRAG</span>
+        <span>✋ MOVE = AIR MOUSE</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 6. JAVASCRIPT LOGIC (AIR MOUSE CLICKING & DRAGGING) ── -->
+  <script>
+    let topZIndex = 100;
+    const widgetLayer = document.getElementById('widgetLayer');
+    const pulseRing = document.getElementById('pulseRing');
+    const transcriptionText = document.getElementById('transcriptionText');
+    const speakerBadge = document.getElementById('speakerBadge');
+    const speakerModeText = document.getElementById('speakerModeText');
+    const streamStateLabel = document.getElementById('streamStateLabel');
+    const liveDot = document.getElementById('liveDot');
+
+    // ── Clock Update Loop ──
+    function updateClock() {
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0];
+      const dateStr = now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+      document.getElementById('headerTime').innerText = timeStr;
+      document.getElementById('headerDate').innerText = dateStr;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ── Real-Time Streaming Transcription Display ──
+    let streamInterval = null;
+    function streamTranscription(speaker, text) {
+      if (streamInterval) clearInterval(streamInterval);
+
+      if (speaker === 'user') {
+        speakerBadge.className = 'speaker-badge user';
+        speakerBadge.innerText = 'USER';
+        speakerModeText.innerText = 'AUDIO INPUT';
+        streamStateLabel.innerText = 'LISTENING';
+        liveDot.style.background = 'var(--cyan)';
+        liveDot.style.boxShadow = '0 0 6px var(--cyan)';
+        pulseRing.classList.add('active');
+      } else {
+        speakerBadge.className = 'speaker-badge agent';
+        speakerBadge.innerText = 'ZEZO AI';
+        speakerModeText.innerText = 'VOICE RESPONSE';
+        streamStateLabel.innerText = 'LIVE TRANSCRIBING';
+        liveDot.style.background = 'var(--green)';
+        liveDot.style.boxShadow = '0 0 6px var(--green)';
+        pulseRing.classList.add('active');
+      }
+
+      transcriptionText.innerText = '';
+      let index = 0;
+      streamInterval = setInterval(() => {
+        if (index < text.length) {
+          transcriptionText.innerText += text[index];
+          index++;
+        } else {
+          clearInterval(streamInterval);
+          setTimeout(() => {
+            if (speaker === 'agent') {
+              pulseRing.classList.remove('active');
+            }
+          }, 2500);
+        }
+      }, 20);
+    }
+
+    // ── Push-To-Talk Toggle ──
+    let isListening = false;
+    function toggleSimulatedListening() {
+      isListening = !isListening;
+      if (isListening) {
+        streamTranscription('user', 'Hamza: "Zezo, open system telemetry and files."');
+      } else {
+        streamTranscription('agent', 'Zezo: "Widgets loaded. You can click any button or move widgets with your physical hand!"');
+      }
+    }
+
+    // ── Draggable Window Engine (Mouse & Touch) ──
+    function makeDraggable(winEl, handleEl) {
+      let isDragging = false;
+      let startX, startY, initX, initY;
+
+      handleEl.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.win-btn')) return;
+        isDragging = true;
+        bringToFront(winEl);
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = winEl.getBoundingClientRect();
+        initX = rect.left;
+        initY = rect.top;
+
+        function onMouseMove(moveEvent) {
+          if (!isDragging) return;
+          const dx = moveEvent.clientX - startX;
+          const dy = moveEvent.clientY - startY;
+          winEl.style.left = Math.max(10, Math.min(window.innerWidth - winEl.offsetWidth - 10, initX + dx)) + 'px';
+          winEl.style.top = Math.max(54, Math.min(window.innerHeight - winEl.offsetHeight - 74, initY + dy)) + 'px';
+        }
+
+        function onMouseUp() {
+          isDragging = false;
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+        }
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+      });
+
+      winEl.addEventListener('mousedown', () => bringToFront(winEl));
+    }
+
+    function bringToFront(winEl) {
+      document.querySelectorAll('.widget-window').forEach(w => w.classList.remove('active-focus'));
+      winEl.classList.add('active-focus');
+      if (parseInt(winEl.style.zIndex) !== topZIndex) {
+        winEl.style.zIndex = ++topZIndex;
+      }
+    }
+
+    function closeWidget(id) {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ── 7. AIR MOUSE & CLICKING ENGINE (MediaPipe Hands - Full Overhaul) ──
+    // ═══════════════════════════════════════════════════════════════════
+    let isHandTrackingActive = false;
+    let cameraInstance = null;
+    let handsInstance = null;
+    const handCursorRing = document.getElementById('handCursorRing');
+    const cursorLabelTag = document.getElementById('cursorLabelTag');
+    const cameraPipBox = document.getElementById('cameraPipBox');
+    const cameraLandmarkCanvas = document.getElementById('cameraLandmarkCanvas');
+    const landmarkCtx = cameraLandmarkCanvas.getContext('2d');
+    const gestureActionLabel = document.getElementById('gestureActionLabel');
+    const proximityTargetLabel = document.getElementById('proximityTargetLabel');
+    const handToggleBtn = document.getElementById('handToggleBtn');
+    const handToggleLabel = document.getElementById('handToggleLabel');
+    const webcamVideo = document.getElementById('webcamVideo');
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ── STABLE 1€ FILTER (with reset + adaptive beta) ──
+    // ═══════════════════════════════════════════════════════════════════
+    class OneEuroFilter {
+      constructor(freq = 60, minCutoff = 1.0, beta = 0.007, dCutoff = 1.0) {
+        this.freq = freq;
+        this.minCutoff = minCutoff;
+        this.beta = beta;
+        this.dCutoff = dCutoff;
+        this.reset();
+      }
+      reset() {
+        this.xPrev = null;
+        this.dxPrev = 0;
+        this.lastTime = null;
+      }
+      alpha(cutoff, dt) {
+        const tau = 1.0 / (2 * Math.PI * cutoff);
+        return 1.0 / (1.0 + tau / dt);
+      }
+      filter(x, timestamp = performance.now()) {
+        if (this.xPrev === null) {
+          this.xPrev = x;
+          this.lastTime = timestamp;
+          return x;
+        }
+        const dt = Math.min(Math.max((timestamp - this.lastTime) / 1000, 0.001), 0.1);
+        this.lastTime = timestamp;
+        const dx = (x - this.xPrev) / dt;
+        const aD = this.alpha(this.dCutoff, dt);
+        const dxHat = aD * dx + (1 - aD) * this.dxPrev;
+        this.dxPrev = dxHat;
+        const cutoff = this.minCutoff + this.beta * Math.abs(dxHat);
+        const a = this.alpha(cutoff, dt);
+        const xHat = a * x + (1 - a) * this.xPrev;
+        this.xPrev = xHat;
+        return xHat;
+      }
+    }
+
+    const filterX = new OneEuroFilter(60, 0.9, 0.006, 1.0);
+    const filterY = new OneEuroFilter(60, 0.9, 0.006, 1.0);
+
+    // Cursor state
+    let rawTargetHandX = window.innerWidth / 2;
+    let rawTargetHandY = window.innerHeight / 2;
+    let targetHandX = window.innerWidth / 2;
+    let targetHandY = window.innerHeight / 2;
+    let smoothHandX = window.innerWidth / 2;
+    let smoothHandY = window.innerHeight / 2;
+
+    // Hand size reference for scale-invariant pinch
+    let handSizeRef = null;          // EMA of wrist→middle-MCP distance
+    const HAND_SIZE_ALPHA = 0.05;
+
+    // Pinch state
+    let isPinchingState = false;
+    let pinchStartTime = 0;
+    let hasDraggedSincePinch = false;
+    let pinchReleaseCounter = 0;
+    let pinchStartCounter = 0;        // debounce for pinch START
+    const PINCH_START_FRAMES = 3;     // must see 3 consecutive pinch frames to engage
+    const PINCH_RELEASE_FRAMES = 4;   // must see 4 consecutive open frames to release
+
+    // Hover/drag state
+    let currentHoveredClickable = null;
+    let hoveredWidget = null;
+    let grabbedWidget = null;
+    let grabOffsetX = 0;
+    let grabOffsetY = 0;
+    let widgetTargetX = 0;
+    let widgetTargetY = 0;
+    let widgetSmoothX = 0;
+    let widgetSmoothY = 0;
+    let grabJustStarted = false;
+
+    // Frame timing
+    let lastHoverCheck = 0;
+    const HOVER_CHECK_INTERVAL = 33;  // ~30Hz
+
+    // Confidence gating
+    let handLostFrames = 0;
+    const HAND_LOST_THRESHOLD = 8;
+
+    function triggerAirClickRipple(x, y) {
+      const ripple = document.createElement('div');
+      ripple.className = 'air-click-ripple';
+      ripple.style.left = x + 'px';
+      ripple.style.top = y + 'px';
+      document.body.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 400);
+    }
+
+    function handRenderLoop(now = performance.now()) {
+      if (isHandTrackingActive) {
+        // ── Cursor smoothing ──
+        const filteredX = filterX.filter(rawTargetHandX, now);
+        const filteredY = filterY.filter(rawTargetHandY, now);
+
+        // Deadzone: ignore sub-pixel jitter
+        const distFromPrev = Math.hypot(filteredX - targetHandX, filteredY - targetHandY);
+        if (distFromPrev > 1.5) {
+          targetHandX = filteredX;
+          targetHandY = filteredY;
+        }
+
+        // Adaptive smoothing: faster when moving, slower when still
+        const speed = Math.hypot(targetHandX - smoothHandX, targetHandY - smoothHandY);
+        const lerp = speed > 30 ? 0.55 : 0.35;
+        smoothHandX += (targetHandX - smoothHandX) * lerp;
+        smoothHandY += (targetHandY - smoothHandY) * lerp;
+
+        handCursorRing.style.left = smoothHandX + 'px';
+        handCursorRing.style.top = smoothHandY + 'px';
+
+        if (!grabbedWidget) {
+          // Throttle hover detection to ~30Hz
+          if (now - lastHoverCheck > HOVER_CHECK_INTERVAL) {
+            lastHoverCheck = now;
+            detectHoverAndClickables(smoothHandX, smoothHandY);
+          }
+        } else {
+          hasDraggedSincePinch = true;
+
+          // If we JUST grabbed, initialize target from current widget pos
+          if (grabJustStarted) {
+            grabJustStarted = false;
+            widgetTargetX = parseFloat(grabbedWidget.style.left) || grabbedWidget.getBoundingClientRect().left;
+            widgetTargetY = parseFloat(grabbedWidget.style.top) || grabbedWidget.getBoundingClientRect().top;
+            widgetSmoothX = widgetTargetX;
+            widgetSmoothY = widgetTargetY;
+          }
+
+          widgetTargetX = smoothHandX - grabOffsetX;
+          widgetTargetY = smoothHandY - grabOffsetY;
+
+          // Smooth widget drag (faster follow = feels responsive)
+          widgetSmoothX += (widgetTargetX - widgetSmoothX) * 0.5;
+          widgetSmoothY += (widgetTargetY - widgetSmoothY) * 0.5;
+
+          const clampedX = Math.max(10, Math.min(window.innerWidth - grabbedWidget.offsetWidth - 10, widgetSmoothX));
+          const clampedY = Math.max(54, Math.min(window.innerHeight - grabbedWidget.offsetHeight - 74, widgetSmoothY));
+
+          grabbedWidget.style.left = clampedX + 'px';
+          grabbedWidget.style.top = clampedY + 'px';
+        }
+      }
+      requestAnimationFrame(handRenderLoop);
+    }
+    requestAnimationFrame(handRenderLoop);
+
+    function detectHoverAndClickables(hx, hy) {
+      // Find new hovered clickable
+      const elements = document.elementsFromPoint(hx, hy);
+      const clickableCandidate = elements.find(el =>
+        el.tagName === 'BUTTON' ||
+        el.classList.contains('intent-chip') ||
+        el.classList.contains('btn-icon') ||
+        el.classList.contains('win-btn') ||
+        el.classList.contains('media-btn') ||
+        el.classList.contains('media-play-pill') ||
+        el.classList.contains('file-item-card') ||
+        el.classList.contains('avatar-halo-wrapper')
+      );
+
+      // Only update if hovered element CHANGED (prevents flicker)
+      if (clickableCandidate !== currentHoveredClickable) {
+        if (currentHoveredClickable) currentHoveredClickable.classList.remove('air-hover');
+        currentHoveredClickable = clickableCandidate || null;
+        if (currentHoveredClickable) currentHoveredClickable.classList.add('air-hover');
+      }
+
+      if (currentHoveredClickable) {
+        handCursorRing.classList.add('hovering-clickable');
+        cursorLabelTag.innerText = 'PINCH TO CLICK';
+        cursorLabelTag.style.color = 'var(--green)';
+        proximityTargetLabel.innerText = 'TARGET: BUTTON';
+        proximityTargetLabel.style.color = 'var(--green)';
+        // Clear widget lock
+        if (hoveredWidget) {
+          hoveredWidget.classList.remove('hand-target-lock');
+          hoveredWidget = null;
+        }
+        return;
+      }
+
+      handCursorRing.classList.remove('hovering-clickable');
+
+      // Widget proximity detection
+      const allWidgets = Array.from(document.querySelectorAll('.widget-window'));
+      let closest = null;
+      let minDistance = 9999;
+
+      allWidgets.forEach(w => {
+        const r = w.getBoundingClientRect();
+        const isInside = (hx >= r.left - 30 && hx <= r.right + 30 && hy >= r.top - 30 && hy <= r.bottom + 30);
+        if (isInside) {
+          const centerX = r.left + r.width / 2;
+          const centerY = r.top + r.height / 2;
+          const dist = Math.hypot(hx - centerX, hy - centerY);
+          if (dist < minDistance) {
+            minDistance = dist;
+            closest = w;
+          }
+        }
+      });
+
+      // Only update widget lock class if changed
+      if (closest !== hoveredWidget) {
+        if (hoveredWidget) hoveredWidget.classList.remove('hand-target-lock');
+        hoveredWidget = closest;
+        if (hoveredWidget) hoveredWidget.classList.add('hand-target-lock');
+      }
+
+      if (hoveredWidget) {
+        cursorLabelTag.innerText = 'PINCH TO DRAG';
+        cursorLabelTag.style.color = 'var(--cyan)';
+        proximityTargetLabel.innerText = 'TARGET: WIDGET';
+        proximityTargetLabel.style.color = 'var(--cyan)';
+      } else {
+        cursorLabelTag.innerText = 'AIR MOUSE';
+        cursorLabelTag.style.color = '#fff';
+        proximityTargetLabel.innerText = 'AIMING';
+        proximityTargetLabel.style.color = 'var(--text-muted)';
+      }
+    }
+
+    async function toggleHandTracking() {
+      isHandTrackingActive = !isHandTrackingActive;
+
+      if (isHandTrackingActive) {
+        handToggleBtn.classList.add('tracking-on');
+        handToggleLabel.innerText = '60FPS AIR MOUSE: LIVE';
+        handCursorRing.style.display = 'block';
+        cameraPipBox.style.display = 'flex';
+        streamTranscription('agent', 'Zezo: "Air Mouse activated! Move your hand to aim, pinch fingers to CLICK buttons or DRAG windows!"');
+
+        // ── Reset all filter/tracking state for clean session ──
+        filterX.reset();
+        filterY.reset();
+        handSizeRef = null;
+        isPinchingState = false;
+        pinchStartCounter = 0;
+        pinchReleaseCounter = 0;
+        handLostFrames = 0;
+        grabbedWidget = null;
+        hoveredWidget = null;
+        currentHoveredClickable = null;
+        smoothHandX = targetHandX = rawTargetHandX = window.innerWidth / 2;
+        smoothHandY = targetHandY = rawTargetHandY = window.innerHeight / 2;
+
+        startMediaPipeHands();
+      } else {
+        handToggleBtn.classList.remove('tracking-on');
+        handToggleLabel.innerText = '60FPS AIR MOUSE: OFF';
+        handCursorRing.style.display = 'none';
+        cameraPipBox.style.display = 'none';
+        document.querySelectorAll('.widget-window').forEach(w => {
+          w.classList.remove('hand-target-lock');
+          w.classList.remove('hand-pinched-active');
+        });
+        if (currentHoveredClickable) currentHoveredClickable.classList.remove('air-hover');
+        if (grabbedWidget) grabbedWidget.classList.remove('hand-pinched-active');
+        grabbedWidget = null;
+        hoveredWidget = null;
+        currentHoveredClickable = null;
+        if (cameraInstance) { try { cameraInstance.stop(); } catch(e){} }
+        if (webcamVideo.srcObject) {
+          webcamVideo.srcObject.getTracks().forEach(track => track.stop());
+          webcamVideo.srcObject = null;
+        }
+        streamTranscription('agent', 'Zezo: "Air mouse deactivated."');
+      }
+    }
+
+    function startMediaPipeHands() {
+      if (!handsInstance) {
+        handsInstance = new Hands({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+        handsInstance.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 1,          // Accurate model for superior stability
+          minDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.6
+        });
+        handsInstance.onResults(onHandResults);
+      }
+      if (!cameraInstance) {
+        cameraInstance = new Camera(webcamVideo, {
+          onFrame: async () => {
+            if (isHandTrackingActive && webcamVideo.readyState >= 2) {
+              try { await handsInstance.send({ image: webcamVideo }); } catch(e) {}
+            }
+          },
+          width: 640,                  // 640x480 resolution for high precision landmarks
+          height: 480
+        });
+      }
+      cameraInstance.start().catch(err => {
+        console.error("Camera access failed:", err);
+        streamTranscription('agent', 'Zezo: "Webcam permission blocked. Please allow camera access in browser."');
+      });
+    }
+
+    function onHandResults(results) {
+      cameraLandmarkCanvas.width = cameraLandmarkCanvas.offsetWidth;
+      cameraLandmarkCanvas.height = cameraLandmarkCanvas.offsetHeight;
+      landmarkCtx.clearRect(0, 0, cameraLandmarkCanvas.width, cameraLandmarkCanvas.height);
+
+      const hasHand = results.multiHandLandmarks && results.multiHandLandmarks.length > 0;
+
+      if (!hasHand) {
+        handLostFrames++;
+        // Only release grab after hand has been gone for a few frames (prevents flicker drop)
+        if (handLostFrames > HAND_LOST_THRESHOLD) {
+          gestureActionLabel.innerText = 'SEARCHING HAND...';
+          gestureActionLabel.style.color = 'var(--text-muted)';
+          if (grabbedWidget) {
+            grabbedWidget.classList.remove('hand-pinched-active');
+            grabbedWidget = null;
+          }
+          isPinchingState = false;
+          pinchStartCounter = 0;
+          handCursorRing.classList.remove('pinching');
+        }
+        return;
+      }
+
+      handLostFrames = 0;
+      const landmarks = results.multiHandLandmarks[0];
+      drawHandSkeleton(landmarks, landmarkCtx, cameraLandmarkCanvas.width, cameraLandmarkCanvas.height);
+
+      const wrist     = landmarks[0];
+      const thumbTip  = landmarks[4];
+      const indexMcp  = landmarks[5];
+      const indexTip  = landmarks[8];
+      const middleMcp = landmarks[9];
+
+      // ── Scale-invariant pinch distance ──
+      const handSize = Math.hypot(middleMcp.x - wrist.x, middleMcp.y - wrist.y) + 1e-6;
+      handSizeRef = handSizeRef === null ? handSize : (handSizeRef * (1 - HAND_SIZE_ALPHA) + handSize * HAND_SIZE_ALPHA);
+
+      const pinchRaw = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+      const pinchNorm = pinchRaw / handSizeRef;   // normalized by hand size → depth invariant
+
+      // ── Stable aim point: blend of wrist + index MCP (palm center) ──
+      const aimX = (wrist.x * 0.35 + indexMcp.x * 0.65);
+      const aimY = (wrist.y * 0.35 + indexMcp.y * 0.65);
+
+      // ── Remap camera→screen with active zone ──
+      const marginX = 0.18;
+      const marginY = 0.18;
+      const normAimX = Math.max(0, Math.min(1, (aimX - marginX) / (1 - 2 * marginX)));
+      const normAimY = Math.max(0, Math.min(1, (aimY - marginY) / (1 - 2 * marginY)));
+
+      rawTargetHandX = (1 - normAimX) * window.innerWidth;
+      rawTargetHandY = normAimY * window.innerHeight;
+
+      // ── Pinch state machine with hysteresis ──
+      const PINCH_ON = 0.42;
+      const PINCH_OFF = 0.58;
+
+      const isPinchSignal = isPinchingState ? (pinchNorm < PINCH_OFF) : (pinchNorm < PINCH_ON);
+
+      if (isPinchSignal) {
+        pinchReleaseCounter = 0;
+
+        if (!isPinchingState) {
+          pinchStartCounter++;
+          if (pinchStartCounter >= PINCH_START_FRAMES) {
+            // ── PINCH ENGAGED ──
+            isPinchingState = true;
+            pinchStartCounter = 0;
+            pinchStartTime = Date.now();
+            hasDraggedSincePinch = false;
+            handCursorRing.classList.add('pinching');
+            gestureActionLabel.innerText = '🤏 PINCH / CLICK';
+            gestureActionLabel.style.color = 'var(--accent)';
+
+            // Decide: click vs drag
+            let targetToClick = currentHoveredClickable;
+            if (!targetToClick && !hoveredWidget) {
+              const elUnder = document.elementFromPoint(smoothHandX, smoothHandY);
+              if (elUnder) {
+                targetToClick = elUnder.closest(
+                  'button, .intent-chip, .btn-icon, .win-btn, .media-btn, .media-play-pill, .file-item-card, .avatar-halo-wrapper, input, a, [onclick]'
+                );
+              }
+            }
+
+            if (targetToClick) {
+              triggerAirClickRipple(smoothHandX, smoothHandY);
+              targetToClick.classList.add('air-click-active');
+              setTimeout(() => targetToClick && targetToClick.classList.remove('air-click-active'), 180);
+              if (targetToClick.tagName === 'INPUT') targetToClick.focus();
+              else targetToClick.click();
+              gestureActionLabel.innerText = '💥 CLICKED!';
+              gestureActionLabel.style.color = 'var(--green)';
+            } else if (hoveredWidget && !grabbedWidget) {
+              // ── GRAB WIDGET ──
+              grabbedWidget = hoveredWidget;
+              bringToFront(grabbedWidget);
+              grabbedWidget.classList.add('hand-pinched-active');
+
+              // Capture offset relative to CURRENT cursor, not interpolated
+              const r = grabbedWidget.getBoundingClientRect();
+              grabOffsetX = smoothHandX - r.left;
+              grabOffsetY = smoothHandY - r.top;
+              grabJustStarted = true;
+
+              gestureActionLabel.innerText = '✊ DRAGGING WIDGET';
+              gestureActionLabel.style.color = 'var(--cyan)';
+            }
+          }
+        }
+      } else {
+        pinchStartCounter = 0;
+        pinchReleaseCounter++;
+
+        // Release only after sustained open-hand frames
+        if (pinchReleaseCounter >= PINCH_RELEASE_FRAMES) {
+          if (isPinchingState) {
+            // Tap-click fallback for very quick pinches
+            const duration = Date.now() - pinchStartTime;
+            if (duration < 280 && !hasDraggedSincePinch && !grabbedWidget) {
+              const elUnder = document.elementFromPoint(smoothHandX, smoothHandY);
+              const fb = elUnder ? elUnder.closest(
+                'button, .intent-chip, .btn-icon, .win-btn, .media-btn, .media-play-pill, .file-item-card, .avatar-halo-wrapper, input, a, [onclick]'
+              ) : null;
+              if (fb) {
+                triggerAirClickRipple(smoothHandX, smoothHandY);
+                if (fb.tagName === 'INPUT') fb.focus();
+                else fb.click();
+              }
+            }
+          }
+
+          isPinchingState = false;
+          handCursorRing.classList.remove('pinching');
+          gestureActionLabel.innerText = '✋ AIR MOUSE (AIM)';
+          gestureActionLabel.style.color = 'var(--cyan)';
+
+          if (grabbedWidget) {
+            grabbedWidget.classList.remove('hand-pinched-active');
+            grabbedWidget = null;
+          }
+        }
+      }
+    }
+
+    function drawHandSkeleton(landmarks, ctx, w, h) {
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.8)';
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+      ctx.lineWidth = 1.5;
+
+      const connections = [
+        [0, 1], [1, 2], [2, 3], [3, 4],
+        [0, 5], [5, 6], [6, 7], [7, 8],
+        [5, 9], [9, 10], [10, 11], [11, 12],
+        [9, 13], [13, 14], [14, 15], [15, 16],
+        [13, 17], [17, 18], [18, 19], [19, 20],[0, 17]
+      ];
+
+      connections.forEach(([i, j]) => {
+        ctx.beginPath();
+        ctx.moveTo(landmarks[i].x * w, landmarks[i].y * h);
+        ctx.lineTo(landmarks[j].x * w, landmarks[j].y * h);
+        ctx.stroke();
+      });
+
+      landmarks.forEach((pt, idx) => {
+        ctx.beginPath();
+        ctx.arc(pt.x * w, pt.y * h, idx === 8 || idx === 4 ? 3.5 : 2, 0, Math.PI * 2);
+        ctx.fillStyle = idx === 8 || idx === 4 ? '#f24e1e' : '#38bdf8';
+        ctx.fill();
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ── RAZOR-SHARP TACTICAL WIDGET CREATORS ──
+    // ═══════════════════════════════════════════════════════════════════
+
+    // 1. YouTube / Audio Spectrum Player Widget
+    function openYouTubeWidget(query = 'lofi hip hop radio') {
+      const existing = document.getElementById('widget-yt');
+      if (existing) { bringToFront(existing); return; }
+
+      const id = 'widget-yt';
+      const win = document.createElement('div');
+      win.className = 'widget-window active-focus';
+      win.id = id;
+      win.style.width = '390px';
+      win.style.left = '40px';
+      win.style.top = '65px';
+      win.style.pointerEvents = 'auto';
+
+      win.innerHTML = `
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+        <div class="widget-header" id="handle-${id}">
+          <div class="widget-title-area">
+            <span class="drag-grip"><iconify-icon icon="solar:menu-dots-bold"></iconify-icon></span>
+            <iconify-icon icon="solar:play-circle-bold" style="color: #ef4444; font-size: 15px;"></iconify-icon>
+            <span class="widget-title-text">MEDIA SPECTRUM STREAM</span>
+            <span class="widget-category-badge badge-red">LIVE AUDIO</span>
+          </div>
+          <div class="widget-actions">
+            <button class="win-btn close-btn" onclick="closeWidget('${id}')">✕</button>
+          </div>
+        </div>
+
+        <div class="widget-body">
+          <div class="media-player-canvas-box">
+            <canvas id="spectrumCanvas" class="spectrum-canvas"></canvas>
+            <div style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+              <iconify-icon icon="solar:soundwave-bold" style="color: var(--accent); font-size: 32px; filter: drop-shadow(0 0 10px var(--accent-glow));"></iconify-icon>
+              <span style="font-family: var(--font-mono); font-size: 10px; color: #fff; letter-spacing: 0.12em; text-transform: uppercase;">SYNTHWAVE // CHILL RADIO</span>
+            </div>
+          </div>
+
+          <div class="track-meta-row">
+            <div class="track-info-left">
+              <div class="track-icon-badge">
+                <iconify-icon icon="solar:music-note-bold"></iconify-icon>
+              </div>
+              <div>
+                <div class="track-title">Lofi Hip Hop Radio · Beats to Relax/Study</div>
+                <div class="track-artist">Lofi Girl · Live 24/7 Audio Stream</div>
+              </div>
+            </div>
+            <span style="font-family: var(--font-mono); font-size: 9px; color: var(--green); white-space: nowrap;">● PLAYING</span>
+          </div>
+
+          <div class="audio-scrub-bar">
+            <div class="audio-scrub-fill"></div>
+          </div>
+
+          <div class="media-ctrl-bar">
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button class="media-btn" title="Previous Track"><iconify-icon icon="solar:skip-previous-bold"></iconify-icon></button>
+              <button class="media-play-pill" title="Play / Pause"><iconify-icon icon="solar:pause-bold"></iconify-icon></button>
+              <button class="media-btn" title="Next Track"><iconify-icon icon="solar:skip-next-bold"></iconify-icon></button>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);">
+              <span>03:24 / 04:15</span>
+              <iconify-icon icon="solar:volume-loud-bold" style="color: var(--cyan); font-size: 14px;"></iconify-icon>
+              <span>85%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="widget-footer">
+          <span>SOURCE: YOUTUBE API</span>
+          <span>CODEC: OPUS / AAC · 320 KBPS</span>
+        </div>
+      `;
+
+      widgetLayer.appendChild(win);
+      makeDraggable(win, win.querySelector('.widget-header'));
+      initSpectrumCanvas();
+      streamTranscription('agent', `Zezo: "Media audio stream initialized for '${query}'."`);
+    }
+
+    function initSpectrumCanvas() {
+      const canvas = document.getElementById('spectrumCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      function render() {
+        if (!canvas) return;
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const bars = 28;
+        const width = canvas.width / bars;
+        const time = Date.now() * 0.003;
+
+        for (let i = 0; i < bars; i++) {
+          const height = Math.abs(Math.sin(time + i * 0.35)) * (canvas.height * 0.55) + 10;
+          const x = i * width;
+          const y = canvas.height - height;
+
+          const grad = ctx.createLinearGradient(0, canvas.height, 0, y);
+          grad.addColorStop(0, 'rgba(242, 78, 30, 0.1)');
+          grad.addColorStop(1, 'rgba(242, 78, 30, 0.7)');
+
+          ctx.fillStyle = grad;
+          ctx.fillRect(x + 2, y, width - 4, height);
+        }
+        requestAnimationFrame(render);
+      }
+      render();
+    }
+
+    // 2. File Explorer Widget
+    function openFileExplorerWidget() {
+      const existing = document.getElementById('widget-files');
+      if (existing) { bringToFront(existing); return; }
+
+      const id = 'widget-files';
+      const win = document.createElement('div');
+      win.className = 'widget-window active-focus';
+      win.id = id;
+      win.style.width = '360px';
+      win.style.right = '40px';
+      win.style.top = '65px';
+      win.style.pointerEvents = 'auto';
+
+      win.innerHTML = `
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+        <div class="widget-header" id="handle-${id}">
+          <div class="widget-title-area">
+            <span class="drag-grip"><iconify-icon icon="solar:menu-dots-bold"></iconify-icon></span>
+            <iconify-icon icon="solar:folder-with-files-bold" style="color: var(--cyan); font-size: 15px;"></iconify-icon>
+            <span class="widget-title-text">WORKSPACE EXPLORER</span>
+            <span class="widget-category-badge badge-cyan">GIT // ACTIVE</span>
+          </div>
+          <div class="widget-actions">
+            <button class="win-btn close-btn" onclick="closeWidget('${id}')">✕</button>
+          </div>
+        </div>
+
+        <div class="widget-body">
+          <div class="fs-breadcrumb">
+            <iconify-icon icon="solar:branching-paths-up-bold" style="color: var(--cyan);"></iconify-icon>
+            <span>~/zezo-os/core/.agent_worktrees</span>
+          </div>
+
+          <div class="file-item-card" onclick="streamTranscription('agent', 'Inspecting main.py (Orchestrator Loop)')">
+            <div class="file-item-left">
+              <span class="ext-badge" style="background: rgba(34, 197, 94, 0.15); color: var(--green); border: 1px solid rgba(34, 197, 94, 0.3);">PY</span>
+              <div>
+                <div class="file-name">main.py</div>
+                <div class="file-desc">WebSocket Orchestrator Loop</div>
+              </div>
+            </div>
+            <span class="git-diff-badge">+42 / -12</span>
+          </div>
+
+          <div class="file-item-card" onclick="streamTranscription('agent', 'Inspecting actions/opencode_agent.py')">
+            <div class="file-item-left">
+              <span class="ext-badge" style="background: rgba(56, 189, 248, 0.15); color: var(--cyan); border: 1px solid rgba(56, 189, 248, 0.3);">PY</span>
+              <div>
+                <div class="file-name">actions/opencode_agent.py</div>
+                <div class="file-desc">Autonomous Multi-file Coder</div>
+              </div>
+            </div>
+            <span class="git-diff-badge" style="color: var(--cyan); background: var(--cyan-dim); border-color: rgba(56,189,248,0.3);">ACTIVE</span>
+          </div>
+
+          <div class="file-item-card" onclick="streamTranscription('agent', 'Inspecting memory/sqlite_memory.py')">
+            <div class="file-item-left">
+              <span class="ext-badge" style="background: rgba(168, 85, 247, 0.15); color: var(--purple); border: 1px solid rgba(168, 85, 247, 0.3);">DB</span>
+              <div>
+                <div class="file-name">memory/sqlite_memory.py</div>
+                <div class="file-desc">FTS5 BM25 Brain Memory</div>
+              </div>
+            </div>
+            <span style="font-family: var(--font-mono); font-size: 9px; color: var(--text-muted);">2.4 MB</span>
+          </div>
+
+          <div class="file-item-card" onclick="streamTranscription('agent', 'Inspecting AGENTS.md (Rulebook)')">
+            <div class="file-item-left">
+              <span class="ext-badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3);">MD</span>
+              <div>
+                <div class="file-name">AGENTS.md</div>
+                <div class="file-desc">Master Non-Negotiable Rules</div>
+              </div>
+            </div>
+            <span style="font-family: var(--font-mono); font-size: 9px; color: var(--text-muted);">LOCKED</span>
+          </div>
+        </div>
+
+        <div class="widget-footer">
+          <span>FILES: 4 SCANNED</span>
+          <span>BRANCH: master (Clean)</span>
+        </div>
+      `;
+
+      widgetLayer.appendChild(win);
+      makeDraggable(win, win.querySelector('.widget-header'));
+      streamTranscription('agent', 'Zezo: "Workspace directory tree loaded into floating file explorer."');
+    }
+
+    // 3. System Telemetry Widget
+    function openTelemetryWidget() {
+      const existing = document.getElementById('widget-telemetry');
+      if (existing) { bringToFront(existing); return; }
+
+      const id = 'widget-telemetry';
+      const win = document.createElement('div');
+      win.className = 'widget-window active-focus';
+      win.id = id;
+      win.style.width = '330px';
+      win.style.left = '40px';
+      win.style.bottom = '80px';
+      win.style.pointerEvents = 'auto';
+
+      win.innerHTML = `
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+        <div class="widget-header" id="handle-${id}">
+          <div class="widget-title-area">
+            <span class="drag-grip"><iconify-icon icon="solar:menu-dots-bold"></iconify-icon></span>
+            <iconify-icon icon="solar:chart-square-bold" style="color: var(--green); font-size: 15px;"></iconify-icon>
+            <span class="widget-title-text">HARDWARE TELEMETRY</span>
+            <span class="widget-category-badge badge-green">LIVE // 100HZ</span>
+          </div>
+          <div class="widget-actions">
+            <button class="win-btn close-btn" onclick="closeWidget('${id}')">✕</button>
+          </div>
+        </div>
+
+        <div class="widget-body">
+          <div class="telemetry-grid">
+            <div class="telemetry-card">
+              <div class="telemetry-card-top">
+                <span class="telemetry-label">CPU LOAD</span>
+                <span class="pulse-dot" style="background: var(--green);"></span>
+              </div>
+              <div class="telemetry-val" style="color: var(--green);">12.4%</div>
+              <div class="telemetry-meter-bar">
+                <div class="telemetry-meter-fill" style="width: 12.4%; background: var(--green);"></div>
+              </div>
+              <span class="telemetry-sub">16 Cores · 4.8 GHz</span>
+            </div>
+
+            <div class="telemetry-card">
+              <div class="telemetry-card-top">
+                <span class="telemetry-label">RAM USAGE</span>
+                <span class="pulse-dot" style="background: var(--cyan);"></span>
+              </div>
+              <div class="telemetry-val" style="color: var(--cyan);">4.8 <span style="font-size: 11px; color: var(--text-muted);">/ 32GB</span></div>
+              <div class="telemetry-meter-bar">
+                <div class="telemetry-meter-fill" style="width: 15%; background: var(--cyan);"></div>
+              </div>
+              <span class="telemetry-sub">DDR5 6000MHz</span>
+            </div>
+
+            <div class="telemetry-card">
+              <div class="telemetry-card-top">
+                <span class="telemetry-label">GROQ SPEED</span>
+                <span class="pulse-dot" style="background: #f59e0b;"></span>
+              </div>
+              <div class="telemetry-val" style="color: #f59e0b;">184k <span style="font-size: 10px; color: var(--text-muted);">t/s</span></div>
+              <div class="telemetry-meter-bar">
+                <div class="telemetry-meter-fill" style="width: 82%; background: #f59e0b;"></div>
+              </div>
+              <span class="telemetry-sub">Llama-3.3-70B</span>
+            </div>
+
+            <div class="telemetry-card">
+              <div class="telemetry-card-top">
+                <span class="telemetry-label">NETWORK</span>
+                <span class="pulse-dot" style="background: #a855f7;"></span>
+              </div>
+              <div class="telemetry-val" style="color: #fff;">14 <span style="font-size: 10px; color: var(--text-muted);">ms</span></div>
+              <div class="telemetry-meter-bar">
+                <div class="telemetry-meter-fill" style="width: 95%; background: #a855f7;"></div>
+              </div>
+              <span class="telemetry-sub">WebSocket Live</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="widget-footer">
+          <span>HOST: WIN11-PRO-X64</span>
+          <span>THERMALS: 44°C (NOMINAL)</span>
+        </div>
+      `;
+
+      widgetLayer.appendChild(win);
+      makeDraggable(win, win.querySelector('.widget-header'));
+      streamTranscription('agent', 'Zezo: "Real-time hardware telemetry streams mapped."');
+    }
+
+    // 4. Weather Widget
+    function openWeatherWidget() {
+      const existing = document.getElementById('widget-weather');
+      if (existing) { bringToFront(existing); return; }
+
+      const id = 'widget-weather';
+      const win = document.createElement('div');
+      win.className = 'widget-window active-focus';
+      win.id = id;
+      win.style.width = '310px';
+      win.style.right = '40px';
+      win.style.bottom = '80px';
+      win.style.pointerEvents = 'auto';
+
+      win.innerHTML = `
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+        <div class="widget-header" id="handle-${id}">
+          <div class="widget-title-area">
+            <span class="drag-grip"><iconify-icon icon="solar:menu-dots-bold"></iconify-icon></span>
+            <iconify-icon icon="solar:sun-cloud-bold" style="color: #f59e0b; font-size: 15px;"></iconify-icon>
+            <span class="widget-title-text">ATMOSPHERE & WEATHER</span>
+            <span class="widget-category-badge badge-amber">ISLAMABAD</span>
+          </div>
+          <div class="widget-actions">
+            <button class="win-btn close-btn" onclick="closeWidget('${id}')">✕</button>
+          </div>
+        </div>
+
+        <div class="widget-body">
+          <div class="weather-container">
+            <div class="weather-top-row">
+              <div>
+                <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);">ISLAMABAD / LAHORE · PK</span>
+                <div class="weather-temp-huge">28°C</div>
+                <span style="color: var(--green); font-size: 11px; font-weight: 600;">Partly Cloudy & Clear</span>
+              </div>
+              <iconify-icon icon="solar:sun-fog-bold" style="font-size: 52px; color: #f59e0b;"></iconify-icon>
+            </div>
+
+            <div class="weather-strip">
+              <div class="weather-mini-col">
+                <span style="color: var(--text-muted);">15:00</span>
+                <iconify-icon icon="solar:sun-bold" style="color: #f59e0b; font-size: 16px;"></iconify-icon>
+                <span style="color: #fff; font-weight: 600;">29°</span>
+              </div>
+              <div class="weather-mini-col">
+                <span style="color: var(--text-muted);">18:00</span>
+                <iconify-icon icon="solar:sun-cloud-bold" style="color: #f59e0b; font-size: 16px;"></iconify-icon>
+                <span style="color: #fff; font-weight: 600;">25°</span>
+              </div>
+              <div class="weather-mini-col">
+                <span style="color: var(--text-muted);">21:00</span>
+                <iconify-icon icon="solar:moon-stars-bold" style="color: var(--cyan); font-size: 16px;"></iconify-icon>
+                <span style="color: #fff; font-weight: 600;">22°</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="widget-footer">
+          <span>HUMIDITY: 42% · WIND: 12 KM/H</span>
+          <span>UV: 3.2 (MODERATE)</span>
+        </div>
+      `;
+
+      widgetLayer.appendChild(win);
+      makeDraggable(win, win.querySelector('.widget-header'));
+      streamTranscription('agent', 'Zezo: "Current weather is 28°C, partly cloudy and pleasant."');
+    }
+
+    // 5. OpenCode Terminal Widget
+    function openCodingStreamWidget() {
+      const existing = document.getElementById('widget-code');
+      if (existing) { bringToFront(existing); return; }
+
+      const id = 'widget-code';
+      const win = document.createElement('div');
+      win.className = 'widget-window active-focus';
+      win.id = id;
+      win.style.width = '440px';
+      win.style.left = '50%';
+      win.style.top = '60px';
+      win.style.transform = 'translateX(-50%)';
+      win.style.pointerEvents = 'auto';
+
+      win.innerHTML = `
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+        <div class="widget-header" id="handle-${id}">
+          <div class="widget-title-area">
+            <span class="drag-grip"><iconify-icon icon="solar:menu-dots-bold"></iconify-icon></span>
+            <iconify-icon icon="solar:code-2-bold" style="color: var(--purple); font-size: 15px;"></iconify-icon>
+            <span class="widget-title-text">OPENCODE AUTONOMOUS AGENT</span>
+            <span class="widget-category-badge badge-purple">PTY // STREAM</span>
+          </div>
+          <div class="widget-actions">
+            <button class="win-btn close-btn" onclick="closeWidget('${id}')">✕</button>
+          </div>
+        </div>
+
+        <div class="widget-body">
+          <div class="terminal-window">
+            <div><span class="term-line-prompt">zezo@agent-box:~$</span> <span class="term-line-cmd">opencode --agent refactor --target actions/kilo_agent.py</span></div>
+            <div class="term-line-info">[STEP 1/3] Parsing AST Syntax Tree with Tree-Sitter...</div>
+            <div class="term-line-success">✔ Tree verified: 0 compilation errors detected</div>
+            <div style="margin-top: 4px;">
+              <span class="term-line-diff-del">- def run_blocking_task():</span><br>
+              <span class="term-line-diff-add">+ async def run_async_task_with_worker():</span>
+            </div>
+            <div class="term-line-warn" style="margin-top: 4px;">⚡ Running unit tests in virtual environment: 12/12 passed (0.38s)</div>
+          </div>
+        </div>
+
+        <div class="widget-footer">
+          <span>TASK-ID: #8892</span>
+          <span>STATUS: COMPLETE · 0 ERRORS</span>
+        </div>
+      `;
+
+      widgetLayer.appendChild(win);
+      makeDraggable(win, win.querySelector('.widget-header'));
+      streamTranscription('agent', 'Zezo: "Autonomous OpenCode worker streaming live code diffs."');
+    }
+
+    // ── Voice Intent Trigger ──
+    function triggerVoiceIntent(type) {
+      if (type === 'youtube') openYouTubeWidget('lofi hip hop');
+      else if (type === 'files') openFileExplorerWidget();
+      else if (type === 'telemetry') openTelemetryWidget();
+      else if (type === 'weather') openWeatherWidget();
+      else if (type === 'coding') openCodingStreamWidget();
+    }
+
+    function handleInputKey(e) {
+      if (e.key === 'Enter') {
+        const val = e.target.value.toLowerCase().trim();
+        if (!val) return;
+        e.target.value = '';
+
+        streamTranscription('user', `User: "${val}"`);
+
+        setTimeout(() => {
+          if (val.includes('youtube') || val.includes('song') || val.includes('music') || val.includes('play')) {
+            openYouTubeWidget(val);
+          } else if (val.includes('file') || val.includes('folder') || val.includes('worktree')) {
+            openFileExplorerWidget();
+          } else if (val.includes('status') || val.includes('cpu') || val.includes('ram') || val.includes('system')) {
+            openTelemetryWidget();
+          } else if (val.includes('weather') || val.includes('forecast') || val.includes('temp')) {
+            openWeatherWidget();
+          } else if (val.includes('code') || val.includes('agent') || val.includes('opencode')) {
+            openCodingStreamWidget();
+          } else {
+            streamTranscription('agent', `Zezo: "Command '${val}' recognized. Dispatching subagent routine."`);
+          }
+        }, 700);
+      }
+    }
+
+    // ── Navigation Switcher ──
+    function switchView(view) {
+      if (view === 'office') {
+        window.location.href = '../scranton_pixel_office_fleet/index.html';
+      } else if (view === 'hud') {
+        window.location.href = '../../frontend/index.html';
+      }
+    }
+  </script>
+</body>
+
+</html>

@@ -5,6 +5,15 @@ import threading
 import time
 from pathlib import Path
 
+def _safe_print(text: str) -> None:
+    try:
+        print(text)
+    except Exception:
+        try:
+            print(text.encode('ascii', errors='replace').decode('ascii'))
+        except Exception:
+            pass
+
 # ── Gemini grounding quota circuit breaker ────────────────────────────────────
 # The google_search grounding tool has its own small quota, separate from plain
 # generation.  Once it is spent every call returns 429 — so retrying it at the
@@ -29,7 +38,7 @@ def _note_gemini_error(exc: Exception) -> None:
             already = time.monotonic() < _quota_blocked_until
             _quota_blocked_until = time.monotonic() + _QUOTA_COOLDOWN_SEC
         if not already:
-            print(
+            _safe_print(
                 "[WebSearch] Gemini grounding quota exhausted — skipping it for "
                 f"{_QUOTA_COOLDOWN_SEC // 60} min and serving results from DDG."
             )
@@ -43,7 +52,7 @@ def _log_gemini_failure(context: str, exc: Exception) -> None:
     """Log a Gemini failure — silently when it is just the expected cooldown."""
     if isinstance(exc, _QuotaCooldown):
         return          # announced once when the breaker tripped; not a warning
-    print(f"[WebSearch] \u26a0\ufe0f {context} failed ({exc}) — using DDG instead")
+    _safe_print(f"[WebSearch] ⚠️ {context} failed ({exc}) — using DDG instead")
 
 
 def _run_bounded(fn, timeout: float, label: str = "task"):
@@ -363,7 +372,7 @@ def web_search(
     if player:
         player.write_log(f"[Search:{mode}] {query or ', '.join(items)}")
 
-    print(f"[WebSearch] 🔍 mode={mode!r}  query={query!r}")
+    _safe_print(f"[WebSearch] 🔍 mode={mode!r}  query={query!r}")
 
     try:
         if mode == "compare" and items:
@@ -377,14 +386,14 @@ def web_search(
         return _search(query)
 
     except Exception as e:
-        print(f"[WebSearch] ❌ All backends failed: {e}")
+        _safe_print(f"[WebSearch] ❌ All backends failed: {e}")
         return f"Search failed: {e}"
 
 
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "web_search",
-    "description": "Searches the web. Use for ANY question about current facts, events, prices, or topics — always prefer this over guessing. Modes: 'search' (default), 'news' (latest headlines on a topic), 'research' (deep comprehensive answer), 'price' (product cost lookup), 'compare' (side-by-side comparison of items).",
+    "description": "Searches the web. Use for ANY question about current facts, events, prices, or topics — always prefer this over guessing. Never rely on your own memory for current/recent information; your training knowledge is outdated. Search the EXACT product/model/version name the user said — never substitute or 'correct' it with an older name you remember. Modes: 'search' (default), 'news' (latest headlines on a topic), 'research' (deep comprehensive answer), 'price' (product cost lookup), 'compare' (side-by-side comparison of items).",
     "parameters": {
         "type": "OBJECT",
         "properties": {

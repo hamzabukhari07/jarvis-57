@@ -17,8 +17,8 @@ DEFAULT_THRESHOLDS = {
     "gpu":  95.0,
 }
 
-_COOLDOWN   = 300
-_CPU_STREAK = 3
+_COOLDOWN   = 300   # seconds between same-type alerts (5 min)
+_CPU_STREAK = 3     # consecutive high readings required before CPU alert
 
 # ── NVML DLL cache (Windows: nvml.dll, Linux: libnvidia-ml.so.1) ─────────────
 _nvml_lib: object = None
@@ -69,45 +69,131 @@ def _nvml_gpu() -> float:
         return -1.0
 
 
-def _get_gpu_usage() -> float:
-    # pynvml — subprocess-free, works everywhere if installed
-    try:
-        import pynvml  # type: ignore
-        pynvml.nvmlInit()
-        h = pynvml.nvmlDeviceGetHandleByIndex(0)
-        return float(pynvml.nvmlDeviceGetUtilizationRates(h).gpu)
-    except Exception:
-        pass
+# ── Windows PDH GPU Performance Tracker (AMD Radeon, Intel, NVIDIA) ────────
+class _WindowsPDH_GPU:
+    def __init__(self):
+        self.ok = False
+        if _OS != "Windows":
+            return
+        try:
+            from ctypes import wintypes
+            self.pdh = ctypes.windll.pdh
+            self.hQuery = wintypes.HANDLE()
+            self.hCounter = wintypes.HANDLE()
+            if self.pdh.PdhOpenQueryW(None, 0, ctypes.byref(self.hQuery)) == 0:
+                # 3D engine is standard for active GPU usage across AMD, Intel, NVIDIA
+                res = self.pdh.PdhAddEnglishCounterW(self.hQuery, r"\GPU Engine(*engtype_3D)\Utilization Percentage", 0, ctypes.byref(self.hCounter))
+                if res != 0:
+                    res = self.pdh.PdhAddEnglishCounterW(self.hQuery, r"\GPU Engine(*)\Utilization Percentage", 0, ctypes.byref(self.hCounter))
+                if res == 0:
+                    self.pdh.PdhCollectQueryData(self.hQuery)
+                    self.ok = True
+        except Exception:
+            self.ok = False
 
-    return _nvml_gpu()
+    def read(self) -> float:
+        if not self.ok:
+            return -1.0
+        try:
+            from ctypes import wintypes
+            class PDH_FMT_COUNTERVALUE(ctypes.Structure):
+                _fields_ = [("CStatus", wintypes.DWORD), ("doubleValue", ctypes.c_double)]
+            self.pdh.PdhCollectQueryData(self.hQuery)
+            val = PDH_FMT_COUNTERVALUE()
+            res = self.pdh.PdhGetFormattedCounterValue(self.hCounter, 0x00000200, None, ctypes.byref(val))
+            if res == 0 and val.CStatus == 0:
+                return max(0.0, min(100.0, round(val.doubleValue, 1)))
+        except Exception:
+            pass
+        return 0.0
+
+_pdh_gpu_tracker: _WindowsPDH_GPU | None = None
+
+_nvml_py = None            # cached pynvml module, initialised once
+_nvml_py_handle = None
+_nvml_py_failed = False
+
+
+def _get_gpu_usage() -> float:
+    global _pdh_gpu_tracker, _nvml_py, _nvml_py_handle, _nvml_py_failed
+    # nvmlInit()/nvmlDeviceGetHandleByIndex() are not free and this runs on the
+    # UI's 500 ms telemetry tick. Initialise the binding once, then reuse it.
+    if not _nvml_py_failed:
+        try:
+            if _nvml_py is None:
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=FutureWarning)
+                    import pynvml  # type: ignore
+                pynvml.nvmlInit()
+                _nvml_py = pynvml
+                _nvml_py_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+            return float(_nvml_py.nvmlDeviceGetUtilizationRates(_nvml_py_handle).gpu)
+        except Exception:
+            _nvml_py_failed = True
+
+    # 2. nvml.dll fallback (NVIDIA)
+    nvml_val = _nvml_gpu()
+    if nvml_val >= 0:
+        return nvml_val
+
+    # 3. Windows Native Performance Data Helper (AMD Radeon RX series, Intel Arc/Iris, NVIDIA)
+    if _OS == "Windows":
+        if _pdh_gpu_tracker is None:
+            _pdh_gpu_tracker = _WindowsPDH_GPU()
+        val = _pdh_gpu_tracker.read()
+        if val >= 0:
+            return val
+
+    return -1.0
+
+
+_cpu_temp_cache = (0.0, -1.0)     # (monotonic timestamp, value)
+_CPU_TEMP_TTL   = 60.0            # seconds between real reads
 
 
 def _get_cpu_temp() -> float:
+    global _cpu_temp_cache
+    # The Windows WMI thermal-zone query below is very slow (measured 30-160 ms,
+    # occasionally ~0.5 s) and it is the only option on Windows — psutil has no
+    # sensors_temperatures() there. Cache it for a minute so neither the 10 s
+    # system monitor nor the on-demand status tool pays that cost every call.
+    now = time.monotonic()
+    cached_at, cached_val = _cpu_temp_cache
+    if now - cached_at < _CPU_TEMP_TTL:
+        return cached_val
+
+    result = -1.0
+
     # psutil — works on Linux; occasionally Windows with proper drivers
     try:
         temps = psutil.sensors_temperatures()
         for name in ["coretemp", "k10temp", "cpu_thermal", "acpitz",
                      "cpu-thermal", "zenpower", "it8688"]:
             if name in temps and temps[name]:
-                return temps[name][0].current
-        for entries in temps.values():
-            if entries:
-                return entries[0].current
+                result = temps[name][0].current
+                break
+        else:
+            for entries in temps.values():
+                if entries:
+                    result = entries[0].current
+                    break
     except Exception:
         pass
 
     # Windows: wmi module (pure Python COM, zero subprocess)
-    if _OS == "Windows":
+    if result < 0 and _OS == "Windows":
         try:
             import wmi  # type: ignore
             w = wmi.WMI(namespace="root/wmi")
             tz = w.MSAcpi_ThermalZoneTemperature()
             if tz:
-                return (tz[0].CurrentTemperature / 10.0) - 273.15
+                result = (tz[0].CurrentTemperature / 10.0) - 273.15
         except Exception:
             pass
 
-    return -1.0
+    _cpu_temp_cache = (now, result)
+    return result
 
 
 def get_system_status() -> dict:
@@ -122,6 +208,15 @@ def get_system_status() -> dict:
     uptime_h    = int(uptime_secs // 3600)
     uptime_m    = int((uptime_secs % 3600) // 60)
 
+    battery_info = "Desktop PC (Direct AC power, no battery)"
+    try:
+        b = psutil.sensors_battery()
+        if b is not None:
+            plugged_str = "Plugged in" if b.power_plugged else "On battery"
+            battery_info = f"{round(b.percent, 1)}% ({plugged_str})"
+    except Exception:
+        battery_info = "Not available"
+
     return {
         "cpu_percent":   round(cpu, 1),
         "ram_percent":   round(ram.percent, 1),
@@ -129,6 +224,7 @@ def get_system_status() -> dict:
         "ram_total_gb":  round(ram.total  / 1024 ** 3, 1),
         "cpu_temp_c":    round(temp, 1) if temp > 0 else None,
         "gpu_percent":   round(gpu,  1) if gpu  >= 0 else None,
+        "battery":       battery_info,
         "uptime":        f"{uptime_h}h {uptime_m}m",
         "process_count": len(psutil.pids()),
     }
@@ -172,15 +268,17 @@ class SystemMonitor:
 
         # Check active coding agent tasks and their CPU contribution
         task_cpu = 0.0
+        has_running_tasks = False
         try:
             from core.task_manager import get_task_manager
-            task_cpu = get_task_manager().get_active_tasks_cpu_percent()
+            mgr = get_task_manager()
+            task_cpu = mgr.get_active_tasks_cpu_percent()
+            has_running_tasks = len(mgr.list_running_tasks()) > 0
         except Exception:
             pass
 
-        # If task subprocesses account for >= 50% of the CPU spike, suppress alert (known build load)
-        # If external/rogue processes are driving the spike, alert normally
-        is_task_driven = (task_cpu > 0.0 and task_cpu >= (cpu * 0.5))
+        # If background tasks are running or task subprocesses account for >= 50% of the CPU spike, suppress alert (known build/AI workload)
+        is_task_driven = has_running_tasks or (task_cpu > 0.0 and task_cpu >= (cpu * 0.5))
 
         if cpu >= self.thresholds["cpu"]:
             if not is_task_driven:

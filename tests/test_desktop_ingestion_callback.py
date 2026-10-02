@@ -51,6 +51,31 @@ class TestDesktopIngestionCallback(unittest.TestCase):
             if test_file.exists():
                 test_file.unlink()
 
+    def test_ui_server_folder_ingestion_callback(self):
+        # Test folder payload ingestion
+        folder_info = {
+            "name": "my_test_website",
+            "path": "C:\\fake\\my_test_website",
+            "size": 10240,
+            "file_type": "folder",
+            "is_folder": True,
+            "files_count": 5,
+            "text": "Workspace folder 'my_test_website' with 5 files (index.html, style.css, app.js)",
+            "engine": "folder_workspace",
+            "is_truncated": False,
+        }
+        server = ZezoUIServer(port=8799)
+        captured = []
+        server.on_file_uploaded = lambda info: captured.append(info)
+        if server.on_file_uploaded:
+            server.on_file_uploaded(folder_info)
+
+        self.assertEqual(len(captured), 1)
+        self.assertTrue(captured[0]["is_folder"])
+        self.assertEqual(captured[0]["name"], "my_test_website")
+        self.assertEqual(captured[0]["files_count"], 5)
+        print(f"[RUNTIME PASS] Desktop folder ingestion callback captured: {captured[0]['name']} ({captured[0]['files_count']} files)")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -16,3 +16,8 @@ Aur task complete hone par:
 
 D:\anitgravity\zezo work\zezo latest\.antigravity\skills\verify.md
 Verify the changes using the verification pipeline and report the results.
+
+
+
+
+Treat the following architecture plan as the target design. Before modifying anything, deeply inspect the existing ZEZO codebase and map every task to the current implementation. Do not blindly implement the phases. Identify what already exists, what needs to change, what should be reused, and any conflicts or risks. Then propose the safest implementation order. Do not modify code until I explicitly approve the implementation plan

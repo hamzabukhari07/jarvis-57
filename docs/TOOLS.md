@@ -41,7 +41,7 @@ TOOL = {
 
 | Tool | File | Purpose | Parameters |
 |------|------|---------|------------|
-| `antigravity_run` | `actions/antigravity_agent.py` | Full multi-file web app & design synthesis agent via official Antigravity CLI (`agy`) with pure raw HTML reference blueprint injection & adaptive redesign directives | `task`, `project_path`, `model` |
+| `antigravity_run` | `actions/antigravity_agent.py` | Full multi-file web app & design synthesis agent via official Antigravity CLI (`agy`) with pure raw HTML reference blueprint injection, stack-fidelity routing (single-file HTML vs React/Next.js), and adaptive redesign directives | `task`, `project_path`, `model` |
 | `opencode_run` | `actions/opencode_agent.py` | Full autonomous implementation, multi-file code generation & test suite synthesis | `task`, `project_path`, `model` |
 | `kilo_run` | `actions/kilo_agent.py` | Fast refactoring & multi-file editing agent (free tier StepFun / Gemini) | `task`, `project_path`, `model` |
 | `code_helper` | `actions/code_helper.py` | Single function, inline snippet generator, or single-file code review | `task`, `file_path`, `code` |
@@ -68,33 +68,34 @@ TOOL = {
 
 ### Browser & Web
 
-| Tool | File | Purpose |
-|------|------|---------|
-| `browser_control` | `actions/browser_control.py` | Open URLs, navigate tabs, interact with browser |
-| `web_read_page` | `actions/web_reader.py` | Deep web scraping and markdown text extraction |
-| `web_search` | `actions/web_search.py` | Gemini grounded + DDG fallback, modes: news, research, price, compare |
-| `agent_reach` | `actions/agent_reach.py` | Social media research and media scraping (YouTube, Reddit, X) |
-| `flight_finder` | `actions/flight_finder.py` | Live flight price and availability |
-| `youtube_video` | `actions/youtube_video.py` | Search, play, control YouTube |
+| Tool | File | Purpose | Parameters |
+|------|------|---------|------------|
+| `clone_website` | `actions/website_cloner.py` | Autonomous AI Website Reverse Engineering pipeline (DOM extraction, token harvesting, AI synthesis of clean semantic HTML/CSS/JS, asset localization, and automatic local preview) | `url`, `output_format` ('static'/'clean_html'/'react'/'nextjs'/'redesign'), `include_subpages`, `max_pages`, `redesign_prompt`, `custom_folder` |
+| `browser_control` | `actions/browser_control.py` | Open URLs, navigate tabs, interact with browser | `url`, `action` |
+| `web_read_page` | `actions/web_reader.py` | Deep web scraping and markdown text extraction. Scrapling (Fetcher/StealthyFetcher) when installed, otherwise a built-in `requests` + BeautifulSoup fallback. | `url`, `stealth`, `max_chars` |
+| `web_search` | `actions/web_search.py` | Gemini grounded + DDG fallback, modes: news, research, price, compare | `query`, `mode` |
+| `agent_reach` | `actions/agent_reach.py` | Multi-platform intelligence, spoken audio Whisper transcription, video transcripts, social discussions & repo analysis (Instagram Reels, TikTok, YouTube, Reddit, GitHub, X, Stack Overflow, Hacker News, RSS) | `platform` ('auto'/'multi'/'instagram'/'tiktok'/'youtube'/'reddit'/'github'/'twitter'/'stackoverflow'/'hackernews'/'rss'), `target` |
+| `flight_finder` | `actions/flight_finder.py` | Live flight price and availability | `origin`, `destination`, `date` |
+| `youtube_video` | `actions/youtube_video.py` | Search, play, control YouTube | `query`, `action` |
 
 ### OS Controls & Media
 
-| Tool | File | Purpose |
-|------|------|---------|
-| `computer_settings` | `actions/computer_settings.py` | Volume, brightness, WiFi, power |
-| `computer_control` | `actions/computer_control.py` | Keyboard, mouse, window management |
-| `open_app` | `actions/open_app.py` | Application launcher and process terminator |
-| `weather_report` | `actions/weather_report.py` | Live weather forecast |
-| `game_updater` | `actions/game_updater.py` | Steam/Epic game updates and patch notes |
-| `reminder` | `actions/reminder.py` | Scheduled alarms, timers, reminders |
-| `send_message` | `actions/send_message.py` | WhatsApp, Telegram messaging |
+| Tool | File | Purpose | Parameters |
+|------|------|---------|------------|
+| `computer_settings` | `actions/computer_settings.py` | Volume, brightness, WiFi, power, battery queries | `action`, `value` |
+| `computer_control` | `actions/computer_control.py` | Mouse clicks/drags, keyboard hotkeys, Unicode typing, compound batch macros, window control, and 3-tier escalated perception (L1 UIA ➔ L1.5 RapidOCR ROI ➔ L2 Vision) | `action` ('click'/'screen_click'/'double_click'/'type'/'hotkey'/'press'/'batch'/'get_active_window_info'/aliases), `x`, `y`, `description`, `text`, `keys`, `key`, `sequence` |
+| `open_app` | `actions/open_app.py` | Application launcher with post-launch focus guard and process terminator | `app_name`, `path`, `action` ('open'/'close') |
+| `weather_report` | `actions/weather_report.py` | Live weather forecast | `city`, `time` |
+| `game_updater` | `actions/game_updater.py` | Steam/Epic game updates and patch notes | `game_name`, `action` |
+| `reminder` | `actions/reminder.py` | Scheduled alarms, timers, reminders | `time_str`, `message` |
+| `send_message` | `actions/send_message.py` | WhatsApp, Telegram messaging with explicit send governance | `platform`, `action` ('search'/'send'), `recipient`, `message` |
 
-### Vision
+### Vision & Perception
 
-| Tool | File | Purpose |
-|------|------|---------|
-| `screen_process` | `actions/screen_processor.py` | Screen/webcam capture |
-| `close_camera` | `main.py` | Close camera stream |
+| Tool | File | Purpose | Parameters |
+|------|------|---------|------------|
+| `screen_process` | `actions/screen_processor.py` | Fast OS ground-truth state (1ms), RapidOCR text extraction, multi-region capture, dHash caching (0ms hit), and Gemini multimodal vision | `action` ('capture'/'read_text'), `angle` ('screen'/'camera'), `prompt`, `region` |
+| `close_camera` | `main.py` | Close live camera stream view | None |
 
 ### Memory
 

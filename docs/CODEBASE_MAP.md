@@ -17,8 +17,12 @@ JARVIS/
 │   ├── face_model.obj               # MediaPipe face mesh (25 KB, Apache 2.0)
 │   ├── avatar.py                    # Holographic avatar renderer
 │   ├── avatar_mesh.py               # Head geometry builder
+│   ├── models.py                    # Single source of truth for model ids (Gemini/Antigravity/Groq)
+│   ├── provider_health.py           # Startup provider/model health-check
 │   ├── gemini.py                    # One-shot Gemini calls, model ladder
 │   ├── llm_client.py                # Local LLM client (Ollama/OpenAI)
+│   ├── llm_router.py                # Background text router: Groq → Gemini → Ollama
+│   ├── voice_fallback.py            # Offline voice loop: VAD → STT → LLM → TTS (fallback only)
 │   ├── stt.py                       # Whisper/Vosk STT engines (optional)
 │   ├── tts.py                       # EdgeTTS/Kokoro/ElevenLabs TTS engines
 │   ├── viseme.py                    # Transcript→mouth shapes fusion
@@ -33,7 +37,12 @@ JARVIS/
 │   ├── log_bus.py                   # In-memory ring buffer with secret redaction
 │   ├── repo_context.py              # Active workspace resolver & persistence
 │   ├── design_resolver.py           # Raw HTML blueprint injector & adaptive resolver
-│   ├── design_extractor.py          # On-demand HTML/CSS token & component extractor
+│   ├── computer/                    # Modular Desktop Automation Engine (0 MB VRAM)
+│   │   ├── __init__.py              # Perception & driver exports
+│   │   ├── windows_native.py        # Win32 APIs, DWM extended frame bounds, DPI awareness
+│   │   ├── windows_uia.py           # Windows UI Automation (L1 UIA, STA COM worker)
+│   │   ├── ocr_engine.py            # Multilingual RapidOCR (L1.5 OCR, Urdu normalizer, CPU ONNX)
+│   │   └── pyautogui_driver.py      # Input driver, Unicode clipboard typing, key aliases
 │   ├── undo.py                      # Shared undo stack
 │   ├── confirm.py                   # Irreversible-action confirmation gate
 │   └── installer.py                 # OS-specific post-install setup
@@ -63,7 +72,7 @@ JARVIS/
 │   ├── weather_report.py            # Live weather data
 │   ├── web_search.py                # Gemini + DDG parallel search
 │   └── youtube_video.py             # YouTube playback control
-├── skills/                          # Declarative skill packages (hamza_taste, opencode, kilo_code, etc.)
+├── skills/                          # Declarative skill packages (hamza_taste, opencode, kilo_code, figma_helper, etc.)
 ├── memory/
 │   ├── __init__.py
 │   ├── sqlite_memory.py             # SQLite FTS5 database with BM25 indexing
@@ -213,15 +222,68 @@ JARVIS/
 
 **Called by**: `main.py`, `ui.py`, `core/*`
 
+### core/models.py
+
+**Purpose**: Single source of truth for every provider model identifier (Gemini
+Live + one-shot ladders, Antigravity CLI, Groq). Import model names from here;
+never hardcode a model string elsewhere.
+
+**Key constants**: `GEMINI_LIVE_MODEL`, `GEMINI_FAST/SMART/SEARCH_MODELS`,
+`ANTIGRAVITY_CLI_MODELS`, `DEFAULT_ANTIGRAVITY_MODEL`, `ANTIGRAVITY_MODEL_ALIASES`,
+`DEFAULT_GROQ_*`
+
+**Called by**: `main.py`, `core/gemini.py`, `memory/config_manager.py` (re-exports),
+`core/provider_health.py`, `core/task_manager.py`, `actions/antigravity_agent.py`,
+`actions/website_cloner.py`
+
+### core/provider_health.py
+
+**Purpose**: Startup health-check. Pings every configured Gemini model (cheap
+`models.get`, no generation) and the Groq `/models` endpoint, logs a one-line
+summary, and marks retired Gemini models so `core/gemini.py`'s ladder skips them.
+Runs off the GUI thread via `start_background_check()`.
+
+**Key functions**: `run_health_check()`, `start_background_check()`, `get_status()`
+
+**Called by**: `main.py` (`_bootstrap_deps`)
+
 ### core/gemini.py (439 lines)
 
 **Purpose**: One-shot Gemini calls (non-live). Model ladder, quota management.
 
-**Key functions**: `call()`, `text()`, `as_json()`, `client()`
+**Key functions**: `call()`, `text()`, `as_json()`, `client()`, `mark_unavailable()`
 **Key classes**: `_Reply`
-**Key constants**: `_LADDERS`, `LIVE`, `FAST`, `SMART`, `SEARCH`
+**Key constants**: `_LADDERS` (built from `core/models.py`), `LIVE`, `FAST`, `SMART`, `SEARCH`
 
-**Called by**: Actions, plugins, `actions/web_search.py`
+**Called by**: Actions, plugins, `actions/web_search.py`, `core/provider_health.py`
+
+### core/llm_router.py
+
+**Purpose**: Provider router for **background** (non-realtime) text. Tries Groq
+(fast + free), then the Gemini ladder, then local Ollama; first answer wins.
+Live voice is untouched (still Gemini Live).
+
+**Key functions**: `generate_text(prompt, system, tier, timeout_ms, allow_groq, log)`
+
+**Called by**: `actions/code_helper.py`, `actions/youtube_video.py`,
+`actions/flight_finder.py`, `actions/desktop.py`
+
+### core/voice_fallback.py
+
+**Purpose**: Offline/local **fallback** voice loop. When Gemini Live is
+unavailable, this runs: mic → energy VAD (Silero if installed) → STT
+(local `faster-whisper` → Groq Whisper) → `core.llm_router` (Groq → Gemini →
+Ollama) → TTS (`core.tts` Kokoro → edge-tts). Half-duplex (no barge-in in v1),
+no tool dispatch. **Never** the primary path — Live stays primary.
+
+**Config**: `voice_fallback` = `off` | `manual` | `auto` (`off` default).
+
+**Run standalone**: `python -m core.voice_fallback`
+
+**Key pieces**: `UtteranceSegmenter`, `transcribe_utterance`, `make_tts`,
+`VoiceFallback`
+
+**Tests**: `tests/test_voice_fallback_suite.py`
 
 ### core/llm_client.py (586 lines)
 

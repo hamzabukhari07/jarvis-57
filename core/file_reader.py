@@ -442,11 +442,137 @@ def _read_with_markitdown(path: Path) -> str | None:
     return None
 
 
-def _read_with_gemini_rest(path: Path, instruction: str = "") -> str | None:
-    """Use Gemini REST API (one-shot document OCR/analysis) for complex or scanned PDFs."""
+def _read_with_pdfplumber(path: Path) -> str | None:
+    """Local text-layer PDF extraction via pdfplumber (free, offline).
+
+    Runs before the paid Gemini path so native PDFs never spend a cloud call and
+    never depend on MarkItDown being installed. Returns None for scanned PDFs
+    (no text layer), which then fall through to Gemini OCR.
+    """
+    try:
+        import pdfplumber
+        pages: list[str] = []
+        with pdfplumber.open(str(path)) as pdf:
+            for page in pdf.pages:
+                txt = page.extract_text() or ""
+                if txt.strip():
+                    pages.append(txt)
+        out = "\n\n".join(pages).strip()
+        if out:
+            print(f"[FileReader] [PDFPLUMBER] Extracted {len(out):,} characters from '{path.name}'.")
+            return out
+    except ImportError:
+        pass
+    except Exception as e:
+        print(f"[FileReader] pdfplumber error on {path.name}: {e}")
+    return None
+
+
+def _read_office_local(path: Path, ext: str) -> str | None:
+    """Local Office text extraction via the installed python-docx / openpyxl / python-pptx.
+
+    Used when MarkItDown is not installed, so .docx/.xlsx/.pptx still read offline
+    instead of falling through to a raw binary decode that yields garbage.
+    """
+    try:
+        if ext == ".docx":
+            import docx
+            doc = docx.Document(str(path))
+            parts = [p.text for p in doc.paragraphs if p.text.strip()]
+            for table in doc.tables:
+                for row in table.rows:
+                    cells = [c.text.strip() for c in row.cells]
+                    if any(cells):
+                        parts.append(" | ".join(cells))
+            out = "\n".join(parts).strip()
+        elif ext in (".xlsx", ".xlsm"):
+            import openpyxl
+            wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
+            lines: list[str] = []
+            for ws in wb.worksheets:
+                lines.append(f"# Sheet: {ws.title}")
+                for row in ws.iter_rows(values_only=True):
+                    vals = ["" if v is None else str(v) for v in row]
+                    if any(vals):
+                        lines.append("\t".join(vals))
+            wb.close()
+            out = "\n".join(lines).strip()
+        elif ext == ".pptx":
+            from pptx import Presentation
+            prs = Presentation(str(path))
+            lines = []
+            for i, slide in enumerate(prs.slides, 1):
+                lines.append(f"# Slide {i}")
+                for shape in slide.shapes:
+                    if shape.has_text_frame and shape.text_frame.text.strip():
+                        lines.append(shape.text_frame.text.strip())
+            out = "\n".join(lines).strip()
+        else:
+            return None
+        if out:
+            print(f"[FileReader] [OFFICE_LOCAL] Extracted {len(out):,} characters from '{path.name}'.")
+            return out
+    except ImportError:
+        pass
+    except Exception as e:
+        print(f"[FileReader] local Office reader error on {path.name}: {e}")
+    return None
+
+
+# Inline base64 uploads above this size exceed the socket write timeout on slow
+# links, so larger documents go through the resumable Files API upload instead.
+_INLINE_LIMIT_BYTES = 2 * 1024 * 1024
+
+
+def _extract_via_files_api(path: Path, prompt: str) -> str | None:
+    """Extract a large document by uploading it to the Gemini Files API first.
+
+    Inline base64 uploads of multi-MB files hit the socket write timeout on slow
+    connections — that is what broke the scanned-PDF path. The Files API uses a
+    resumable upload and returns a reference the REST models generate from. The
+    Live rung is skipped because it cannot carry documents.
+    """
+    try:
+        from core import gemini
+        cl = gemini.client(timeout_ms=300_000)
+        uploaded = cl.files.upload(file=str(path))
+        resp = gemini.call([prompt, uploaded], tier=gemini.SMART,
+                           timeout_ms=180_000, allow_live=False)
+        if resp is not None:
+            text = (getattr(resp, "text", None) or "").strip()
+            if text:
+                print(f"[FileReader] [FILES_API] Extracted {len(text):,} characters from '{path.name}'.")
+                return text
+    except Exception as e:
+        print(f"[FileReader] Files API error on {path.name}: {e}")
+    return None
+
+
+def _read_with_gemini_rest(path: Path, instruction: str = "",
+                           allow_live: bool = True) -> str | None:
+    """One-shot multimodal document/image extraction via the canonical ladder.
+
+    Routed through ``core.gemini.call()`` instead of a raw client with hardcoded,
+    now-retired model names. Documents pass ``allow_live=False`` because the Live
+    realtime session cannot carry them (a multi-MB PDF closes it with 1006).
+    Files larger than ``_INLINE_LIMIT_BYTES`` use the Files API to avoid inline
+    upload timeouts.
+    """
     try:
         from core import gemini
         from google.genai import types as gtypes
+
+        prompt = instruction or (
+            "Read and extract all text, structure, tables, and content from this document. "
+            "Format the output as clean GitHub-flavored Markdown. Preserve mathematical formulas and tables."
+        )
+
+        # Large documents: resumable Files API upload (inline base64 times out).
+        if path.stat().st_size > _INLINE_LIMIT_BYTES:
+            text = _extract_via_files_api(path, prompt)
+            if text:
+                return text
+
         data_bytes = path.read_bytes()
         mime, _ = mimetypes.guess_type(str(path))
         if not mime:
@@ -457,26 +583,50 @@ def _read_with_gemini_rest(path: Path, instruction: str = "") -> str | None:
             else:
                 mime = "application/octet-stream"
 
-        prompt = instruction or (
-            "Read and extract all text, structure, tables, and content from this document. "
-            "Format the output as clean GitHub-flavored Markdown. Preserve mathematical formulas and tables."
-        )
-
-        cl = gemini.client()
         part = gtypes.Part.from_bytes(data=data_bytes, mime_type=mime)
-        for model_name in ("gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-latest", "gemini-3.1-pro-preview"):
-            try:
-                resp = cl.models.generate_content(
-                    model=model_name,
-                    contents=[prompt, part]
-                )
-                if resp and hasattr(resp, "text") and resp.text:
-                    return resp.text.strip()
-            except Exception as model_err:
-                print(f"[FileReader] {model_name} failed: {model_err}")
-                continue
+        resp = gemini.call([prompt, part], tier=gemini.SMART, timeout_ms=120_000,
+                           allow_live=allow_live)
+        if resp is not None:
+            text = (getattr(resp, "text", None) or "").strip()
+            if text:
+                return text
     except Exception as e:
-        print(f"[FileReader] Gemini REST Document API error: {e}")
+        print(f"[FileReader] Gemini multimodal error: {e}")
+    return None
+
+
+def _read_with_groq_vision(path: Path, instruction: str = "") -> str | None:
+    """Free-tier multimodal image understanding via Groq (Llama 4 Scout / Qwen3-VL).
+
+    Preferred over the paid Gemini REST vision path for dropped images when a
+    Groq API key is configured. Returns None when Groq is unavailable so the
+    caller can fall through to Gemini.
+    """
+    try:
+        from memory.config_manager import get_groq_api_key, get_groq_vision_model
+        if not get_groq_api_key():
+            return None
+        # Groq's free tier has no multimodal model today; only attempt when the
+        # user has explicitly configured one, so we never waste a failed call.
+        if not get_groq_vision_model():
+            return None
+        from core.llm_client import call_groq_vision
+
+        mime, _ = mimetypes.guess_type(str(path))
+        if not mime:
+            mime = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
+
+        prompt = instruction or (
+            "Read and extract all text, structure, tables, and visual content from this image. "
+            "Format the output as clean GitHub-flavored Markdown. If it is a photo or diagram, "
+            "describe it precisely and transcribe any visible text verbatim."
+        )
+        result = call_groq_vision(path.read_bytes(), mime, prompt)
+        if result:
+            print(f"[FileReader] [GROQ_VISION] Extracted {len(result):,} characters from '{path.name}'.")
+            return result
+    except Exception as e:
+        print(f"[FileReader] Groq vision error on {path.name}: {e}")
     return None
 
 
@@ -583,32 +733,37 @@ def read_file(
     # 4. Images
     elif ext in IMAGE_EXTS:
         detected_type = "image"
-        # If read via one-shot reader, use Gemini REST
-        gem_res = _read_with_gemini_rest(path, instruction)
-        if gem_res:
-            extracted_text = gem_res
-            engine_used = "gemini_vision"
+        # Free tier first: Groq vision, then paid Gemini REST, then metadata.
+        groq_res = _read_with_groq_vision(path, instruction)
+        if groq_res:
+            extracted_text = groq_res
+            engine_used = "groq_vision"
         else:
-            extracted_text = f"Image file '{path.name}' ({path.stat().st_size:,} bytes) ready for visual analysis."
-            engine_used = "image_metadata"
+            gem_res = _read_with_gemini_rest(path, instruction)
+            if gem_res:
+                extracted_text = gem_res
+                engine_used = "gemini_vision"
+            else:
+                extracted_text = f"Image file '{path.name}' ({path.stat().st_size:,} bytes) ready for visual analysis."
+                engine_used = "image_metadata"
 
     # 5. Office & PDF
     elif ext in OFFICE_EXTS:
         detected_type = "document" if ext != ".pdf" else "pdf"
-        # Try MarkItDown first
-        md_text = _read_with_markitdown(path)
 
         if ext == ".pdf":
+            # Local text first (fast & free): pdfplumber (<150ms), else MarkItDown, else pay for OCR.
+            local_text = _read_with_pdfplumber(path) or _read_with_markitdown(path)
             page_cnt = _get_pdf_page_count(path)
-            scanned = md_text is None or _is_scanned_pdf(md_text, page_cnt)
-            extracted_len = len(md_text.strip()) if md_text else 0
+            scanned = local_text is None or _is_scanned_pdf(local_text, page_cnt)
+            extracted_len = len(local_text.strip()) if local_text else 0
             print(f"[FileReader] [PDF_SCAN] '{path.name}': is_scanned={scanned} (chars={extracted_len}, pages={page_cnt})")
 
             # PDF Quality Check
             if scanned:
                 print(f"[FileReader] [GEMINI_REST] Invoking Gemini REST Document API for scanned PDF: {path.name}")
-                # Fallback 1: Gemini Multimodal Document REST API
-                gem_doc = _read_with_gemini_rest(path, instruction)
+                # Fallback 1: Gemini Multimodal Document REST API (REST only — Live cannot carry PDFs)
+                gem_doc = _read_with_gemini_rest(path, instruction, allow_live=False)
                 if gem_doc:
                     extracted_text = gem_doc
                     engine_used = "gemini_document_api"
@@ -622,17 +777,19 @@ def read_file(
                         engine_used = "docling_lazy"
                         print(f"[FileReader] [OK] Docling OCR extracted {len(docling_text):,} characters.")
                     else:
-                        extracted_text = md_text or "Could not extract text from scanned PDF."
+                        extracted_text = local_text or "Could not extract text from scanned PDF."
                         engine_used = "markitdown_low_quality"
             else:
-                extracted_text = md_text
-                engine_used = "markitdown"
-                print(f"[FileReader] [OK] MarkItDown native text extracted {len(md_text):,} characters.")
+                extracted_text = local_text
+                engine_used = "pdfplumber"
+                print(f"[FileReader] [OK] Local PDF text extracted {len(local_text):,} characters.")
         else:
-            if md_text:
-                extracted_text = md_text
-                engine_used = "markitdown"
-                print(f"[FileReader] [OK] MarkItDown extracted {len(md_text):,} characters from '{path.name}'.")
+            # Local text first (free): MarkItDown, else python-docx/openpyxl/python-pptx.
+            local_text = _read_with_markitdown(path) or _read_office_local(path, ext)
+            if local_text:
+                extracted_text = local_text
+                engine_used = "office_local"
+                print(f"[FileReader] [OK] Local extraction yielded {len(local_text):,} characters from '{path.name}'.")
             else:
                 # Fallback to direct read or raw decode
                 extracted_text = _read_text_direct(path)

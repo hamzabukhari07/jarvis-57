@@ -34,6 +34,7 @@ _APP_ALIASES: dict[str, dict[str, str]] = {
     "vlc":                {"Windows": "vlc",                     "Darwin": "VLC",                  "Linux": "vlc"},
     "netflix":            {"Windows": "Netflix",                 "Darwin": "Netflix",              "Linux": "firefox"},
     "vscode":             {"Windows": "code",                    "Darwin": "Visual Studio Code",   "Linux": "code"},
+    "vs code":            {"Windows": "code",                    "Darwin": "Visual Studio Code",   "Linux": "code"},
     "visual studio code": {"Windows": "code",                    "Darwin": "Visual Studio Code",   "Linux": "code"},
     "code":               {"Windows": "code",                    "Darwin": "Visual Studio Code",   "Linux": "code"},
     "terminal":           {"Windows": "wt",                      "Darwin": "Terminal",             "Linux": "x-terminal-emulator"},
@@ -55,7 +56,9 @@ _APP_ALIASES: dict[str, dict[str, str]] = {
     "task manager":       {"Windows": "taskmgr.exe",             "Darwin": "Activity Monitor",     "Linux": "gnome-system-monitor"},
     "settings":           {"Windows": "ms-settings:",            "Darwin": "System Preferences",   "Linux": "gnome-control-center"},
     "calculator":         {"Windows": "calc.exe",                "Darwin": "Calculator",           "Linux": "gnome-calculator"},
+    "calc":               {"Windows": "calc.exe",                "Darwin": "Calculator",           "Linux": "gnome-calculator"},
     "paint":              {"Windows": "mspaint.exe",             "Darwin": "Preview",              "Linux": "gimp"},
+    "control panel":      {"Windows": "control.exe",             "Darwin": "System Preferences",   "Linux": "gnome-control-center"},
     "instagram":          {"Windows": "Instagram",               "Darwin": "Instagram",            "Linux": "firefox"},
     "tiktok":             {"Windows": "TikTok",                  "Darwin": "TikTok",               "Linux": "firefox"},
     "notion":             {"Windows": "Notion",                  "Darwin": "Notion",               "Linux": "notion"},
@@ -79,8 +82,63 @@ def _normalize(raw: str) -> str:
 
     return raw  
 
-def _launch_windows(app_name: str) -> bool:
+_WIN_URI_MAP = {
+    "whatsapp": "whatsapp:",
+    "spotify": "spotify:",
+    "telegram": "tg:",
+    "discord": "discord:",
+    "calculator": "calc.exe",
+    "notepad": "notepad.exe",
+    "cmd": "cmd.exe",
+    "powershell": "powershell.exe",
+    "terminal": "wt.exe",
+    "explorer": "explorer.exe",
+    "settings": "ms-settings:",
+}
 
+def _find_windows_start_menu_shortcut(app_name: str) -> Path | None:
+    app_lower = app_name.lower().strip()
+    search_dirs = []
+    appdata = os.environ.get("APPDATA")
+    programdata = os.environ.get("PROGRAMDATA")
+    if appdata:
+        search_dirs.append(Path(appdata) / "Microsoft" / "Windows" / "Start Menu" / "Programs")
+    if programdata:
+        search_dirs.append(Path(programdata) / "Microsoft" / "Windows" / "Start Menu" / "Programs")
+
+    for s_dir in search_dirs:
+        if s_dir.exists():
+            for lnk in s_dir.rglob("*.lnk"):
+                stem = lnk.stem.lower()
+                if app_lower == stem or app_lower in stem:
+                    return lnk
+    return None
+
+def _resolve_windows_launcher(app_name: str) -> str | None:
+    """Resolve a concrete Windows executable for an app so launching is verifiable.
+
+    The old path branch ran `cmd /c start "" "code" "<file>"` and assumed success.
+    VS Code's `code` shim is usually NOT on PATH, so the file never opened while we
+    still reported success. This finds the real binary (or the code.cmd shim).
+    """
+    key = (app_name or "").lower().strip()
+    if key in ("code", "vscode", "vs code", "visual studio code"):
+        candidates: list[Path] = []
+        for base in (os.environ.get("LOCALAPPDATA"), os.environ.get("PROGRAMFILES"), os.environ.get("PROGRAMFILES(X86)")):
+            if base:
+                candidates.append(Path(base) / "Programs" / "Microsoft VS Code" / "Code.exe")
+                candidates.append(Path(base) / "Microsoft VS Code" / "Code.exe")
+        for c in candidates:
+            if c.exists():
+                return str(c)
+        return shutil.which("code.cmd") or shutil.which("code")
+    return shutil.which(app_name) or shutil.which((app_name or "").split(".")[0])
+
+
+def _launch_windows(app_name: str) -> bool:
+    clean_name = app_name.lower().strip()
+
+    # 1. System PATH or direct binary
     if shutil.which(app_name) or shutil.which(app_name.split(".")[0]):
         try:
             subprocess.Popen(
@@ -89,28 +147,41 @@ def _launch_windows(app_name: str) -> bool:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            time.sleep(1.5)
+            time.sleep(1.0)
             return True
         except Exception as e:
             print(f"[open_app] subprocess failed: {e}")
 
-    if ":" in app_name:
+    # 2. Known UWP / URI protocol
+    uri = _WIN_URI_MAP.get(clean_name) or (app_name if ":" in app_name else None)
+    if uri:
         try:
-            subprocess.Popen(f"start {app_name}", shell=True)
+            os.startfile(uri)
             time.sleep(1.0)
             return True
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[open_app] startfile uri {uri} failed: {e}")
 
+    # 3. Start Menu shortcut (.lnk)
+    shortcut = _find_windows_start_menu_shortcut(app_name)
+    if shortcut:
+        try:
+            os.startfile(str(shortcut))
+            time.sleep(1.0)
+            return True
+        except Exception as e:
+            print(f"[open_app] startfile shortcut {shortcut} failed: {e}")
+
+    # 4. Fallback: Start Menu key search
     try:
         import pyautogui
-        pyautogui.PAUSE = 0.1
+        pyautogui.PAUSE = 0.05
         pyautogui.press("win")
-        time.sleep(0.7)
-        pyautogui.write(app_name, interval=0.05)
-        time.sleep(0.9)
+        time.sleep(0.5)
+        pyautogui.write(app_name, interval=0.03)
+        time.sleep(0.6)
         pyautogui.press("enter")
-        time.sleep(2.5)
+        time.sleep(1.5)
         return True
     except Exception as e:
         print(f"[open_app] Start Menu search failed: {e}")
@@ -263,13 +334,20 @@ def close_application_by_name(app_name: str) -> bool:
             return False
 
     if _SYSTEM == "Windows":
-        exe_name = target if target.endswith(".exe") else f"{target}.exe"
-        try:
-            res = subprocess.run(["taskkill", "/IM", exe_name, "/F"], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
-            if res.returncode == 0:
-                return True
-        except Exception:
-            pass
+        candidates = [target]
+        if not target.endswith(".exe"):
+            candidates.append(f"{target}.exe")
+        if clean_name == "control panel":
+            candidates.append("control.exe")
+
+        for exe_name in candidates:
+            try:
+                res = subprocess.run(["taskkill", "/IM", exe_name, "/F"], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                if res.returncode == 0:
+                    return True
+            except Exception:
+                pass
+
         if _PSUTIL:
             try:
                 killed = False
@@ -277,13 +355,14 @@ def close_application_by_name(app_name: str) -> bool:
                     if p.info.get('pid') == my_pid:
                         continue
                     pname = (p.info.get('name') or '').lower()
-                    if clean_name in pname or target in pname:
+                    if clean_name in pname or target in pname or (clean_name == "control panel" and "control.exe" in pname):
                         p.kill()
                         killed = True
-                    if killed:
-                        return True
+                if killed:
+                    return True
             except Exception:
                 pass
+
     elif _SYSTEM in ("Darwin", "Linux"):
         try:
             res = subprocess.run(["pkill", "-f", clean_name], capture_output=True)
@@ -291,7 +370,43 @@ def close_application_by_name(app_name: str) -> bool:
                 return True
         except Exception:
             pass
+
+    # Window closing fallback
+    try:
+        from actions.computer_control import _safe_close_window
+        res = _safe_close_window(app_name)
+        if res.startswith("Closed window:"):
+            return True
+    except Exception:
+        pass
+
     return False
+
+
+def _format_open_confirmation(app_name: str) -> str:
+    try:
+        from core.computer import windows_native
+        from actions.screen_processor import get_active_window_context
+        # Post-Launch Focus Guard: poll for up to 500ms to ensure the launched app gains focus
+        for _ in range(5):
+            ctx = get_active_window_context()
+            title = ctx.get("foreground_title", "")
+            proc = ctx.get("foreground_process", "")
+            if not windows_native.is_self_or_console_window(ctx.get("hwnd")):
+                if title:
+                    return f"Opened {app_name} (Focused: '{title}' [{proc}])."
+            time.sleep(0.1)
+
+        # If still not focused, attempt explicit focus attachment
+        windows_native.focus_window(app_name)
+        ctx = get_active_window_context()
+        title = ctx.get("foreground_title", "")
+        proc = ctx.get("foreground_process", "")
+        if title:
+            return f"Opened {app_name} (Focused: '{title}' [{proc}])."
+    except Exception:
+        pass
+    return f"Opened {app_name}."
 
 
 def open_app(
@@ -341,42 +456,62 @@ def open_app(
 
         try:
             if _SYSTEM == "Windows":
-                try:
-                    subprocess.Popen(f'cmd /c start "" "{normalized}" "{p}"', shell=True)
-                except Exception:
-                    os.startfile(str(p))
-            elif _SYSTEM == "Darwin":
+                exe = _resolve_windows_launcher(normalized)
+                if exe:
+                    proc = subprocess.Popen([exe, str(p)])
+                    time.sleep(1.2)
+                    if proc.poll() is None:
+                        if player:
+                            player.write_log(f"[open_app] {app_name} → {p}")
+                        return f"Opened {p.name} in {app_name}."
+                # Could not resolve the requested app — open with the OS default so
+                # the file still opens, and report the truth instead of claiming success.
+                os.startfile(str(p))
+                if player:
+                    player.write_log(f"[open_app] {p} → default app")
+                return f"Opened {p.name} with the default application (could not confirm {app_name})."
+            if _SYSTEM == "Darwin":
                 subprocess.Popen(["open", "-a", normalized, str(p)])
-            else:
-                subprocess.Popen([normalized, str(p)])
-
-            if player:
-                player.write_log(f"[open_app] {app_name} → {p}")
+                return f"Opened {p.name} in {app_name}."
+            subprocess.Popen([normalized, str(p)])
             return f"Opened {p.name} in {app_name}."
         except Exception as e:
             print(f"[open_app] Error launching with path: {e}")
             try:
-                if _SYSTEM == "Windows":
-                    os.startfile(str(p))
-                    return f"Opened {p.name}."
+                os.startfile(str(p))
+                return f"Opened {p.name} with the default application."
             except Exception as e2:
                 return f"Failed to open {p}: {e2}"
+
+    if not path_arg:
+        try:
+            from actions.computer_control import _focus_window
+            for cand in (app_name, normalized):
+                if cand:
+                    res = _focus_window(cand)
+                    if res.startswith("Focused window:"):
+                        if player:
+                            player.write_log(f"[open_app] Focused existing window: {app_name}")
+                        print(f"[open_app] Brought existing window to foreground: {res}")
+                        return _format_open_confirmation(app_name)
+        except Exception as e:
+            print(f"[open_app] Existing window check error: {e}")
 
     launcher = _OS_LAUNCHERS.get(_SYSTEM)
     if launcher is None:
         return f"Unsupported operating system: {_SYSTEM}"
 
-    print(f"[open_app] Launching: '{app_name}' → '{normalized}' ({_SYSTEM})")
+    print(f"[open_app] Launching: '{app_name}' -> '{normalized}' ({_SYSTEM})")
 
     if player:
         player.write_log(f"[open_app] {app_name}")
 
     try:
         if launcher(normalized):
-            return f"Opened {app_name}."
+            return _format_open_confirmation(app_name)
         if normalized.lower() != app_name.lower():
             if launcher(app_name):
-                return f"Opened {app_name}."
+                return _format_open_confirmation(app_name)
         return (
             f"Could not confirm that {app_name} launched. "
             f"It may still be loading, or it might not be installed."

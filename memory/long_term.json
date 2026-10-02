@@ -9,8 +9,8 @@
       "updated": "2026-09-21"
     },
     "full_name": {
-      "value": "Hamza Bukhari",
-      "updated": "2026-09-20"
+      "value": "HAMZA BUKHARI",
+      "updated": "2026-09-22"
     },
     "job": {
       "value": "Full Stack Developer",
@@ -19,6 +19,26 @@
     "city": {
       "value": "Lahore, Pakistan",
       "updated": "2026-09-21"
+    },
+    "phone": {
+      "value": "+92 328 1622225",
+      "updated": "2026-09-22"
+    },
+    "email": {
+      "value": "hamzabukhari.build@gmail.com",
+      "updated": "2026-09-22"
+    },
+    "last_app_opened": {
+      "value": "Photoshop",
+      "updated": "2026-09-26"
+    },
+    "sentiment": {
+      "value": "user loves zezo",
+      "updated": "2026-09-29"
+    },
+    "missed_me_last_spoken_urdu": {
+      "value": "true",
+      "updated": "2026-09-30"
     }
   },
   "preferences": {
@@ -37,28 +57,44 @@
     "ai_interest": {
       "value": "ChatGPT Astra",
       "updated": "2026-09-21"
+    },
+    "vape_model": {
+      "value": "VOOPOO Argus Pod",
+      "updated": "2026-09-25"
+    },
+    "last_url_visited": {
+      "value": "https://v4.p.sh-sc.cdn.pstatic.net/gh/p/sh-sc/v4/20241022_1/img/sh_og.png",
+      "updated": "2026-09-27"
+    },
+    "voice_ai_pipeline_requirements": {
+      "value": "completely free, using workarounds/fallbacks",
+      "updated": "2026-09-27"
+    },
+    "last_app_opened": {
+      "value": "Photoshop",
+      "updated": "2026-09-27"
+    },
+    "provider_name": {
+      "value": "Groq",
+      "updated": "2026-09-29"
     }
   },
   "projects": {
-    "active_project": {
-      "value": "C:\\Users\\Hamza\\Desktop\\website",
-      "updated": "2026-09-21"
-    },
     "active_file": {
-      "value": ".gitignore",
-      "updated": "2026-09-21"
+      "value": "gmail.com",
+      "updated": "2026-09-30"
     },
     "recent_task": {
       "value": "Build a SaaS landing page",
-      "updated": "2026-09-21"
+      "updated": "2026-10-01"
     },
     "current_project_path": {
       "value": "C:\\Users\\Hamza\\Desktop\\website",
       "updated": "2026-09-21"
     },
     "portfolio_path": {
-      "value": "Desktop/portfolio",
-      "updated": "2026-09-21"
+      "value": "desktop/portfolio",
+      "updated": "2026-09-22"
     },
     "portfolio_details": {
       "value": "User wants to build personal portfolio and will provide details.",
@@ -71,10 +107,68 @@
     "active_task": {
       "value": "Build personal portfolio landing page based on resume",
       "updated": "2026-09-21"
+    },
+    "current_project_description": {
+      "value": "Redesign user-provided website as an e-commerce store with modern UI",
+      "updated": "2026-09-22"
+    },
+    "active_project_path": {
+      "value": "C:\\Users\\Hamza\\Desktop\\ecommerce_redesign",
+      "updated": "2026-09-22"
+    },
+    "ecom_redesign_source_url": {
+      "value": "https://najaftraders.com",
+      "updated": "2026-09-22"
+    },
+    "voice_ai_pipeline_requirements": {
+      "value": "5 alternative architectures using free/open-source tools: Local, Free Cloud Hybrid, Best Local Quality, Open-Source Stack, Adaptive Router",
+      "updated": "2026-09-24"
+    },
+    "voice_ai_performance_goal": {
+      "value": "improve responsiveness by looking into local architectures",
+      "updated": "2026-09-25"
+    },
+    "jarvis_project": {
+      "value": "Building a Jarvis-like voice assistant",
+      "updated": "2026-09-26"
+    },
+    "active_project": {
+      "value": "C:\\Users\\Hamza Bukhari\\Desktop",
+      "updated": "2026-10-01"
+    },
+    "jarvis_project_status": {
+      "value": "user actively seeking best TTS to improve responsiveness",
+      "updated": "2026-09-27"
+    },
+    "jarvis_pipeline_update": {
+      "value": "User is fixing and adding a new feature to the voice AI pipeline",
+      "updated": "2026-09-29"
+    },
+    "jarvis_voice_pipeline_v2": {
+      "value": "User actively replacing voice pipeline, described as 'adding a new brain'",
+      "updated": "2026-09-29"
     }
   },
-  "relationships": {},
-  "wishes": {},
+  "relationships": {
+    "github_link": {
+      "value": "github.com/fakexezo-lgtm",
+      "updated": "2026-09-22"
+    },
+    "user_sentiment_positive": {
+      "value": "missed me",
+      "updated": "2026-09-30"
+    }
+  },
+  "wishes": {
+    "portfolio_requirements": {
+      "value": "personal portfolio, content to be provided later by user",
+      "updated": "2026-09-22"
+    },
+    "jarvis_tts": {
+      "value": "looking for best TTS options for Jarvis",
+      "updated": "2026-09-26"
+    }
+  },
   "notes": {
     "user_considers_gender": {
       "value": "asked if male or female",
@@ -99,37 +193,61 @@
     "spider_man_folder_exists": {
       "value": "true",
       "updated": "2026-09-21"
+    },
+    "project_status": {
+      "value": "portfolio folder created, awaiting content details",
+      "updated": "2026-09-22"
+    },
+    "portfolio_context": {
+      "value": "personal portfolio, user gathering person details",
+      "updated": "2026-09-22"
+    },
+    "recent_task": {
+      "value": "Cloned website https://heyclicky.com into heyclicky_com_clone",
+      "updated": "2026-09-27"
+    },
+    "pending_report_generation": {
+      "value": "Rust vs Go research report for Desktop",
+      "updated": "2026-09-22"
+    },
+    "last_user_message_short": {
+      "value": "user said wo",
+      "updated": "2026-10-01"
+    },
+    "user_sentiment_positive": {
+      "value": "missed me",
+      "updated": "2026-10-01"
     }
   },
   "sessions": [
     {
-      "date": "2026-09-21",
-      "summary": "صارف نے حمزہ سے حال چال پوچھا اور ان کے پورٹ فولیو پروجیکٹ، خاص طور پر لینڈنگ پیج کی پیشرفت کے بارے میں دریافت کیا۔ انہوں نے حمزہ کو休憩 لینے کا مشورہ دیا اور ڈیزائن میں مدد کے لیے اپنی خدمات پیش کیں۔",
-      "language": "Urdu"
-    },
-    {
-      "date": "2026-09-21",
-      "summary": "The user interacted with the assistant to create a folder named \"Spider-Man\" on the desktop and add a text file containing \"Hello Hamza\" inside it, followed by creating another unnamed file. The user then attempted to have the assistant read a specific PDF file (\"resume\") from th",
+      "date": "2026-10-01",
+      "summary": "The user interacted with ZEZO, asking to open Notepad, clear its contents, and write \"hello Zizo\". After confirming this action, the user ended the interaction with several disjointed messages.",
       "language": "English"
     },
     {
-      "date": "2026-09-21",
-      "summary": "The user and the assistant initially troubleshooted connectivity and voice lagging issues, leading to a restart of the assistant. Afterward, the user provided their resume for the assistant to create a portfolio landing page, which was generated, presented, and initially accepted",
+      "date": "2026-10-01",
+      "summary": "The user directed the assistant to interact with Notepad, view the desktop, and write Python scripts for scraping Wikipedia headlines and generating Fibonacci sequences. The user also had the assistant open and modify the scraper script in VS Code before eventually closing the ap",
+      "language": "English"
+    },
+    {
+      "date": "2026-10-02",
+      "summary": "The user requested code for the \"office view\" of a specific desktop application from a GitHub repository. After the model initially incorrectly provided summarized analysis, the user directed it to navigate the repository structure, ultimately leading to the model reading the con",
       "language": "English"
     }
   ],
   "monitors": {
-    "opencode_task_138e6a1b_status": {
-      "topic": "OpenCode task 138e6a1b status",
-      "added": "2026-09-20",
-      "last_check": "2026-09-21",
-      "last_hash": "1d252c9508c9"
+    "rest_api_testing_methodologies_and_tools": {
+      "topic": "REST API testing methodologies and tools",
+      "added": "2026-09-27",
+      "last_check": "2026-10-02",
+      "last_hash": "f12ac263772e"
     },
-    "antigravity_task_7a8eb009_status": {
-      "topic": "Antigravity task 7a8eb009 status",
-      "added": "2026-09-20",
-      "last_check": "2026-09-21",
-      "last_hash": "5c9100389419"
+    "artemis_mission": {
+      "topic": "Artemis mission",
+      "added": "2026-10-01",
+      "last_check": "2026-10-02",
+      "last_hash": "bd230b98220b"
     }
   }
 }

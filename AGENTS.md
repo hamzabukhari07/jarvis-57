@@ -31,8 +31,12 @@ zezo version 2/
 │   ├── task_manager.py         # Thread-safe background task registry & status tracker
 │   ├── repo_context.py         # 3-tier active repository resolver & memory persistence
 │   ├── prompt.txt              # System prompt injected into Gemini Live session
+│   ├── models.py               # Single source of truth for model ids (Gemini / Antigravity / Groq)
+│   ├── provider_health.py      # Startup provider & model health-check (marks dead models)
 │   ├── gemini.py               # One-shot Gemini client with model fallback ladder
 │   ├── llm_client.py           # Multi-provider LLM interface (Ollama, OpenAI, Groq)
+│   ├── llm_router.py           # Background text router: Groq → Gemini → Ollama (live voice untouched)
+│   ├── voice_fallback.py       # Offline fallback voice loop (VAD → STT → LLM → TTS) when Gemini Live is down
 │   ├── viseme.py               # Audio formant & text phoneme extractor for avatar lip-sync
 │   ├── avatar.py               # Holographic head rasterizer & face state animator
 │   ├── avatar_mesh.py          # 3D vector geometry for facial acting
@@ -47,13 +51,16 @@ zezo version 2/
 │   ├── log_bus.py              # Backend log ring buffer (stdlib logging + stdout/stderr tee)
 │   └── governance.py           # Path validation, dangerous-command DENY patterns, policy matrix
 │
-├── actions/                    # 🛠️ Self-Describing Tools (23 Discovered Actions)
+├── actions/                    # 🛠️ Self-Describing Tools (24 Discovered Actions)
 │   ├── opencode_agent.py       # [opencode_run] Autonomous multi-file coding agent
 │   ├── kilo_agent.py           # [kilo_run] Multi-file refactoring & editing agent
+│   ├── antigravity_agent.py    # [antigravity_run] Studio UI & Antigravity synthesis agent
 │   ├── code_helper.py          # [code_helper] Single function / inline snippet generator
 │   ├── dev_agent.py            # [dev_agent] Read-only codebase exploration & bug hunter
 │   ├── design_extractor.py     # [extract_design_system] HTML/CSS design token extractor
 │   ├── task_status.py          # [task_status] Background task status / progress query
+│   ├── website_cloner.py       # [clone_website] Offline site cloner & asset localizer
+│   ├── browser_control.py      # [browser_control] Browser tab navigation & interactions
 │   ├── open_app.py             # [open_app] Launch / terminate desktop apps & open files
 │   ├── computer_control.py     # [computer_control] Keyboard shortcuts, clicks, hotkeys
 │   ├── computer_settings.py    # [computer_settings] System volume, brightness, power
@@ -62,6 +69,7 @@ zezo version 2/
 │   ├── screen_processor.py     # [screen_process] Desktop screenshot capture & analysis
 │   ├── web_search.py           # [web_search] Google / DuckDuckGo live search
 │   ├── web_reader.py           # [web_read_page] Deep web scraping & markdown extraction
+│   ├── agent_reach.py          # [agent_reach] Multi-platform intelligence & Whisper transcription
 │   ├── reminder.py             # [reminder] Scheduled alarms, timers, reminders
 │   ├── system_monitor.py       # [system_status] Live CPU, RAM, GPU, battery metrics
 │   ├── background_monitor.py   # [background_monitor] Long-running process surveillance
@@ -70,9 +78,7 @@ zezo version 2/
 │   ├── flight_finder.py        # [flight_finder] Real-time flight search
 │   ├── youtube_video.py        # [youtube_video] YouTube search and video playback
 │   ├── game_updater.py         # [game_updater] Gaming news and patch notes
-│   ├── desktop.py              # [desktop_control] Desktop icons & window positioning
-│   ├── antigravity_agent.py    # [antigravity_run] Antigravity workflow runner
-│   └── agent_reach.py          # [agent_reach] Social research API & media extraction
+│   └── desktop.py              # [desktop_control] Desktop icons & window positioning
 │
 ├── memory/                     # 💾 Persistence & Intelligence Layer
 │   ├── sqlite_memory.py        # SQLite FTS5 database (zezo_brain.db) with BM25 search
@@ -139,12 +145,13 @@ zezo version 2/
 
 | If You Change / Edit... | You MUST Also Verify / Update... | Why |
 | :--- | :--- | :--- |
-| Any `actions/*.py` | `core/action_loader.py`, `core/prompt.txt` | Ensure `TOOL` schema is valid and routing rules in `prompt.txt` match. |
+| Any `actions/*.py` | `core/action_loader.py`, `core/prompt.txt`, `docs/TOOLS.md` | Ensure `TOOL` schema is valid, routing rules match, and `docs/TOOLS.md` is synced. |
 | `actions/opencode_agent.py` or `actions/kilo_agent.py` | `core/task_manager.py`, `actions/task_status.py`, `core/repo_context.py` | Task submission, live progress reporting, and directory resolution depend on them. |
 | `actions/open_app.py` | `actions/browser_control.py`, `actions/computer_control.py` | Window and process termination (`close_application_by_name`) is shared. |
-| `memory/config_manager.py` | `actions/opencode_agent.py`, `actions/kilo_agent.py`, `main.py` | Model names (`get_opencode_model()`, `get_voice()`) are retrieved from here. |
+| `memory/config_manager.py` | `actions/opencode_agent.py`, `actions/kilo_agent.py`, `main.py`, `docs/CONFIGURATION.md` | Model names & API key masking config are retrieved here; `docs/CONFIGURATION.md` must stay synced. |
+| Any Core Engine / Feature | `docs/<FILE>.md`, `docs/README.md` | **Mandatory Documentation Sync Rule:** Every feature build/bug fix must update `docs/`. |
 | `core/prompt.txt` | `main.py` (`_build_config`) | Ensure prompt tokens `{assistant_name}`, `{platform}`, `{capabilities}`, `{limits}` remain intact. |
-| `ui.py` | `main.py` | Signal-slot connections between `JarvisUI` and `JarvisLive` (logs, avatar visemes, waveform). |
+| `ui.py` / `frontend/index.html` | `main.py`, `core/ui_server.py` | Signal-slot / WebSocket connections between UI, server, and live audio engines. |
 | `core/log_bus.py` | `ui.py` (`LogConsoleOverlay`, `Ctrl+L`), `memory/sqlite_memory.py` (`redact_secrets`) | The console renders the bus ring buffer; `redact_secrets` is the sole scrub source and must stay the only secret-pattern list. |
 
 ---
@@ -162,7 +169,7 @@ zezo version 2/
       │
 [ 5. VERIFY ] ──► Run py_compile, import checks, and action_loader discovery.
       │
-[ 6. DOCUMENT ] ──► Update AGENTS.md, prompt.txt, and decisions.md.
+[ 6. DOCUMENT ] ──► Update docs/<FILE>.md, docs/README.md, AGENTS.md, prompt.txt & LEARNING_JOURNAL.md.
 ```
 
 ---
@@ -191,3 +198,51 @@ After completing each feature, create or append to `LEARNING_JOURNAL.md` at the 
 ```
 
 Keep it human-readable. Update it as part of the `verify` step.
+
+---
+
+## 🚨 REGRESSION RULES — DO NOT BREAK
+
+These rules exist because bugs were fixed. Breaking any of them will
+reintroduce a previously-fixed bug.
+
+### Rule 1: No backdrop-filter inside modals
+- `.modal-overlay` may have `backdrop-filter: blur(12px)`.
+- Elements inside the modal (`.modal-panel`, `.modal-panel .frame-inner`,
+  any nested card/badge/button) MUST NOT have `backdrop-filter`.
+- Modal panel backgrounds must be OPAQUE (`#0a0a0a`, not `rgba(...,0.95)`).
+
+### Rule 2: Never use `transition: all`
+- Always list explicit properties:
+  `transition: border-color 0.15s ease, background-color 0.15s ease;`
+- Never write `transition: all ...` in any CSS rule.
+
+### Rule 3: Never remove `_zezoAnimActive` from openModal
+- `window.openModal` in `frontend/js/ui.js` MUST set
+  `window._zezoAnimActive = false;`
+- `function openModal` in the inline `<script>` in `frontend/index.html`
+  MUST set `window._zezoAnimActive = false;`
+- `closeModal` in BOTH files MUST contain:
+  `const anyOpen = document.querySelector('.modal-overlay.open');`
+  `if (!anyOpen) { window._zezoAnimActive = !document.hidden && !window._zezoDragging; }`
+- These lines MUST NEVER be removed during refactoring.
+
+### Rule 4: Hide avatar GIF while modal is open
+- `openModal` MUST set:
+  `document.getElementById('vortex-gif').style.visibility = 'hidden';`
+- `closeModal` MUST set:
+  `document.getElementById('vortex-gif').style.visibility = 'visible';`
+- `id="vortex-gif"` on the avatar MUST NEVER be renamed.
+
+### Rule 5: openModal must not close its own id
+- `openModal(id)` MUST NOT call `closeModal(id)` for the same id.
+- `openModal(id)` MUST NOT call any function that closes the same id.
+
+### Rule 6: Settings is a MODAL, not a drawer
+- The settings panel is `<div class="modal-overlay" id="settings-modal">`.
+- Do NOT reintroduce `.settings-dropdown-drawer` or anchored drawers.
+- Gear button onclick is `openModal('settings-modal')`.
+
+### Rule 7: QtWebEngine does not support `vh` reliably
+- Prefer `position: fixed` with `inset: 0` over `vh`-based heights.
+- If you must use `vh`, add a JS fallback on `window.resize`.

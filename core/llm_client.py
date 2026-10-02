@@ -16,6 +16,7 @@ Supports two backends — selected via  "llm_provider"  in config/api_keys.json:
         Note: tool-calling support depends on the model; use a model that
         supports function/tool calls (e.g. Qwen2.5, Llama-3.1, Mistral).
 """
+import base64
 import json
 import re
 import subprocess
@@ -374,8 +375,11 @@ def call_groq_text(
     system:  str | None = None,
     model:   str | None = None,
     timeout: int = 30,
+    max_tokens: int = 2048,
+    temperature: float = 0.2,
+    response_format: dict | None = None,
 ) -> str:
-    """High-speed text and code completion on Groq LPU (500+ tokens/sec).
+    """High-speed text and code completion on Groq LPU (500-1000 tokens/sec).
 
     Uses OpenAI-compatible endpoint with Bearer authentication.
     """
@@ -388,11 +392,9 @@ def call_groq_text(
     primary_model = model or get_groq_model()
     candidates = [
         primary_model,
-        "qwen/qwen3.8-27b",
-        "openai/gpt-oss-120b",
-        "groq/compound-mini",
-        "openai/gpt-oss-20b",
-        "llama-3.3-70b-versatile",
+        "openai/gpt-oss-120b",        # 500 t/s, high reasoning & code
+        "openai/gpt-oss-20b",         # 1000 t/s, ultra-fast decisions
+        "qwen/qwen3.8-27b",           # 450 t/s, balanced code
     ]
     # Deduplicate preserving order
     models_to_try = list(dict.fromkeys(candidates))
@@ -413,7 +415,211 @@ def call_groq_text(
         payload = {
             "model": candidate,
             "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if response_format:
+            payload["response_format"] = response_format
+        try:
+            resp = requests.post(endpoint, json=payload, headers=headers, timeout=timeout)
+            if resp.status_code == 200:
+                data = resp.json()
+                return (data.get("choices", [{}])[0].get("message", {}).get("content") or "").strip()
+            last_err = f"Groq HTTP {resp.status_code}: {resp.text[:120]}"
+        except Exception as e:
+            last_err = str(e)
+            continue
+
+    raise RuntimeError(f"All Groq candidate models failed. Last error: {last_err}")
+
+
+def call_groq_json(
+    prompt: str,
+    system: str | None = None,
+    model: str | None = None,
+    timeout: int = 30,
+) -> dict | list | None:
+    """Structured JSON output on Groq LPU in ~100-200ms."""
+    sys_prompt = (
+        (system or "") + "\n\nYou MUST return valid JSON only. No markdown fences, no explanation."
+    ).strip()
+    try:
+        raw = call_groq_text(
+            prompt,
+            system=sys_prompt,
+            model=model,
+            timeout=timeout,
+            max_tokens=2048,
+            temperature=0.1,
+            response_format={"type": "json_object"},
+        )
+        if not raw:
+            return None
+        return json.loads(raw)
+    except Exception as e:
+        # Fallback to loose extraction if strict JSON format failed
+        try:
+            raw = call_groq_text(prompt, system=sys_prompt, model=model, timeout=timeout, max_tokens=2048)
+            if "{" in raw and "}" in raw:
+                raw = raw[raw.find("{"): raw.rfind("}") + 1]
+            elif "[" in raw and "]" in raw:
+                raw = raw[raw.find("["): raw.rfind("]") + 1]
+            return json.loads(raw)
+        except Exception:
+            return None
+
+
+
+def call_groq_stream(
+    prompt: str,
+    system: str | None = None,
+    model: str | None = None,
+    timeout: int = 30,
+    log: Optional[Callable[[str], None]] = None,
+) -> Generator[str, None, None]:
+    """High-speed streaming text completion from Groq LPU yielding sentences.
+
+    Yields complete sentences as they accumulate so TTS and playback can start
+    immediately within the first 150-250ms of generation.
+    """
+    from memory.config_manager import get_groq_api_key, get_groq_model
+
+    api_key = get_groq_api_key()
+    if not api_key:
+        raise ValueError("Groq API key not configured in config/api_keys.json")
+
+    primary_model = model or get_groq_model()
+    candidates = [
+        primary_model,
+        "openai/gpt-oss-20b",
+        "openai/gpt-oss-120b",
+        "qwen/qwen3.8-27b",
+    ]
+    models_to_try = list(dict.fromkeys([m for m in candidates if m]))
+
+    endpoint = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    messages: list[dict] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
+    for candidate in models_to_try:
+        payload = {
+            "model": candidate,
+            "messages": messages,
             "temperature": 0.2,
+            "max_tokens": 120,
+            "stream": True,
+        }
+        try:
+            with requests.post(endpoint, json=payload, headers=headers, timeout=timeout, stream=True) as resp:
+                if resp.status_code != 200:
+                    continue
+                buf = ""
+                has_yielded = False
+                first_token = True
+                for line in resp.iter_lines():
+                    if not line:
+                        continue
+                    line_str = line.decode("utf-8") if isinstance(line, bytes) else line
+                    if line_str.startswith("data: "):
+                        data_part = line_str[6:].strip()
+                        if data_part == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data_part)
+                            delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content") or ""
+                            if delta:
+                                if first_token:
+                                    first_token = False
+                                    if log:
+                                        log(f"[TIMING] LLM first token: {time.time():.3f}")
+                                buf += delta
+                                while True:
+                                    m = _SENT_END.search(buf)
+                                    if not m:
+                                        break
+                                    sentence = buf[: m.start() + 1].strip()
+                                    buf = buf[m.end() :]
+                                    if sentence:
+                                        has_yielded = True
+                                        yield sentence
+                        except Exception:
+                            continue
+                if buf.strip():
+                    has_yielded = True
+                    yield buf.strip()
+                if has_yielded:
+                    return
+        except Exception:
+            continue
+
+    # Fallback to non-streaming if all stream requests failed
+    text = call_groq_text(prompt, system=system, model=model, timeout=timeout)
+    if text:
+        yield text
+
+
+def call_groq_vision(
+    image_bytes: bytes,
+    mime: str,
+    prompt: str,
+    system: str | None = None,
+    model: str | None = None,
+    timeout: int = 60,
+) -> str:
+    """Free-tier multimodal image understanding on Groq (Llama 4 Scout / Qwen3-VL).
+
+    Accepts raw image bytes plus an instruction and returns the model's text
+    answer. Uses the OpenAI-compatible chat endpoint with a base64 data URI,
+    so it replaces the paid Gemini REST vision call for dropped images.
+    """
+    from memory.config_manager import get_groq_api_key, get_groq_vision_model
+
+    api_key = get_groq_api_key()
+    if not api_key:
+        raise ValueError("Groq API key not configured in config/api_keys.json")
+
+    primary_model = (model or get_groq_vision_model() or "").strip()
+    candidates = [
+        primary_model,
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "qwen/qwen3-vl-32b-instruct",
+    ]
+    models_to_try = [m for m in dict.fromkeys(candidates) if m]
+
+    b64 = base64.b64encode(image_bytes).decode("ascii")
+    data_uri = f"data:{mime or 'image/jpeg'};base64,{b64}"
+
+    endpoint = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    messages: list[dict] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({
+        "role": "user",
+        "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": data_uri}},
+        ],
+    })
+
+    last_err = None
+    for candidate in models_to_try:
+        payload = {
+            "model": candidate,
+            "messages": messages,
+            "temperature": 0.1,
             "max_tokens": 4096,
         }
         try:
@@ -426,7 +632,51 @@ def call_groq_text(
             last_err = str(e)
             continue
 
-    raise RuntimeError(f"All Groq candidate models failed. Last error: {last_err}")
+    raise RuntimeError(f"All Groq vision candidate models failed. Last error: {last_err}")
+
+
+def transcribe_groq_whisper(
+    audio_path: str | Path,
+    model: str | None = None,
+    language: str | None = None,
+    prompt: str | None = None,
+    timeout: int = 180,
+) -> str:
+    """Free-tier fast audio/video transcription on Groq (whisper-large-v3-turbo).
+
+    Accepts a local audio file path (mp3/wav/m4a/ogg/flac/webm). Groq's free
+    tier caps the upload at ~25 MB, so the caller must chunk larger inputs;
+    on any error the caller should fall back to Gemini.
+    """
+    from memory.config_manager import get_groq_api_key, get_groq_whisper_model
+
+    api_key = get_groq_api_key()
+    if not api_key:
+        raise ValueError("Groq API key not configured in config/api_keys.json")
+
+    path = Path(audio_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Audio file not found: {path}")
+
+    chosen = model or get_groq_whisper_model()
+    endpoint = "https://api.groq.com/openai/v1/audio/transcriptions"
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    data = {"model": chosen, "response_format": "json"}
+    if language:
+        data["language"] = language
+    if prompt:
+        data["prompt"] = prompt
+
+    with open(path, "rb") as fh:
+        files = {"file": (path.name, fh)}
+        resp = requests.post(endpoint, headers=headers, data=data, files=files, timeout=timeout)
+
+    if resp.status_code != 200:
+        raise RuntimeError(f"Groq Whisper HTTP {resp.status_code}: {resp.text[:160]}")
+
+    payload = resp.json()
+    return (payload.get("text") or "").strip()
 
 
 

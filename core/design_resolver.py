@@ -145,7 +145,12 @@ def is_redesign_or_explicit_request(task: str) -> bool:
         "different design", "regenerate", "make it like", "look like", "replace design",
         "start fresh", "rebuild", "re-create", "reference", "design system", "theme",
         "palette", "styling", "switch to", "make it exact", "according to this",
-        "provided design", "loaded design", "design theme", "clean real estate"
+        "provided design", "loaded design", "design theme", "clean real estate",
+        # Full-rebuild / explicit stack requests must override project preservation
+        "entirely new", "from scratch", "start over", "brand new", "convert to",
+        "convert into", "single file", "single-file", "single html", "single-html",
+        "one index", "one html file", "static html", "static site",
+        "no react", "without react", "not react",
     ]
     return any(k in t for k in redesign_keywords)
 
@@ -235,7 +240,11 @@ def resolve_design(
             stem_tokens = clean_stem.split()
         if stem_tokens and all(tok in task_words for tok in stem_tokens):
             return True
-        if clean_stem and clean_stem in task_clean:
+        # Word-boundary match only. A raw substring test made very short stems
+        # match inside unrelated words (e.g. the "en" stem matched "content",
+        # "entirely" and "agency"), which falsely selected the HTML-less
+        # En-DESIGN reference and blocked the real Hamza Taste reference.
+        if clean_stem and len(clean_stem) >= 3 and re.search(rf"\b{re.escape(clean_stem)}\b", task_clean):
             return True
         return False
 

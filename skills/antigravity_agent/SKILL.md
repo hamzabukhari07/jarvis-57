@@ -8,7 +8,7 @@ Use this skill whenever the user asks Antigravity to write code, design an appli
 ## Core Capabilities:
 - **`antigravity_run` Tool:**
   - Plans complete file structures and dependency graphs.
-  - Generates stunning web applications or website or landing page using D:\anitgravity\zezo work\zezo latest\skills\hamza_taste\references\html
+  - Generates stunning web applications or website or landing page using skills/hamza_taste/references/html
   - Generates complete Python, FastAPI, CLI, or backend modules.
   - Build Fullstack apps using any framework the user wants
   - Automatically verifies syntax and exports complete project reports to the Zezo HUD screen.

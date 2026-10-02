@@ -26,6 +26,22 @@ def _is_blocked(topic: str) -> bool:
     return any(word in t for word in _BLOCKED)
 
 
+# A task id looks like a 6+ char hex string; a task-status topic also mentions
+# "task" and a status word. Status is a LOCAL concern (the `task_status` tool),
+# never a web topic, so these must never become a monitor.
+_TASK_ID_RE = re.compile(r"\b[0-9a-f]{6,}\b", re.IGNORECASE)
+_TASK_STATUS_WORDS = ("status", "progress", "complete", "finished", "done")
+
+
+def _looks_like_task_status(topic: str) -> bool:
+    t = topic.lower()
+    if "task" not in t:
+        return False
+    if not any(w in t for w in _TASK_STATUS_WORDS):
+        return False
+    return bool(_TASK_ID_RE.search(t))
+
+
 # ── Slug / hash helpers ────────────────────────────────────────────────────────
 
 def _slug(topic: str) -> str:
@@ -62,6 +78,9 @@ def add_monitor(topic: str) -> str:
         return "Please specify a topic to monitor."
     if _is_blocked(topic):
         return "I don't monitor crypto or financial topics."
+    if _looks_like_task_status(topic):
+        return ("Task status is local — I check it with the task_status tool, not the web. "
+                "I did not add a web monitor for that.")
     monitors = _load()
     slug = _slug(topic)
     if slug in monitors:

@@ -60,12 +60,13 @@ def _parse_date(raw: str) -> str:
             return val.strftime("%Y-%m-%d")
 
     try:
-        from core import gemini
-        result = gemini.text(
+        from core.llm_router import generate_text
+        result = generate_text(
             f"Today is {today.strftime('%Y-%m-%d')}. "
             f"Convert this date expression to YYYY-MM-DD: '{raw}'. "
             f"Return ONLY the date string, nothing else.",
-            tier=gemini.FAST,
+            tier="fast",
+            timeout_ms=15_000,
         )
         if re.match(r"\d{4}-\d{2}-\d{2}", result):
             return result

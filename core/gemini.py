@@ -71,6 +71,13 @@ import time
 import threading
 from pathlib import Path
 
+from core.models import (
+    GEMINI_FAST_MODELS,
+    GEMINI_SMART_MODELS,
+    GEMINI_SEARCH_MODELS,
+    GEMINI_LIVE_MODEL,
+)
+
 if getattr(sys, "frozen", False):
     _BASE = Path(sys.executable).parent
 else:
@@ -113,18 +120,21 @@ SEARCH = "search"  # grounded search — REST only, see below
 #     on REST — see SEARCH.
 LIVE = "live"
 
+# Model names live in ONE place: core/models.py (verified live 2026-09-25).
+# Change a name there and this ladder, main.py's live session and the startup
+# health check all follow.
 _LADDERS = {
-    FAST: (LIVE, "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"),
-    SMART: (LIVE, "gemini-3.6-flash", "gemini-3.1-pro-preview", "gemini-pro-latest"),
+    FAST: (LIVE, *GEMINI_FAST_MODELS),
+    SMART: (LIVE, *GEMINI_SMART_MODELS),
     # Grounded search needs response.candidates[...].grounding_metadata, which a
     # Live turn does not produce. REST only, and it says so rather than silently
     # returning an answer with no sources behind it.
-    SEARCH: ("gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"),
+    SEARCH: tuple(GEMINI_SEARCH_MODELS),
 }
 
 # The Live model to use for one-shot calls. main.py owns the real one; this is
 # only the fallback for when this module is imported without it (tests).
-_LIVE_FALLBACK = "models/gemini-3.1-flash-live-preview"
+_LIVE_FALLBACK = GEMINI_LIVE_MODEL
 
 # How many one-shot Live sessions may exist at once.
 #
@@ -181,6 +191,14 @@ _cool_lock = threading.Lock()
 def _cool(model: str) -> None:
     with _cool_lock:
         _cooldown[model] = time.monotonic() + _COOLDOWN_SECONDS
+
+
+def mark_unavailable(model: str) -> None:
+    """Public hook for the startup health-check (`core/provider_health.py`): a
+    model that 404'd is retired, so skip it in the ladder instead of paying for a
+    failed round trip on every call."""
+    if model:
+        _cool(model)
 
 
 def _cooling(model: str) -> bool:
@@ -362,7 +380,7 @@ def _live_call(contents, config, timeout_ms: int, key: str):
 
 
 def call(contents, tier: str = FAST, config=None,
-         timeout_ms: int = DEFAULT_TIMEOUT_MS, key: str = ""):
+         timeout_ms: int = DEFAULT_TIMEOUT_MS, key: str = "", allow_live: bool = True):
     """Run one generation, walking the ladder until one answers.
 
     Returns the SDK's own response object, so callers that need more than the
@@ -370,6 +388,10 @@ def call(contents, tier: str = FAST, config=None,
     when every model on the ladder failed; the reason for each is printed, since
     a silent None during a session nobody can debug is how the original problem
     stayed hidden.
+
+    ``allow_live=False`` drops the Live rung, which the Live API needs for
+    realtime audio and still images but cannot carry large documents (a
+    multi-MB PDF sent over the Live WebSocket closes it with 1006).
     """
     # `tier` is normally FAST or SMART. Anything else is taken to be an explicit
     # model name — screen_agent lets the user pick one in its settings — and it
@@ -379,6 +401,8 @@ def call(contents, tier: str = FAST, config=None,
     ladder = _LADDERS.get(tier)
     if ladder is None:
         ladder = (tier,) + tuple(m for m in _LADDERS[SMART] if m != tier)
+    if not allow_live:
+        ladder = tuple(m for m in ladder if m != LIVE)
 
     resolved_key = key or api_key()
     if not resolved_key:
@@ -402,9 +426,10 @@ def call(contents, tier: str = FAST, config=None,
             return cl.models.generate_content(**kwargs)
         except Exception as e:
             msg = str(e)
-            if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
+            if ("429" in msg or "RESOURCE_EXHAUSTED" in msg
+                    or "503" in msg or "UNAVAILABLE" in msg):
                 _cool(model)
-                print(f"[Gemini] {model}: out of quota — skipping it for "
+                print(f"[Gemini] {model}: unavailable/out of quota — skipping it for "
                       f"{_COOLDOWN_SECONDS // 60} minutes")
             else:
                 print(f"[Gemini] {model}: {type(e).__name__}: {msg[:140]}")
@@ -412,20 +437,48 @@ def call(contents, tier: str = FAST, config=None,
 
 
 def text(contents, tier: str = FAST, config=None,
-         timeout_ms: int = DEFAULT_TIMEOUT_MS, key: str = "", default: str = "") -> str:
-    """`call`, reduced to the reply text. `default` when nothing answered."""
+         timeout_ms: int = DEFAULT_TIMEOUT_MS, key: str = "", default: str = "",
+         allow_live: bool = True, allow_groq: bool = True) -> str:
+    """`call`, reduced to the reply text. `default` when nothing answered.
+    Falls back to Groq LPU when Gemini models are busy or rate-limited.
+    """
     resp = call(contents, tier=tier, config=config,
-                timeout_ms=timeout_ms, key=key)
-    if resp is None:
-        return default
-    return (getattr(resp, "text", None) or "").strip() or default
+                timeout_ms=timeout_ms, key=key, allow_live=allow_live)
+    if resp is not None:
+        out = (getattr(resp, "text", None) or "").strip()
+        if out:
+            return out
+
+    # Groq LPU fallback for pure text queries
+    if allow_groq and isinstance(contents, str):
+        try:
+            from core.llm_client import call_groq_text
+            sys_inst = str(getattr(config, "system_instruction", "") or "") if config else None
+            groq_out = call_groq_text(contents, system=sys_inst, timeout=max(10, int(timeout_ms / 1000)))
+            if groq_out:
+                return groq_out
+        except Exception:
+            pass
+    return default
 
 
 def as_json(contents, tier: str = FAST, config=None,
-            timeout_ms: int = DEFAULT_TIMEOUT_MS, key: str = "", default=None):
+            timeout_ms: int = DEFAULT_TIMEOUT_MS, key: str = "", default=None,
+            allow_live: bool = True, allow_groq: bool = True):
     """`text`, parsed as JSON, tolerating the fences and prose a model wraps it
-    in. `default` when nothing answered or the answer would not parse."""
-    raw = text(contents, tier=tier, config=config, timeout_ms=timeout_ms, key=key)
+    in. Uses Groq LPU fallback for fast structured output."""
+    raw = text(contents, tier=tier, config=config, timeout_ms=timeout_ms, key=key,
+               allow_live=allow_live, allow_groq=allow_groq)
+    if not raw and allow_groq and isinstance(contents, str):
+        try:
+            from core.llm_client import call_groq_json
+            sys_inst = str(getattr(config, "system_instruction", "") or "") if config else None
+            j = call_groq_json(contents, system=sys_inst, timeout=max(10, int(timeout_ms / 1000)))
+            if j is not None:
+                return j
+        except Exception:
+            pass
+
     if not raw:
         return default
     if "{" in raw and "}" in raw:
@@ -437,3 +490,4 @@ def as_json(contents, tier: str = FAST, config=None,
     except Exception as e:
         print(f"[Gemini] reply was not JSON: {e}")
         return default
+

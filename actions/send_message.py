@@ -130,16 +130,33 @@ def _search_in_app(query: str) -> None:
     search_hotkey = ("command", "f") if os_name == "mac" else ("ctrl", "f")
 
     pyautogui.hotkey(*search_hotkey)
-    time.sleep(0.5)
+    time.sleep(0.4)
     _clear_and_paste(query)
-    time.sleep(1.0)
+    time.sleep(0.8)
 
-def _desktop_send(app_name: str, receiver: str, message: str) -> str:
-    if not _open_app(app_name):
-        return f"Could not open {app_name}."
+def _desktop_send(app_name: str, receiver: str, message: str = "") -> str:
+    # Try focusing already-running application window first
+    focused = False
+    try:
+        from actions.computer_control import _focus_window
+        focused = _focus_window(app_name)
+    except Exception:
+        pass
 
-    time.sleep(1.0)
+    if not focused:
+        if not _open_app(app_name):
+            return f"Could not open {app_name}."
+        time.sleep(1.2)
+
+    time.sleep(0.5)
     _search_in_app(receiver)
+
+    if not message:
+        return f"Searched for '{receiver}' in {app_name}. The search results are displayed on your screen."
+
+    # Navigate down from the search bar to the first search result contact
+    pyautogui.press("down")
+    time.sleep(0.3)
     pyautogui.press("enter")
     time.sleep(0.8)
 
@@ -149,21 +166,21 @@ def _desktop_send(app_name: str, receiver: str, message: str) -> str:
     time.sleep(0.3)
     return f"Message sent to {receiver} via {app_name}."
 
-def _send_whatsapp(receiver: str, message: str) -> str:
+def _send_whatsapp(receiver: str, message: str = "") -> str:
     return _desktop_send("WhatsApp", receiver, message)
 
-def _send_telegram(receiver: str, message: str) -> str:
+def _send_telegram(receiver: str, message: str = "") -> str:
     return _desktop_send("Telegram", receiver, message)
 
-def _send_signal(receiver: str, message: str) -> str:
+def _send_signal(receiver: str, message: str = "") -> str:
     return _desktop_send("Signal", receiver, message)
 
 
-def _send_discord(receiver: str, message: str) -> str:
+def _send_discord(receiver: str, message: str = "") -> str:
     return _desktop_send("Discord", receiver, message)
 
 
-def _send_instagram(receiver: str, message: str) -> str:
+def _send_instagram(receiver: str, message: str = "") -> str:
     _require_pyautogui()
 
     if not _open_browser_url("https://www.instagram.com/direct/new/"):
@@ -171,6 +188,9 @@ def _send_instagram(receiver: str, message: str) -> str:
 
     _paste_text(receiver)
     time.sleep(1.5)
+
+    if not message:
+        return f"Searched for '{receiver}' on Instagram Direct."
 
     pyautogui.press("down")
     time.sleep(0.3)
@@ -191,15 +211,18 @@ def _send_instagram(receiver: str, message: str) -> str:
     return f"Message sent to {receiver} via Instagram."
 
 
-def _send_messenger(receiver: str, message: str) -> str:
+def _send_messenger(receiver: str, message: str = "") -> str:
     _require_pyautogui()
 
     if not _open_browser_url("https://www.messenger.com/"):
         return "Could not open Messenger in browser."
 
-
     _search_in_app(receiver)
     time.sleep(0.5)
+
+    if not message:
+        return f"Searched for '{receiver}' on Messenger."
+
     pyautogui.press("down")
     time.sleep(0.3)
     pyautogui.press("enter")
@@ -227,7 +250,7 @@ def _resolve_platform(platform_str: str):
     for keywords, handler in _PLATFORM_MAP:
         if any(k in key for k in keywords):
             return handler
-    return lambda r, m: _desktop_send(platform_str.strip().title(), r, m)
+    return lambda r, m="": _desktop_send(platform_str.strip().title(), r, m)
 
 
 def send_message(
@@ -237,16 +260,29 @@ def send_message(
     session_memory=None,
 ) -> str:
     params       = parameters or {}
-    receiver     = params.get("receiver", "").strip()
-    message_text = params.get("message_text", "").strip()
+    receiver     = params.get("receiver", "").strip() or params.get("contact", "").strip() or params.get("to", "").strip()
+    message_text = params.get("message_text", "").strip() or params.get("message", "").strip() or params.get("text", "").strip()
     platform     = params.get("platform", "whatsapp").strip()
+    action       = params.get("action", "send").lower().strip()
 
     if not receiver:
-        return "Please specify a recipient."
-    if not message_text:
-        return "Please specify the message content."
+        return "Please specify a recipient or contact name to search."
+
     if not _PYAUTOGUI:
         return "PyAutoGUI is not installed — cannot control the desktop."
+
+    if action == "search" or not message_text:
+        print(f"[SendMessage] 🔍 Searching contact on {platform}: {receiver}")
+        if player:
+            player.write_log(f"[msg] Searching {receiver} on {platform}")
+        try:
+            handler = _resolve_platform(platform)
+            result = handler(receiver, "")
+        except Exception as e:
+            result = f"Could not search contact: {e}"
+        if player:
+            player.write_log(f"[msg] {result}")
+        return result
 
     preview = message_text[:50] + ("…" if len(message_text) > 50 else "")
     print(f"[SendMessage] 📨 {platform} → {receiver}: {preview}")
@@ -269,27 +305,32 @@ def send_message(
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "send_message",
-    "description": "Sends a text message via WhatsApp, Telegram, or other messaging platform.",
+    "description": (
+        "Sends a text message or searches contacts via WhatsApp, Telegram, Discord, Instagram, etc. "
+        "Use action='send' to send a message or action='search' to look up a contact."
+    ),
     "parameters": {
         "type": "OBJECT",
         "properties": {
             "receiver": {
                 "type": "STRING",
-                "description": "Recipient contact name"
+                "description": "Recipient contact name or person to search"
             },
             "message_text": {
                 "type": "STRING",
-                "description": "The message to send"
+                "description": "The message to send (optional if action='search')"
             },
             "platform": {
                 "type": "STRING",
-                "description": "Platform: WhatsApp, Telegram, etc."
+                "description": "Platform: WhatsApp, Telegram, Discord, Instagram, Signal, Messenger (default: WhatsApp)"
+            },
+            "action": {
+                "type": "STRING",
+                "description": "send | search (default: send)"
             }
         },
         "required": [
-            "receiver",
-            "message_text",
-            "platform"
+            "receiver"
         ]
     },
     "handler": send_message,

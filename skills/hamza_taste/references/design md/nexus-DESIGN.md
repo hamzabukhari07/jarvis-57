@@ -2,8 +2,8 @@
 version: "3.0"
 name: "Nexus"
 theme: "light"
-source: "D:/anitgravity/zezo work/zezo latest/skills/hamza_taste/references/html/nexus.html"
-extracted_at: "2026-09-21T18:19:54.668871+00:00"
+source: "C:/Users/Hamza Bukhari/Documents/antigravity/zezo latest/skills/hamza_taste/references/html/nexus.html"
+extracted_at: "2026-10-01T12:03:37.199586+00:00"
 description: "Refined editorial light design system extracted deterministically from Nexus. Features clean #f8f9fa cream canvas, high-contrast #0f172a ink typography, and elegant Inter headings."
 colors:
   primary: "#fd6703"
@@ -95,7 +95,7 @@ components:
 # Nexus — Design Specification
 
 > **Aesthetic Profile:** Light Editorial / Cream Precision  
-> **Extracted Source:** D:/anitgravity/zezo work/zezo latest/skills/hamza_taste/references/html/nexus.html  
+> **Extracted Source:** C:/Users/Hamza Bukhari/Documents/antigravity/zezo latest/skills/hamza_taste/references/html/nexus.html  
 > **Theme:** LIGHT  
 
 ---

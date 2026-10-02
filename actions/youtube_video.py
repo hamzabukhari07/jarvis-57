@@ -11,6 +11,7 @@ from urllib.parse import quote_plus
 
 try:
     import pyautogui
+    pyautogui.FAILSAFE = False
     _PYAUTOGUI = True
 except ImportError:
     _PYAUTOGUI = False
@@ -73,37 +74,27 @@ def _open_url(url: str) -> None:
     except Exception as e:
         print(f"[YouTube] ⚠️ open_url failed: {e}")
 
-def _scrape_first_video_url(query: str) -> str | None:
-
-    if not _REQUESTS_OK:
-        return None
-
-    search_url = (
-        f"https://www.youtube.com/results"
-        f"?search_query={quote_plus(query)}"
-        f"&sp={_YT_VIDEO_FILTER}"
-    )
-
+def _find_video_url(query: str) -> str | None:
+    """Find YouTube video URL for a query using yt-dlp search."""
     try:
-        r    = requests.get(search_url, headers=HEADERS, timeout=10)
-        html = r.text
-
-        video_ids = re.findall(r'"videoId":"([A-Za-z0-9_-]{11})"', html)
-
-        seen = set()
-        for vid in video_ids:
-            if vid in seen:
-                continue
-            seen.add(vid)
-
-            if f'/shorts/{vid}' in html:
-                continue
-            return f"https://www.youtube.com/watch?v={vid}"
-
+        import yt_dlp
+        ydl_opts = {
+            "quiet": True,
+            "skip_download": True,
+            "extract_flat": True,
+            "playlistend": 1,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+            entries = info.get("entries", []) if info else []
+            if entries:
+                e = entries[0]
+                return e.get("url") or f"https://www.youtube.com/watch?v={e.get('id', '')}"
     except Exception as e:
-        print(f"[YouTube] ⚠️ scrape_first_video_url failed: {e}")
+        print(f"[YouTube] ⚠️ yt-dlp search failed: {e}")
 
     return None
+
 
 def _extract_video_id(url: str) -> str | None:
     match = re.search(
@@ -133,64 +124,28 @@ def _ask_for_url(prompt_text: str = "YouTube video URL:") -> str | None:
         return None
 
 
-def _get_transcript(video_id: str) -> str | None:
-    if not _TRANSCRIPT_OK:
-        return None
-    try:
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-        transcript      = None
-
-        lang_priority = ["en", "tr", "de", "fr", "es", "it", "pt", "ru", "ja", "ko", "ar", "zh"]
-
-        try:
-            transcript = transcript_list.find_manually_created_transcript(lang_priority)
-        except Exception:
-            pass
-
-        if transcript is None:
-            try:
-                transcript = transcript_list.find_generated_transcript(lang_priority)
-            except Exception:
-                for t in transcript_list:
-                    transcript = t
-                    break
-
-        if transcript is None:
-            return None
-
-        fetched = transcript.fetch()
-        return " ".join(entry["text"] for entry in fetched)
-
-    except Exception as e:
-        print(f"[YouTube] ⚠️ Transcript fetch failed: {e}")
-        return None
-
-
 def _summarize_with_gemini(transcript: str, video_url: str) -> str:
-    from google.genai import types
-    from core import gemini
+    """Summarise via the provider router (Groq → Gemini → Ollama). Falls back to
+    Gemini automatically if Groq is unconfigured or rejects the long transcript."""
+    from core.llm_router import generate_text
 
     max_chars = 80000
     truncated = transcript[:max_chars] + ("..." if len(transcript) > max_chars else "")
-    # A whole transcript can be 80k characters, hence the long deadline — but a
-    # deadline there is, and the ladder in core/gemini.py picks the model.
-    response = gemini.call(
-        f"Please summarize this YouTube video transcript:\n\n{truncated}",
-        tier=gemini.SMART,
-        timeout_ms=60_000,
-        config=types.GenerateContentConfig(
-            system_instruction=(
+    try:
+        return generate_text(
+            f"Please summarize this YouTube video transcript:\n\n{truncated}",
+            system=(
                 "You are JARVIS, an AI assistant. "
                 "Summarize YouTube video transcripts clearly and concisely. "
                 "Structure: 1-sentence overview, then 3-5 key points. "
                 "Be direct. Address the user as 'sir'. "
                 "Match the language of the transcript."
-            )
-        )
-    )
-    if response is None:
-        return "I couldn't reach Gemini to summarise that transcript, sir."
-    return (response.text or "").strip()
+            ),
+            tier="smart",
+            timeout_ms=60_000,
+        ).strip()
+    except Exception as e:
+        return f"I couldn't summarise that transcript, sir. ({e})"
 
 
 def _save_summary(content: str, video_url: str) -> str:
@@ -222,129 +177,88 @@ def _save_summary(content: str, video_url: str) -> str:
     return str(filepath)
 
 
-def _scrape_video_info(video_id: str) -> dict:
-    if not _REQUESTS_OK:
-        return {}
-    url = f"https://www.youtube.com/watch?v={video_id}"
-    try:
-        r    = requests.get(url, headers=HEADERS, timeout=12)
-        html = r.text
-        info = {}
-
-        for key, pattern in [
-            ("title",    r'"title":\{"runs":\[\{"text":"([^"]+)"'),
-            ("channel",  r'"ownerChannelName":"([^"]+)"'),
-            ("views",    r'"viewCount":"(\d+)"'),
-            ("duration", r'"lengthSeconds":"(\d+)"'),
-            ("likes",    r'"label":"([0-9,]+ likes)"'),
-        ]:
-            match = re.search(pattern, html)
-            if match:
-                raw = match.group(1)
-                if key == "views":
-                    info[key] = f"{int(raw):,}"
-                elif key == "duration":
-                    secs = int(raw)
-                    info[key] = f"{secs // 60}:{secs % 60:02d}"
-                else:
-                    info[key] = raw
-
-        return info
-    except Exception as e:
-        print(f"[YouTube] ⚠️ Info scrape failed: {e}")
-        return {}
-
-
-def _scrape_trending(region: str = "TR", max_results: int = 8) -> list[dict]:
-    if not _REQUESTS_OK:
-        return []
-    url = f"https://www.youtube.com/feed/trending?gl={region.upper()}"
-    try:
-        r    = requests.get(url, headers=HEADERS, timeout=12)
-        html = r.text
-
-        titles   = re.findall(r'"title":\{"runs":\[\{"text":"([^"]+)"\}\]', html)
-        channels = re.findall(r'"ownerText":\{"runs":\[\{"text":"([^"]+)"', html)
-
-        results, seen = [], set()
-        for i, title in enumerate(titles):
-            if title in seen or len(title) < 5:
-                continue
-            seen.add(title)
-            channel = channels[i] if i < len(channels) else "Unknown"
-            results.append({"rank": len(results) + 1, "title": title, "channel": channel})
-            if len(results) >= max_results:
-                break
-
-        return results
-    except Exception as e:
-        print(f"[YouTube] ⚠️ Trending scrape failed: {e}")
-        return []
-
 def _handle_play(parameters: dict, player) -> str:
-    query = parameters.get("query", "").strip()
+    query = (
+        (parameters.get("query") or "").strip()
+        or (parameters.get("url") or "").strip()
+        or (parameters.get("video_url") or "").strip()
+    )
     if not query:
-        return "Please tell me what you'd like to watch, sir."
+        print("[YouTube] ▶️ No specific query provided, opening YouTube homepage.")
+        _open_url("https://www.youtube.com")
+        return "Opened YouTube in your browser. Tell me what you'd like to watch."
 
     if player:
-        player.write_log(f"[YouTube] Searching: {query}")
+        player.write_log(f"[YouTube] Play: {query}")
 
-    print(f"[YouTube] 🔍 Scraping first non-Shorts video for: {query}")
+    # 1. A pasted YouTube URL: open it directly in the default browser. It must
+    #    NOT go through yt-dlp search — "ytsearch1:<url>" treats the URL as a
+    #    search term and returns the wrong video (or a search page).
+    if _is_valid_youtube_url(query):
+        print(f"[YouTube] ▶️ Opening URL directly: {query}")
+        _open_url(query)
+        return f"Opened in your browser: {query}"
 
-    video_url = _scrape_first_video_url(query)
-
+    # 2. A search term: resolve the top video and open it, else the search page.
+    print(f"[YouTube] 🔍 Searching via yt-dlp for: {query}")
+    video_url = _find_video_url(query)
     if video_url:
         print(f"[YouTube] ▶️ Opening: {video_url}")
         _open_url(video_url)
-        return f"Playing: {query}"
+        return f"Opened '{query}' in your browser: {video_url}"
 
-    print(f"[YouTube] ⚠️ Scrape failed, opening filtered search page")
+    print(f"[YouTube] ⚠️ Search failed, opening filtered search page")
     fallback_url = (
         f"https://www.youtube.com/results"
         f"?search_query={quote_plus(query)}"
         f"&sp={_YT_VIDEO_FILTER}"
     )
     _open_url(fallback_url)
-    return f"Opened YouTube search for: {query} (manual selection required)"
+    return f"Opened YouTube search for: {query} — pick a video to play."
 
 
-def _handle_summarize(parameters: dict, player, speak) -> str:
-    if not _TRANSCRIPT_OK:
-        return "youtube-transcript-api is not installed. Run: pip install youtube-transcript-api"
+def _handle_summarize(parameters: dict, player=None, speak=None) -> str:
+    url = (
+        parameters.get("url", "").strip() or 
+        parameters.get("query", "").strip() or 
+        parameters.get("video_url", "").strip()
+    )
 
-    url = _ask_for_url("Please paste the YouTube video URL:")
+    if url and not _is_valid_youtube_url(url):
+        found_url = _find_video_url(url)
+        if found_url:
+            url = found_url
+
+    if not url:
+        url = _ask_for_url("Please paste the YouTube video URL:")
+
     if not url:
         return "No URL provided, sir. Summary cancelled."
     if not _is_valid_youtube_url(url):
-        return "That doesn't appear to be a valid YouTube URL, sir."
-
-    video_id = _extract_video_id(url)
-    if not video_id:
-        return "Could not extract video ID from that URL, sir."
+        return f"That doesn't appear to be a valid YouTube URL: '{url}', sir."
 
     if player:
         player.write_log(f"[YouTube] Summarizing: {url}")
     if speak:
-        speak("Fetching the transcript now, sir. One moment.")
+        speak(f"Fetching transcript for video, sir.")
 
-    transcript = _get_transcript(video_id)
-    if not transcript:
-        return "I couldn't retrieve a transcript for that video, sir."
+    from actions.agent_reach import fetch_youtube_transcript
+    full_content = fetch_youtube_transcript(url)
 
-    if speak:
-        speak("Transcript retrieved. Generating summary now.")
+    if not full_content or "Unable to fetch transcript" in full_content:
+        return f"I couldn't retrieve transcript or details for that video ({url}), sir."
 
     try:
-        summary = _summarize_with_gemini(transcript, url)
+        summary = _summarize_with_gemini(full_content, url)
     except Exception as e:
-        return f"Summary generation failed, sir: {e}"
+        return f"Summary generation failed for {url}, sir: {e}"
 
     if speak:
         speak(summary)
 
-    if parameters.get("save", False):
+    if parameters.get("save", True):
         saved_path = _save_summary(summary, url)
-        return f"Summary complete and saved to Desktop: {saved_path}"
+        return f"Summary complete and saved to Desktop: {saved_path}\n\nSummary:\n{summary}"
 
     return summary
 
@@ -356,37 +270,28 @@ def _handle_get_info(parameters: dict, player, speak) -> str:
     if not url or not _is_valid_youtube_url(url):
         return "Please provide a valid YouTube URL, sir."
 
-    video_id = _extract_video_id(url)
-    if not video_id:
-        return "Could not extract video ID, sir."
-
     if player:
         player.write_log(f"[YouTube] Getting info: {url}")
 
-    info = _scrape_video_info(video_id)
-    if not info:
+    from actions.agent_reach import fetch_youtube_transcript
+    info_str = fetch_youtube_transcript(url)
+    if not info_str or "Unable to fetch transcript" in info_str:
         return "Could not retrieve video information, sir."
 
-    lines = [
-        f"{key.capitalize()}: {info[key]}"
-        for key in ("title", "channel", "views", "duration", "likes")
-        if key in info
-    ]
-    result = "\n".join(lines)
-
     if speak:
-        speak(f"Here's the video info, sir. {result.replace(chr(10), '. ')}")
+        speak("Here's the video info, sir.")
 
-    return result
+    return info_str
 
 
 def _handle_trending(parameters: dict, player, speak) -> str:
-    region = parameters.get("region", "TR").upper()
+    region = parameters.get("region", "US").upper()
 
     if player:
         player.write_log(f"[YouTube] Trending: {region}")
 
-    trending = _scrape_trending(region=region, max_results=8)
+    from actions.agent_reach import fetch_youtube_trending
+    trending = fetch_youtube_trending(region=region, max_results=8)
     if not trending:
         return f"Could not fetch trending videos for region {region}, sir."
 
@@ -403,11 +308,49 @@ def _handle_trending(parameters: dict, player, speak) -> str:
 
     return result
 
+
+def _handle_stop(parameters: dict, player=None, speak=None) -> str:
+    if player:
+        player.write_log("[YouTube] Stopping playback")
+    if _PYAUTOGUI:
+        pyautogui.press('playpause')
+        time.sleep(0.1)
+    try:
+        from actions.computer_control import _focus_window
+        res = _focus_window("YouTube")
+        if "Focused" not in res:
+            res = _focus_window("chrome")
+        if "Focused" in res and _PYAUTOGUI:
+            pyautogui.press("k")
+    except Exception:
+        pass
+    return "YouTube playback stopped."
+
+
+def _handle_close(parameters: dict, player=None, speak=None) -> str:
+    if player:
+        player.write_log("[YouTube] Closing YouTube tab")
+    if _PYAUTOGUI:
+        pyautogui.press('playpause')
+        time.sleep(0.05)
+    try:
+        from actions.computer_control import _safe_close_tab, _focus_window
+        _focus_window("YouTube")
+        time.sleep(0.1)
+        return _safe_close_tab()
+    except Exception as e:
+        return f"Could not close YouTube tab: {e}"
+
+
 _ACTION_MAP = {
     "play":      _handle_play,
     "summarize": _handle_summarize,
     "get_info":  _handle_get_info,
     "trending":  _handle_trending,
+    "stop":      _handle_stop,
+    "pause":     _handle_stop,
+    "close":     _handle_close,
+    "close_tab": _handle_close,
 }
 
 
@@ -429,7 +372,7 @@ def youtube_video(
     if handler is None:
         return (
             f"Unknown YouTube action: '{action}'. "
-            "Available: play, summarize, get_info, trending."
+            "Available: play, stop, pause, close, summarize, get_info, trending."
         )
 
     try:
@@ -444,17 +387,17 @@ def youtube_video(
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "youtube_video",
-    "description": "Controls YouTube. Use for: playing videos, summarizing a video's content, getting video info, or showing trending videos.",
+    "description": "Controls YouTube playback and videos. Actions: play (open a YouTube URL directly, or the top result for a search term, in the default browser), stop / pause (stop video playback), close (close YouTube tab), summarize, get_info, trending.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
             "action": {
                 "type": "STRING",
-                "description": "play | summarize | get_info | trending (default: play)"
+                "description": "play | stop | pause | close | summarize | get_info | trending (default: play)"
             },
             "query": {
                 "type": "STRING",
-                "description": "Search query for play action"
+                "description": "For play: a full YouTube URL (opened directly) or a search term (opens the top result)"
             },
             "save": {
                 "type": "BOOLEAN",

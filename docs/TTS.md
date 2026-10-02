@@ -114,8 +114,8 @@ self._play_cursor = 0.0  # wall-clock time when next audio will begin to sound
 
 # The tail guard prevents the assistant from hearing its own echo:
 self._tail_until = time.monotonic() + self._out_latency + _TAIL_MARGIN
-# _TAIL_MARGIN = 0.25 seconds
-# _out_latency is measured from the device's own reported latency
+# _TAIL_MARGIN = 0.06 seconds
+# _out_latency is measured from the device's own reported latency (starts at 0.20s)
 ```
 
 ## The Echo Guard (Self-Echo Prevention)

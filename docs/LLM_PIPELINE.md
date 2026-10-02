@@ -176,6 +176,50 @@ For complex planning tasks (agent mode), the local LLM is used:
 
 The local LLM handles multi-step planning while Gemini Live handles the voice conversation.
 
+### Streaming Sentence Generation for Cascade Voice (`call_groq_stream`)
+
+**File:** `core/llm_client.py` (`call_groq_stream`), `core/voice_fallback.py` (`llm_generate_stream`)
+
+For low-latency voice responses in Cascade mode, token streaming is accumulated into complete sentences rather than waiting for the entire generation to finish:
+
+```
+Groq LPU Server-Sent Events (SSE)
+    ↓ (raw token stream)
+Token Buffer & Sentence Boundary Regex: r'(?<=[.!?])\s+|(?<=\n)\s*\n'
+    ↓ (yields complete sentences)
+llm_generate_stream() generator
+    ↓
+TTS Engine (Kokoro / Edge-TTS / ElevenLabs) synthesizes Sentence 1 (~150ms)
+    ↓
+Audio playback begins while Sentence 2 and Sentence 3 stream in the background
+```
+
+- **Time-To-First-Audio (TTFA):** Down to ~150–250ms on Groq models (`openai/gpt-oss-20b` at 1000 t/s).
+- **Early Cancellation:** If the user speaks during playback, `_interrupted.set()` cancels the generator and aborts subsequent sentence requests immediately.
+
+### Background Text Router (Groq coprocessor)
+
+**File:** `core/llm_router.py`
+
+Non-realtime text work (summaries, short parses, command/code generation) goes
+through a router, **not** straight to Gemini:
+
+```
+Background text task
+    ↓
+Groq LPU (fast + free)  →  Gemini ladder  →  Ollama (local)
+    first provider that answers wins; unavailable ones are skipped
+```
+
+- `generate_text(prompt, system, tier, timeout_ms, allow_groq=True, log)`.
+- The **live voice loop never uses this** — that stays on Gemini Live.
+- Grounded search (needs grounding metadata), multimodal calls, and long HTML/doc
+  synthesis stay on `core.gemini` directly (Groq's token cap would truncate them).
+- Wired into: `actions/code_helper.py`, `actions/youtube_video.py` (summary),
+  `actions/flight_finder.py` (date parse), `actions/desktop.py` (command codegen).
+- Raises only if **every** provider fails, so callers still get a real error.
+- Without a Groq key configured it is transparent: the Gemini rung serves.
+
 ### Gemini One-Shot Calls
 
 **File:** `core/gemini.py`

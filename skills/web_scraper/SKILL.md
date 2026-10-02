@@ -12,8 +12,9 @@ Use this skill when reading full webpage contents, blog posts, developer documen
 
 ## Core Capabilities:
 - **`web_read_page` Tool:**
-  - Fast C-based HTTP/2 fetching via `scrapling.Fetcher`
+  - Fast C-based HTTP/2 fetching via `scrapling.Fetcher` (optional dependency)
   - Automatic fallback to `scrapling.StealthyFetcher` for 403 Forbidden / Cloudflare Turnstile challenges
+  - Always-available fallback to `requests` + BeautifulSoup when Scrapling is not installed
   - Converts HTML directly into readable, clean Markdown
   - Eliminates cookie banners, navigation menus, and script tags
 

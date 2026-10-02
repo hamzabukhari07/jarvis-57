@@ -1,11 +1,12 @@
 """
 core/governance.py — Multi-Tier Security & Governance Policy Matrix.
 
-Inspired by QwenPaw (Tier 2-3 Governance) and Hermes (Tool Guardrails).
-Classifies every action into:
-  - ALLOW: Frictionless, silent execution for safe read-only operations.
-  - ASK: Interactive user confirmation gate for sensitive/irreversible actions.
-  - DENY: Hard block with immediate security alert for dangerous/destructive commands.
+Classifies actions into a formal 5-tier ToolRisk taxonomy:
+  - READ_ONLY: Safe read-only inspection (Allowed frictionless).
+  - LOCAL_MUTATION: Local state changes (Allowed if confidence >= 0.70).
+  - EXTERNAL_MUTATION: Outbound messaging / publishing (Requires confirmation).
+  - CODE_EXECUTION: Autonomous agent execution (Gated with ApprovalScope).
+  - PRIVILEGED_OS: Irreversible system actions / shutdown (Requires explicit user approval).
 """
 
 from __future__ import annotations
@@ -14,6 +15,8 @@ import enum
 import os
 import re
 import sys
+import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
@@ -22,6 +25,97 @@ class PolicyDecision(str, enum.Enum):
     ALLOW = "ALLOW"
     ASK   = "ASK"
     DENY  = "DENY"
+
+
+class ToolRisk(str, enum.Enum):
+    READ_ONLY         = "read_only"
+    LOCAL_MUTATION    = "local_mutation"
+    EXTERNAL_MUTATION = "external_mutation"
+    CODE_EXECUTION    = "code_execution"
+    PRIVILEGED_OS     = "privileged_os"
+
+
+class ApprovalState(str, enum.Enum):
+    PENDING  = "pending"
+    APPROVED = "approved"
+    DENIED   = "denied"
+    EXPIRED  = "expired"
+
+
+@dataclass(frozen=True)
+class ApprovalScope:
+    job_id: str
+    tool_name: str
+    risk: ToolRisk
+    expires_at: float
+
+
+@dataclass(frozen=True)
+class ApprovalGrant:
+    scope: ApprovalScope
+    state: ApprovalState = ApprovalState.APPROVED
+    approved_by: Optional[str] = None
+
+    def can_execute(self, job_id: str, tool_name: str, now: float | None = None) -> bool:
+        current_time = time.time() if now is None else now
+        return (
+            self.state is ApprovalState.APPROVED
+            and self.scope.job_id == job_id
+            and self.scope.tool_name == tool_name
+            and current_time < self.scope.expires_at
+        )
+
+
+# ── Action to Risk Classification Mapping ─────────────────────────────────────
+TOOL_RISK_MAP: dict[str, ToolRisk] = {
+    # 1. READ_ONLY (Immediate frictionless execution)
+    "screen_process":         ToolRisk.READ_ONLY,
+    "web_search":             ToolRisk.READ_ONLY,
+    "web_read_page":          ToolRisk.READ_ONLY,
+    "system_status":          ToolRisk.READ_ONLY,
+    "task_status":            ToolRisk.READ_ONLY,
+    "weather_report":         ToolRisk.READ_ONLY,
+    "flight_finder":          ToolRisk.READ_ONLY,
+    "game_updater":           ToolRisk.READ_ONLY,
+    "extract_design_system":  ToolRisk.READ_ONLY,
+    "file_processor":         ToolRisk.READ_ONLY,
+
+    # 2. LOCAL_MUTATION (Allowed with confidence >= 0.70)
+    "computer_control":       ToolRisk.LOCAL_MUTATION,
+    "open_app":               ToolRisk.LOCAL_MUTATION,
+    "desktop_control":        ToolRisk.LOCAL_MUTATION,
+    "file_controller":        ToolRisk.LOCAL_MUTATION,
+    "computer_settings":      ToolRisk.LOCAL_MUTATION,
+    "youtube_video":          ToolRisk.LOCAL_MUTATION,
+    "reminder":               ToolRisk.LOCAL_MUTATION,
+
+    # 3. EXTERNAL_MUTATION (Outbound communication / publishing)
+    "send_message":           ToolRisk.EXTERNAL_MUTATION,
+    "agent_reach":            ToolRisk.EXTERNAL_MUTATION,
+
+    # 4. CODE_EXECUTION (Autonomous synthesis & multi-file agents)
+    "opencode_run":           ToolRisk.CODE_EXECUTION,
+    "kilo_run":               ToolRisk.CODE_EXECUTION,
+    "antigravity_run":        ToolRisk.CODE_EXECUTION,
+    "code_helper":            ToolRisk.CODE_EXECUTION,
+    "dev_agent":              ToolRisk.CODE_EXECUTION,
+    "clone_website":          ToolRisk.CODE_EXECUTION,
+
+    # 5. PRIVILEGED_OS (Irreversible actions / system shutdown)
+    "shutdown_jarvis":        ToolRisk.PRIVILEGED_OS,
+    "modify_system_setting":  ToolRisk.PRIVILEGED_OS,
+}
+
+
+def get_tool_risk(tool_name: str, parameters: dict | None = None) -> ToolRisk:
+    """Return the assigned risk tier for any action name, accounting for fine-grained sub-actions."""
+    if tool_name == "send_message":
+        act = str((parameters or {}).get("action", "")).lower().strip()
+        if act in ("search", "search_contact", "find_chat", "find_contact", "read", "list", "get_status"):
+            return ToolRisk.READ_ONLY
+        return ToolRisk.EXTERNAL_MUTATION
+
+    return TOOL_RISK_MAP.get(tool_name, ToolRisk.LOCAL_MUTATION)
 
 
 # ── Critical System Paths (Forbidden to modify / delete) ──────────────────────
@@ -86,12 +180,10 @@ def _check_path_safety(target_path: str) -> Optional[str]:
         return None
     try:
         norm = os.path.normpath(str(target_path)).lower()
-        # Check system directory blacklist
         for sys_path in _FORBIDDEN_SYSTEM_PATHS:
             if norm == sys_path or norm.startswith(sys_path + "\\") or norm.startswith(sys_path + "/"):
                 return f"Path '{target_path}' resides inside protected system directory '{sys_path}'"
         
-        # Check forbidden critical files (e.g. hosts file)
         base_name = os.path.basename(norm).lower()
         if base_name in _FORBIDDEN_FILES:
             return f"Modification of critical system file '{base_name}' is forbidden"
@@ -100,9 +192,13 @@ def _check_path_safety(target_path: str) -> Optional[str]:
     return None
 
 
-def evaluate(tool_name: str, args: dict[str, Any] | None = None) -> tuple[PolicyDecision, str]:
+def evaluate(
+    tool_name: str,
+    args: dict[str, Any] | None = None,
+    confidence: float = 1.0,
+) -> tuple[PolicyDecision, str]:
     """
-    Evaluate a proposed tool call and parameters.
+    Evaluate a proposed tool call against 5-tier risk taxonomy and safety patterns.
     Returns:
       (PolicyDecision.ALLOW, "Reason")
       (PolicyDecision.ASK, "Confirmation prompt / details")
@@ -110,14 +206,15 @@ def evaluate(tool_name: str, args: dict[str, Any] | None = None) -> tuple[Policy
     """
     name = (tool_name or "").strip()
     params = args or {}
+    risk = get_tool_risk(name, params)
 
-    # 1. Scan arguments stringified for dangerous patterns
+    # 1. Scan arguments for hard dangerous patterns (DENY)
     arg_str = " ".join(f"{k}={v}" for k, v in params.items() if v is not None)
     for pattern, reason in _DANGEROUS_PATTERNS:
         if pattern.search(arg_str):
             return PolicyDecision.DENY, reason
 
-    # 2. Check path safety if tool operates on files or paths
+    # 2. Check path safety if tool operates on files or paths (DENY)
     path_keys = ["file_path", "filepath", "path", "destination", "target", "dir", "folder"]
     for pk in path_keys:
         val = params.get(pk)
@@ -126,16 +223,21 @@ def evaluate(tool_name: str, args: dict[str, Any] | None = None) -> tuple[Policy
             if violation:
                 return PolicyDecision.DENY, violation
 
-    # 3. Check shell commands passed into dev_agent / computer_control / code_helper
+    # 3. Check shell commands passed into dev_agent / computer_control / code_helper (DENY)
     cmd = params.get("command") or params.get("cmd") or params.get("code")
     if isinstance(cmd, str):
         for pattern, reason in _DANGEROUS_PATTERNS:
             if pattern.search(cmd):
                 return PolicyDecision.DENY, reason
 
-    # 4. Check if action is categorized under ASK (Sensitive)
-    if name in _SENSITIVE_ACTIONS:
-        return PolicyDecision.ASK, _SENSITIVE_ACTIONS[name]
+    # 4. Check PRIVILEGED_OS or explicit sensitive actions (ASK)
+    if risk is ToolRisk.PRIVILEGED_OS or name in _SENSITIVE_ACTIONS:
+        desc = _SENSITIVE_ACTIONS.get(name, f"Executing privileged action: {name}")
+        return PolicyDecision.ASK, desc
 
-    # 5. Otherwise, ALLOW
-    return PolicyDecision.ALLOW, "Operation verified safe by governance policy"
+    # 5. Check confidence thresholds
+    if risk is ToolRisk.LOCAL_MUTATION and confidence < 0.70:
+        return PolicyDecision.ASK, f"Low perception confidence ({confidence:.2f}) for local mutation '{name}'"
+
+    # 6. Otherwise, ALLOW
+    return PolicyDecision.ALLOW, f"Operation verified safe by governance policy ({risk.value})"

@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import platform
 from pathlib import Path
@@ -12,6 +13,11 @@ except ImportError:
 
 from core.undo import push_undo
 from core.file_reader import resolve_path, fuzzy_find_in_dir
+
+
+def _norm_token(s: str) -> str:
+    return re.sub(r"[\s_\-]+", "", s.lower()) if s else ""
+
 
 _resolve_path = resolve_path
 _fuzzy_find_in_dir = fuzzy_find_in_dir
@@ -211,6 +217,38 @@ def list_files(path: str = "desktop", show_hidden: bool = False) -> str:
         return f"Error listing files: {e}"
 
 
+import time
+
+_RECENT_CREATED_FILES: dict[str, float] = {}
+
+def _check_recent_duplicate_warning(target: Path) -> str:
+    now = time.time()
+    # Clean up entries older than 60s
+    for k in list(_RECENT_CREATED_FILES.keys()):
+        if now - _RECENT_CREATED_FILES[k] > 60:
+            del _RECENT_CREATED_FILES[k]
+
+    warning_msg = ""
+    target_tokens = set(re.findall(r"\w+", target.stem.lower()))
+    for p_str, t_stamp in _RECENT_CREATED_FILES.items():
+        recent_p = Path(p_str)
+        if recent_p.parent == target.parent:
+            recent_tokens = set(re.findall(r"\w+", recent_p.stem.lower()))
+            overlap = target_tokens.intersection(recent_tokens)
+            if overlap and (len(overlap) >= 2 or target.stem.lower() in recent_p.stem.lower() or recent_p.stem.lower() in target.stem.lower()):
+                elapsed = int(now - t_stamp)
+                warning_msg = (
+                    f" [WARNING: A similar file '{recent_p.name}' was created {elapsed}s ago in {target.parent.name}/. "
+                    f"Avoid creating multiple duplicate report files; use action='write' to update/overwrite existing files.]"
+                )
+                break
+
+    _RECENT_CREATED_FILES[str(target.resolve())] = now
+    return warning_msg
+
+
+import re
+
 def create_file(path: str, name: str = "", content: str = "") -> str:
     try:
         base   = _resolve_path(path)
@@ -227,20 +265,41 @@ def create_file(path: str, name: str = "", content: str = "") -> str:
         if not _is_safe_path(target):
             return f"Access denied: {target}"
 
+        if target.exists():
+            return f"File already exists: '{target.name}' at {target.parent.name}/. Use action='append_file' or 'write' to modify."
+
+        warn = _check_recent_duplicate_warning(target)
         target.parent.mkdir(parents=True, exist_ok=True)
-        existed = target.exists()
-        previous = None
-        if existed:
-            try:
-                previous = target.read_text(encoding="utf-8", errors="ignore")
-            except Exception:
-                previous = None
         target.write_text(content, encoding="utf-8")
-        push_undo(f"created {target.name}",
-                  _undo_write(target, previous) if existed else _undo_create(target))
-        return f"File created: {target.name} at {target.parent.name}/"
+        push_undo(f"created {target.name}", _undo_create(target))
+        return f"File created: {target.name} at {target.parent.name}/" + warn
     except Exception as e:
         return f"Could not create file: {e}"
+
+
+def append_file(path: str, name: str = "", content: str = "") -> str:
+    try:
+        base   = _resolve_path(path)
+        target = (base / name) if name else base
+        if target.is_dir():
+            target = target / (name or "note.txt")
+
+        if not _is_safe_path(target):
+            return f"Access denied: {target}"
+
+        target.parent.mkdir(parents=True, exist_ok=True)
+        existed = target.exists()
+        previous = target.read_text(encoding="utf-8", errors="ignore") if existed else None
+        
+        with open(target, "a", encoding="utf-8") as f:
+            f.write(content)
+
+        push_undo(f"appended to {target.name}",
+                  _undo_write(target, previous) if existed else _undo_create(target))
+        return f"Appended to file: {target.name} at {target.parent.name}/"
+    except Exception as e:
+        return f"Could not append to file: {e}"
+
 
 
 def create_folder(path: str, name: str = "") -> str:
@@ -670,6 +729,9 @@ def file_controller(
         elif action == "create_file":
             return create_file(path, name=name, content=params.get("content", ""))
 
+        elif action == "append_file":
+            return append_file(path, name=name, content=params.get("content", ""))
+
         elif action == "create_folder":
             return create_folder(path, name=name)
 
@@ -750,7 +812,7 @@ TOOL = {
         "properties": {
             "action": {
                 "type": "STRING",
-                "description": "open | list | create_file | create_folder | delete | move | copy | rename | read | write | find | largest | disk_usage | organize_desktop | info"
+                "description": "open | list | create_file | append_file | create_folder | delete | move | copy | rename | read | write | find | largest | disk_usage | organize_desktop | info"
             },
             "path": {
                 "type": "STRING",

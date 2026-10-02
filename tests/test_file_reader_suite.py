@@ -3,9 +3,12 @@ tests/test_file_reader_suite.py — Unit tests for ZEZO Universal Multi-Format F
 """
 
 import os
+import sys
 import tempfile
 from pathlib import Path
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.file_reader import (
     read_file,
@@ -86,7 +89,7 @@ class TestFileReaderSuite:
 
         tm = get_task_manager()
         msg = file_processor({"file_path": str(test_doc), "action": "summarize"})
-        assert "background task queue" in msg
+        assert "background" in msg.lower() and "task id" in msg.lower()
 
         # Wait for background task to complete
         start = time.time()

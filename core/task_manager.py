@@ -29,17 +29,65 @@ def strip_ansi(text: str) -> str:
 
 
 class TaskStatus(str, Enum):
+    CREATED = "created"
     QUEUED = "queued"
     RUNNING = "running"
+    CANCELLING = "cancelling"
     DONE = "done"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
+
+VALID_STATUS_TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
+    TaskStatus.CREATED: {TaskStatus.QUEUED, TaskStatus.RUNNING, TaskStatus.CANCELLED},
+    TaskStatus.QUEUED: {TaskStatus.RUNNING, TaskStatus.CANCELLING, TaskStatus.CANCELLED},
+    TaskStatus.RUNNING: {TaskStatus.CANCELLING, TaskStatus.DONE, TaskStatus.FAILED, TaskStatus.CANCELLED},
+    TaskStatus.CANCELLING: {TaskStatus.CANCELLED, TaskStatus.FAILED, TaskStatus.DONE},
+    TaskStatus.DONE: set(),
+    TaskStatus.FAILED: set(),
+    TaskStatus.CANCELLED: set(),
+}
+
+
+@dataclass
+class ToolExecutionContext:
+    """Encapsulates execution lifecycle, cancellation tokens, and watchdog timeouts for tool dispatches."""
+    task_id: str
+    tool_name: str
+    timeout_seconds: float = 30.0
+    started_at: float = field(default_factory=time.time)
+    cancel_event: threading.Event = field(default_factory=threading.Event)
+    metadata: dict = field(default_factory=dict)
+
+    def is_cancelled(self) -> bool:
+        return self.cancel_event.is_set()
+
+    def check_timeout(self) -> bool:
+        return (time.time() - self.started_at) > self.timeout_seconds
+
+    def elapsed_seconds(self) -> float:
+        return round(time.time() - self.started_at, 2)
+
+    def raise_if_cancelled(self) -> None:
+        if self.is_cancelled():
+            raise RuntimeError(f"Tool '{self.tool_name}' ({self.task_id}) was cancelled by user.")
+        if self.check_timeout():
+            raise TimeoutError(f"Tool '{self.tool_name}' ({self.task_id}) timed out after {self.timeout_seconds}s.")
+
+
+CODING_TOOLS = {"opencode_agent", "kilo_agent", "dev_agent", "antigravity_agent"}
+MAX_CONCURRENT_CODING_TASKS = 1
+
+CLONER_TOOLS = {"website_cloner", "clone_website"}
+MAX_CONCURRENT_CLONES = 2
 
 
 @dataclass
 class TaskState:
     id: str
     tool: str
+    engine: str = ""
+    model: str = ""
     status: TaskStatus = TaskStatus.QUEUED
     progress: int = 0
     message: str = ""
@@ -47,34 +95,97 @@ class TaskState:
     error: Optional[str] = None
     pid: Optional[int] = None
     params: dict = field(default_factory=dict)
+    logs: list[dict] = field(default_factory=list)
     started_at: float = field(default_factory=time.time)
     finished_at: Optional[float] = None
     notified: bool = False
+    group_id: Optional[str] = None
+    group_title: Optional[str] = None
+    parent_id: Optional[str] = None
     cancel_event: threading.Event = field(default_factory=threading.Event)
     _high_cpu_sec: int = field(default=0, repr=False)
 
+    def transition_to(self, new_status: TaskStatus) -> bool:
+        """Safely transition to new status enforcing monotonic progression."""
+        allowed = VALID_STATUS_TRANSITIONS.get(self.status, set())
+        if new_status in allowed or self.status == new_status:
+            self.status = new_status
+            return True
+        logger.warning(
+            "Task %s invalid monotonic transition: %s -> %s (ignoring)",
+            self.id, self.status.value, new_status.value
+        )
+        return False
+
+    @staticmethod
+    def _infer_engine(tool_name: str) -> str:
+        t = (tool_name or "").lower()
+        if "antigravity" in t:
+            return "Antigravity Agent"
+        if "opencode" in t:
+            return "OpenCode Agent"
+        if "kilo" in t:
+            return "Kilo Code Agent"
+        if "dev_agent" in t:
+            return "Dev Agent"
+        if "design" in t:
+            return "Design Token Extractor"
+        if "clone" in t:
+            return "Website Cloner Engine"
+        if "web" in t:
+            return "Web Intelligence Engine"
+        return "Autonomous Subprocess"
+
     def to_dict(self) -> dict:
         prog = 100 if self.status == TaskStatus.DONE else self.progress
+        started_str = time.strftime("%H:%M:%S", time.localtime(self.started_at)) if self.started_at else "--:--:--"
+        model_name = self.model
+        if not model_name and isinstance(self.params, dict):
+            model_name = self.params.get("model") or ""
+        if not model_name:
+            t = (self.tool or "").lower()
+            from core.models import DEFAULT_ANTIGRAVITY_MODEL
+            if self.tool in CODING_TOOLS or "opencode" in t or "kilo" in t or "antigravity" in t:
+                try:
+                    from memory.config_manager import get_opencode_model
+                    model_name = get_opencode_model()
+                except Exception:
+                    model_name = DEFAULT_ANTIGRAVITY_MODEL
+            elif self.tool in CLONER_TOOLS or "clone" in t:
+                model_name = DEFAULT_ANTIGRAVITY_MODEL
+            else:
+                model_name = "Built-in Engine"
+
+        subtasks = []
+        if isinstance(self.result, dict) and "subtasks" in self.result:
+            subtasks = self.result["subtasks"]
+        elif isinstance(self.params, dict) and "subtasks" in self.params:
+            subtasks = self.params["subtasks"]
+
         return {
             "id": self.id,
             "tool": self.tool,
+            "engine": self.engine or self._infer_engine(self.tool),
+            "model": model_name,
             "status": self.status.value,
             "progress": prog,
             "message": strip_ansi(self.message),
             "result": self.result,
+            "subtasks": subtasks,
             "error": self.error,
             "pid": self.pid,
             "params": self.params,
+            "group_id": self.group_id or self.id,
+            "group_title": self.group_title or "",
+            "parent_id": self.parent_id or "",
+            "logs": list(self.logs),
             "started_at": self.started_at,
+            "started_time_str": started_str,
             "finished_at": self.finished_at,
             "elapsed_sec": round(
                 (self.finished_at or time.time()) - self.started_at, 1
             ),
         }
-
-
-CODING_TOOLS = {"opencode_agent", "kilo_agent", "dev_agent", "antigravity_agent"}
-MAX_CONCURRENT_CODING_TASKS = 1
 
 
 class TaskManager:
@@ -88,6 +199,10 @@ class TaskManager:
         self._ttl = ttl_sec
         self._watchdog_started = False
         self._coding_queue: list[tuple[str, Callable, dict, TaskContext, TaskState]] = []
+        self._clone_semaphore = threading.Semaphore(MAX_CONCURRENT_CLONES)
+        self._last_submit_time: float = 0.0
+        self._current_group_id: Optional[str] = None
+        self._current_group_title: Optional[str] = None
 
     # ── public ───────────────────────────────────────────────
 
@@ -96,16 +211,43 @@ class TaskManager:
         tool_name: str,
         fn: Callable[[dict, "TaskContext"], dict],
         params: dict,
+        group_id: Optional[str] = None,
+        group_title: Optional[str] = None,
+        parent_id: Optional[str] = None,
     ) -> str:
         task_id = uuid.uuid4().hex[:8]
-        state = TaskState(id=task_id, tool=tool_name, params=dict(params or {}))
-        ctx = TaskContext(task_id, self)
+        now = time.time()
 
         with self._lock:
+            # Auto-grouping for multi-tool bursts dispatched in the same request (within 3.5s window)
+            if not group_id:
+                if (now - self._last_submit_time) < 3.5 and self._current_group_id:
+                    group_id = self._current_group_id
+                    group_title = group_title or self._current_group_title
+                else:
+                    group_id = uuid.uuid4().hex[:8]
+                    if not group_title and params:
+                        raw_title = params.get("target") or params.get("query") or params.get("task") or params.get("repo") or ""
+                        clean_title = re.sub(r'^(language:[^ ]+|site:[^ ]+)\s*', '', str(raw_title)).strip()
+                        group_title = clean_title or tool_name.replace("_", " ").title()
+                    self._current_group_id = group_id
+                    self._current_group_title = group_title
+
+            self._last_submit_time = now
+
+            state = TaskState(
+                id=task_id,
+                tool=tool_name,
+                params=dict(params or {}),
+                group_id=group_id,
+                group_title=group_title,
+                parent_id=parent_id,
+            )
+            ctx = TaskContext(task_id, self)
+
             # Rapid duplicate submission debounce (prevents double-invocations from live voice stream)
             if tool_name in CODING_TOOLS:
                 repo_target = (params or {}).get("repo") or (params or {}).get("project_path")
-                now = time.time()
                 for existing in self._tasks.values():
                     if (
                         existing.tool == tool_name
@@ -141,6 +283,65 @@ class TaskManager:
 
             self._start_task_thread(task_id, fn, params, ctx, state)
             return task_id
+
+    def submit_after(
+        self,
+        parent_task_id: str,
+        tool_name: str,
+        fn: Callable[[dict, "TaskContext"], dict],
+        params: dict,
+    ) -> str:
+        """Submit a chained task that waits for parent_task_id to reach DONE status before executing."""
+        task_id = uuid.uuid4().hex[:8]
+        state = TaskState(
+            id=task_id,
+            tool=tool_name,
+            params=dict(params or {}),
+            status=TaskStatus.QUEUED,
+            message=f"waiting for task {parent_task_id}",
+        )
+        ctx = TaskContext(task_id, self)
+
+        with self._lock:
+            self._prune()
+            self._tasks[task_id] = state
+            self._last_task_id = task_id
+            self._ensure_watchdog()
+
+        def _waiter():
+            # Check parent status periodically
+            while True:
+                time.sleep(0.5)
+                with self._lock:
+                    if state.cancel_event.is_set():
+                        state.status = TaskStatus.CANCELLED
+                        state.finished_at = time.time()
+                        return
+                    parent = self._tasks.get(parent_task_id)
+                    if not parent:
+                        state.status = TaskStatus.FAILED
+                        state.error = f"Parent task {parent_task_id} not found"
+                        state.finished_at = time.time()
+                        return
+                    if parent.status == TaskStatus.DONE:
+                        break
+                    if parent.status in (TaskStatus.FAILED, TaskStatus.CANCELLED):
+                        state.status = TaskStatus.FAILED
+                        state.error = f"Parent task {parent_task_id} {parent.status.value}"
+                        state.finished_at = time.time()
+                        return
+
+            # Parent finished successfully, now run child task
+            self._start_task_thread(task_id, fn, params, ctx, state)
+
+        threading.Thread(
+            target=_waiter,
+            name=f"jarvis-task-chain-{task_id}",
+            daemon=True,
+        ).start()
+        logger.info("task %s [%s] chained after %s", task_id, tool_name, parent_task_id)
+        return task_id
+
 
     def _start_task_thread(
         self,
@@ -252,6 +453,17 @@ class TaskManager:
                 and not s.notified
             ]
 
+    def get_group_tasks(self, group_id: str) -> list[TaskState]:
+        with self._lock:
+            return [t for t in self._tasks.values() if (t.group_id or t.id) == group_id]
+
+    def has_active_tasks_in_group(self, group_id: str) -> bool:
+        with self._lock:
+            return any(
+                (t.group_id or t.id) == group_id and t.status in (TaskStatus.RUNNING, TaskStatus.QUEUED)
+                for t in self._tasks.values()
+            )
+
     def all_tasks(self) -> list[dict]:
         with self._lock:
             return [s.to_dict() for s in self._tasks.values()]
@@ -326,7 +538,14 @@ class TaskManager:
             if progress is not None and progress >= 0:
                 s.progress = max(0, min(100, progress))
             if message:
-                s.message = strip_ansi(message)[-280:]
+                clean_msg = strip_ansi(message).strip()
+                if clean_msg:
+                    s.message = clean_msg[-280:]
+                    ts = time.strftime("%H:%M:%S")
+                    if not s.logs or s.logs[-1].get("text") != clean_msg:
+                        s.logs.append({"time": ts, "text": clean_msg, "progress": s.progress})
+                        if len(s.logs) > 250:
+                            s.logs = s.logs[-250:]
 
     def _on_complete(self, task_id: str, result: Optional[dict] = None) -> None:
         with self._lock:
@@ -336,6 +555,10 @@ class TaskManager:
             s.status = TaskStatus.DONE
             s.progress = 100
             s.message = "completed"
+            ts = time.strftime("%H:%M:%S")
+            s.logs.append({"time": ts, "text": "Task execution completed successfully", "progress": 100})
+            if len(s.logs) > 60:
+                s.logs = s.logs[-60:]
             if result is not None:
                 s.result = result
 
@@ -347,6 +570,10 @@ class TaskManager:
             s.status = TaskStatus.FAILED
             s.error = str(error)
             s.message = f"failed: {error}"
+            ts = time.strftime("%H:%M:%S")
+            s.logs.append({"time": ts, "text": f"Error: {error}", "progress": s.progress})
+            if len(s.logs) > 60:
+                s.logs = s.logs[-60:]
 
 
     def _ensure_watchdog(self) -> None:
@@ -478,16 +705,28 @@ class TaskContext:
 
 
 
-# ── singleton ────────────────────────────────────────────────
+# ── singleton (Process-Level Persistent) ───────────────────────
+
+import sys
 
 _default: Optional[TaskManager] = None
 _default_lock = threading.Lock()
 
 
 def get_task_manager() -> TaskManager:
+    """Returns the process-level TaskManager singleton, guaranteed to survive session reconnects."""
     global _default
+    # Check process-level store first to survive module reloads and session reconnects
+    if getattr(sys, "_zezo_task_manager", None) is not None:
+        _default = sys._zezo_task_manager
+        return _default
+
     if _default is None:
         with _default_lock:
-            if _default is None:
+            if getattr(sys, "_zezo_task_manager", None) is not None:
+                _default = sys._zezo_task_manager
+            elif _default is None:
                 _default = TaskManager()
+                sys._zezo_task_manager = _default
     return _default
+

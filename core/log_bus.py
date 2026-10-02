@@ -100,6 +100,15 @@ _NOISY_LOGGERS = (
     "docx",
     "pptx",
     "openpyxl",
+    # Rust HTTP/DNS/HTTP2 stack pulled in by ddgs -> primp. Its DEBUG stream is
+    # enormous (a single web search emitted >1000 lines of DNS + HTTP/2 frames
+    # and rolled the whole ring buffer), so pin it to WARNING like the rest.
+    "hickory_net",
+    "hickory_resolver",
+    "hickory_proto",
+    "h2",
+    "cookie_store",
+    "primp",
 )
 
 
@@ -153,6 +162,21 @@ def emit(level: str, source: str, message: str) -> None:
     except Exception:
         # A logging path must never be the reason the assistant dies.
         pass
+
+
+def emit_tool_micro_event(
+    event_type: str,
+    tool_name: str,
+    details: dict | None = None,
+    level: str = "INFO",
+) -> None:
+    """Emit a structured micro-event (e.g. started, progress, completed, failed) for HUD/activity stream."""
+    details_str = ""
+    if details:
+        parts = [f"{k}={v}" for k, v in details.items() if v is not None]
+        details_str = f" ({', '.join(parts)})" if parts else ""
+    msg = f"[{tool_name}] event={event_type}{details_str}"
+    emit(level, f"tool.{tool_name}", msg)
 
 
 def mark() -> int:

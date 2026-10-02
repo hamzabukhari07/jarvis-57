@@ -1,0 +1,2396 @@
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+<style>
+  /* ── 100% Exact Autonomous Traffic Vectors Design System Tokens ── */
+  :root {
+    --bg-deep: #050505;
+    --bg-surface: #0a0a0a;
+    --bg-elevated: #111111;
+    --border-subtle: rgba(255, 255, 255, 0.05);
+    --border-default: rgba(255, 255, 255, 0.10);
+    --border-strong: rgba(255, 255, 255, 0.20);
+    --text-primary: #f5f5f7;
+    --text-secondary: #a0a0ab;
+    --text-muted: rgba(255, 255, 255, 0.40);
+    --accent: #f24e1e;
+    --accent-dim: rgba(242, 78, 30, 0.15);
+    --radius-sm: 2px;
+    --radius-md: 4px;
+    --radius-lg: 8px;
+    --font-sans: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background-color: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  .mono { font-family: var(--font-mono); }
+  .text-muted { color: var(--text-muted); }
+  .text-secondary { color: var(--text-secondary); }
+  .text-accent { color: var(--accent); }
+
+  /* ── Section framing & Exact Corner Brackets ── */
+  .frame {
+    position: relative;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.10), rgba(255,255,255,0.02), transparent);
+    padding: 1px;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);
+    display: flex;
+    flex-direction: column;
+    transition: flex 0.25s cubic-bezier(0.16, 1, 0.3, 1), height 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .frame-inner {
+    background: rgba(10,10,10,0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
+    padding: 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+  .corner { position: absolute; width: 12px; height: 1px; background: rgba(255,255,255,0.4); z-index: 5; pointer-events: none; }
+  .corner-v { position: absolute; width: 1px; height: 12px; background: rgba(255,255,255,0.4); z-index: 5; pointer-events: none; }
+  .corner-tl { top: 0; left: 0; }
+  .corner-tr { top: 0; right: 0; }
+  .corner-bl { bottom: 0; left: 0; }
+  .corner-br { bottom: 0; right: 0; }
+  .corner-v-tl { top: 0; left: 0; }
+  .corner-v-tr { top: 0; right: 0; }
+  .corner-v-bl { bottom: 0; left: 0; }
+  .corner-v-br { bottom: 0; right: 0; }
+
+  /* ── Section headers ── */
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-subtle);
+  }
+
+  /* ── Typography scale ── */
+  .type-display { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; color: #fff; }
+  .type-heading { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; color: #fff; }
+  .type-body { font-size: 12px; font-weight: 300; line-height: 1.5; color: var(--text-secondary); }
+  .type-label { font-family: var(--font-mono); font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); }
+  .type-code { font-family: var(--font-mono); font-size: 11px; font-weight: 400; color: var(--text-primary); }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 6px 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .btn:hover { border-color: var(--border-strong); background: var(--bg-elevated); color: #fff; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { filter: brightness(1.15); border-color: var(--accent); }
+  .btn-ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
+  .btn-ghost:hover { color: #fff; background: rgba(255,255,255,0.04); }
+  .btn-danger { border-color: rgba(239,68,68,0.4); color: #ef4444; }
+  .btn-danger:hover { background: rgba(239,68,68,0.15); border-color: #ef4444; }
+  .btn-sm { padding: 4px 8px; font-size: 9px; }
+  .btn-icon { width: 28px; height: 28px; padding: 0; border-radius: var(--radius-sm); }
+  .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-icon.active { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+
+  /* ── 100% Autonomous Traffic Vectors Design System: Input Fields & Select Dropdowns ── */
+  .input-field,
+  input[type="text"],
+  input[type="password"],
+  select.input-field,
+  select {
+    width: 100%;
+    background-color: #050505 !important;
+    background: #050505 !important;
+    border: 1px solid var(--border-default) !important;
+    border-radius: var(--radius-md) !important;
+    padding: 9px 12px !important;
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+    color: #f5f5f7 !important;
+    outline: none !important;
+    transition: border 0.2s ease, box-shadow 0.2s ease !important;
+    box-shadow: none !important;
+  }
+  .input-field::placeholder,
+  input::placeholder {
+    color: var(--text-muted) !important;
+    font-family: var(--font-sans) !important;
+    font-weight: 300 !important;
+    opacity: 0.7 !important;
+  }
+  .input-field:focus,
+  input[type="text"]:focus,
+  input[type="password"]:focus,
+  select:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px rgba(242, 78, 30, 0.2) !important;
+    background-color: #08080a !important;
+  }
+
+  /* Custom Webkit Select Dropdown Styling */
+  select, select.input-field {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23f24e1e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 10px center !important;
+    background-size: 14px 14px !important;
+    padding-right: 32px !important;
+    cursor: pointer !important;
+  }
+  select option {
+    background-color: #111111 !important;
+    color: #f5f5f7 !important;
+    padding: 10px 14px !important;
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+  }
+  select option:hover,
+  select option:focus,
+  select option:active,
+  select option:checked {
+    background-color: var(--accent-dim) !important;
+    color: var(--accent) !important;
+  }
+
+  /* Fix Webkit Autofill Override (Yellow / White background bug) */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #050505 inset !important;
+    -webkit-text-fill-color: #f5f5f7 !important;
+    caret-color: #f5f5f7 !important;
+    transition: background-color 5000s ease-in-out 0s !important;
+  }
+
+  /* ── Badges / Chips ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 2px 7px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    white-space: nowrap;
+    line-height: 1.3;
+    max-width: 100%;
+  }
+  .badge-accent { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .badge-success { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.3); color: #22c55e; }
+  .badge-warn { background: rgba(234,179,8,0.1); border-color: rgba(234,179,8,0.3); color: #eab308; }
+
+  /* ── Progress ── */
+  .progress-track {
+    width: 100%;
+    height: 4px;
+    background: var(--bg-elevated);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 999px;
+    transition: width 0.3s ease, background 0.3s ease;
+  }
+
+  /* ── Cards & Data Tables ── */
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+  }
+  .card-interactive {
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .card-interactive:hover, .card-interactive.active {
+    border-color: var(--accent);
+    background: var(--bg-elevated);
+  }
+
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    text-align: left;
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .data-table td {
+    font-size: 11px;
+    color: var(--text-secondary);
+    padding: 5px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+  }
+  .data-table tr:hover td { background: rgba(255,255,255,0.02); color: var(--text-primary); }
+
+  /* ── Tabs ── */
+  .hud-tabs {
+    display: flex;
+    gap: 3px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+    flex-shrink: 0;
+  }
+  .hud-tabs::-webkit-scrollbar { display: none; }
+  .hud-tab {
+    padding: 3px 6px;
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .hud-tab:hover {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.03);
+  }
+  .hud-tab.active {
+    color: #ffffff;
+    background: var(--bg-elevated);
+    border-color: var(--accent);
+  }
+
+  /* ── 100% Autonomous Traffic Vectors Design System: File Drag & Drop ── */
+  .dropzone {
+    border: 1.5px dashed var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--bg-deep);
+    padding: 14px 10px;
+    text-align: center;
+    transition: border-color 0.25s ease, background 0.25s ease;
+    cursor: pointer;
+    position: relative;
+  }
+  .dropzone:hover {
+    border-color: var(--border-strong);
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .dropzone.dragover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .dropzone-icon {
+    width: 36px;
+    height: 36px;
+    margin: 0 auto 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+  }
+  .dropzone:hover .dropzone-icon {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .dropzone.dragover .dropzone-icon {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── Background & Lines ── */
+  /* ── Background & Lines ── */
+  .container-lines {
+    display: none !important;
+  }
+
+  /* ── Master App Layout ── */
+  .app-shell {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    padding: 6px;
+    gap: 6px;
+    max-width: 100%;
+    margin: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  /* ── AUTHENTIC NATIVE TOP BAR (Matching ui.py Exact Window Header) ── */
+  .top-navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 48px;
+    padding: 0 14px;
+    background: rgba(10, 10, 10, 0.95);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 20px -6px rgba(0,0,0,0.7);
+    flex-shrink: 0;
+  }
+
+  .header-left-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+  }
+
+  .header-center-branding {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+
+  .header-brand-title {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #ffffff;
+    text-transform: uppercase;
+    position: relative;
+    padding-bottom: 2px;
+  }
+
+  .header-brand-divider {
+    width: 24px;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+    transition: width 0.3s ease;
+  }
+  .header-center-branding:hover .header-brand-divider {
+    width: 48px;
+  }
+
+  .header-right-clock {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    font-family: var(--font-mono);
+  }
+  .header-clock-time {
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 1px;
+    line-height: 1.1;
+  }
+  .header-clock-date {
+    font-size: 8px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+
+  .workspace-grid {
+    display: grid;
+    grid-template-columns: minmax(210px, 250px) minmax(0, 1fr) minmax(260px, 300px);
+    gap: 6px;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    max-width: 100%;
+    height: calc(100vh - 58px);
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  /* ── Interactive Splitter Handle (QSplitter Style) ── */
+  .center-column-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .splitter-bar {
+    height: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: row-resize;
+    user-select: none;
+    margin: 1px 0;
+    position: relative;
+    z-index: 20;
+    transition: background 0.2s ease;
+  }
+  .splitter-bar:hover {
+    background: var(--accent-dim);
+  }
+  .splitter-grip {
+    width: 36px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    transition: all 0.2s ease;
+  }
+  .splitter-bar:hover .splitter-grip {
+    width: 54px;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* ── Full Settings Dropdown Drawer (Anchored Directly Below Settings Trigger) ── */
+  .settings-dropdown-drawer {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: 270px;
+    border-radius: 0 !important;
+    box-shadow: 0 25px 60px -10px rgba(0,0,0,0.98), 0 0 25px var(--accent-dim);
+    z-index: 9999;
+    padding: 0;
+    display: none;
+    flex-direction: column;
+    animation: drawerIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .settings-dropdown-drawer .frame-inner {
+    border-radius: 0 !important;
+  }
+  .settings-dropdown-drawer.open {
+    display: flex;
+  }
+  @keyframes drawerIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .settings-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .settings-row:hover {
+    border-color: var(--border-strong);
+    background: var(--bg-elevated);
+  }
+
+  /* ── Functional Color Dot Pickers ── */
+  .color-dot-picker {
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  }
+  .color-dot-picker:hover {
+    transform: scale(1.25);
+    box-shadow: 0 0 8px currentColor;
+  }
+  .color-dot-picker.active {
+    border-color: #ffffff;
+    box-shadow: 0 0 10px currentColor;
+    transform: scale(1.2);
+  }
+
+  /* ── Cyber HUD Mini Switch Toggles ── */
+  .hud-switch {
+    width: 30px;
+    height: 16px;
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    flex-shrink: 0;
+  }
+  .hud-switch .switch-knob {
+    width: 12px;
+    height: 12px;
+    background: #94a3b8;
+    border-radius: 50%;
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  }
+  .hud-switch.active {
+    background: rgba(34, 197, 94, 0.22);
+    border-color: #22c55e;
+  }
+  .hud-switch.active .switch-knob {
+    left: 15px;
+    background: #22c55e;
+    box-shadow: 0 0 8px #22c55e;
+  }
+  .hud-switch.active-accent {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
+  .hud-switch.active-accent .switch-knob {
+    left: 15px;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* ── Fluid Vortex Avatar & States (Full Black Block, No Glow Distortion) ── */
+  #avatar-frame,
+  #avatar-frame .frame-inner {
+    background: #000000 !important;
+  }
+  .vortex-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    pointer-events: none;
+  }
+  .vortex-halo {
+    display: none !important; /* Glow background removed per design specification */
+  }
+  .vortex-gif {
+    position: relative;
+    z-index: 3;
+    width: 290px;
+    height: 290px;
+    max-width: 330px;
+    max-height: 330px;
+    object-fit: contain;
+    filter: none !important; /* No drop shadows or blurry halos */
+    /* `mix-blend-mode: screen` removed. Over this pure-black frame it is a
+       pixel-identical no-op (verified), but blending the animated GIF inside a
+       `backdrop-filter` ancestor forces a per-frame backdrop read, which makes
+       the QtWebEngine compositor flicker. */
+    transition: width 0.3s ease, height 0.3s ease;
+  }
+
+  /* ── State Selector Pills (State Demonstrator) ── */
+  .state-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 3px 7px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: rgba(10, 10, 10, 0.7);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .state-pill-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+    background: var(--bg-elevated);
+  }
+  .state-pill-btn.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: #ffffff;
+    font-weight: 600;
+  }
+
+  /* ── 4. Unified Avatar Command Dock (Option 1) ── */
+  .avatar-command-dock {
+    background: rgba(10, 10, 14, 0.92);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    padding: 4px 6px;
+    box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+    z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: auto;
+    user-select: none;
+  }
+  .avatar-command-dock:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(14, 14, 18, 0.96);
+  }
+
+  .dock-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    outline: none;
+    color: var(--text-muted);
+    padding: 3px 7px;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .dock-btn:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: #ffffff;
+  }
+  .dock-btn iconify-icon {
+    font-size: 12px;
+  }
+
+  /* Mic Button Active / Muted */
+  .dock-btn.mic-btn.active {
+    background: rgba(249, 115, 22, 0.12);
+    color: #f97316;
+    border-color: rgba(249, 115, 22, 0.3);
+  }
+  .dock-btn.mic-btn.muted {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.3);
+  }
+
+  /* Stop Button */
+  .dock-btn.stop-btn:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.35);
+  }
+
+  /* Power / Sleep Button */
+  .dock-btn.power-btn.sleeping {
+    background: rgba(168, 85, 247, 0.15);
+    color: #a855f7;
+    border-color: rgba(168, 85, 247, 0.35);
+  }
+  .dock-btn.power-btn.offline {
+    background: rgba(100, 116, 139, 0.15);
+    color: #64748b;
+    border-color: rgba(100, 116, 139, 0.3);
+  }
+
+  /* State Badge */
+  .dock-state-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 3px 6px;
+    border-radius: var(--radius-sm);
+  }
+  .state-matrix-canvas {
+    display: block;
+    width: 14px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+  .state-heading-text {
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+    font-weight: 500;
+    letter-spacing: -0.1px;
+    color: #f1f5f9;
+    white-space: nowrap;
+    transition: color 0.25s ease;
+  }
+
+  .dock-divider {
+    width: 1px;
+    height: 14px;
+    background: rgba(255, 255, 255, 0.10);
+    flex-shrink: 0;
+  }
+
+  /* ── 5. Clean Prompt Command Input Bar (Panel 05) ── */
+  .command-input-container {
+    background: rgba(12, 12, 16, 0.95);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 4px 6px 4px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .command-input-container:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 16px -2px var(--accent-dim), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .command-input-field {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: #ffffff;
+    padding: 3px 0;
+  }
+  .command-input-field::placeholder {
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 11px;
+  }
+
+  .command-send-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: #ffffff;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .command-send-btn:hover {
+    background: var(--accent-hover);
+    transform: scale(1.05);
+    box-shadow: 0 0 10px var(--accent);
+  }
+  .command-dock-send-btn:active {
+    transform: scale(0.96);
+  }
+
+  /* ── Stream & Chat Message UI/UX (User vs ZEZO Distinction) ── */
+  .stream-msg {
+    position: relative;
+    padding: 8px 10px;
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: all 0.15s ease;
+    animation: msgFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes msgFadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .stream-msg:hover {
+    border-color: var(--border-default);
+    background: var(--bg-elevated);
+  }
+
+  .stream-msg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    margin-bottom: 2px;
+  }
+  .stream-msg-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .stream-msg-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 700;
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    letter-spacing: 0.5px;
+  }
+
+  /* User Message Card Variant (Distinct Neutral Slate Obsidian - Never clashes with accent colors) */
+  .stream-msg-user {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 3px solid #64748b;
+    border-radius: var(--radius-sm);
+  }
+  .stream-msg-user .stream-msg-tag {
+    background: rgba(100, 116, 139, 0.18);
+    color: #cbd5e1;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+  }
+  .stream-msg-user .stream-msg-body {
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.45;
+  }
+
+  /* ZEZO AI Response Card Variant (Dynamic Theme Accent Glow & Branded Tag) */
+  .stream-msg-zezo {
+    background: rgba(14, 14, 18, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+  .stream-msg-zezo .stream-msg-tag {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  .stream-msg-zezo .stream-msg-body {
+    color: #f1f5f9;
+    font-size: 11px;
+    line-height: 1.5;
+    font-family: var(--font-sans);
+    font-weight: 400;
+  }
+
+  /* System Event Log Card Variant */
+  .stream-msg-sys {
+    padding: 5px 8px;
+    background: rgba(8, 8, 10, 0.6);
+    border-left: 2px solid var(--border-default);
+    font-size: 10px;
+    font-family: var(--font-mono);
+  }
+  .stream-msg-sys.ok {
+    border-left-color: #22c55e;
+    background: rgba(34, 197, 94, 0.04);
+  }
+  .stream-msg-sys.interrupt {
+    border-left-color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+  }
+  .stream-msg-sys.state {
+    border-left-color: var(--accent);
+  }
+  .stream-msg-sys.hud {
+    border-left-color: #a855f7;
+    background: rgba(168, 85, 247, 0.04);
+  }
+
+  /* Message Copy Button */
+  .msg-copy-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    padding: 2px 5px;
+    font-size: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .msg-copy-btn:hover {
+    color: #ffffff;
+    border-color: var(--border-default);
+    background: var(--bg-surface);
+  }
+  .msg-copy-btn.copied {
+    color: #22c55e !important;
+    border-color: rgba(34, 197, 94, 0.4) !important;
+    background: rgba(34, 197, 94, 0.1) !important;
+  }
+
+  /* ── Modal Overlays ── */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(12px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-panel {
+    width: 720px;
+    max-height: 85vh;
+    border-radius: 0 !important;
+    box-shadow: 0 25px 60px -12px rgba(0,0,0,0.98);
+    display: flex;
+    flex-direction: column;
+    animation: modalIn 0.2s ease-out;
+  }
+  .modal-panel .frame-inner {
+    border-radius: 0 !important;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.97) translateY(8px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* Scrollbars */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg-deep); }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+   /* ── Toast Notification System ── */
+   #zezo-toast-container {
+     position: fixed;
+     bottom: 20px;
+     right: 20px;
+     z-index: 99999;
+     display: flex;
+     flex-direction: column;
+     gap: 8px;
+     pointer-events: none;
+   }
+   .zezo-toast {
+     pointer-events: auto;
+     background: var(--bg-elevated);
+     border: 1px solid var(--border-default);
+     border-radius: var(--radius-md);
+     padding: 10px 16px;
+     font-family: var(--font-mono);
+     font-size: 11px;
+     color: var(--text-primary);
+     box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+     display: flex;
+     align-items: center;
+     gap: 8px;
+     animation: toastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+     max-width: 320px;
+   }
+   .zezo-toast.success { border-color: rgba(34,197,94,0.4); }
+   .zezo-toast.success .toast-icon { color: #22c55e; }
+   .zezo-toast.error { border-color: rgba(239,68,68,0.4); }
+   .zezo-toast.error .toast-icon { color: #ef4444; }
+   .zezo-toast.info { border-color: rgba(242,78,30,0.4); }
+   .zezo-toast.info .toast-icon { color: var(--accent); }
+   .zezo-toast.removing { animation: toastOut 0.2s ease-in forwards; }
+   @keyframes toastIn {
+     from { opacity: 0; transform: translateX(40px) scale(0.95); }
+     to { opacity: 1; transform: translateX(0) scale(1); }
+   }
+   @keyframes toastOut {
+     from { opacity: 1; transform: translateX(0) scale(1); }
+     to { opacity: 0; transform: translateX(40px) scale(0.95); }
+   }
+   /* ── Toast Notification System ── */
+   #zezo-toast-container {
+     position: fixed;
+     bottom: 20px;
+     right: 20px;
+     z-index: 99999;
+     display: flex;
+     flex-direction: column;
+     gap: 8px;
+     pointer-events: none;
+   }
+   .zezo-toast {
+     pointer-events: auto;
+     background: var(--bg-elevated);
+     border: 1px solid var(--border-default);
+     border-radius: var(--radius-md);
+     padding: 10px 16px;
+     font-family: var(--font-mono);
+     font-size: 11px;
+     color: var(--text-primary);
+     box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+     display: flex;
+     align-items: center;
+     gap: 8px;
+     animation: toastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+     max-width: 320px;
+   }
+   .zezo-toast.success { border-color: rgba(34,197,94,0.4); }
+   .zezo-toast.success .toast-icon { color: #22c55e; }
+   .zezo-toast.error { border-color: rgba(239,68,68,0.4); }
+   .zezo-toast.error .toast-icon { color: #ef4444; }
+   .zezo-toast.info { border-color: rgba(242,78,30,0.4); }
+   .zezo-toast.info .toast-icon { color: var(--accent); }
+   .zezo-toast.removing { animation: toastOut 0.2s ease-in forwards; }
+   @keyframes toastIn {
+     from { opacity: 0; transform: translateX(40px) scale(0.95); }
+     to { opacity: 1; transform: translateX(0) scale(1); }
+   }
+   @keyframes toastOut {
+     from { opacity: 1; transform: translateX(0) scale(1); }
+     to { opacity: 0; transform: translateX(40px) scale(0.95); }
+   }
+   /* Toast Notification System */
+   #zezo-toast-container {
+     position: fixed;
+     bottom: 20px;
+     right: 20px;
+     z-index: 99999;
+     display: flex;
+     flex-direction: column;
+     gap: 8px;
+     pointer-events: none;
+   }
+   .zezo-toast {
+     pointer-events: auto;
+     background: var(--bg-elevated);
+     border: 1px solid var(--border-default);
+     border-radius: var(--radius-md);
+     padding: 10px 16px;
+     font-family: var(--font-mono);
+     font-size: 11px;
+     color: var(--text-primary);
+     box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+     display: flex;
+     align-items: center;
+     gap: 8px;
+     animation: toastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+     max-width: 320px;
+   }
+   .zezo-toast.success { border-color: rgba(34,197,94,0.4); }
+   .zezo-toast.success .toast-icon { color: #22c55e; }
+   .zezo-toast.error { border-color: rgba(239,68,68,0.4); }
+   .zezo-toast.error .toast-icon { color: #ef4444; }
+   .zezo-toast.info { border-color: rgba(242,78,30,0.4); }
+   .zezo-toast.info .toast-icon { color: var(--accent); }
+   .zezo-toast.removing { animation: toastOut 0.2s ease-in forwards; }
+   @keyframes toastIn {
+     from { opacity: 0; transform: translateX(40px) scale(0.95); }
+     to { opacity: 1; transform: translateX(0) scale(1); }
+   }
+   @keyframes toastOut {
+     from { opacity: 1; transform: translateX(0) scale(1); }
+     to { opacity: 0; transform: translateX(40px) scale(0.95); }
+   }
+</style>
+</head>
+
+<body>
+
+<!-- Container lines with square corner nodes -->
+<div class="container-lines">
+  <div style="position:absolute;top:0;left:-3px;width:6px;height:6px;background:#050505;border:1px solid rgba(255,255,255,0.2);"></div>
+  <div style="position:absolute;bottom:0;left:-3px;width:6px;height:6px;background:#050505;border:1px solid rgba(255,255,255,0.2);"></div>
+  <div style="position:absolute;top:0;right:-3px;width:6px;height:6px;background:#050505;border:1px solid rgba(255,255,255,0.2);"></div>
+  <div style="position:absolute;bottom:0;right:-3px;width:6px;height:6px;background:#050505;border:1px solid rgba(255,255,255,0.2);"></div>
+</div>
+
+<!-- Three.js WebGL particle background removed: the full-window scene pinned a
+     whole CPU core in QtWebEngine. The dot-matrix state icon below is kept. -->
+
+<div class="app-shell">
+  
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 1. TOP NAVBAR (Exact match to ui.py Native Header from Screenshot) -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <header class="top-navbar" style="position: relative; z-index: 100;">
+    <!-- Left: 4 Icon Buttons (Settings ⚙, Logs ⧉, Task Matrix ⊞, Remote QR 📱) -->
+    <div class="header-left-actions" style="position: relative;">
+      
+      <!-- Settings Trigger Wrapper & Anchored Dropdown Drawer -->
+      <div style="position: relative;">
+        <button class="btn btn-icon btn-sm" id="settings-trigger-btn" onclick="toggleSettingsDrawer(event)" title="Full Settings & Quick Controls">
+          <iconify-icon icon="solar:settings-linear" style="font-size: 16px;"></iconify-icon>
+        </button>
+
+        <!-- ── FULL NATIVE CONTROLS DRAWER (Anchored Directly Below Gear Button) ── -->
+        <div class="settings-dropdown-drawer frame" id="settings-drawer" style="width: 270px; max-height: calc(100vh - 70px);">
+          <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+          <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+          <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+          <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+          <div class="frame-inner" style="padding: 10px; overflow-y: auto;">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px; margin-bottom: 6px;">
+              <span class="mono" style="font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: 1.5px;">• CONTROLS</span>
+              <button class="btn btn-ghost btn-sm" onclick="toggleSettingsDrawer(event)" style="padding:2px 6px; font-size:10px;">✕</button>
+            </div>
+
+            <!-- 16 Native Control Buttons -->
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              
+              <!-- 1. Remote Control -->
+              <button class="btn btn-sm" onclick="openModal('qr-modal')" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:smartphone-linear" style="font-size: 13px; color: var(--accent);"></iconify-icon>
+                <span>REMOTE CONTROL</span>
+              </button>
+
+              <!-- 2. Fullscreen [F11] -->
+              <button class="btn btn-sm" onclick="toggleFullScreenMode()" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:maximize-square-linear" style="font-size: 13px;"></iconify-icon>
+                <span>FULLSCREEN [F11]</span>
+              </button>
+
+              <!-- 3. Desktop Shortcut -->
+              <button class="btn btn-sm" onclick="simulateShortcut()" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:widget-add-linear" style="font-size: 13px;"></iconify-icon>
+                <span>CREATE DESKTOP SHORTCUT</span>
+              </button>
+
+              <!-- 4. Autostart Toggle -->
+              <button class="btn btn-sm" id="drawer-autostart-btn" onclick="toggleAutostart()" style="justify-content: space-between; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <span style="display:flex; align-items:center; gap:6px;">
+                  <iconify-icon icon="solar:power-bold" style="font-size: 13px;"></iconify-icon>
+                  <span>AUTO-START:</span>
+                </span>
+                <div class="hud-switch" id="autostart-switch"><div class="switch-knob"></div></div>
+              </button>
+
+              <!-- 5. Customise Assistant -->
+              <button class="btn btn-sm" onclick="openModal('customise-modal')" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:user-hand-up-linear" style="font-size: 13px;"></iconify-icon>
+                <span>CUSTOMISE ASSISTANT</span>
+              </button>
+
+              <!-- 6. Morning Brief Toggle -->
+              <button class="btn btn-sm" id="drawer-brief-btn" onclick="toggleBriefMode()" style="justify-content: space-between; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <span style="display:flex; align-items:center; gap:6px;">
+                  <iconify-icon icon="solar:sun-2-linear" style="font-size: 13px;"></iconify-icon>
+                  <span>MORNING BRIEF:</span>
+                </span>
+                <div class="hud-switch active" id="brief-mode-switch"><div class="switch-knob"></div></div>
+              </button>
+
+              <!-- 7. Wake Word Toggle -->
+              <button class="btn btn-sm" id="drawer-wake-btn" onclick="toggleWakeWord()" style="justify-content: space-between; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <span style="display:flex; align-items:center; gap:6px;">
+                  <iconify-icon icon="solar:microphone-3-linear" style="font-size: 13px;"></iconify-icon>
+                  <span>WAKE WORD:</span>
+                </span>
+                <div class="hud-switch active-accent" id="wake-word-switch"><div class="switch-knob"></div></div>
+              </button>
+
+              <!-- 8. Push-To-Talk Toggle -->
+              <button class="btn btn-sm" id="drawer-ptt-btn" onclick="togglePtt()" style="justify-content: space-between; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <span style="display:flex; align-items:center; gap:6px;">
+                  <iconify-icon icon="solar:keyboard-linear" style="font-size: 13px;"></iconify-icon>
+                  <span>PUSH-TO-TALK:</span>
+                </span>
+                <div class="hud-switch active" id="ptt-switch"><div class="switch-knob"></div></div>
+              </button>
+
+              <!-- 8B. Voice Fallback Toggle -->
+              <button class="btn btn-sm" id="drawer-fallback-btn" onclick="toggleVoiceFallback()" style="justify-content: space-between; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <span style="display:flex; align-items:center; gap:6px;">
+                  <iconify-icon icon="solar:shield-warning-linear" style="font-size: 13px;"></iconify-icon>
+                  <span>AUTO FALLBACK:</span>
+                </span>
+                <div class="hud-switch active" id="fallback-switch"><div class="switch-knob"></div></div>
+              </button>
+
+              <!-- 9. HUD Style Cycler -->
+              <button class="btn btn-sm" id="drawer-hud-btn" onclick="cycleHudStyle()" style="justify-content: space-between; text-align: left; font-size: 9px; padding: 5px 8px; border-color: var(--accent);">
+                <span style="display:flex; align-items:center; gap:6px; color: var(--accent);">
+                  <iconify-icon icon="solar:mask-hamsa-linear" style="font-size: 13px;"></iconify-icon>
+                  <span>HUD STYLE:</span>
+                </span>
+                <span class="type-code text-accent" id="hud-style-label" style="font-size: 8px;">FLUID VORTEX</span>
+              </button>
+
+              <!-- 10. Audio Devices -->
+              <button class="btn btn-s</span>m" onclick="openModal('audio-modal'); if (window.requestAudioDevices) window.requestAudioDevices();" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:headphones-round-linear" style="font-size: 13px;"></iconify-icon>
+                <span>AUDIO DEVICES</span>
+              </button>
+
+              <!-- 11. Memory Engine -->
+              <button class="btn btn-sm" onclick="openModal('memory-modal')" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:atom-linear" style="font-size: 13px;"></iconify-icon>
+                <span>MEMORY</span>
+              </button>
+
+              <!-- 12. Voice Pipeline & Engines -->
+              <button class="btn btn-sm" onclick="openModal('pipeline-modal')" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:transmission-linear" style="font-size: 13px;"></iconify-icon>
+                <span>VOICE PIPELINE</span>
+              </button>
+
+              <!-- 13. Plugins & Extensions (Merged) -->
+              <button class="btn btn-sm" onclick="openModal('plugin-modal')" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:box-minimalistic-linear" style="font-size: 13px;"></iconify-icon>
+                <span>PLUGINS & EXTENSIONS</span>
+              </button>
+
+              <!-- 14. Skill Hub -->
+              <button class="btn btn-sm" onclick="openModal('skills-modal')" style="justify-content: flex-start; text-align: left; font-size: 9px; padding: 5px 8px;">
+                <iconify-icon icon="solar:bolt-linear" style="font-size: 13px;"></iconify-icon>
+                <span>SKILL HUB</span>
+              </button>
+
+            </div>
+
+            <!-- ── 16. FUNCTIONAL UI ACCENT COLOR PICKER (8 Studio Colors) ── -->
+            <div style="border-top: 1px solid var(--border-subtle); margin-top: 8px; padding-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+              <span class="type-label" style="font-size: 8px; color: var(--text-muted); letter-spacing: 0.12em;">UI ACCENT COLOR</span>
+              <div style="display: flex; gap: 5px; align-items: center; justify-content: space-between;">
+                <!-- Orange (Default) -->
+                <div class="color-dot-picker active" id="color-dot-orange" onclick="setAccentColor('#f24e1e', 'orange')" title="Solar Orange" style="background: #f24e1e; color: #f24e1e;"></div>
+                <!-- Cyan -->
+                <div class="color-dot-picker" id="color-dot-cyan" onclick="setAccentColor('#00d2ff', 'cyan')" title="Neon Cyan" style="background: #00d2ff; color: #00d2ff;"></div>
+                <!-- Emerald -->
+                <div class="color-dot-picker" id="color-dot-emerald" onclick="setAccentColor('#10b981', 'emerald')" title="Cyber Emerald" style="background: #10b981; color: #10b981;"></div>
+                <!-- Purple -->
+                <div class="color-dot-picker" id="color-dot-purple" onclick="setAccentColor('#a855f7', 'purple')" title="Hyper Purple" style="background: #a855f7; color: #a855f7;"></div>
+                <!-- Amber -->
+                <div class="color-dot-picker" id="color-dot-amber" onclick="setAccentColor('#f59e0b', 'amber')" title="Electric Amber" style="background: #f59e0b; color: #f59e0b;"></div>
+                <!-- Red -->
+                <div class="color-dot-picker" id="color-dot-red" onclick="setAccentColor('#ef4444', 'red')" title="Crimson Red" style="background: #ef4444; color: #ef4444;"></div>
+                <!-- Pink -->
+                <div class="color-dot-picker" id="color-dot-pink" onclick="setAccentColor('#ec4899', 'pink')" title="Hot Pink" style="background: #ec4899; color: #ec4899;"></div>
+                <!-- Blue -->
+                <div class="color-dot-picker" id="color-dot-blue" onclick="setAccentColor('#38bdf8', 'blue')" title="Ice Blue" style="background: #38bdf8; color: #38bdf8;"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-icon btn-sm" onclick="openModal('log-modal')" title="Backend Log Console (Ctrl+L)">
+        <iconify-icon icon="solar:document-text-linear" style="font-size: 16px;"></iconify-icon>
+      </button>
+      <button class="btn btn-icon btn-sm" onclick="openModal('task-modal')" title="Task Matrix & Registry">
+        <iconify-icon icon="solar:layers-minimalistic-linear" style="font-size: 16px;"></iconify-icon>
+      </button>
+      <button class="btn btn-icon btn-sm" onclick="openModal('qr-modal')" title="Mobile Remote Control & Key">
+        <iconify-icon icon="solar:qr-code-linear" style="font-size: 16px;"></iconify-icon>
+      </button>
+    </div>
+
+    <!-- Center: Prominent Bold ZEZO Title with Accent Divider -->
+    <div class="header-center-branding">
+      <div class="header-brand-title">ZEZO</div>
+      <div class="header-brand-divider"></div>
+    </div>
+
+    <!-- Right: Digital Clock & Date (JetBrains Mono) -->
+    <div class="header-right-clock">
+      <div class="header-clock-time" id="header-clock-time">18:50:38</div>
+      <div class="header-clock-date" id="header-clock-date">MON 21 SEP 2026</div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 2. MASTER 3-COLUMN TACTICAL WORKSPACE -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <main class="workspace-grid">
+    
+    <!-- ── LEFT PANEL: Hardware Telemetry & Task Queue ── -->
+    <aside style="display: flex; flex-direction: column; gap: 8px; overflow: hidden; min-width: 0;">
+      
+      <!-- Telemetry Frame -->
+      <div class="frame" style="flex: 0 0 auto;">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        
+        <div class="frame-inner">
+          <div class="section-label">01 · Hardware Telemetry</div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+            <div class="card">
+              <div class="type-label">CPU CORE LOAD</div>
+              <div id="val_cpu" style="font-size:16px;font-weight:600;color:#fff;margin:2px 0;">0%</div>
+              <div class="progress-track"><div class="progress-fill" id="bar_cpu" style="width:0%;"></div></div>
+            </div>
+            <div class="card">
+              <div class="type-label">RAM USAGE</div>
+              <div id="val_mem" style="font-size:16px;font-weight:600;color:#fff;margin:2px 0;">0%</div>
+              <div class="progress-track"><div class="progress-fill" id="bar_mem" style="width:0%;"></div></div>
+            </div>
+            <div class="card">
+              <div class="type-label">SYSTEM GPU</div>
+              <div id="val_gpu" style="font-size:16px;font-weight:600;color:#fff;margin:2px 0;">0%</div>
+              <div class="progress-track"><div class="progress-fill" id="bar_gpu" style="width:0%;"></div></div>
+            </div>
+            <div class="card">
+              <div class="type-label">NET BANDWIDTH</div>
+              <div id="val_net" style="font-size:16px;font-weight:600;color:#fff;margin:2px 0;">0 KB/s</div>
+              <div class="progress-track"><div class="progress-fill" id="bar_net" style="width:0%;"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Autonomous Task Queue Frame -->
+      <div class="frame" style="flex: 1; min-height: 0;">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        
+        <div class="frame-inner">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div class="section-label" style="margin-bottom:0;">02 · Task Queue</div>
+            <span class="badge badge-accent mono" id="task-count-badge">0 ACTIVE</span>
+          </div>
+          
+          <div id="task-queue-list" style="display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex: 1; padding-right: 2px;">
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; color: var(--text-muted); padding: 24px 10px;">
+              <iconify-icon icon="solar:checklist-minimalistic-linear" style="font-size: 28px; margin-bottom: 6px; opacity: 0.35;"></iconify-icon>
+              <div style="font-size: 11px; font-weight: 500;">No Active Tasks</div>
+              <div style="font-size: 9px; font-family: var(--font-mono); margin-top: 2px; color: var(--text-muted);">Tasks dispatched via voice or prompt will appear here.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ── CENTER PANEL: 3D Holographic Viewport + MULTI-VIEW EXPANDABLE INSPECTOR ── -->
+    <section class="center-column-wrapper" id="center-column">
+      
+      <!-- Hologram & Fluid Vortex Avatar Frame -->
+      <div class="frame" id="avatar-frame" style="flex: 1.15; min-height: 140px;">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        
+        <div class="frame-inner" style="position: relative; justify-content: space-between; align-items: center; text-align: center; padding: 10px;">
+
+          <!-- ── 3D HOLOGRAPHIC FLUID VORTEX AVATAR (Pure Pitch Black Frame, No Glow Distortion) ── -->
+          <div id="avatar-container" style="position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; display: flex; align-items: center; justify-content: center;">
+            <div class="vortex-container">
+              <img src="download.gif" onerror="this.src='../References/download.gif'" alt="Holographic Fluid Core" class="vortex-gif" id="vortex-gif" />
+            </div>
+          </div>
+
+          <!-- ── UNIFIED AVATAR COMMAND DOCK (Option 1: Mic, State Badge, Stop, Sleep/Power) ── -->
+          <div class="avatar-command-dock" id="avatar-command-dock">
+            <!-- 1. Mic Mute / Unmute Button -->
+            <button class="dock-btn mic-btn active" id="dock-mic-btn" onclick="toggleMic()" title="Toggle Microphone Mute (F4)">
+              <iconify-icon icon="solar:microphone-3-bold" id="dock-mic-icon"></iconify-icon>
+              <span id="dock-mic-label">MIC</span>
+            </button>
+
+            <div class="dock-divider"></div>
+
+            <!-- 2. Minimalist 2x3 Phosphor Matrix State Badge -->
+            <div class="dock-state-badge" id="dock-state-badge">
+              <canvas id="state-matrix-icon" width="16" height="18" class="state-matrix-canvas"></canvas>
+              <span class="state-heading-text" id="state-heading-text">Standby...</span>
+            </div>
+
+            <div class="dock-divider"></div>
+
+            <!-- 3. Emergency Stop / Halt Button -->
+            <button class="dock-btn stop-btn" id="dock-stop-btn" onclick="emergencyStop()" title="Emergency Stop / Interrupt (Escape)">
+              <iconify-icon icon="solar:stop-circle-bold"></iconify-icon>
+              <span>STOP</span>
+            </button>
+
+            <div class="dock-divider"></div>
+
+            <!-- 4. Power & Sleep Mode Button -->
+            <button class="dock-btn power-btn" id="dock-power-btn" onclick="togglePowerSleep()" title="Put ZEZO to Sleep / Wake Up">
+              <iconify-icon icon="solar:power-bold" id="dock-power-icon"></iconify-icon>
+              <span id="dock-power-label">SLEEP</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Interactive Drag Splitter Bar -->
+      <div class="splitter-bar" id="drag-splitter" title="Drag to resize Inspector panel / Double click to reset">
+        <div class="splitter-grip"></div>
+      </div>
+
+      <!-- Center HUD Data Display & MULTI-VIEW EXPANDABLE Inspector Frame -->
+      <div class="frame" id="inspector-frame" style="flex: 1; min-height: 44px;">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        
+        <div class="frame-inner" id="inspector-container">
+          <!-- Dynamic Live Canvas Header with Smart Context Badge and Compact Controls -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-shrink: 0; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden;">
+              <div class="section-label" style="margin-bottom:0; font-size: 10px; white-space: nowrap; flex-shrink: 0;" id="inspector-header">03 · LIVE DISPLAY CANVAS</div>
+              <span class="badge badge-accent" id="canvas-context-badge" style="font-size: 8px; text-transform: uppercase; letter-spacing: 0.05em; display: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; flex-shrink: 1;" title="">STANDBY</span>
+            </div>
+            
+            <div style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;">
+              <button class="btn btn-ghost btn-sm" onclick="copyCanvasContent(this)" title="Copy Canvas Content" style="font-size: 9px; padding: 2px 6px; white-space: nowrap;">
+                <iconify-icon icon="solar:copy-linear" style="font-size: 11px;"></iconify-icon> COPY
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="clearCanvasContent()" title="Clear Canvas Content" style="font-size: 9px; padding: 2px 6px; white-space: nowrap;">
+                CLEAR
+              </button>
+              <button class="btn btn-icon btn-sm" onclick="toggleCanvasExpand()" id="canvas-expand-btn" title="Toggle Fullscreen Focus" style="padding: 2px 4px;">
+                <iconify-icon icon="solar:maximize-square-linear" style="font-size: 12px;"></iconify-icon>
+              </button>
+            </div>
+          </div>
+
+          <!-- Unified Dynamic Display Canvas Container -->
+          <div id="inspector-body" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px; padding-right: 2px;">
+            
+            <!-- Default Idle / Empty State -->
+            <div id="canvas-empty-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 120px; text-align: center; color: var(--text-muted); padding: 16px;">
+              <iconify-icon icon="solar:atom-linear" style="font-size: 28px; color: var(--accent); margin-bottom: 6px; opacity: 0.6;"></iconify-icon>
+              <div style="font-size: 12px; font-weight: 600; color: #fff;">Autonomous Execution Engine Ready</div>
+              <div style="font-size: 10px; font-family: var(--font-mono); max-width: 360px; margin-top: 4px; line-height: 1.4; color: var(--text-secondary);">
+                Multi-agent workflows (Coding, Web Extraction, File Intelligence, System Telemetry) stream live output here during execution.
+              </div>
+            </div>
+
+            <!-- Dynamic Active Content Container -->
+            <div id="canvas-active-content" style="display: none; width: 100%;">
+              <div id="canvas-content-text" style="font-family: var(--font-mono); font-size: 11px; line-height: 1.5; color: var(--text-primary); white-space: pre-wrap; word-break: break-word; padding: 4px 2px;"></div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ── RIGHT PANEL: File Dropzone, Live Stream & REDESIGNED COMMAND BAR ── -->
+    <aside style="display: flex; flex-direction: column; gap: 8px; overflow: hidden; min-width: 0;">
+      
+      <!-- Payload Ingestion / File Dropzone Frame -->
+      <div class="frame" style="flex: 0 0 auto;">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        
+        <div class="frame-inner">
+          <div class="section-label">04 · Payload Ingestion</div>
+          
+          <input type="file" id="payload-file-input" style="display: none;" multiple onchange="uploadPayloadFiles(this.files)">
+          <input type="file" id="payload-folder-input" style="display: none;" webkitdirectory directory multiple onchange="uploadPayloadFolder(this.files)">
+          
+          <div class="dropzone" id="dropzone-box" title="Drag & drop files or entire folder here">
+            <div class="dropzone-icon">
+              <iconify-icon icon="solar:folder-with-files-bold-duotone" style="font-size: 18px;"></iconify-icon>
+            </div>
+            <div style="font-size:11px; font-weight:600; color:var(--text-primary); margin-bottom: 6px;">
+              Drop documents or project folder
+            </div>
+            
+            <div style="display: flex; gap: 6px; justify-content: center;" onclick="event.stopPropagation();">
+              <button class="btn btn-ghost btn-sm" onclick="document.getElementById('payload-file-input').click()" style="font-size: 9px; padding: 2px 8px;">
+                <iconify-icon icon="solar:file-linear" style="font-size: 11px;"></iconify-icon> Pick Files
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="document.getElementById('payload-folder-input').click()" style="font-size: 9px; padding: 2px 8px; border-color: var(--accent); color: var(--accent);">
+                <iconify-icon icon="solar:folder-favourite-bold-duotone" style="font-size: 11px;"></iconify-icon> Pick Folder
+              </button>
+            </div>
+          </div>
+
+          <!-- Multi-Payload Ingestion List & Management Panel -->
+          <div id="payload-items-container" style="display: none; flex-direction: column; gap: 4px; margin-top: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1px 2px;">
+              <span class="type-code text-muted" id="payload-count-label" style="font-size: 9px; letter-spacing: 0.5px;">INGESTED PAYLOADS (0)</span>
+              <button class="btn btn-ghost btn-sm" onclick="clearAllPayloads()" style="font-size: 8.5px; padding: 1px 5px; color: var(--accent);" title="Clear all ingested payloads">CLEAR ALL</button>
+            </div>
+            <div id="payload-list-items" style="display: flex; flex-direction: column; gap: 3px; max-height: 115px; overflow-y: auto; padding-right: 2px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Activity Stream Frame -->
+      <div class="frame" style="flex: 1; min-height: 0;">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        
+        <div class="frame-inner">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 6px; flex-shrink: 0; min-width: 0;">
+            <div class="section-label" style="margin-bottom:0; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">05 · Activity Log</div>
+            <div style="display: flex; gap: 4px; flex-shrink: 0;">
+              <button id="copy-stream-btn" class="btn btn-ghost btn-sm" onclick="copyEntireStream(this)" style="font-size: 9px; padding: 2px 6px; white-space: nowrap;" title="Copy entire chat & stream transcript">
+                <iconify-icon icon="solar:copy-linear" style="font-size: 11px;"></iconify-icon> COPY ALL
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="clearStream()" style="font-size: 9px; padding: 2px 6px; white-space: nowrap;">CLEAR</button>
+            </div>
+          </div>
+
+          <!-- Activity Log Messages (High-Tech Structured Cards) -->
+          <div id="stream-box" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px;">
+          </div>
+
+          <!-- ── CLEAN PROMPT COMMAND INPUT BAR (Panel 05) ── -->
+          <div class="command-input-container" style="margin-top: 6px;">
+            <input type="text" class="command-input-field" id="user-input" placeholder="Ask ZEZO or enter command..." onkeydown="if(event.key==='Enter') executeCommand()">
+            <button class="command-send-btn" onclick="executeCommand()" title="Send Prompt (Enter)">
+              <iconify-icon icon="solar:arrow-right-linear" style="font-size: 13px;"></iconify-icon>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- 3. INTERACTIVE MODAL OVERLAYS (Matching ui.py Exact Dialogs) -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+<!-- Modal 1: Slide-Out Task Matrix Drawer -->
+<div class="modal-overlay" id="task-modal" onclick="if(event.target===this) closeModal('task-modal')">
+  <div class="modal-panel frame">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="badge badge-accent mono" style="font-size: 11px;">⚡ ZEZO TASK MANAGER</span>
+          <span class="type-code text-muted">Autonomous Process Registry & Hardware Telemetry</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('task-modal')">✕</button>
+      </div>
+
+      <!-- Summary KPI Row -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+        <div class="card" style="border-color: var(--accent);">
+          <div class="type-label">RUNNING PROCESSES</div>
+          <div style="font-size:20px; font-weight:600; color:var(--accent);" id="task-modal-running-count">0</div>
+        </div>
+        <div class="card">
+          <div class="type-label">QUEUED JOBS</div>
+          <div style="font-size:20px; font-weight:600; color:#fff;" id="task-modal-queued-count">0</div>
+        </div>
+        <div class="card">
+          <div class="type-label">COMPLETED SESSIONS</div>
+          <div style="font-size:20px; font-weight:600; color:#22c55e;" id="task-modal-done-count">0</div>
+        </div>
+      </div>
+
+      <!-- Detailed Task Cards -->
+      <div id="task-modal-list" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 420px;">
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 160px; text-align: center; color: var(--text-muted);">
+          <iconify-icon icon="solar:checklist-minimalistic-linear" style="font-size: 32px; margin-bottom: 8px; opacity: 0.35;"></iconify-icon>
+          <div style="font-size: 12px; font-weight: 500;">No Background Tasks</div>
+          <div style="font-size: 10px; font-family: var(--font-mono); margin-top: 4px; color: var(--text-muted);">All asynchronous agent executions will be registered here.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 1B: Rich Task Detail Inspector Modal (More Detail View Mockup Match) -->
+<div class="modal-overlay" id="task-detail-modal" onclick="if(event.target===this) closeModal('task-detail-modal')">
+  <div class="modal-panel frame" style="width: 480px; max-width: 95vw;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+      
+      <!-- Top Title Bar -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="badge badge-accent mono" id="task-detail-badge">ZEZO CODER</span>
+          <span class="type-code text-muted" id="task-detail-id">#2446f935</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('task-detail-modal')">✕</button>
+      </div>
+
+      <!-- Hero Task Title & Path -->
+      <div>
+        <div style="font-size: 13.5px; font-weight: 600; color: #ffffff; line-height: 1.3;" id="task-detail-title">
+          Synthesizing layout, hero section & components
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px;">
+          <span class="type-code text-muted" id="task-detail-target" style="font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;">
+            Target: Desktop/website
+          </span>
+          <span class="badge badge-accent" id="task-detail-status-badge">● RUNNING (45%)</span>
+        </div>
+        <!-- Progress track -->
+        <div class="progress-track" style="margin-top: 8px;">
+          <div class="progress-fill" id="task-detail-progress-bar" style="width: 45%;"></div>
+        </div>
+      </div>
+
+      <!-- Section: INTERNAL DETAILS -->
+      <div>
+        <div class="section-label" style="margin-bottom: 6px;">INTERNAL DETAILS</div>
+        <div style="background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px 10px; font-family: var(--font-mono); font-size: 10px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Engine:</span> <span style="color: #ffffff; font-weight: 600;" id="task-detail-engine">Antigravity Agent</span></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Model:</span> <span style="color: var(--accent); font-weight: 600;" id="task-detail-model">Gemini 3.1 Flash</span></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">PID / Job:</span> <span style="color: var(--text-secondary);" id="task-detail-pid">15128 (Assigned)</span></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Started:</span> <span style="color: var(--text-secondary);" id="task-detail-started">18:29:15</span></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Elapsed:</span> <span style="color: var(--text-secondary);" id="task-detail-elapsed">1m 12s</span></div>
+        </div>
+      </div>
+
+      <!-- Section: RECENT LOG / EXECUTION STEPS -->
+      <div>
+        <div class="section-label" style="margin-bottom: 6px;">RECENT LOG</div>
+        <div id="task-detail-log-stream" style="background: #050508; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px 10px; font-family: var(--font-mono); font-size: 9.5px; max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;">
+          <div style="color: var(--text-muted);">[SYS] Initializing execution plan...</div>
+        </div>
+      </div>
+
+      <!-- Section: ACTIONS FOOTER -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 8px; margin-top: 2px;">
+        <button class="btn btn-danger btn-sm" id="task-detail-cancel-btn" onclick="cancelCurrentTaskFromDetail()">
+          <iconify-icon icon="solar:stop-circle-bold"></iconify-icon> CANCEL TASK
+        </button>
+        <div style="display: flex; gap: 6px;">
+          <button class="btn btn-ghost btn-sm" onclick="copyTaskParamsFromDetail(this)">
+            <iconify-icon icon="solar:copy-linear"></iconify-icon> PARAMS
+          </button>
+          <button class="btn btn-primary btn-sm" id="btn-copy-task-logs" onclick="copyTaskLogsFromDetail(this)" title="Copy task logs to clipboard">
+            <iconify-icon icon="solar:copy-bold"></iconify-icon> COPY LOGS
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- Modal 2: AUTHENTIC REMOTE CONTROL MODAL (Screenshot 1 Exact Match) -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="qr-modal" onclick="if(event.target===this) closeModal('qr-modal')">
+  <div class="modal-panel frame" style="max-width: 440px;">
+    <!-- 100% Authentic Corner Brackets -->
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 20px; text-align: center; display: flex; flex-direction: column; align-items: center;">
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 12px;">
+        <span class="badge badge-accent mono" style="font-size: 10px;">📱 MOBILE REMOTE CONTROL</span>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('qr-modal')">✕</button>
+      </div>
+
+      <div class="type-code text-muted" style="font-size: 11px; margin-bottom: 14px; width: 100%; text-align: center;">
+        Direct Local Gateway: <span id="remote-url-display" style="color:var(--text-primary); font-weight:600;">—</span>
+      </div>
+
+      <!-- ── PERFECTLY CENTERED TIGHT QR CODE BOX (No Stretched White Background) ── -->
+      <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-bottom: 16px;">
+        <div style="width: 180px; height: 180px; background: #ffffff; padding: 10px; border: 1px solid rgba(255, 255, 255, 0.25); box-shadow: 0 15px 35px rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <img id="remote-qr-img" src="" alt="Remote QR Code" style="width: 160px; height: 160px; display: block; object-fit: contain;">
+        </div>
+      </div>
+
+      <!-- ── PROMINENT PAIRING KEY + COPY ACTION (Screenshot 1 Match) ── -->
+      <div style="width: 100%; margin-bottom: 12px;">
+        <div class="type-label" style="margin-bottom: 5px; color: var(--text-muted); letter-spacing: 0.15em;">AUTHENTICATION PAIRING KEY</div>
+        <div style="display: flex; gap: 6px; align-items: stretch;">
+          <div id="pairing-key-display" style="flex: 1; font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: var(--accent); background: var(--bg-deep); border: 1px solid var(--border-default); padding: 8px 12px; letter-spacing: 8px; user-select: all; text-align: center;">
+            ——
+          </div>
+          <button class="btn btn-sm" id="copy-pairing-key-btn" onclick="copyPairingKey()" title="Copy pairing key" style="flex-shrink: 0; padding: 8px 12px;">
+            <iconify-icon icon="solar:copy-linear"></iconify-icon> COPY
+          </button>
+        </div>
+      </div>
+
+      <!-- Countdown Expiry Timer -->
+      <div class="type-code text-muted" id="remote-timer-lbl" style="font-size: 10px; margin-bottom: 14px;">
+        Key expires in <span id="remote-timer-value" style="color:#fff; font-weight:600;">--:--</span>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
+        <button class="btn btn-primary btn-sm" onclick="regenerateKey()">
+          <iconify-icon icon="solar:refresh-linear"></iconify-icon> NEW KEY
+        </button>
+        <button class="btn btn-sm" onclick="closeModal('qr-modal')">
+          DISMISS
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 3: Audio Devices & I/O Settings Modal -->
+<div class="modal-overlay" id="audio-modal" onclick="if(event.target===this) closeModal('audio-modal')">
+  <div class="modal-panel frame" style="max-width: 500px;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <span class="badge badge-accent mono">🔊 AUDIO I/O & ENDPOINTS</span>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('audio-modal')">✕</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div>
+          <label class="type-label" style="margin-bottom: 4px; display: block;">Microphone Input Endpoint</label>
+          <select id="audio-input-select" style="width: 100%; background: var(--bg-deep); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 8px 12px; font-family: var(--font-mono); font-size: 11px; color: #fff;"></select>
+          <div id="audio-input-warning" class="type-code" style="display: none; margin-top: 4px; font-size: 9.5px; color: #f59e0b;"></div>
+          <div style="margin-top: 6px; display: flex; align-items: center; gap: 8px;">
+            <div style="flex: 1; height: 6px; background: var(--bg-deep); border: 1px solid var(--border-default); border-radius: 3px; overflow: hidden;">
+              <div id="audio-mic-bar" style="height: 100%; width: 0%; background: var(--accent); transition: width 0.08s linear;"></div>
+            </div>
+            <span id="audio-mic-status" class="type-code text-muted" style="font-size: 9.5px; min-width: 104px; text-align: right;">MIC: waiting…</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="type-label" style="margin-bottom: 4px; display: block;">Speaker Output Endpoint</label>
+          <select id="audio-output-select" style="width: 100%; background: var(--bg-deep); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 8px 12px; font-family: var(--font-mono); font-size: 11px; color: #fff;"></select>
+          <div id="audio-output-warning" class="type-code" style="display: none; margin-top: 4px; font-size: 9.5px; color: #f59e0b;"></div>
+        </div>
+
+        <button class="btn btn-primary btn-sm" onclick="saveAudioDevices()" style="justify-content: center;">
+          <iconify-icon icon="solar:refresh-circle-bold" style="font-size: 13px;"></iconify-icon>
+          <span id="audio-save-label">APPLY &amp; RECONNECT</span>
+        </button>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span class="type-label">SELF-ECHO FILTER & MIC BLEED SUPPRESSION</span>
+            <span class="type-code text-accent" id="audio-echo-state">Active</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" style="width: 85%;"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 4: High-Tech Backend Log Console Modal (Ctrl+L) -->
+<div class="modal-overlay" id="log-modal" onclick="if(event.target===this) closeModal('log-modal')">
+  <div class="modal-panel frame" style="width: 980px; max-width: 95vw;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+      
+      <!-- Top Title & Close Bar -->
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="badge badge-accent mono">📜 BACKEND LOG CONSOLE</span>
+          <span class="type-code text-muted" id="log-stats-badge">0 / 20,000 LINES</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('log-modal')">✕</button>
+      </div>
+
+      <!-- Action Toolbar Row: Follow, Pause, Clear, Export, Copy & Filters -->
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; background: rgba(12, 12, 18, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 6px 10px;">
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <!-- Follow Toggle -->
+          <button class="btn btn-sm active" id="log-follow-btn" onclick="toggleLogFollow()" style="font-size: 9.5px; padding: 3px 8px;">
+            <iconify-icon icon="solar:record-bold" style="color: var(--accent); font-size: 11px;"></iconify-icon>
+            <span id="log-follow-label">FOLLOW</span>
+          </button>
+          
+          <!-- Pause Stream Toggle -->
+          <button class="btn btn-sm" id="log-pause-btn" onclick="toggleLogPause()" style="font-size: 9.5px; padding: 3px 8px;">
+            <iconify-icon icon="solar:pause-bold" style="font-size: 11px;"></iconify-icon>
+            <span id="log-pause-label">PAUSE</span>
+          </button>
+          
+          <!-- Clear Logs -->
+          <button class="btn btn-ghost btn-sm" onclick="clearBackendLogsUI()" style="font-size: 9.5px; padding: 3px 8px;" title="Clear Backend Log Buffer">
+            <iconify-icon icon="solar:trash-bin-trash-linear" style="font-size: 11px;"></iconify-icon>
+            <span>CLEAR</span>
+          </button>
+          
+          <!-- Export Logs -->
+          <button class="btn btn-ghost btn-sm" onclick="exportBackendLogsUI()" style="font-size: 9.5px; padding: 3px 8px;" title="Download Backend Logs">
+            <iconify-icon icon="solar:download-linear" style="font-size: 11px;"></iconify-icon>
+            <span>EXPORT</span>
+          </button>
+          
+          <!-- Copy All -->
+          <button class="btn btn-sm" onclick="copyBackendLogsUI(this)" style="font-size: 9.5px; padding: 3px 8px;" title="Copy all visible logs to clipboard">
+            <iconify-icon icon="solar:copy-linear" style="font-size: 11px;"></iconify-icon>
+            <span>COPY ALL</span>
+          </button>
+        </div>
+
+        <!-- Real-time Filter Controls: Search, Level, Source -->
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <!-- Search Input -->
+          <div style="position: relative; display: flex; align-items: center;">
+            <iconify-icon icon="solar:magnifer-linear" style="position: absolute; left: 8px; font-size: 11px; color: var(--text-muted); pointer-events: none; z-index: 2;"></iconify-icon>
+            <input type="text" id="log-search-filter" placeholder="Filter text..." oninput="filterBackendLogs()" style="background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #fff; font-family: var(--font-mono); font-size: 10px; padding: 4px 8px 4px 26px; width: 140px; outline: none;">
+          </div>
+
+          <!-- Level Filter -->
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span class="type-label" style="font-size: 8px;">LEVEL</span>
+            <select id="log-level-filter" onchange="filterBackendLogs()" style="background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #fff; font-family: var(--font-mono); font-size: 9.5px; padding: 3px 6px; outline: none; cursor: pointer;">
+              <option value="ALL">ALL</option>
+              <option value="INFO">INFO & ABOVE</option>
+              <option value="WARNING">WARNINGS</option>
+              <option value="ERROR">ERRORS</option>
+              <option value="DEBUG">DEBUG (ALL)</option>
+            </select>
+          </div>
+
+          <!-- Source Filter -->
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span class="type-label" style="font-size: 8px;">SOURCE</span>
+            <select id="log-source-filter" onchange="filterBackendLogs()" style="background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: #fff; font-family: var(--font-mono); font-size: 9.5px; padding: 3px 6px; outline: none; cursor: pointer; max-width: 120px;">
+              <option value="ALL">ALL</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- High-Tech Monospace Terminal View -->
+      <div id="log-modal-buffer" style="background: #050508; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px; font-family: var(--font-mono); font-size: 10.5px; line-height: 1.5; height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; user-select: text;">
+        <div style="color:var(--text-muted);">[SYS] Connecting to Python backend Log Bus ring buffer...</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal 5: Customise Assistant Modal -->
+<div class="modal-overlay" id="customise-modal" onclick="if(event.target===this) closeModal('customise-modal')">
+  <div class="modal-panel frame" style="max-width: 540px; max-height: min(90vh, 700px); display: flex; flex-direction: column;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 0; display: flex; flex-direction: column; overflow: hidden; height: 100%; max-height: inherit;">
+      <!-- Fixed Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; background: var(--bg-deep);">
+        <span class="badge badge-accent mono">⚙ CUSTOMISE ASSISTANT</span>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('customise-modal')">✕</button>
+      </div>
+
+      <!-- Scrollable Content Body -->
+      <div style="padding: 14px 18px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; flex: 1; min-height: 0;">
+        <div>
+          <label class="type-label" style="display:block; margin-bottom:4px;">Assistant Identity Name</label>
+          <input type="text" id="customise-asst-name" class="input-field" value="ZEZO" style="width:100%;">
+        </div>
+
+        <div>
+          <label class="type-label" style="display:block; margin-bottom:4px;">Gemini Live Voice Persona</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <select id="customise-voice-select" class="input-field" style="flex: 1; background:var(--bg-deep);">
+              <option value="Puck">Puck (Engaging & Crisp)</option>
+              <option value="Aoede">Aoede (Melodic & Friendly)</option>
+              <option value="Charon">Charon (Authoritative & Deep)</option>
+              <option value="Fenrir">Fenrir (Precise & Fast)</option>
+              <option value="Kore">Kore (Warm & Studio)</option>
+            </select>
+            <button type="button" class="btn btn-sm btn-outline" id="btn-preview-voice" onclick="previewCurrentVoice()" style="display:flex; align-items:center; gap:6px; padding: 6px 12px; white-space:nowrap;">
+              <iconify-icon id="preview-btn-icon" icon="solar:play-circle-bold-duotone" style="font-size:16px; color:var(--accent);"></iconify-icon>
+              <span id="preview-btn-label">PREVIEW VOICE</span>
+            </button>
+          </div>
+          <div id="voice-preview-status" style="font-size: 10px; color: var(--text-muted); margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+            <iconify-icon icon="solar:volume-loud-linear"></iconify-icon> Click Preview to listen to a live sample of this voice persona
+          </div>
+        </div>
+
+        <!-- Automatic Voice Fallback Failover Toggle -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-deep); padding: 9px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="type-label" style="margin: 0; font-size: 11px; color: var(--text-primary); cursor: pointer;" onclick="toggleVoiceFallback()">Auto Voice Fallback</span>
+              <span id="customise-fallback-badge" class="badge badge-success" style="font-size: 8px;">AUTO ON</span>
+            </div>
+            <span style="font-size: 9.5px; color: var(--text-muted);">Switch to offline cascade if Live disconnects. If OFF, errors show on screen.</span>
+          </div>
+          <div class="hud-switch active" id="customise-fallback-switch" onclick="toggleVoiceFallback()" style="cursor: pointer;"><div class="switch-knob"></div></div>
+        </div>
+
+        <div>
+          <label class="type-label" style="display:block; margin-bottom:4px;">Offline Fallback Voice (Kokoro)</label>
+          <select id="customise-fallback-voice-select" class="input-field" style="width:100%; background:var(--bg-deep);">
+            <option value="af_heart">af_heart (US Female · Warm)</option>
+          </select>
+          <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+            <iconify-icon icon="solar:cloud-offline-linear"></iconify-icon> Used only when Gemini Live is offline (voice_fallback = auto)
+          </div>
+        </div>
+
+        <div>
+          <label class="type-label" style="display:block; margin-bottom:4px;">Assistant Response Language</label>
+          <select id="customise-lang-select" class="input-field" style="width:100%; background:var(--bg-deep);">
+            <option value="auto">Auto-Detect (Matches User's Spoken Language)</option>
+            <option value="English">Always English (Hamesha English mein response kare)</option>
+            <option value="Urdu">Always Urdu (Hamesha Urdu mein response kare)</option>
+            <option value="Hindi">Always Hindi (Hamesha Hindi mein response kare)</option>
+            <option value="Spanish">Always Spanish</option>
+            <option value="French">Always French</option>
+            <option value="German">Always German</option>
+            <option value="Arabic">Always Arabic</option>
+            <option value="Turkish">Always Turkish</option>
+          </select>
+          <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">
+            Select whether ZEZO dynamically switches languages or always replies in your chosen language (e.g. speak in Urdu/Hindi, get responses in English).
+          </div>
+        </div>
+
+        <!-- API Keys & Security Credentials Section -->
+        <div style="border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 2px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <label class="type-label" style="display:flex; align-items:center; gap:6px; color:var(--accent);">
+              <iconify-icon icon="solar:key-minimalistic-square-bold" style="font-size:13px;"></iconify-icon>
+              <span>API KEYS & CREDENTIALS (LOCAL PRIVATE)</span>
+            </label>
+            <span class="badge badge-success" style="font-size: 8.5px;">🔒 GIT IGNORED</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size: 10px; color: var(--text-secondary);">Google Gemini API Key</span>
+                  <span id="gemini-key-status" class="badge badge-success" style="font-size: 8px; display:none;">✓ SAVED & ACTIVE</span>
+                </div>
+                <button type="button" onclick="togglePasswordVisibility('customise-gemini-key', this)" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px; display:flex; align-items:center; gap:3px;">
+                  <iconify-icon icon="solar:eye-linear"></iconify-icon> Show
+                </button>
+              </div>
+              <input type="password" id="customise-gemini-key" class="input-field" placeholder="AIzaSy... (Paste new key to replace)" style="width:100%; font-family:var(--font-mono); font-size:11px;">
+            </div>
+
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size: 10px; color: var(--text-secondary);">Groq API Key (Optional Fallback)</span>
+                  <span id="groq-key-status" class="badge badge-success" style="font-size: 8px; display:none;">✓ SAVED & ACTIVE</span>
+                </div>
+                <button type="button" onclick="togglePasswordVisibility('customise-groq-key', this)" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px; display:flex; align-items:center; gap:3px;">
+                  <iconify-icon icon="solar:eye-linear"></iconify-icon> Show
+                </button>
+              </div>
+              <input type="password" id="customise-groq-key" class="input-field" placeholder="gsk_... (Optional)" style="width:100%; font-family:var(--font-mono); font-size:11px;">
+            </div>
+
+            <div style="font-size: 9.5px; color: var(--text-muted); line-height: 1.4;">
+              🛡️ Keys are saved locally in <code style="color:var(--accent);">config/api_keys.json</code>. This file is strictly excluded by <code style="color:var(--accent);">.gitignore</code> and will NEVER be pushed to GitHub.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fixed Sticky Footer Action Buttons -->
+      <div style="display: flex; justify-content: flex-end; gap: 8px; padding: 10px 18px; border-top: 1px solid var(--border-subtle); background: var(--bg-deep); flex-shrink: 0;">
+        <button class="btn btn-sm" onclick="closeModal('customise-modal')">CANCEL</button>
+        <button class="btn btn-primary btn-sm" onclick="saveCustomiseSettings()">SAVE CHANGES</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 6: SQLite FTS5 Memory Engine Modal -->
+<div class="modal-overlay" id="memory-modal" onclick="if(event.target===this) closeModal('memory-modal')">
+  <div class="modal-panel frame" style="max-width: 640px;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <iconify-icon icon="solar:atom-bold" style="color:var(--accent); font-size:16px;"></iconify-icon>
+          <span class="badge badge-accent mono">🧠 SQLITE FTS5 BRAIN (BM25 SEARCH)</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('memory-modal')">✕</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <input type="text" class="input-field" placeholder="Search long-term semantic memory (e.g. projects, users, design)...">
+        <div style="background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px; max-height: 280px; overflow-y: auto; font-family: var(--font-mono); font-size: 11px;">
+          <div style="color:var(--text-muted); text-align:center; padding: 20px;">SQLite FTS5 Semantic Memory Engine Ready. Query database above.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 7: Plugins & Ecosystem Modal -->
+<div class="modal-overlay" id="plugin-modal" onclick="if(event.target===this) closeModal('plugin-modal')">
+  <div class="modal-panel frame" style="max-width: 600px;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <span class="badge badge-accent mono">🧩 PLUGIN ECOSYSTEM</span>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('plugin-modal')">✕</button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 340px; overflow-y: auto;">
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <b>Git Workflow</b>
+            <span class="badge badge-success">ACTIVE</span>
+          </div>
+          <div class="type-body" style="font-size: 10px; margin-top: 4px;">Automated branch staging, clean semantic commit messages.</div>
+        </div>
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <b>YouTube Intel</b>
+            <span class="badge badge-success">ACTIVE</span>
+          </div>
+          <div class="type-body" style="font-size: 10px; margin-top: 4px;">Video transcription, metadata parsing, playback hooks.</div>
+        </div>
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <b>Design Extractor</b>
+            <span class="badge badge-success">ACTIVE</span>
+          </div>
+          <div class="type-body" style="font-size: 10px; margin-top: 4px;">Deterministic HTML/CSS token & component parser.</div>
+        </div>
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <b>System Telemetry</b>
+            <span class="badge badge-success">ACTIVE</span>
+          </div>
+          <div class="type-body" style="font-size: 10px; margin-top: 4px;">Hardware metrics, thread scheduling, GPU VRAM monitor.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 8: Declarative Skills Hub Modal -->
+<div class="modal-overlay" id="skills-modal" onclick="if(event.target===this) closeModal('skills-modal')">
+  <div class="modal-panel frame" style="max-width: 680px;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <span class="badge badge-accent mono">⚡ SKILL HUB · 10 DISCOVERED PACKAGES</span>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('skills-modal')">✕</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px; max-height: 380px; overflow-y: auto;">
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <b>skills/hamza_taste</b>
+            <div class="type-code text-muted" style="font-size:10px;">Studio UI aesthetic, anti-slop design rules & color tokens</div>
+          </div>
+          <span class="badge badge-accent">DESIGN</span>
+        </div>
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <b>skills/opencode</b>
+            <div class="type-code text-muted" style="font-size:10px;">Full autonomous multi-file coding workflow with feedback loop</div>
+          </div>
+          <span class="badge badge-accent">CODING</span>
+        </div>
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <b>skills/social_research</b>
+            <div class="type-code text-muted" style="font-size:10px;">YouTube, Reddit & GitHub research pipeline</div>
+          </div>
+          <span class="badge">RESEARCH</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 9: Voice Pipeline & Engine Selection -->
+<div class="modal-overlay" id="pipeline-modal" onclick="if(event.target===this) closeModal('pipeline-modal')">
+  <div class="modal-panel frame" style="max-width: 620px; max-height: min(88vh, 680px); display: flex; flex-direction: column;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 0; display: flex; flex-direction: column; overflow: hidden; height: 100%; max-height: inherit;">
+      <!-- 1. Fixed Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; background: var(--bg-deep);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <iconify-icon icon="solar:transmission-bold-duotone" style="font-size: 15px; color: var(--accent);"></iconify-icon>
+          <span class="badge badge-accent mono" style="letter-spacing: 0.8px;">⚡ VOICE PIPELINE & ENGINE SELECTION</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('pipeline-modal')">✕</button>
+      </div>
+
+      <!-- 2. Scrollable Body Content -->
+      <div style="padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1; min-height: 0;">
+
+        <!-- Section 1: Pipeline Mode & Failover -->
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <span class="type-label mono" style="font-size: 9.5px; color: var(--text-muted); letter-spacing: 1.5px;">MODE & FAILOVER</span>
+          <div style="display: flex; gap: 16px; align-items: center;">
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;">
+              <input type="radio" name="pipeline-mode" value="live" checked onchange="togglePipelineMode('live')" style="cursor: pointer;">
+              <span style="color: var(--text-primary); font-weight: 500;">Live (Default)</span>
+              <span style="color: var(--text-muted); font-size: 10.5px;">Gemini realtime</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;">
+              <input type="radio" name="pipeline-mode" value="cascade" onchange="togglePipelineMode('cascade')" style="cursor: pointer;">
+              <span style="color: var(--text-primary); font-weight: 500;">Cascade</span>
+              <span style="color: var(--text-muted); font-size: 10.5px;">Custom engines</span>
+            </label>
+          </div>
+
+          <!-- Voice Fallback Toggle in Pipeline Modal -->
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 7px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); margin-top: 2px;">
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 11px; font-weight: 600; color: var(--text-primary);">Voice Fallback Failover</span>
+                <span id="pipeline-fallback-badge" class="badge badge-success" style="font-size: 8px;">AUTO ON</span>
+              </div>
+              <span style="font-size: 9.5px; color: var(--text-muted);">Switch to offline cascade if Live disconnects. If OFF, errors show directly without fallback.</span>
+            </div>
+            <div class="hud-switch active" id="pipeline-fallback-switch" onclick="toggleVoiceFallback()" style="cursor: pointer;"><div class="switch-knob"></div></div>
+          </div>
+        </div>
+
+        <!-- Section 2: Cascade Engines (2-Column Responsive Grid) -->
+        <div id="cascade-engines-section" style="display: none; flex-direction: column; gap: 6px; border-top: 1px solid var(--border-subtle); padding-top: 8px;">
+          <span class="type-label mono" style="font-size: 9.5px; color: var(--text-muted); letter-spacing: 1.5px;">CASCADE ENGINES</span>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <!-- STT Engine -->
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <label style="font-size: 10.5px; color: var(--text-secondary);">Speech-to-Text (STT)</label>
+              <select id="stt-engine-select" class="input-field" onchange="updatePipelineWarnings()" style="font-family: var(--font-mono); font-size: 11px; padding: 5px 8px; background: var(--bg-deep);">
+                <option value="local_whisper">local_whisper (Offline)</option>
+                <option value="groq_whisper">groq_whisper (Fast Cloud)</option>
+                <option value="vosk">vosk (Ultra-Lightweight)</option>
+              </select>
+            </div>
+
+            <!-- LLM Engine -->
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <label style="font-size: 10.5px; color: var(--text-secondary);">Language Model (LLM)</label>
+              <select id="llm-engine-select" class="input-field" onchange="updatePipelineWarnings()" style="font-family: var(--font-mono); font-size: 11px; padding: 5px 8px; background: var(--bg-deep);">
+                <option value="groq">groq (Fast, Free)</option>
+                <option value="gemini">gemini (Advanced)</option>
+                <option value="ollama">ollama (Local)</option>
+              </select>
+            </div>
+
+            <!-- TTS Engine -->
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <label style="font-size: 10.5px; color: var(--text-secondary);">Text-to-Speech (TTS)</label>
+              <select id="tts-engine-select" class="input-field" onchange="updateTtsVoiceOptions(); updatePipelineWarnings();" style="font-family: var(--font-mono); font-size: 11px; padding: 5px 8px; background: var(--bg-deep);">
+                <option value="kokoro">kokoro (Offline)</option>
+                <option value="edge_tts">edge_tts (Free)</option>
+                <option value="elevenlabs">elevenlabs (Premium)</option>
+              </select>
+            </div>
+
+            <!-- TTS Voice -->
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <label style="font-size: 10.5px; color: var(--text-secondary);">TTS Voice</label>
+              <select id="tts-voice-select" class="input-field" style="font-family: var(--font-mono); font-size: 11px; padding: 5px 8px; background: var(--bg-deep);">
+                <option value="">Default for Engine</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: One-Click Presets (Responsive 4-Item Grid) -->
+        <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border-subtle); padding-top: 8px;">
+          <span class="type-label mono" style="font-size: 9.5px; color: var(--text-muted); letter-spacing: 1.5px;">QUICK PRESETS</span>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+            <button class="btn btn-sm" onclick="applyPreset('live')" style="flex-direction: column; padding: 6px 4px; text-align: center; gap: 2px;">
+              <span style="font-weight: 600; font-size: 10.5px;">Gemini Live</span>
+              <div style="font-size: 8.5px; color: var(--text-muted);">Realtime</div>
+            </button>
+            <button class="btn btn-sm" onclick="applyPreset('cloud-fast')" style="flex-direction: column; padding: 6px 4px; text-align: center; gap: 2px;">
+              <span style="font-weight: 600; font-size: 10.5px;">Cloud Fast</span>
+              <div style="font-size: 8.5px; color: var(--text-muted);">Groq + Edge</div>
+            </button>
+            <button class="btn btn-sm" onclick="applyPreset('balanced')" style="flex-direction: column; padding: 6px 4px; text-align: center; gap: 2px;">
+              <span style="font-weight: 600; font-size: 10.5px;">Balanced</span>
+              <div style="font-size: 8.5px; color: var(--text-muted);">Groq + Kokoro</div>
+            </button>
+            <button class="btn btn-sm" onclick="applyPreset('offline')" style="flex-direction: column; padding: 6px 4px; text-align: center; gap: 2px;">
+              <span style="font-weight: 600; font-size: 10.5px;">Offline</span>
+              <div style="font-size: 8.5px; color: var(--text-muted);">Local All</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 3B: Groq API Key Configuration (Direct inline entry) -->
+        <div id="pipeline-groq-key-box" style="display: flex; flex-direction: column; gap: 5px; border-top: 1px solid var(--border-subtle); padding-top: 8px; background: rgba(242, 78, 30, 0.04); border-radius: var(--radius-sm); padding: 8px 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="font-size: 10.5px; font-weight: 600; color: var(--accent); display: flex; align-items: center; gap: 5px;">
+              <iconify-icon icon="solar:key-minimalistic-square-bold"></iconify-icon> GROQ API KEY CONFIGURATION
+            </label>
+            <span id="pipeline-groq-key-status" class="badge" style="font-size: 8px;">CHECKING...</span>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <input type="password" id="pipeline-groq-key-input" class="input-field" placeholder="gsk_... (Enter key & click Save Key)" style="flex: 1; font-family: var(--font-mono); font-size: 10.5px; padding: 5px 8px; background: var(--bg-deep);">
+            <button type="button" class="btn btn-sm btn-outline" onclick="togglePasswordVisibility('pipeline-groq-key-input', this)" style="padding: 0 8px; font-size: 10px;">
+              <iconify-icon icon="solar:eye-linear"></iconify-icon>
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-save-pipeline-groq" onclick="savePipelineGroqKey()" style="font-size: 10px; padding: 5px 10px; white-space: nowrap;">SAVE KEY</button>
+          </div>
+          <div style="font-size: 9px; color: var(--text-muted);">
+            Required for Groq Whisper (STT) and Groq Llama 3.3 (LLM). Saved securely in local <code>config/api_keys.json</code>.
+          </div>
+        </div>
+
+        <!-- Section 4: Warnings & System Telemetry -->
+        <div id="pipeline-warnings-section" style="display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--border-subtle); padding-top: 8px;">
+        </div>
+
+      </div>
+
+      <!-- 3. Fixed Sticky Footer Action Buttons -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 18px; border-top: 1px solid var(--border-subtle); background: var(--bg-deep); flex-shrink: 0;">
+        <span class="type-code text-muted" style="font-size: 9px;">APPLY RECONNECTS LIVE ENGINE</span>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-sm" onclick="closeModal('pipeline-modal')">CANCEL</button>
+          <button class="btn btn-primary btn-sm" onclick="savePipelineSettings()">APPLY</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 10: First Launch Onboarding API Key Modal -->
+<div class="modal-overlay" id="onboarding-modal" style="z-index: 9999;">
+  <div class="modal-panel frame" style="max-width: 480px;">
+    <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+    <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+    <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+    <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+
+    <div class="frame-inner" style="padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--accent-dim); border: 1px solid var(--accent); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 20px;">
+          ⚡
+        </div>
+        <div>
+          <div style="font-size: 16px; font-weight: 700; color: #fff; letter-spacing: -0.01em;">Welcome to ZEZO OS</div>
+          <div class="type-code text-muted" style="font-size: 10.5px;">Autonomous Desktop AI Operating System</div>
+        </div>
+      </div>
+
+      <div style="background: rgba(242, 78, 30, 0.08); border: 1px solid rgba(242, 78, 30, 0.25); border-radius: var(--radius-md); padding: 10px 12px; font-size: 11px; line-height: 1.5; color: var(--text-secondary);">
+        🔑 <b>Setup Required:</b> Google Gemini API Key is needed to initialize the real-time Live WebSocket loop and autonomous action modules.
+      </div>
+
+      <div>
+        <label class="type-label" style="display:block; margin-bottom:6px; color:var(--text-primary);">Paste Google Gemini API Key</label>
+        <div style="position: relative;">
+          <input type="password" id="onboarding-gemini-key" class="input-field" placeholder="AIzaSy..." style="width:100%; font-family:var(--font-mono); font-size:11px; padding-right: 60px;">
+          <button type="button" onclick="togglePasswordVisibility('onboarding-gemini-key', this)" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:10px; display:flex; align-items:center; gap:3px;">
+            <iconify-icon icon="solar:eye-linear"></iconify-icon> Show
+          </button>
+        </div>
+        <div style="font-size: 9.5px; color: var(--text-muted); margin-top: 5px; display: flex; justify-content: space-between; align-items: center;">
+          <span>Need a free key? <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent); text-decoration:underline;">Get it from Google AI Studio</a></span>
+        </div>
+      </div>
+
+      <div style="background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 9.5px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+        <iconify-icon icon="solar:shield-check-bold" style="color:#22c55e; font-size:14px; flex-shrink:0;"></iconify-icon>
+        <span>Your key will be saved strictly to local <code style="color:var(--accent);">config/api_keys.json</code> (100% git-ignored).</span>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;">
+        <button class="btn btn-primary" onclick="saveOnboardingKey()" style="width: 100%; padding: 10px; font-size: 11px;">
+          LAUNCH ZEZO OS <iconify-icon icon="solar:alt-arrow-right-bold" style="font-size:14px;"></iconify-icon>
+        </button>
+      </div>
+    </div>
+  </div>

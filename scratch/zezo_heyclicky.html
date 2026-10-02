@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>heyclicky - an ai buddy on your mac</title>
+  <style>
+    :root {
+      --color-beige: #ffe9d6;
+      --color-gray: #626262;
+      --color-brown: #9a5518;
+      --color-light-blue: #d6e6ff;
+      --color-orange: #ffc999;
+      --color-silver: #d6d5d7;
+      --color-white: #ffffff;
+      --color-teal: #d2f1f7;
+      --color-dark-blue: #221898;
+      --color-black: #000000;
+      --color-light-gray: #f0f0f0;
+      --color-blue-accent: #9ec5ff;
+      --color-bat-gray: #B5B5B4;
+      --color-bat-bg: #FDFFF6;
+    }
+
+    @font-face {
+      font-family: 'Inter';
+      src: url('./assets/fonts/797e433ab948586e-s.p.0r6juujl39pe6.woff2') format('woff2');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Plus Jakarta Sans';
+      src: url('./assets/fonts/83afe278b6a6bb3c-s.p.2bn3s6zvc0dyp.woff2') format('woff2');
+      font-weight: 700;
+    }
+    @font-face {
+      font-family: 'Outfit';
+      src: url('./assets/fonts/7ebf22b5a21034f8-s.p.3j3877k49yy0l.woff2') format('woff2');
+      font-weight: 500;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--color-light-gray);
+      color: var(--color-black);
+      overflow-x: hidden;
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    /* Top Mac OS Style Menu Bar */
+    .top-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 32px;
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--color-silver);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      z-index: 1000;
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+    }
+
+    .top-nav .left, .top-nav .right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .top-nav .right {
+      margin-left: auto;
+      gap: 12px;
+    }
+
+    .nav-brand {
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-icon {
+      height: 16px;
+      width: auto;
+      object-fit: contain;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .get-clicky-btn {
+      background: var(--color-black);
+      color: var(--color-white);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 100px 20px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    .headline {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 64px;
+      line-height: 1.1;
+      margin-bottom: 16px;
+      color: var(--color-black);
+    }
+
+    .tagline {
+      font-size: 20px;
+      color: var(--color-gray);
+      margin-bottom: 32px;
+      max-width: 500px;
+    }
+
+    .download-btns {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 24px;
+      border-radius: 16px;
+      font-weight: bold;
+      font-size: 16px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .btn-apple {
+      background: var(--color-black);
+      color: var(--color-white);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .btn-windows {
+      background: var(--color-white);
+      color: var(--color-black);
+      border: 1px solid var(--color-silver);
+    }
+
+    .btn-gloss {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: url('./assets/images/btn-gloss.png') center/cover no-repeat;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .btn-sub {
+      font-size: 12px;
+      color: var(--color-gray);
+      margin-bottom: 40px;
+    }
+
+    /* Floating Badges */
+    .floating-badge {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+      position: absolute;
+      pointer-events: none;
+    }
+
+    /* Mac Window Video Card */
+    .mac-window {
+      width: 100%;
+      max-width: 800px;
+      margin: 0 auto;
+      background: var(--color-white);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      border: 1px solid var(--color-silver);
+    }
+
+    .window-bar {
+      height: 32px;
+      background: var(--color-light-gray);
+      border-bottom: 1px solid var(--color-silver);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .dot-close { background-color: #ff5f57; }
+    .dot-min { background-color: #ffbd2e; }
+    .dot-zoom { background-color: #28c840; }
+
+    .window-content video {
+      width: 100%;
+      display: block;
+    }
+
+    .window-caption {
+      padding: 8px 16px;
+      font-size: 14px;
+      color: var(--color-gray);
+      text-align: center;
+      border-top: 1px solid var(--color-silver);
+    }
+
+    /* Features Section */
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 40px;
+      max-width: 1000px;
+      margin: 80px auto;
+      padding: 0 20px;
+    }
+
+    .feature-card {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .feature-card.reverse {
+      flex-direction: column-reverse;
+    }
+
+    .feature-info {
+      flex: 1;
+    }
+
+    .feature-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    .feature-desc {
+      font-size: 16px;
+      color: var(--color-gray);
+      line-height: 1.6;
+    }
+
+    .feature-showcase {
+      flex: 1;
+      width: 100%;
+    }
+
+    /* Pricing Section */
+    .pricing {
+      padding: 80px 20px;
+      background: #fdfdfd;
+      text-align: center;
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      max-width: 1000px;
+      margin: 40px auto 0;
+    }
+
+    .pricing-card {
+      background: var(--color-white);
+      border: 1px solid var(--color-silver);
+      border-radius: 16px;
+      padding: 32px;
+      text-align: left;
+      transition: border-color 0.2s;
+    }
+
+    .pricing-card:hover {
+      border-color: var(--color-blue-accent);
+    }
+
+    .pricing-card.popular {
+      border: 2px solid var(--color-dark-blue);
+      position: relative;
+    }
+
+    .popular-badge {
+      position: absolute;
+      top: -12px;
+      right: 20px;
+      background: var(--color-dark-blue);
+      color: var(--color-white);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .plan-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .plan-price {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .plan-price span {
+      font-size: 16px;
+      font-weight: 400;
+      color: var(--color-gray);
+    }
+
+    .plan-features {
+      list-style: none;
+      margin-bottom: 32px;
+      font-size: 14px;
+      color: var(--color-gray);
+    }
+
+    .plan-features li {
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .check-icon {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Footer */
+    .footer {
+      padding: 60px 20px;
+      border-top: 1px solid var(--color-silver);
+      text-align: center;
+      background: var(--color-white);
+    }
+
+    .footer-logo {
+      width: 120px;
+      height: auto;
+      margin-bottom: 12px;
+    }
+
+    .copyright {
+      font-size: 12px;
+      color: var(--color-bat-gray);
+    }
+
+    @media (min-width: 768px) {
+      .headline { font-size: 80px; }
+      .feature-card { flex-direction: row; gap: 60px; }
+      .feature-card.reverse { flex-direction: row-reverse; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="top-nav">
+  <div class="left">
+    <a href="#" class="nav-brand">
+      <img src="./assets/images/apple-icon.png" alt="logo" class="status-icon" style="height: 18px;">
+      heyclicky
+    </a>
+    <a href="#feat">features</a>
+    <a href="#pr">pricing</a>
+    <a href="https://www.heyclicky.com/trust">trust</a>
+    <a href="https://www.heyclicky.com/changelog">changelog</a>
+    <a href="https://www.heyclicky.com/careers">careers</a>
+  </div>
+  <div class="right">
+    <img src="./assets/images/beachball.svg" alt="wifi" class="status-icon">
+    <img src="./assets/images/btn-apple.svg" alt="headphones" class="status-icon">
+    <img src="./assets/images/btn-windows.svg" alt="bluetooth" class="status-icon">
+    <span class="battery-status" style="color: var(--color-bat-gray);">91%</span>
+    <span class="time">10:07 PM</span>
+    <a href="https://github.com/farzaa/clicky-releases/releases/latest/download/HeyClicky.dmg" class="get-clicky-btn">
+      <img src="./assets/images/btn-apple.svg" alt="apple" class="status-icon" style="filter: invert(1);">
+      get heyclicky
+    </a>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <img src="./assets/images/beachball.svg" alt="beachball" class="floating-badge" style="left:10%; top:20%;">
+    <img src="./assets/images/gif-pokemon.webp" alt="pika" class="floating-badge" style="right:15%; top:60%;">
+
+    <h1 class="headline">heyclicky</h1>
+    <p class="tagline">an ai buddy that lives on your mac</p>
+
+    <div class="download-btns">
+      <a href="https://github.com/farzaa/clicky-releases/releases/latest/download/HeyClicky.dmg" class="btn btn-apple">
+        <div class="btn-gloss"></div>
+        <img src="./assets/images/btn-apple.svg" alt="apple logo">
+        download for mac
+      </a>
+      <a href="https://tally.so/r/kdWMjM" class="btn btn-windows">
+        <div class="btn-gloss"></div>
+        <img src="./assets/images/btn-windows.svg" alt="windows logo">
+        windows waitlist
+      </a>
+    </div>
+    <span class="btn-sub">100% free. sonoma 14.2 or higher</span>
+
+    <div class="mac-window">
+      <div class="window-bar">
+        <span class="dot dot-close"></span>
+        <span class="dot dot-min"></span>
+        <span class="dot dot-zoom"></span>
+      </div>
+      <div class="window-content">
+        <video autoplay loop muted playsinline poster="./assets/images/clicky-fl-poster.webp" src="./assets/images/hello.mp4"></video>
+      </div>
+      <div class="window-caption">hello.mov</div>
+    </div>
+  </section>
+
+  <section class="features-grid" id="feat">
+    <div class="feature-card">
+      <div class="feature-info">
+        <h3 class="feature-title">finally do the thing</h3>
+        <p class="feature-desc">from fl studio to claude code, jump into any tool, ask questions and heyclicky draws on your screen and teaches you.</p>
+      </div>
+      <div class="feature-showcase">
+        <div class="mac-window">
+          <div class="window-bar"><span class="dot dot-close"></span><span class="dot dot-min"></span><span class="dot dot-zoom"></span></div>
+          <div class="window-content"><video loop muted playsinline src="./assets/images/clicky-fl.mp4" poster="./assets/images/clicky-fl-poster.webp" onclick="this.play()"></video></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature-card reverse">
+      <div class="feature-info">
+        <h3 class="feature-title">use your screen as context</h3>
+        <p class="feature-desc">if you hit a wall, you can show heyclicky and it'll walk you through the next step.</p>
+      </div>
+      <div class="feature-showcase">
+        <div class="mac-window">
+          <div class="window-bar"><span class="dot dot-close"></span><span class="dot dot-min"></span><span class="dot dot-zoom"></span></div>
+          <div class="window-content"><video loop muted playsinline src="./assets/images/clicky-spatial.mp4" poster="./assets/images/clicky-spatial-poster.webp" onclick="this.play()"></video></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pricing" id="pr">
+    <h2 class="feature-title" style="text-align: center;">heyclicky, your way</h2>
+    <p class="feature-desc" style="text-align: center; margin-bottom: 40px;">simple pricing, cancel anytime.</p>
+
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <h4 class="plan-title">free</h4>
+        <div class="plan-price">$0 <span>forever</span></div>
+        <ul class="plan-features">
+          <li><img src="./assets/images/pr-check.svg" alt="check" class="check-icon"> 25 messages / mo</li>
+          <li><img src="./assets/images/pr-check.svg" alt="check" class="check-icon"> basic capabilities</li>
+        </ul>
+        <a href="#" class="btn btn-windows" style="width: 100%; justify-content: center;">start free</a>
+      </div>
+
+      <div class="pricing-card popular">
+        <div class="popular-badge">popular</div>
+        <h4 class="plan-title">pro</h4>
+        <div class="plan-price">$20 <span>/ mo</span></div>
+        <ul class="plan-features">
+          <li><img src="./assets/images/pr-check.svg" alt="check" class="check-icon"> unlimited talk</li>
+          <li><img src="./assets/images/pr-check.svg" alt="check" class="check-icon"> 150 agent messages</li>
+        </ul>
+        <a href="#" class="btn btn-apple" style="width: 100%; justify-content: center;">get pro</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <img src="./assets/images/footer-wordmark.webp" alt="heyclicky wordmark" class="footer-logo">
+  <p class="copyright">&copy; 2024 HeyClicky Inc. All rights reserved.</p>
+</footer>
+
+<script>
+  // Simple intersection observer for video autoplay
+  const videos = document.querySelectorAll('video');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.play();
+      } else {
+        entry.target.pause();
+      }
+    });
+  }, { threshold: 0.5 });
+
+  videos.forEach(video => observer.observe(video));
+</script>
+
+</body>
+</html>

@@ -2,8 +2,8 @@
 version: "3.0"
 name: "Saas"
 theme: "light"
-source: "D:/anitgravity/zezo work/zezo latest/skills/hamza_taste/references/html/saas.html"
-extracted_at: "2026-09-21T18:19:54.711336+00:00"
+source: "C:/Users/Hamza Bukhari/Documents/antigravity/zezo latest/skills/hamza_taste/references/html/saas.html"
+extracted_at: "2026-10-01T12:03:37.286515+00:00"
 description: "Refined editorial light design system extracted deterministically from Saas. Features clean #ececee cream canvas, high-contrast #27272a ink typography, and elegant Plus Jakarta Sans headings."
 colors:
   primary: "#27272a"
@@ -95,7 +95,7 @@ components:
 # Saas — Design Specification
 
 > **Aesthetic Profile:** Light Editorial / Cream Precision  
-> **Extracted Source:** D:/anitgravity/zezo work/zezo latest/skills/hamza_taste/references/html/saas.html  
+> **Extracted Source:** C:/Users/Hamza Bukhari/Documents/antigravity/zezo latest/skills/hamza_taste/references/html/saas.html  
 > **Theme:** LIGHT  
 
 ---

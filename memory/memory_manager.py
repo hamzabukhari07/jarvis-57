@@ -304,7 +304,7 @@ def format_memory_for_prompt(memory: dict | None) -> str:
         return ""
 
     out = [
-        "[WHAT YOU KNOW ABOUT THIS PERSON — use naturally, never recite like a list]",
+        "[WHAT YOU KNOW ABOUT THE USER / CREATOR — This is the person talking directly to you right now. NEVER refer to them in 3rd person as an external 'subject'. Never recite their profile unprompted.]",
         *core_lines,
     ]
 

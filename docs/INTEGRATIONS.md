@@ -39,12 +39,13 @@ JARVIS integrates with several external services. All API calls are made over HT
 | Property | Value |
 |----------|-------|
 | Provider | Microsoft Playwright |
-| SDK | `playwright>=1.40,<2` |
+| SDK | `playwright>=1.62,<2` |
+| Anti-bot fetch | `scrapling[fetchers]>=0.4,<1` (`Fetcher` / `StealthyFetcher`) |
 | Browsers | Chromium, Firefox |
-| Purpose | Web browsing, navigation, interaction |
-| Installed via | `python setup.py` |
+| Purpose | Web browsing, navigation, interaction, anti-bot page reads |
+| Installed via | `pip install -r requirements.txt` (`ensure_requirements`) |
 
-**File**: `actions/browser_control.py`, `setup.py`
+**File**: `actions/browser_control.py`, `actions/web_reader.py`, `actions/website_cloner.py`
 
 ### 4. Weather Services
 
@@ -146,6 +147,21 @@ JARVIS integrates with several external services. All API calls are made over HT
 | CDN | `https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js` |
 | Auto-download | Served locally after first download |
 
+### 17. Groq LPU (Free-Tier Coprocessor)
+
+| Property | Value |
+|----------|-------|
+| Provider | Groq |
+| API | OpenAI-compatible REST (`api.groq.com`) |
+| Auth | `groq_api_key` from `config/api_keys.json` |
+| Text model | `qwen/qwen3.8-27b` (`call_groq_text`) |
+| Whisper | `whisper-large-v3-turbo` (`transcribe_groq_whisper`, ~25 MB cap) |
+| Vision | `groq_vision_model` — **empty by default** (free tier has no multimodal) |
+| Purpose | Free, low-latency STT + background text; never used for the realtime voice loop |
+| Failure | Falls back to the Gemini ladder / local `faster-whisper` |
+
+**File**: `core/llm_client.py`, `actions/file_processor.py`, `actions/code_helper.py`, `core/file_reader.py`
+
 ## Failure Behavior Summary
 
 | Service | Failure Mode | Mitigation |
@@ -162,10 +178,11 @@ JARVIS integrates with several external services. All API calls are made over HT
 
 ```
 Primary: Gemini Live API (voice) + Gemini REST (text/search)
+Coprocessor: Groq LPU (free-tier Whisper STT + background text; opt-in vision)
 Search: Google Grounded + DuckDuckGo
-Browser: Playwright/Chromium
+Browser: Playwright/Chromium + Scrapling (anti-bot fetch)
 Local LLM: Ollama/OpenAI-compatible
-TTS: EdgeTTS, Kokoro, ElevenLabs (optional)
+TTS: Gemini Live native (main); EdgeTTS, Kokoro, ElevenLabs (dormant alternatives)
 Messaging: WhatsApp, Telegram
 Gaming: Steam, Epic
 Smart Home: Tuya, Home Assistant

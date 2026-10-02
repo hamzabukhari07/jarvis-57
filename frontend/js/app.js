@@ -135,6 +135,14 @@ class ZezoApp {
         });
 
         socket.connect();
+        socket.on('api_keys_updated', function(data) {
+            if (data.status === 'success' && window.showToast) {
+                window.showToast('API keys saved', 'success');
+            }
+        });
+        socket.on('pipeline_settings_updated', function(data) {
+            if (window.showToast) window.showToast('Pipeline settings saved', 'success');
+        });
     }
 
     _initClock() {

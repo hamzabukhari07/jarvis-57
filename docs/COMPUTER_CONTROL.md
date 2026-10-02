@@ -1,36 +1,48 @@
-# JARVIS — Computer Control Architecture
+# ZEZO OS — Modular Computer Control Architecture
+
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Core Principle:** *"Observe only when necessary — Escalate perception, don't waterfall it."*
 
 ## Overview
 
-JARVIS controls the operating system through a set of tools that use different Python libraries and OS APIs depending on the platform.
+ZEZO executes computer control through modular drivers under `core/computer/` with 4-tier escalated perception and execution:
+$$\text{L0: Fast Win32 State (1ms)} \longrightarrow \text{L1: Windows UIA (<15ms)} \longrightarrow \text{L1.5: Multilingual RapidOCR (<80ms)} \longrightarrow \text{L2: Gemini Vision (~2.0s)}$$
 
-## Control Categories
+---
 
-### System Settings (actions/computer_settings.py)
+## Driver Modules (`core/computer/`)
 
-| Action | Windows | macOS | Linux | Library |
-|--------|---------|-------|-------|---------|
-| Volume up/down | `pyautogui.press("volumeup")` | `osascript` | `pactl` | pyautogui / osascript / pactl |
-| Brightness | `pyautogui` | `osascript` | `brightnessctl` | pyautogui / osascript |
-| WiFi toggle | `pycaw` / `netsh` | `networksetup` | `nmcli` | pycaw / subprocess |
-| Power (shutdown/restart) | `subprocess` | `subprocess` | `subprocess` | subprocess |
-| Dark mode | `pywinauto` | `defaults write` | `gsettings` | Platform-specific |
-| Undo settings | State capture + restore | State capture + restore | State capture + restore | core/undo.py |
+| Module | Purpose | Key Capabilities |
+| :--- | :--- | :--- |
+| `windows_native.py` | Win32 OS Integration | Window enumeration, focus switching (`AttachThreadInput`), physical bounds calibration via `DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS=9)`, safe closing (`WM_CLOSE`), DPI awareness initialization (`SetProcessDPIAware`). |
+| `windows_uia.py` | Windows UI Automation (L1 UIA) | Fast accessibility tree inspection (< 15ms, `searchDepth=6`) inside STA COM `ThreadPoolExecutor` worker with strict 0.8s timeout boundaries. Finds native buttons, edits, tabs, and list items. |
+| `ocr_engine.py` | Multilingual CPU OCR (L1.5 RapidOCR) | Sub-80ms CPU ONNX text detection and spatial bounding box extraction with **0 MB GPU VRAM footprint** (~80MB RAM). Unicode Urdu/Arabic normalization `normalize_urdu()` (tashkeel stripping, yeh/kaf/heh unification) and fuzzy matching (`fuzzy_threshold=0.75`). |
+| `pyautogui_driver.py` | Hardware Input Driver | Mouse/keyboard input with `POST_MOVE_VERIFY`, action aliases (`enter`, `escape`, `space`, `backspace`, `tab`, `delete`), and safe multilingual Unicode typing. |
 
-**File:** `actions/computer_settings.py` (962 lines)
+---
 
-### System Control (actions/computer_control.py)
+## 3-Tier Perception Escalation (`actions/computer_control.py`)
+When targeting an on-screen control or text label (`screen_click`, `click`, `double_click` with a `description`):
+1. **Tier 1 (L1 UIA):** Inspects the active window's Windows UI Automation tree (<15ms). Finds native buttons ("Save", "Cancel", "File"), edit controls, and tabs.
+2. **Tier 2 (L1.5 RapidOCR):** Runs local CPU RapidOCR on the active window crop (<80ms). Finds rendered text in canvas/web apps (Figma "Width", "Fill", web canvas strings, Urdu text) without cloud round-trips.
+3. **Tier 3 (L2 Gemini Multimodal Vision):** Fallback to Gemini Multimodal Vision (~2.0s) only for graphical icons, color swatches, and complex visual scenes.
 
-| Action | Windows | macOS | Linux | Library |
-|--------|---------|-------|-------|---------|
-| Keyboard shortcuts | `pyautogui` | `pyautogui` | `pyautogui` | pyautogui |
-| Mouse control | `pyautogui` | `pyautogui` | `pyautogui` | pyautogui |
-| Window management | `pygetwindow` | `subprocess` | `subprocess` | pygetwindow |
-| Clipboard | `pyperclip` | `pyperclip` | `pyperclip` | pyperclip |
-| Taskbar | `pywin32` | `subprocess` | `subprocess` | Platform-specific |
-| Desktop organize | `shutil`, `os` | `shutil`, `os` | `shutil`, `os` | Standard library |
+---
 
-**File:** `actions/computer_control.py` (589 lines)
+## Hotkey Anti-Loop Circuit Breaker & Safety Directives
+- **In-Turn Circuit Breaker (`core/action_loader.py`):** Automatically detects and aborts tight repetitive hotkey loops (>4 identical key actions within 10s, e.g. `shift+tab` spam in canvas editors).
+- **Chat App Governance (`core/prompt.txt`):** When typing in WhatsApp/Telegram, ZEZO only types the message text and strictly requires explicit user confirmation ("bhejo", "send it") before pressing enter.
+- **Contextual GUI Undo:** Commands to undo in active GUI applications (Figma, VS Code, Browser) map directly to `Ctrl+Z` hotkey dispatches instead of filesystem snapshots.
+
+---
+
+## Safe Unicode Typing & Buffer Preservation
+- Automatically detects non-ASCII text (Urdu, Arabic, Hindi, emojis, symbols) or multiline strings.
+- Stashes the user's prior clipboard string in memory.
+- Writes the text to system clipboard and triggers native paste (`Ctrl+V` / `Cmd+V`).
+- Restores the previous user clipboard buffer after paste (`RESTORE_CLIPBOARD_AFTER_PASTE = True`).
+
+**Screen-grounded clicks:** `click`, `double_click`, `right_click` accept either `x,y` OR a `description` — when only a description is given they automatically escalate through L1 UIA ➔ L1.5 RapidOCR ➔ L2 Vision, clicking the found coordinates. `screen_click` / `screen_double_click` are the explicit description-based actions; `smart_click` is accepted as an alias. If the element is not found, the tool returns a clear not-found status rather than clicking blind.
 
 ### Application Launching (actions/open_app.py)
 
@@ -44,6 +56,8 @@ APP_NAMES = {
 ```
 
 Uses `subprocess.Popen` with `CREATE_NO_WINDOW` on Windows.
+
+**Honest launch (2026-09-25):** opening a file in a named app no longer runs the fragile `cmd /c start "" "code" "<file>"` (which silently failed because VS Code's `code` shim is not on PATH, while the tool still reported success). `_resolve_windows_launcher()` now finds the real executable (e.g. `%LOCALAPPDATA%\Programs\Microsoft VS Code\Code.exe`) and launches it with the file; if it cannot resolve the app it opens the file with the OS default and says so — it never claims an app opened when it did not.
 
 ### Browser Control (actions/browser_control.py)
 

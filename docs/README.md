@@ -48,9 +48,11 @@ User speaks → Microphone → Audio gates (wake/echo/PTT) → Gemini Live → S
 - **Search**: Lexical (no embeddings, <1ms)
 - **Persistence**: File on disk, thread-safe, auto-trimmed at 200k chars
 
-## Tools
+## Tools & Perception
 
-- **20+ built-in actions** auto-discovered from `actions/*.py`
+- **24 built-in actions** auto-discovered from `actions/*.py` (0 tool bloat)
+- **11 declarative skill packages** in `skills/` (including `figma_helper`, `hamza_taste`, `opencode`)
+- **4-Tier Escalated Perception Engine**: L0 OS Native (1ms) ➔ L1 Windows UIA (<15ms) ➔ L1.5 Multilingual RapidOCR (<80ms, 0 VRAM) ➔ L2 Gemini Vision (~2.0s)
 - **Plugins** auto-discovered from `plugins/*.py`
 - **Inline tools** in `main.py` for live-session state
 - **All tools** declared as `function_declarations` and sent to Gemini
@@ -85,6 +87,7 @@ Volume, brightness, WiFi, keyboard, mouse, windows, applications, browser, files
 | DuckDuckGo | Web search fallback |
 | Playwright/Chromium | Browser automation |
 | Ollama (optional) | Local LLM backend |
+| Groq LPU (optional) | Free-tier Whisper transcription, text/code completion, optional vision |
 | FastAPI/uvicorn | Dashboard server |
 | EdgeTTS/Kokoro/ElevenLabs | Optional TTS alternatives |
 
@@ -159,6 +162,7 @@ Volume, brightness, WiFi, keyboard, mouse, windows, applications, browser, files
 - [SAFETY_AND_CONFIRMATION.md](SAFETY_AND_CONFIRMATION.md) — Confirmation gate
 - [VISION.md](VISION.md) — Vision system
 - [HUD_AND_AVATAR.md](HUD_AND_AVATAR.md) — PyQt6 UI and avatar
+- [UI.md](UI.md) — Tactical Web HUD & Compositor Architecture (Flicker prevention, modal policy, rAF gating)
 - [LIP_SYNC.md](LIP_SYNC.md) — Lip-sync system
 - [WEB_SEARCH.md](WEB_SEARCH.md) — Web search system
 - [DASHBOARD.md](DASHBOARD.md) — Remote dashboard
@@ -172,6 +176,10 @@ Volume, brightness, WiFi, keyboard, mouse, windows, applications, browser, files
 - [REQUEST_LIFECYCLE.md](REQUEST_LIFECYCLE.md) — Line-by-line request traces
 - [CODEBASE_MAP.md](CODEBASE_MAP.md) — File-by-file map
 - [DESIGN_SYSTEM_ARCHITECTURE.md](DESIGN_SYSTEM_ARCHITECTURE.md) — Hamza Taste 3.0 & Anti-Slop Design System Architecture
+- [AGENT_REACH.md](AGENT_REACH.md) — Multi-Platform Intelligence, Social Extraction & Spoken Audio Transcription Engine
+- [WEBSITE_CLONER.md](WEBSITE_CLONER.md) — Autonomous Website Cloner & Offline Asset Localizer
+- [WORKSPACE_INGESTION.md](WORKSPACE_INGESTION.md) — Workspace Ingestion & Multi-Format Payload Engine
+- [LOCAL_FOLDER_REDESIGN.md](LOCAL_FOLDER_REDESIGN.md) — Local Folder Redesign & Aesthetic Injection Engine
 - [DIAGRAMS.md](DIAGRAMS.md) — 17 Mermaid diagrams
 
 ## Quick Start

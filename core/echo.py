@@ -89,7 +89,7 @@ _BLOCKS_NOISY = 12    # ~770 ms when the room is this hard
 
 _FLOOR_WINDOW = 60    # blocks kept to characterise the room's echo
 _FLOOR_Q = 35         # percentile taken as "typical echo here"
-_WARMUP = 16          # blocks (~1 s) of listening before judging anyone
+_WARMUP = 4           # blocks (~250 ms) of listening before judging anyone
 _RELEARN_RUN = 28     # a 'voice' lasting this long means the room changed
 
 

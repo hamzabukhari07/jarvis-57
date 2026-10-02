@@ -412,7 +412,17 @@ def focus_search():
     if _OS == "Darwin": pyautogui.hotkey("command", "l")
     else:               pyautogui.hotkey("ctrl", "l")
 
-def pause_video():      pyautogui.press("space")
+def pause_video():
+    if _PYAUTOGUI:
+        pyautogui.press("playpause")
+        time.sleep(0.1)
+        try:
+            from actions.computer_control import _focus_browser_or_app_window
+            if _focus_browser_or_app_window():
+                pyautogui.press("space")
+        except Exception:
+            pass
+    return "Paused playback."
 
 def refresh_page():
     if _OS == "Darwin": pyautogui.hotkey("command", "r")

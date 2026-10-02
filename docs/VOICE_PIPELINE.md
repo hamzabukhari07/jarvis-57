@@ -1,6 +1,65 @@
 # JARVIS — Voice Pipeline
 
-## Complete Voice Interaction Flow
+## Pipeline Modes
+
+ZEZO supports two voice pipeline architectures:
+
+### UI initialization contract
+
+The pipeline and assistant settings controls are defined in the frontend ES module. The module must parse completely before `socket.connect()` runs; otherwise the browser cannot register `saveCustomiseSettings`, `togglePipelineMode`, `applyPreset`, or `savePipelineSettings`. Keep the WebSocket connection call after all UI handler declarations, and syntax-check the complete module after editing it.
+
+### 1. Gemini Live (Default)
+
+**Mode**: `pipeline_mode = "live"`
+
+All audio processing in a single Google Gemini Live WebSocket:
+- **STT**: Google automatic speech recognition (real-time)
+- **LLM**: Gemini reasoning and function-calling
+- **TTS**: Gemini synthetic voice (Puck, Charon, Fenrir, Kore, Aoede)
+- **Barge-in**: User can interrupt mid-response
+- **Tool-calling**: Native function invocation
+- **Latency**: ~200-500ms end-to-end
+
+**Best for**: Real-time conversations, tool invocation, natural interruption.
+
+### 2. Cascade Mode (Custom Engines)
+
+**Mode**: `pipeline_mode = "cascade"`
+
+Decoupled pipeline where each stage runs locally or on custom endpoints:
+
+| Stage | Options | Source |
+|-------|---------|--------|
+| **STT** | `local_whisper`, `groq_whisper`, `vosk` | Config key `stt_engine` |
+| **LLM** | `groq`, `gemini`, `ollama` | Config key `llm_engine` |
+| **TTS** | `kokoro`, `edge_tts`, `elevenlabs` | Config key `tts_engine` |
+| **Voice** | Engine-specific | Config key `tts_voice` |
+
+**Engine runthrough**:
+1. User speech → `transcribe_utterance(engine=stt_engine)`
+2. Text → `llm_generate(engine=llm_engine)` → response
+3. Response → `make_tts(engine=tts_engine, voice=tts_voice)` → audio
+
+**Presets** (UI one-click)
+- **Gemini Live**: Live mode (fastest, best quality)
+- **Cloud Fast**: `groq_whisper` + `groq` + `edge_tts` (good quality, lower cost)
+- **Balanced**: `groq_whisper` + `groq` + `kokoro` (local TTS, cloud inference)
+- **Fully Offline**: `local_whisper` + `ollama` + `kokoro` (no cloud, needs local LLM)
+
+**Best for**: Offline-first, cost control, testing individual engines, custom voice synthesis.
+
+### 3. Voice Fallback Failover & Error Surfacing
+
+**Mode**: `voice_fallback = "auto" | "off"` (Config key `voice_fallback`)
+
+Controlled via the UI toggles in the Settings Drawer, Customise Assistant modal, and Voice Pipeline modal:
+- **`auto` (Default)**: If the Gemini Live WebSocket connection drops, encounters a network timeout, or hits quota limits, ZEZO immediately fails over to the local/cascade voice loop (`VoiceFallback`) without dropping user interaction.
+- **`off`**: Automatic failover is strictly disabled. Instead of falling back to offline engines, the exact connection, authentication, or model error is rendered directly to the HUD (`ERR: Live connection failed: ...`), and the user is informed with a prompt to toggle Fallback ON if offline voice is desired.
+- **Direct Groq Key Entry**: The Voice Pipeline modal includes an inline Groq API key configuration card that saves directly to local `config/api_keys.json` and dynamically refreshes telemetry warnings without modal swapping.
+
+---
+
+## Complete Voice Interaction Flow (Gemini Live)
 
 ```
 User speaks
@@ -100,7 +159,7 @@ The callback applies four sequential gates. Each gate can stop the audio from re
 
 1. **Wake word gate**: If asleep and wake word enabled, audio goes ONLY to the local wake word detector
 2. **Speaking lock**: If JARVIS is speaking, microphone is muted to prevent self-interference
-3. **Echo tail guard**: After JARVIS finishes speaking, a 475ms window where the assistant's own voice is filtered out
+3. **Echo tail guard**: After JARVIS finishes speaking, a ~260ms window (`_out_latency` + `_TAIL_MARGIN=0.06s`) where the assistant's own voice is filtered out
 4. **Push-to-talk**: If enabled, audio is blocked unless the Ctrl+Space chord is held
 
 ### Transition 3: Audio → Gemini Live
@@ -196,7 +255,7 @@ The assistant auto-sleeps after 2 minutes of silence (wake-word mode only).
 | `CHUNK_SIZE` | 1024 | Audio frames per callback |
 | `_VIS_HOP` | 480 | Viseme frame step (20ms at 24kHz) |
 | `_VIS_WIN` | 1024 | Viseme analysis window (~43ms) |
-| `_TAIL_MARGIN` | 0.25s | Echo tail margin |
+| `_TAIL_MARGIN` | 0.06s | Echo tail margin (plus measured `_out_latency`) |
 | `WAKE_SLEEP_TIMEOUT` | 120.0s | Auto-sleep after silence |
 | `_REPEAT_MIN` | 12 chars | Minimum chunk length for dedup |
 
@@ -228,6 +287,77 @@ except Exception:
     # Falls back to system default
     _mic_stream = _open_mic(None)
 ```
+
+## Offline Voice Fallback & Cascade Architecture (`core/voice_fallback.py`)
+
+Gemini Live is the primary real-time voice path. When Gemini Live is unavailable (offline, quota limit, service disruption) or when the user explicitly configures **Cascade Mode**, ZEZO executes a high-performance decoupled voice loop:
+
+```
+Full-Duplex Mic (sounddevice 16k InputStream)
+    ↓
+UtteranceSegmenter (180ms VAD pause, 200ms min length, 600.0 RMS energy gate)
+    ↓ (complete utterance)
+Background Utterance Worker Thread (non-blocking mic stream, generation_id tracked)
+    ↓
+STT Transcribe: local faster-whisper (tiny)  →  Groq Whisper Large v3 Turbo  →  Vosk
+    ↓
+┌────────────────────────────────────────────────────────────────────────┐
+│ LAYER 1: Fast Deterministic Matcher (0ms LLM overhead)                 │
+│ Exact & conversational variations: "can you please open the calc",     │
+│ "launch vscode", "mute", "increase volume", "stop", "next track"       │
+│ → Direct action invocation without Groq LLM or conversational TTS      │
+└────────────────────────────────────────────────────────────────────────┘
+    ↓ (if unhandled)
+┌────────────────────────────────────────────────────────────────────────┐
+│ LAYER 2: Laya Secondary Intent Router (Confidence Gated >= 0.75)       │
+│ Isolated intent classifier with confidence scoring & abstention        │
+└────────────────────────────────────────────────────────────────────────┘
+    ↓ (if abstained)
+┌────────────────────────────────────────────────────────────────────────┐
+│ LAYER 3: Groq LLM Streaming & Sentence TTS Pipeline                    │
+│ Streaming tokens → sentence accumulator → parallel synthesis           │
+│ Kokoro offline / Edge-TTS / ElevenLabs                                 │
+└────────────────────────────────────────────────────────────────────────┘
+    ↕
+Instant Barge-In Interruption (Continuous mic detects user speech → sd.stop() < 20ms, cancels in-flight TTS & increments generation_id)
+```
+
+### Key Cascade Features:
+
+1. **Full-Duplex Continuous Mic Stream**:
+   - `sd.InputStream` runs continuously on its own thread without pausing during STT, LLM inference, or TTS playback.
+   - Utterances are dispatched to a dedicated daemon worker (`utterance-worker`), ensuring the microphone loop never stalls or drops incoming audio frames.
+
+2. **Race-Condition-Safe Instant Barge-in & Generation IDs**:
+   - Monotonically increasing `_generation_id` tracks active response lifecycle.
+   - When the user speaks over the assistant (`_is_speaking == True` and `level >= energy * 1.4`):
+     - `_interrupt()` halts audio playback immediately via `sd.stop()` (< 20ms).
+     - Increments `_generation_id` and sets `_interrupted` event.
+     - Drains audio queues in TTS engine and halts pending synthesis tasks.
+     - Prevents stale sentence callbacks from old generations from playing or entering the audio queue.
+     - Feeds interruption audio block directly into `UtteranceSegmenter.push()` so the new user turn begins seamlessly without dropping frames.
+
+3. **3-Layer Intent Architecture (`core/fast_intent.py` & `core/laya_router.py`)**:
+   - **Layer 1: Deterministic Matcher**: Extensible registry handling prefix/suffix stripping ("can you please", "could you", "jarvis please"), app alias mapping (calculator, chrome, vscode, terminal, spotify, discord, notepad, settings, etc.), media controls (play/pause, next track, prev track), volume adjustments, and system queries. Directly dispatches actions (`open_app`, `computer_settings`, `pyautogui`) without invoking Groq LLM or generating conversational TTS.
+   - **Layer 2: Laya Secondary Router**: Isolated classifier with confidence gating and abstention. Handles complex conversational variations.
+   - **Layer 3: Groq LLM Fallback**: Streaming LLM response via `call_groq_stream` when neither layer classifies the command.
+
+4. **Real Latency Instrumentation**:
+   - Real-time logging of all pipeline transitions:
+     - `[TIMING] STT start / end / total`
+     - `[TIMING] FAST_INTENT start / end / FAST_DISPATCH total`
+     - `[TIMING] LAYA start / end / total`
+     - `[TIMING] LLM start / LLM first token`
+     - `[TIMING] FIRST_SENTENCE / TTFT`
+     - `[TIMING] TTS start / first audio / PLAYBACK start`
+     - `[TIMING] TTFA`
+     - `[TIMING] BARGE_IN detected / PLAYBACK stopped / stop duration`
+
+5. **Configurable Engines & Auto-Start**:
+   - **Config:** `voice_fallback` = `auto` (default) | `manual` | `off`.
+   - **Engines:** `stt_engine` (`groq_whisper` / `local_whisper` / `vosk`), `llm_engine` (`groq` / `gemini` / `ollama`), `tts_engine` (`kokoro` / `edge_tts` / `elevenlabs`), `tts_voice`.
+   - **Dynamic Language Support:** Response prompt dynamically enforces user-configured language (`get_response_language()`), automatically falling back to Edge-TTS for non-English scripts.
+   - **Standalone Execution:** `python -m core.voice_fallback`.
 
 ## Data Flow Summary
 

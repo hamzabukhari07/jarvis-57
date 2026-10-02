@@ -1,6 +1,10 @@
 # ── JARVIS — Python dependencies ──────────────────────────────────────────
 # pip skips any line whose sys_platform marker does not match your OS, so this
 # one file serves Windows, macOS and Linux. `python setup.py` runs it for you.
+#
+# Everything the project imports is listed here as a DEFAULT dependency, so a
+# single `pip install -r requirements.txt` gives a fully-featured install.
+# Nothing needed at runtime is left commented out.
 
 # Version bounds: the lower bound is what the app is developed against, the
 # upper bound stops the next MAJOR release of a dependency from breaking every
@@ -11,14 +15,19 @@
 # software with QPainter and posed with numpy, so the face costs no extra
 # package, no OpenGL and no GPU. Nothing below was added for it.
 PyQt6>=6.6,<7
+PyQt6-WebEngine>=6.6,<7
+aiohttp>=3.9,<4               # core/ui_server.py — desktop WebSocket + static UI server
 sounddevice>=0.4,<1
 numpy>=1.24,<3
 google-genai>=2.8.0,<3
 
-# ── Web search & browser control ──────────────────────────────────────────────
+# ── Web search, scraping & browser control ────────────────────────────────────
 requests>=2.31,<3
 beautifulsoup4>=4.12,<5
-playwright>=1.40,<2
+playwright>=1.62,<2
+scrapling[fetchers]>=0.4,<1   # web_reader / web_scraper — anti-bot Fetcher + StealthyFetcher
+ddgs>=9,<10                   # web_search — primary DuckDuckGo backend
+duckduckgo-search>=6,<9       # web_search — legacy fallback (ddgs is tried first)
 
 # ── Automation / input control ────────────────────────────────────────────────
 pyautogui
@@ -34,8 +43,34 @@ mss>=9,<11
 psutil>=5.9,<8
 send2trash
 youtube-transcript-api
+yt-dlp>=2024.1.0
+feedparser>=6.0.0
 python-pptx
 openpyxl
+python-docx
+PyPDF2
+pdfplumber
+markitdown
+docling>=2,<3                 # file_reader — offline OCR/layout for scanned docs
+pandas>=2,<4                  # file_processor — spreadsheet/CSV analysis
+pydub>=0.25,<1                # file_processor — audio metadata/conversion
+audioop-lts>=0.2.1; python_version >= "3.13"   # pydub — restores the stdlib
+                              #   audioop module removed in Python 3.13 (PEP 594)
+py7zr>=0.20,<2                # file_reader — .7z archive extraction
+paho-mqtt                     # printer_control plugin — MQTT printers
+pynvml                        # system_monitor + HUD GPU meter (NVIDIA)
+
+# ── Voice: TTS, STT & wake word (all engines installed by default) ─────────────
+edge-tts>=6.1,<8              # core/tts.py — free online TTS engine
+kokoro>=0.7,<1; python_version < "3.14"   # core/tts.py — local neural TTS. misaki->spacy->blis
+                                          #   has no Python 3.14 wheels yet, so it is
+                                          #   skipped there; 3.11-3.13 installs normally.
+miniaudio>=1.61,<2            # core/tts.py — audio decoding
+faster-whisper>=1.0,<2        # core/stt.py + agent_reach — local STT
+openai-whisper                # actions/agent_reach.py — fallback STT (import whisper)
+vosk>=0.3.44,<0.4             # core/stt.py — lightweight offline STT fallback
+openwakeword>=0.6,<1          # core/wake_word.py — "Hey Jarvis" detection
+torch>=2.2,<3                 # stt/tts/kokoro neural model runtime
 
 # ── Remote dashboard (control from your phone) ────────────────────────────────
 fastapi>=0.110,<1
@@ -59,34 +94,6 @@ pywinauto;  sys_platform == "win32"
 pywin32;    sys_platform == "win32"
 wmi;        sys_platform == "win32"
 
-# ── Documents, media & hardware readouts ──────────────────────────────────────
-# Every one of these is imported inside a try/except at the point of use, so a
-# missing package disables exactly one feature and never stops the app. They are
-# declared because a feature that silently does nothing is worse than a slightly
-# longer install.
-ddgs>=9,<10                  # web_search — the maintained successor to
-                             # duckduckgo-search, which is tried first and
-                             # falls back to the old name automatically
-pdfplumber                   # file_processor — PDF text and tables
-PyPDF2                       # file_processor — PDF fallback reader
-python-docx                  # file_processor — .docx reading
-paho-mqtt                    # printer_control plugin — MQTT printers
-pynvml                       # system_monitor + the HUD's GPU meter (NVIDIA)
-
-# ── Optional: heavy extras, install only if you want the feature ──────────────
-# Left out on purpose — together they are several hundred megabytes, which is a
-# lot to download for a fresh clone that may never use them.
-#
-#   pip install pandas       # file_processor: spreadsheet/CSV analysis
-#   pip install pydub        # file_processor: audio metadata and conversion
-#                            #   (also needs ffmpeg on PATH for most formats)
-#   pip install mediapipe    # pushup_counter: elbow-angle rep detection
-
-# ── Optional: local wake word ("Hey Jarvis") ──────────────────────────────────
-# Deliberately NOT installed by default — it's opt-in. Enable it (and download
-# the tiny model) with one click from ⚙ → WAKE WORD in the app, or install it
-# yourself with:  pip install openwakeword
-#
-# macOS / Linux OS actions (volume, brightness, reminders) shell out to native
-# tools (pactl / brightnessctl / osascript / systemd), so no extra Python
-# packages are needed there — nothing Windows-specific is ever pulled in.
+# ── Dev / test ────────────────────────────────────────────────────────────────
+pytest>=8,<10                 # tests/ suite
+reportlab>=4,<6               # scripts/test_zezo.py — generates a sample PDF

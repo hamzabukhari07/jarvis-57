@@ -1,57 +1,62 @@
-# JARVIS — Vision System
+# ZEZO OS — Tiered Perception & Vision Architecture
+
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Core Principle:** *"Observe only when necessary — Escalate perception, don't waterfall it."*
 
 ## Overview
 
-JARVIS has **on-demand vision** — it can capture screenshots and webcam images, but only when explicitly requested by the user or through a tool call. Vision is not continuous.
+ZEZO features a **4-Tier Escalated Perception Engine** that combines instantaneous Win32 OS telemetry (0.37ms), Windows UI Automation (10ms), local Multilingual RapidOCR (0 MB VRAM, <80ms), perceptual gradient difference hashing (0ms cache hits), and deep Gemini multimodal vision.
 
-**File:** `actions/screen_processor.py`
-
-## Capture Sources
-
-### Screen Capture
-
-**Library**: `mss` (fast screenshot) + `PIL` (compression)
-
-```python
-def _capture_screen() -> tuple[bytes, str]:
-    # Uses mss to capture the display
-    # Returns (jpeg_bytes, "image/jpeg")
-    # Max resolution: 1280x720
-    # JPEG quality: 82
+```
+                              User Request / Gemini Live
+                                          │
+                                   ZEZO Dispatcher
+                                          │
+                               ┌───────────────────────┐
+                               │ Perception Required?  │
+                               └───────────┬───────────┘
+                                           │
+       ┌───────────────────┬───────────────┴───────────────┬───────────────────┐
+       ▼                   ▼                               ▼                   ▼
+L0: OS Native (0.37ms) L1: Windows UIA (10ms)  L1.5: RapidOCR (<80ms)  L2: Gemini Vision (2s)
+(HWND, DWM Physical)   (Native Control Trees)   (Local Multilingual OCR) (Deep Multimodal)
 ```
 
-### Webcam Capture
+**Files:**
+- `actions/screen_processor.py` (L0 OS telemetry, DWM physical crop, fast OCR text extraction, dHash cache)
+- `core/computer/windows_uia.py` (L1 Windows UI Automation inspection, STA COM worker)
+- `core/computer/ocr_engine.py` (L1.5 RapidOCR CPU ONNX with Urdu/Arabic normalizer)
 
-**Library**: `opencv-python` (cv2)
+---
 
-```python
-def _capture_camera() -> tuple[bytes, str]:
-    # Uses cv2.VideoCapture(0)
-    # Returns (jpeg_bytes, "image/jpeg")
-    # Max resolution: 1280x720
-```
+## 4-Tier Perception Ladder
 
-## How Vision Is Used
+### 1. L0 OS Native Telemetry (0.37ms)
+- Direct Windows User32/Kernel32 ctypes query (`GetForegroundWindow`, `IsIconic`, `IsZoomed`).
+- Calibrated with `DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS=9)` in `windows_native.py` to eliminate invisible 8px drop-shadow borders (`-8, -8` offset).
+- Returns exact active window title, process executable, HWND, and physical screen bounds.
 
-### Tool Call: screen_process
+### 2. L1 Windows UI Automation (10ms)
+- Inspects the foreground accessibility tree (`pywinauto` / UIAutomation) inside an STA COM worker thread (`searchDepth=6`, `0.8s` timeout).
+- Resolves button, text field, and component bounding boxes without taking screenshots or invoking cloud vision.
 
-```python
-# Tool declaration in main.py:
-{
-    "name": "screen_process",
-    "description": "Captures the screen or webcam image...",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "angle": {"type": "STRING", "description": "'screen' or 'camera'"},
-            "text": {"type": "STRING", "description": "Question about the image"}
-        },
-        "required": ["text"]
-    }
-}
-```
+### 3. L1.5 Local Multilingual RapidOCR (<80ms, 0 MB VRAM)
+- Runs lightweight CPU ONNX OCR via `rapidocr_onnxruntime` (~80MB RAM, 0 MB GPU VRAM).
+- Strips diacritics/tashkeel and normalizes Urdu/Arabic characters via `normalize_urdu()`.
+- Locates spatial text in canvas applications (Figma, Canva, web apps) and extracts screen text in milliseconds.
 
-### Vision Injection Flow
+### 4. L2 Gemini Multimodal Vision (~2.0s) & Smart Cache (0.0ms Hit)
+- 64-bit gradient difference hashing (`compute_dhash`) detects visual frame delta.
+- If the screen hash and foreground window are unchanged (Hamming distance <= 2), returns cached observation in **0ms** (`[Cache: 0ms]`), eliminating redundant model calls.
+- Deep multimodal reasoning for graphical icons, color swatches, and complex visual scenes.
+
+---
+
+## Multi-Region Screen Capture
+- `full_screen`: Captures primary / combined multi-monitor desktop.
+- `active_window`: Automatically crops to the foreground application HWND bounds (saving 60–80% payload size).
+- `window_region`: Crops to custom bounding box `(x, y, w, h)`.
+
 
 ```
 Gemini calls screen_process tool
@@ -143,3 +148,10 @@ Cooldown: 4 seconds
 Mode: On-demand only
 No continuous vision feed
 ```
+
+
+### Phase 3-6 Extensions (now live)
+- Structured payload: {active_app, window_title, rect, confidence, source, screen_hash, timestamp}
+- 5-tier risk: READ_ONLY, LOCAL_MUTATION, EXTERNAL_MUTATION, CODE_EXECUTION, PRIVILEGED_OS + ApprovalGrant 60s TTL
+- ToolExecutionContext + Monotonic TaskState CREATED->QUEUED->RUNNING->CANCELLING->DONE/FAILED/CANCELLED (1011 keepalive fix)
+- McpClientRuntime isolated worker loop (24ms)

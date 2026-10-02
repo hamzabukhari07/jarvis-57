@@ -1,6 +1,21 @@
 import json
+import os
+import platform
+import subprocess
 import sys
 from pathlib import Path
+
+# Canonical model identifiers live in ONE place: core/models.py.
+# Re-exported here so existing `from memory.config_manager import ...` keeps working.
+from core.models import (
+    ANTIGRAVITY_CLI_MODELS,
+    DEFAULT_ANTIGRAVITY_MODEL,
+    ANTIGRAVITY_MODEL_ALIASES,
+    DEFAULT_GROQ_MODEL,
+    DEFAULT_GROQ_VISION_MODEL,
+    DEFAULT_GROQ_WHISPER_MODEL,
+    GEMINI_FAST_MODELS,
+)
 
 def get_base_dir() -> Path:
     if getattr(sys, "frozen", False):
@@ -17,22 +32,222 @@ def ensure_config_dir() -> None:
 def config_exists() -> bool:
     return CONFIG_FILE.exists()
 
-def save_api_keys(gemini_api_key: str) -> None:
+def clean_api_key(k: str | None) -> str | None:
+    """Sanitize API key input, stripping whitespace and discarding accidental multi-line terminal dumps."""
+    if not k:
+        return None
+    val = str(k).strip()
+    if not val:
+        return None
+    if "\n" in val or "\r" in val or len(val) > 256:
+        for line in val.splitlines():
+            line = line.strip()
+            if line.startswith("gsk_") or line.startswith("AIzaSy") or line.startswith("AQ."):
+                return line
+        return None
+    return val
+
+
+def _atomic_write_config(data: dict) -> None:
+    """Safely write config dictionary to disk via staging file and atomic replace."""
     ensure_config_dir()
+    tmp_file = CONFIG_FILE.with_suffix(".json.tmp")
+    tmp_file.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    try:
+        os.replace(tmp_file, CONFIG_FILE)
+    except Exception:
+        if tmp_file.exists():
+            try:
+                tmp_file.unlink()
+            except Exception:
+                pass
+        raise
 
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
 
-    data["gemini_api_key"] = gemini_api_key.strip()
+def validate_gemini_key(api_key: str, timeout: float = 5.0) -> tuple[bool, str]:
+    """Pre-flight real probe to Google Generative AI REST API with a 1-token query."""
+    c_key = clean_api_key(api_key)
+    if not c_key or len(c_key) < 15:
+        return False, "Invalid or too short Gemini API key"
+    try:
+        import requests
+        candidates = list(GEMINI_FAST_MODELS) or ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3-flash-preview"]
+        last_err = ""
+        for model_name in candidates:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={c_key}"
+            payload = {
+                "contents": [{"parts": [{"text": "ping"}]}],
+                "generationConfig": {"maxOutputTokens": 1}
+            }
+            try:
+                resp = requests.post(url, json=payload, timeout=timeout)
+                if resp.status_code == 200:
+                    return True, "Gemini API key is valid"
+                elif resp.status_code in (400, 401, 403):
+                    try:
+                        err_detail = resp.json().get("error", {}).get("message", resp.text[:120])
+                    except Exception:
+                        err_detail = resp.text[:120]
+                    return False, f"Gemini API key unauthorized ({resp.status_code}): {err_detail}"
+                elif resp.status_code == 429:
+                    return False, "Gemini quota exceeded / rate limited (HTTP 429)"
+                elif resp.status_code == 404:
+                    last_err = f"Model {model_name} not found"
+                    continue
+                else:
+                    last_err = f"HTTP {resp.status_code}: {resp.text[:120]}"
+            except requests.exceptions.Timeout:
+                last_err = "Request timed out"
+                continue
+        return False, f"Gemini probe failed: {last_err}"
+    except Exception as e:
+        return False, f"Gemini probe connection error: {str(e)}"
 
-    CONFIG_FILE.write_text(
-        json.dumps(data, indent=2),
-        encoding="utf-8"
-    )
+
+def validate_groq_key(api_key: str, timeout: float = 5.0) -> tuple[bool, str]:
+    """Pre-flight real probe to Groq chat completions API with a 1-token query."""
+    c_key = clean_api_key(api_key)
+    if not c_key or not c_key.startswith("gsk_"):
+        return False, "Invalid Groq API key format (must start with 'gsk_')"
+    try:
+        import requests
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {c_key}",
+            "Content-Type": "application/json",
+        }
+        candidates = [
+            DEFAULT_GROQ_MODEL,
+            "llama-3.3-70b-versatile",
+            "openai/gpt-oss-120b",
+            "groq/compound-mini",
+            "qwen/qwen3.8-27b",
+        ]
+        # Deduplicate candidates preserving order
+        models_to_try = list(dict.fromkeys(candidates))
+        last_err = ""
+
+        for candidate in models_to_try:
+            payload = {
+                "model": candidate,
+                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 1,
+            }
+            try:
+                resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
+                if resp.status_code == 200:
+                    return True, "Groq API key is valid"
+                elif resp.status_code in (401, 403):
+                    try:
+                        err_detail = resp.json().get("error", {}).get("message", resp.text[:120])
+                    except Exception:
+                        err_detail = resp.text[:120]
+                    return False, f"Groq API key unauthorized ({resp.status_code}): {err_detail}"
+                elif resp.status_code == 429:
+                    return False, "Groq rate limit / quota exceeded (HTTP 429)"
+                elif resp.status_code == 404:
+                    last_err = f"Model {candidate} not found"
+                    continue
+                else:
+                    last_err = f"HTTP {resp.status_code}: {resp.text[:120]}"
+            except requests.exceptions.Timeout:
+                last_err = "Request timed out"
+                continue
+
+        return False, f"Groq probe failed: {last_err}"
+    except Exception as e:
+        return False, f"Groq probe connection error: {str(e)}"
+
+
+def validate_elevenlabs_key(api_key: str, timeout: float = 5.0) -> tuple[bool, str]:
+    """Pre-flight probe to ElevenLabs user endpoint."""
+    c_key = clean_api_key(api_key)
+    if not c_key or len(c_key) < 10:
+        return False, "Invalid ElevenLabs API key format"
+    try:
+        import requests
+        url = "https://api.elevenlabs.io/v1/user"
+        headers = {"xi-api-key": c_key}
+        resp = requests.get(url, headers=headers, timeout=timeout)
+        if resp.status_code == 200:
+            return True, "ElevenLabs API key is valid"
+        elif resp.status_code in (401, 403):
+            return False, f"ElevenLabs authentication failed (HTTP {resp.status_code})"
+        else:
+            return False, f"ElevenLabs server returned HTTP {resp.status_code}: {resp.text[:120]}"
+    except Exception as e:
+        return False, f"ElevenLabs probe connection error: {str(e)}"
+
+
+def save_api_keys_transactional(
+    gemini_api_key: str | None = None,
+    groq_api_key: str | None = None,
+    elevenlabs_api_key: str | None = None,
+    validate: bool = True,
+) -> tuple[bool, str]:
+    """Validate candidate API keys with real live probes, then write atomically.
+    
+    If validation fails for any key, no disk changes occur and (False, err_msg) is returned.
+    """
+    ensure_config_dir()
+    data: dict = load_api_keys()
+
+    # Gemini key validation
+    if gemini_api_key is not None:
+        c_gem = clean_api_key(gemini_api_key)
+        if c_gem and "••••" not in c_gem:
+            if validate:
+                ok, err = validate_gemini_key(c_gem)
+                if not ok:
+                    return False, f"Gemini Key Error: {err}"
+            data["gemini_api_key"] = c_gem
+
+    # Groq key validation
+    if groq_api_key is not None:
+        c_groq = clean_api_key(groq_api_key)
+        if c_groq and "••••" not in c_groq:
+            if validate:
+                ok, err = validate_groq_key(c_groq)
+                if not ok:
+                    return False, f"Groq Key Error: {err}"
+            data["groq_api_key"] = c_groq
+        elif str(groq_api_key).strip() == "":
+            data["groq_api_key"] = ""
+
+    # ElevenLabs key validation
+    if elevenlabs_api_key is not None:
+        c_el = clean_api_key(elevenlabs_api_key)
+        if c_el and "••••" not in c_el:
+            if validate:
+                ok, err = validate_elevenlabs_key(c_el)
+                if not ok:
+                    return False, f"ElevenLabs Key Error: {err}"
+            data["elevenlabs_api_key"] = c_el
+        elif str(elevenlabs_api_key).strip() == "":
+            data["elevenlabs_api_key"] = ""
+
+    _atomic_write_config(data)
+    return True, "API keys validated and saved successfully"
+
+
+def save_api_keys(gemini_api_key: str | None = None, groq_api_key: str | None = None) -> None:
+    """Save keys directly with atomic write (non-validating fallback for backward compatibility)."""
+    ensure_config_dir()
+    data: dict = load_api_keys()
+
+    if gemini_api_key is not None:
+        c_gem = clean_api_key(gemini_api_key)
+        if c_gem and "••••" not in c_gem:
+            data["gemini_api_key"] = c_gem
+    if groq_api_key is not None:
+        c_groq = clean_api_key(groq_api_key)
+        if c_groq and "••••" not in c_groq:
+            data["groq_api_key"] = c_groq
+        elif str(groq_api_key).strip() == "":
+            data["groq_api_key"] = ""
+
+    _atomic_write_config(data)
+
 
 def load_api_keys() -> dict:
     if not CONFIG_FILE.exists():
@@ -45,6 +260,24 @@ def load_api_keys() -> dict:
 
 def get_gemini_key() -> str | None:
     return load_api_keys().get("gemini_api_key")
+
+def get_masked_gemini_key() -> str:
+    key = get_gemini_key()
+    if not key or len(key) < 10:
+        return ""
+    return key[:6] + "••••••••••••" + key[-4:]
+
+def get_masked_groq_key() -> str:
+    key = load_api_keys().get("groq_api_key", "")
+    if not key or len(key) < 10:
+        return ""
+    return key[:6] + "••••••••••••" + key[-4:]
+
+def get_masked_elevenlabs_key() -> str:
+    key = load_api_keys().get("elevenlabs_api_key", "")
+    if not key or len(key) < 8:
+        return ""
+    return key[:4] + "••••••••••••" + key[-4:]
 
 def is_configured() -> bool:
     key = get_gemini_key()
@@ -64,15 +297,10 @@ def get_user_name() -> str:
 def save_assistant_config(assistant_name: str, user_name: str) -> None:
     """Persist assistant name and user name to config."""
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
+    data: dict = load_api_keys()
     data["assistant_name"] = assistant_name.strip() or "JARVIS"
     data["user_name"] = user_name.strip()
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    _atomic_write_config(data)
 
 
 # ── Assistant voice ──────────────────────────────────────────────────────────
@@ -93,15 +321,10 @@ def save_voice(voice_name: str) -> None:
     """Persist the chosen Live voice. Unknown names collapse to the default so a
     bad value can never reach the API and break the session."""
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
+    data: dict = load_api_keys()
     v = (voice_name or "").strip()
     data["voice_name"] = v if v in AVAILABLE_VOICES else DEFAULT_VOICE
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    _atomic_write_config(data)
 
 
 # ── Assistant response language ──────────────────────────────────────────────
@@ -127,15 +350,10 @@ def get_response_language() -> str:
 def save_response_language(lang: str) -> None:
     """Persist the chosen response language."""
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
+    data: dict = load_api_keys()
     l = (lang or "").strip()
     data["response_language"] = l if l in AVAILABLE_LANGUAGES else DEFAULT_RESPONSE_LANGUAGE
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    _atomic_write_config(data)
 
 
 def get_wake_word_enabled() -> bool:
@@ -145,14 +363,9 @@ def get_wake_word_enabled() -> bool:
 
 def save_wake_word_enabled(enabled: bool) -> None:
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
+    data: dict = load_api_keys()
     data["wake_word_enabled"] = bool(enabled)
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    _atomic_write_config(data)
 
 
 def get_push_to_talk_enabled() -> bool:
@@ -206,17 +419,9 @@ def save_thinking_enabled(enabled: bool) -> None:
 def get_turn_tuning() -> dict:
     """How eagerly the server decides you have stopped speaking.
 
-    OFF by default, and that default was earned. Cutting turns shorter looks
-    like a free speed win and is not: proactive audio has to judge whether an
-    utterance was even addressed to the assistant, and a turn clipped early
-    gives it less to judge, so it stays quiet — and the reply to your first
-    sentence only arrives once your second one has given it enough context.
-    That reads as the assistant being a turn behind, which is far worse than
-    the fraction of a second the tuning saves.
-
-    Turn it on with "turn_tuning": {"enabled": true} if your own microphone and
-    speaking pace suit it. `silence_ms` is the one that is felt: the pause the
-    server sits through before accepting your turn is over.
+    ON by default with responsive 450ms silence detection and high end sensitivity
+    so user speech is processed immediately with minimal latency.
+    `silence_ms` is the pause the server sits through before completing your turn.
     """
     cfg = load_api_keys().get("turn_tuning")
     cfg = cfg if isinstance(cfg, dict) else {}
@@ -228,9 +433,9 @@ def get_turn_tuning() -> dict:
             return default
 
     return {
-        "enabled":    bool(cfg.get("enabled", False)),
-        "silence_ms": _int("silence_ms", 550, 200, 3000),
-        "prefix_ms":  _int("prefix_ms", 150, 0, 1000),
+        "enabled":    bool(cfg.get("enabled", True)),
+        "silence_ms": _int("silence_ms", 450, 200, 3000),
+        "prefix_ms":  _int("prefix_ms", 100, 0, 1000),
         # "high" = quicker to decide speech has ended.
         "end_sensitivity":   str(cfg.get("end_sensitivity", "high")).lower(),
         "start_sensitivity": str(cfg.get("start_sensitivity", "default")).lower(),
@@ -239,34 +444,129 @@ def get_turn_tuning() -> dict:
 
 def save_turn_tuning(values: dict) -> None:
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
+    data: dict = load_api_keys()
     cur = data.get("turn_tuning")
     cur = dict(cur) if isinstance(cur, dict) else {}
     cur.update(values or {})
     data["turn_tuning"] = cur
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    _atomic_write_config(data)
 
 
 def get_proactive_audio_enabled() -> bool:
     """Whether the model gets to decide an utterance was not aimed at it and
     stay quiet.
 
-    On by default — it is what stops the assistant answering the room. But it
-    is also the first thing to switch off if replies ever seem to arrive a turn
-    late: what looks like lag is usually the model having judged your previous
-    sentence as not addressed to it, and only changing its mind once the next
-    one arrives.
+    Off by default so every user utterance is heard and processed immediately
+    without classifier hesitation or turn lag.
     """
-    return bool(load_api_keys().get("proactive_audio", True))
+    return bool(load_api_keys().get("proactive_audio", False))
 
 
 def save_proactive_audio_enabled(enabled: bool) -> None:
     _save_flag("proactive_audio", enabled)
+
+
+# ── Offline voice fallback ───────────────────────────────────────────────────
+
+# ── Voice Engine Defaults (Pure Gemini Live WebSocket Mode) ───────────────────
+PIPELINE_MODES = ("live",)
+DEFAULT_PIPELINE_MODE = "live"
+
+
+def get_voice_fallback_mode() -> str:
+    return "off"
+
+
+def save_voice_fallback_mode(mode: str) -> None:
+    pass
+
+
+def get_fallback_voice() -> str:
+    return "af_heart"
+
+
+def save_fallback_voice(voice: str) -> None:
+    pass
+
+
+def get_pipeline_mode() -> str:
+    return "live"
+
+
+def save_pipeline_mode(mode: str) -> None:
+    pass
+
+
+def get_stt_engine() -> str:
+    return "gemini_live"
+
+
+def save_stt_engine(engine: str) -> None:
+    pass
+
+
+def get_llm_engine() -> str:
+    return "gemini_live"
+
+
+def save_llm_engine(engine: str) -> None:
+    pass
+
+
+def get_tts_engine() -> str:
+    return "gemini_live"
+
+
+def save_tts_engine(engine: str) -> None:
+    pass
+
+
+def get_tts_voice() -> str:
+    return ""
+
+
+def save_tts_voice(voice: str) -> None:
+    pass
+
+
+
+def _get_choice(key: str, options: tuple, default: str) -> str:
+    v = str(load_api_keys().get(key, default) or default).strip().lower()
+    return v if v in options else default
+
+
+def _save_choice(key: str, value: str, options: tuple, default: str) -> None:
+    ensure_config_dir()
+    data: dict = load_api_keys()
+    v = str(value or default).strip().lower()
+    data[key] = v if v in options else default
+    _atomic_write_config(data)
+
+
+# ── CLI & Coding Agent Preferences ───────────────────────────────────────────
+CREATION_AGENTS = ("opencode", "antigravity", "kilo")
+DEFAULT_CREATION_AGENT = "opencode"
+
+EDIT_AGENTS = ("groq_helper", "kilo", "opencode")
+DEFAULT_EDIT_AGENT = "groq_helper"
+
+
+def get_preferred_creation_agent() -> str:
+    """Preferred CLI agent for building new multi-file projects."""
+    return _get_choice("preferred_creation_agent", CREATION_AGENTS, DEFAULT_CREATION_AGENT)
+
+
+def save_preferred_creation_agent(agent: str) -> None:
+    _save_choice("preferred_creation_agent", agent, CREATION_AGENTS, DEFAULT_CREATION_AGENT)
+
+
+def get_preferred_edit_agent() -> str:
+    """Preferred CLI agent / tool for editing existing files or sections."""
+    return _get_choice("preferred_edit_agent", EDIT_AGENTS, DEFAULT_EDIT_AGENT)
+
+
+def save_preferred_edit_agent(agent: str) -> None:
+    _save_choice("preferred_edit_agent", agent, EDIT_AGENTS, DEFAULT_EDIT_AGENT)
 
 
 MEDIA_RESOLUTIONS = ("default", "low", "medium", "high")
@@ -289,14 +589,9 @@ def save_media_resolution(value: str) -> None:
 def _save_flag(key: str, value) -> None:
     """Read-modify-write one key without disturbing the rest of the config."""
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
+    data: dict = load_api_keys()
     data[key] = bool(value) if isinstance(value, bool) else value
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    _atomic_write_config(data)
 
 
 def get_brief_enabled() -> bool:
@@ -305,14 +600,79 @@ def get_brief_enabled() -> bool:
 
 def save_brief_enabled(enabled: bool) -> None:
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
-    data["morning_brief_enabled"] = enabled
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    data: dict = load_api_keys()
+    data["morning_brief_enabled"] = bool(enabled)
+    _atomic_write_config(data)
+
+
+def get_startup_lnk_path() -> Path | None:
+    if platform.system() == "Windows":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup" / "ZEZO.lnk"
+    return None
+
+
+def get_autostart_enabled() -> bool:
+    if platform.system() == "Windows":
+        lnk = get_startup_lnk_path()
+        if lnk and lnk.exists():
+            return True
+    return bool(load_api_keys().get("autostart_enabled", False))
+
+
+def save_autostart_enabled(enabled: bool) -> bool:
+    _save_flag("autostart_enabled", enabled)
+    if platform.system() == "Windows":
+        lnk = get_startup_lnk_path()
+        if lnk:
+            if enabled:
+                try:
+                    script = BASE_DIR / "main.py"
+                    python = Path(sys.executable)
+                    pythonw = python.parent / "pythonw.exe"
+                    target = str(pythonw if pythonw.exists() else python)
+                    ico_path = CONFIG_DIR / "zezo.ico"
+                    icon_loc = str(ico_path) if ico_path.exists() else f"{target},0"
+
+                    vbs = "\n".join([
+                        'Set ws = CreateObject("WScript.Shell")',
+                        f'Set sc = ws.CreateShortcut("{str(lnk)}")',
+                        f'sc.TargetPath = "{target}"',
+                        f'sc.Arguments = Chr(34) & "{str(script)}" & Chr(34)',
+                        f'sc.WorkingDirectory = "{str(BASE_DIR)}"',
+                        'sc.Description = "ZEZO Autonomous AI Operating System"',
+                        f'sc.IconLocation = "{icon_loc}"',
+                        'sc.Save',
+                    ])
+                    import tempfile
+                    fd, tmp = tempfile.mkstemp(suffix=".vbs")
+                    try:
+                        with os.fdopen(fd, "w", encoding="utf-8") as f:
+                            f.write(vbs)
+                        proc = subprocess.Popen(
+                            ["wscript.exe", "/nologo", tmp],
+                            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW,
+                        )
+                        proc.wait(timeout=10)
+                    finally:
+                        try:
+                            os.unlink(tmp)
+                        except Exception:
+                            pass
+                    return True
+                except Exception as e:
+                    print(f"Failed to enable autostart: {e}")
+                    return False
+            else:
+                try:
+                    if lnk.exists():
+                        lnk.unlink()
+                    return True
+                except Exception as e:
+                    print(f"Failed to disable autostart: {e}")
+                    return False
+    return True
 
 
 # ── Audio devices ────────────────────────────────────────────────────────────
@@ -323,20 +683,11 @@ def save_brief_enabled(enabled: bool) -> None:
 # so unplugging a headset degrades to the built-in speakers instead of crashing.
 
 def _patch_config(**fields) -> None:
-    """Read-modify-write one or more keys in api_keys.json.
-
-    Every setter in this file open-coded this. Collapsing it here means a new
-    setting is one line, and there is one place where a corrupt config file is
-    handled instead of nine."""
+    """Read-modify-write one or more keys in api_keys.json."""
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
+    data: dict = load_api_keys()
     data.update(fields)
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    _atomic_write_config(data)
 
 
 def get_input_device() -> str:
@@ -384,12 +735,7 @@ def save_plugin_config(namespace: str, values: dict) -> None:
     """Merge `values` into a namespace's stored config (read-modify-write, like
     every other helper here). Only the provided keys are touched."""
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
+    data: dict = load_api_keys()
     pc = data.get("plugin_config")
     if not isinstance(pc, dict):
         pc = {}
@@ -399,26 +745,19 @@ def save_plugin_config(namespace: str, values: dict) -> None:
     cur.update(values)
     pc[namespace] = cur
     data["plugin_config"] = pc
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    _atomic_write_config(data)
 
 
 def save_plugin_enabled(plugin_name: str, enabled: bool) -> None:
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
+    data: dict = load_api_keys()
     plugins_cfg = data.get("plugins_enabled")
     if not isinstance(plugins_cfg, dict):
         plugins_cfg = {}
     plugins_cfg[plugin_name] = enabled
     data["plugins_enabled"] = plugins_cfg
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    _atomic_write_config(data)
 
-
-# ── OpenCode Zen & Free Models Config ─────────────────────────────────────────
 
 # ── OpenCode Zen & Free Models Config ─────────────────────────────────────────
 
@@ -443,14 +782,9 @@ def get_opencode_provider() -> str:
 def save_opencode_provider(provider: str) -> None:
     """Persist OpenCode provider to config."""
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
+    data: dict = load_api_keys()
     data["opencode_provider"] = provider.strip() or DEFAULT_OPENCODE_PROVIDER
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    _atomic_write_config(data)
 
 
 def get_opencode_model() -> str:
@@ -473,14 +807,9 @@ def get_opencode_model() -> str:
 def save_opencode_model(model: str) -> None:
     """Persist chosen OpenCode model to config."""
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
+    data: dict = load_api_keys()
     data["opencode_model"] = model.strip() or DEFAULT_OPENCODE_MODEL
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    _atomic_write_config(data)
 
 
 # ── Kilo Code & Free Models Config ───────────────────────────────────────────
@@ -509,33 +838,18 @@ def get_kilo_model() -> str:
 def save_kilo_model(model: str) -> None:
     """Persist chosen Kilo Code model to config."""
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
+    data: dict = load_api_keys()
     m = model.strip() or DEFAULT_KILO_MODEL
     if not m.startswith("kilo/"):
         m = f"kilo/{m}"
     data["kilo_model"] = m
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    _atomic_write_config(data)
 
 
 # ── Antigravity CLI & Model Config ───────────────────────────────────────────
 
-ANTIGRAVITY_CLI_MODELS = [
-    "gemini-3.7-flash-medium",     # Gemini 3.7 Flash Medium (Default Fast & Smart)
-    "gemini-3.8-flash-medium",     # Gemini 3.8 Flash Medium
-    "gemini-3.6-flash-medium",     # Gemini 3.6 Flash Medium
-    "gemini-3.1-pro-high",         # Gemini 3.1 Pro High Reasoning
-    "gemini-3.1-pro-low",          # Gemini 3.1 Pro Fast
-    "claude-sonnet-4-6",           # Claude Sonnet 4.6 (Thinking)
-    "claude-opus-4-6-thinking",    # Claude Opus 4.6 (Deep Thinking)
-    "gpt-oss-120b-medium",         # GPT-OSS 120B Open Weights
-]
-
-DEFAULT_ANTIGRAVITY_MODEL = "gemini-3.7-flash-medium"
+# ANTIGRAVITY_CLI_MODELS / DEFAULT_ANTIGRAVITY_MODEL are imported from
+# core/models.py above — single source of truth, re-exported for callers.
 
 
 def get_antigravity_model() -> str:
@@ -546,25 +860,24 @@ def get_antigravity_model() -> str:
 def save_antigravity_model(model: str) -> None:
     """Persist chosen Antigravity model to config."""
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
+    data: dict = load_api_keys()
     data["antigravity_model"] = model.strip() or DEFAULT_ANTIGRAVITY_MODEL
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    _atomic_write_config(data)
 
 
 # ── Groq LPU Coprocessor Config ──────────────────────────────────────────────
 
-DEFAULT_GROQ_MODEL = "qwen/qwen3.8-27b"
+# DEFAULT_GROQ_MODEL / DEFAULT_GROQ_VISION_MODEL / DEFAULT_GROQ_WHISPER_MODEL are
+# imported from core/models.py above. Groq's public free tier exposes NO
+# multimodal/vision model, so vision is opt-in (empty default → Gemini).
 
 
 def get_groq_api_key() -> str | None:
-    """Return the configured Groq API key, or None if not set."""
+    """Return the configured Groq API key, or None if not set or invalid."""
     key = load_api_keys().get("groq_api_key", "").strip()
-    return key if key else None
+    if not key or any(c in "\r\n" for c in key) or any(ord(c) >= 128 for c in key):
+        return None
+    return key
 
 
 def get_groq_model() -> str:
@@ -572,17 +885,47 @@ def get_groq_model() -> str:
     return load_api_keys().get("groq_model", DEFAULT_GROQ_MODEL) or DEFAULT_GROQ_MODEL
 
 
-def save_groq_config(api_key: str, model: str = DEFAULT_GROQ_MODEL) -> None:
-    """Persist Groq API key and default model to config."""
+def get_groq_vision_model() -> str:
+    """Return configured Groq multimodal model for image/document extraction."""
+    return (
+        load_api_keys().get("groq_vision_model", DEFAULT_GROQ_VISION_MODEL)
+        or DEFAULT_GROQ_VISION_MODEL
+    )
+
+
+def get_groq_whisper_model() -> str:
+    """Return configured Groq Whisper model for audio/video transcription."""
+    return (
+        load_api_keys().get("groq_whisper_model", DEFAULT_GROQ_WHISPER_MODEL)
+        or DEFAULT_GROQ_WHISPER_MODEL
+    )
+
+
+def get_elevenlabs_api_key() -> str | None:
+    """Return the configured ElevenLabs API key, or None if not set."""
+    key = load_api_keys().get("elevenlabs_api_key", "").strip()
+    return key if key else None
+
+
+def save_groq_config(
+    api_key: str,
+    model: str = DEFAULT_GROQ_MODEL,
+    vision_model: str = "",
+    whisper_model: str = "",
+) -> None:
+    """Persist Groq API key and model choices to config.
+
+    ``vision_model`` / ``whisper_model`` are optional and only written when
+    provided, so existing callers keep their exact behaviour.
+    """
     ensure_config_dir()
-    data: dict = {}
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
+    data: dict = load_api_keys()
     if api_key:
         data["groq_api_key"] = api_key.strip()
     if model:
         data["groq_model"] = model.strip() or DEFAULT_GROQ_MODEL
-    CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    if vision_model:
+        data["groq_vision_model"] = vision_model.strip() or DEFAULT_GROQ_VISION_MODEL
+    if whisper_model:
+        data["groq_whisper_model"] = whisper_model.strip() or DEFAULT_GROQ_WHISPER_MODEL
+    _atomic_write_config(data)

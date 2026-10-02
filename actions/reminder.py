@@ -294,6 +294,20 @@ def reminder(
     session_memory=None,
 ) -> str:
     params = parameters or {}
+    action = (params.get("action") or "set").lower().strip()
+    if action in ("dismiss", "close", "cancel", "stop", "clear"):
+        from actions.computer_control import _safe_close_window
+        res = _safe_close_window("reminder")
+        # Clean up any scheduled reminder scripts if requested
+        try:
+            for f in _scripts_dir().glob("*.py"):
+                f.unlink(missing_ok=True)
+            for f in _scripts_dir().glob("*.xml"):
+                f.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return f"Dismissed active reminder popup. ({res})"
+
     date_str = params.get("date", "").strip()
     time_str = params.get("time", "").strip()
     minutes_raw = params.get("minutes") or params.get("minutes_from_now")
@@ -373,10 +387,15 @@ def reminder(
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "reminder",
-    "description": "Sets a timed notification reminder using the native system Task Scheduler. Supports relative minutes (e.g. in 2 minutes) or specific date and 24h time.",
+    "description": "Sets or dismisses timed notification reminders. Supports relative minutes (e.g. in 2 minutes), specific date and time, or dismissing/closing active reminder popups (action='dismiss').",
     "parameters": {
         "type": "OBJECT",
         "properties": {
+            "action": {
+                "type": "STRING",
+                "enum": ["set", "dismiss", "close", "cancel"],
+                "description": "Operation to perform: 'set' (default) to schedule a reminder, or 'dismiss'/'close' to dismiss active reminder popups."
+            },
             "minutes": {
                 "type": "NUMBER",
                 "description": "Number of minutes from now to trigger the reminder (e.g. 2, 10, 30)."
@@ -394,9 +413,7 @@ TOOL = {
                 "description": "Reminder message text (e.g. 'Drink water')"
             }
         },
-        "required": [
-            "message"
-        ]
+        "required": []
     },
     "handler": reminder,
 }

@@ -70,6 +70,9 @@ def task_status(parameters: dict, player=None, speak=None) -> str:
         st = tm.status(task_id)
         if st:
             return _fmt(st)
+        active = tm.list_active()
+        if active:
+            return "Task ID '" + task_id + "' not found, but active background task is currently running:\n" + "\n".join(_fmt(s) for s in active)
         latest = tm.get_latest_task()
         if latest:
             return f"No task with id '{task_id}'. Most recent task:\n{_fmt(latest)}"
@@ -81,9 +84,9 @@ def task_status(parameters: dict, player=None, speak=None) -> str:
 
     latest = tm.get_latest_task()
     if latest:
-        return f"No tasks are currently running. Most recent task:\n{_fmt(latest)}"
+        return f"No tasks are currently running. Most recent task in process:\n{_fmt(latest)}"
 
-    return "No background tasks have been started in this session."
+    return "No background tasks have been started in this process."
 
 
 TOOL = {

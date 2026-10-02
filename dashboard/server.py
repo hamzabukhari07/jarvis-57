@@ -327,8 +327,36 @@ _ensure_crypto_js()
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def _local_ip() -> str:
-    """Return the best LAN-facing IPv4 address, no internet required."""
-    # Method 1: route trick (fast, works when internet is available)
+    """Return the best LAN-facing IPv4 address, prioritizing active Wi-Fi or Ethernet adapters."""
+    try:
+        import psutil
+        addrs = psutil.net_if_addrs()
+        stats = psutil.net_if_stats()
+        candidates = []
+        for iface_name, iface_addrs in addrs.items():
+            name_lower = iface_name.lower()
+            if any(skip in name_lower for skip in ("loopback", "vethernet", "vmware", "virtualbox", "wsl", "bluetooth", "pseudo")):
+                continue
+            is_up = stats[iface_name].isup if iface_name in stats else True
+            if not is_up:
+                continue
+            for addr in iface_addrs:
+                if addr.family == socket.AF_INET:
+                    ip = addr.address
+                    if not ip.startswith("127.") and not ip.startswith("169.254."):
+                        priority = 0
+                        if "wi-fi" in name_lower or "wifi" in name_lower or "wireless" in name_lower:
+                            priority = 10
+                        elif "ethernet" in name_lower or "lan" in name_lower:
+                            priority = 5
+                        candidates.append((priority, ip))
+        if candidates:
+            candidates.sort(key=lambda x: x[0], reverse=True)
+            return candidates[0][1]
+    except Exception:
+        pass
+
+    # Method 2: route trick (fast, works when internet is available)
     for probe in ("8.8.8.8", "1.1.1.1", "192.168.1.1"):
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -336,25 +364,16 @@ def _local_ip() -> str:
             s.connect((probe, 80))
             ip = s.getsockname()[0]
             s.close()
-            if not ip.startswith("127."):
+            if not ip.startswith("127.") and not ip.startswith("169.254."):
                 return ip
         except Exception:
             pass
 
-    # Method 2: hostname resolution (works offline on most systems)
+    # Method 3: hostname resolution (works offline on most systems)
     try:
         ip = socket.gethostbyname(socket.gethostname())
         if not ip.startswith("127."):
             return ip
-    except Exception:
-        pass
-
-    # Method 3: enumerate all interfaces (fully offline, no external deps)
-    try:
-        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
-            ip = info[4][0]
-            if not ip.startswith("127.") and not ip.startswith("169.254."):
-                return ip
     except Exception:
         pass
 
@@ -490,13 +509,10 @@ class DashboardServer:
         return (certs / "jarvis.key").exists() and (certs / "jarvis.crt").exists()
 
     def get_url(self) -> str:
-        proto = "https" if self._ssl_enabled() else "http"
-        return f"{proto}://{self._ip}:{PORT}"
+        return f"http://{self._ip}:{PORT}"
 
     def get_manual_url(self) -> str:
-        """URL for manual browser entry. When HTTPS active, points to alias port (also HTTPS)."""
-        if self._ssl_enabled():
-            return f"{self._ip}:{PORT + 1}"
+        """URL for manual browser entry."""
         return f"{self._ip}:{PORT}"
 
     def _aes_key(self, session_key: str) -> bytes:
@@ -930,19 +946,14 @@ class DashboardServer:
         asyncio.create_task(self._telemetry_broadcast_loop())
 
         use_ssl  = self._ssl_enabled()
-        ssl_key  = BASE_DIR / "config" / "certs" / "jarvis.key"
-        ssl_cert = BASE_DIR / "config" / "certs" / "jarvis.crt"
-
         if use_ssl:
             asyncio.create_task(self._serve_alias())
 
         cfg = uvicorn.Config(
             self.app, host="0.0.0.0", port=PORT, log_level="warning",
-            **({"ssl_keyfile": str(ssl_key), "ssl_certfile": str(ssl_cert)} if use_ssl else {}),
         )
 
-        proto = "https" if use_ssl else "http"
-        print(f"[Dashboard] {proto}://{self._ip}:{PORT}")
+        print(f"[Dashboard] http://{self._ip}:{PORT}")
         print("[Dashboard] Press 'Remote Control' in JARVIS UI to get the QR code.")
         await uvicorn.Server(cfg).serve()
 

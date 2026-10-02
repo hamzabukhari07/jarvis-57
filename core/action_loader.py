@@ -34,9 +34,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
+import time
+import uuid
+
+from collections import deque
+
 _NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]{0,63}$")
 _DEFAULT_PARAMS = {"type": "OBJECT", "properties": {}}
-_CTX_KEYS = ("player", "speak", "response", "session_memory")
+_CTX_KEYS = ("player", "speak", "response", "session_memory", "context")
 
 
 # A tool may declare that the model should NOT be held up waiting for it.
@@ -72,6 +77,7 @@ class ActionRegistry:
         self._actions = actions          # name -> ActionRecord, VALID entries only
         self._all_records: list[ActionRecord] = []
         self._logger = logger
+        self._key_history: deque = deque(maxlen=20)
 
     # -- called by main.py at LiveConnectConfig build time --
     def get_tool_declarations(self) -> list[dict]:
@@ -100,9 +106,49 @@ class ActionRegistry:
         rec = self._actions.get(name)
         if rec is None or not rec.valid:
             return f"Action '{name}' is not available."
+
+        # Hotkey Anti-Loop Circuit Breaker (stops repetitive keystroke spam)
+        now = time.monotonic()
+        p = parameters or {}
+        act = str(p.get("action", "")).lower().strip()
+        key_target = str(p.get("keys", "") or p.get("key", "") or p.get("hotkey", "") or p.get("text", "")).lower().strip()
+
+        is_key_action = (
+            name == "computer_control" and (
+                act in ("hotkey", "shortcut", "press_hotkey", "send_hotkey", "press", "key", "press_key", "keypress", "key_press", "send_key", "enter", "escape", "space", "backspace", "tab", "delete")
+                or key_target != ""
+            )
+        )
+        if is_key_action:
+            sig = f"{act}:{key_target}"
+            while self._key_history and (now - self._key_history[0][0]) > 10.0:
+                self._key_history.popleft()
+            recent_count = sum(1 for ts, s in self._key_history if s == sig)
+            if recent_count >= 4:
+                msg = f"Aborted: Repetitive hotkey loop detected (>4 calls in 10s for '{sig}'). Use spatial coordinate clicks or inspect the UI state."
+                print(f"[CircuitBreaker] ⚠️ {msg}")
+                return msg
+            self._key_history.append((now, sig))
+
+        from core.task_manager import ToolExecutionContext
+        from core.log_bus import emit_tool_micro_event
+
+        task_id = uuid.uuid4().hex[:8]
+        exec_ctx = ToolExecutionContext(task_id=task_id, tool_name=name, timeout_seconds=30.0)
+        run_ctx = dict(ctx or {})
+        run_ctx["context"] = exec_ctx
+
+        emit_tool_micro_event("started", name, {"task_id": task_id, "params": list((parameters or {}).keys())})
+        t0 = time.perf_counter()
+
         try:
-            return _call_handler(rec.handler, parameters, ctx or {}) or "Done."
+            res = _call_handler(rec.handler, parameters, run_ctx) or "Done."
+            elapsed_ms = round((time.perf_counter() - t0) * 1000, 1)
+            emit_tool_micro_event("completed", name, {"task_id": task_id, "latency_ms": f"{elapsed_ms}ms"})
+            return res
         except Exception as e:
+            elapsed_ms = round((time.perf_counter() - t0) * 1000, 1)
+            emit_tool_micro_event("failed", name, {"task_id": task_id, "error": str(e), "latency_ms": f"{elapsed_ms}ms"}, level="ERROR")
             self._logger(f"Action '{name}' crashed during run(): {e}")
             traceback.print_exc()
             return f"Tool '{name}' failed: {e}"

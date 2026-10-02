@@ -4,13 +4,25 @@ import subprocess as _subprocess
 # ── Nuclear: force CREATE_NO_WINDOW on EVERY subprocess call on Windows ───────
 # This patches Popen itself, so no per-file flag is needed anywhere.
 if _platform.system() == "Windows":
+    try:
+        import ctypes
+        try:
+            ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+        except Exception:
+            try:
+                ctypes.windll.shcore.SetProcessDpiAwareness(2)
+            except Exception:
+                ctypes.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass
+
     _OrigPopen = _subprocess.Popen
 
     class _Popen(_OrigPopen):
         def __init__(self, args, **kw):
             kw["creationflags"] = kw.get("creationflags", 0) | _subprocess.CREATE_NO_WINDOW
             kw.pop("startupinfo", None)   # drop any stale/shared STARTUPINFO
-            super().__init__(args, **                       kw)
+            super().__init__(args, **kw)
 
     _subprocess.Popen = _Popen
 
@@ -62,7 +74,7 @@ from memory import sqlite_memory
 # Only tools that are tied to live-session state stay inline in this file
     # (screen_process, close_camera, save_memory, manage_monitor, shutdown_zezo,
     # system_status).
-from actions.screen_processor  import _capture_camera, _capture_screen
+from actions.screen_processor  import _capture_camera, _capture_screen, analyze_visual
 from actions.system_monitor    import SystemMonitor, get_system_status
 from actions.proactive         import ProactiveEngine
 from actions.background_monitor import (
@@ -73,6 +85,7 @@ from memory.config_manager     import (
     get_brief_enabled, get_media_resolution, get_proactive_audio_enabled,
     get_push_to_talk_enabled, get_thinking_enabled, get_turn_tuning, get_voice,
     get_wake_word_enabled, save_wake_word_enabled,    get_input_device, get_output_device,
+    save_input_device, save_output_device, get_fallback_voice,
 )
 from core.plugin_loader        import discover_plugins
 from core                      import undo as undo_stack
@@ -86,6 +99,7 @@ from core.viseme               import VisemeStream
 from core.wake_word            import (
     WakeWordDetector, is_ready as wake_is_ready, install_and_download as wake_install,
 )
+from core.models               import GEMINI_LIVE_MODEL
 
 # How long the assistant stays awake with no user speech before it auto-sleeps
 # again (wake-word mode only).
@@ -99,7 +113,7 @@ def get_base_dir():
 BASE_DIR        = get_base_dir()
 API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
 PROMPT_PATH     = BASE_DIR / "core" / "prompt.txt"
-LIVE_MODEL          = "models/gemini-3.1-flash-live-preview"
+LIVE_MODEL          = GEMINI_LIVE_MODEL   # single source: core/models.py
 CHANNELS            = 1
 SEND_SAMPLE_RATE    = 16000 
 RECEIVE_SAMPLE_RATE = 24000
@@ -139,7 +153,7 @@ def _pcm_level(samples) -> float:
 # F2 is high for spread vowels (/i/, /e/) and low for rounded ones (/u/, /o/).
 # Extra time beyond the device's reported output latency before the microphone
 # is trusted again: covers room decay and the speaker's own settling.
-_TAIL_MARGIN = 0.25
+_TAIL_MARGIN = 0.06
 
 _VIS_WIN = 1024        # ~43 ms analysis window at 24 kHz: enough for formants
 _VIS_HOP = 480         # 20 ms between frames, i.e. 50 shapes a second
@@ -324,6 +338,19 @@ def _clean_transcript(text: str) -> str:
     text = re.sub(r"[\x00-\x08\x0b-\x1f]", "", text)
     return text.strip()
 
+
+def _is_same_user_input(a: str, b: str) -> bool:
+    """Checks if two user inputs are identical, ignoring URL protocols, trailing slashes, punctuation, and casing."""
+    if not a or not b:
+        return False
+    a_clean = a.strip().lower()
+    b_clean = b.strip().lower()
+    if a_clean == b_clean:
+        return True
+    a_norm = re.sub(r"[./\s\-_,!?]+$", "", re.sub(r"^https?://(www\.)?", "", a_clean))
+    b_norm = re.sub(r"[./\s\-_,!?]+$", "", re.sub(r"^https?://(www\.)?", "", b_clean))
+    return bool(a_norm and b_norm and a_norm == b_norm)
+
 TOOL_DECLARATIONS = [
     # ── Inline tools ─────────────────────────────────────────────────────────
     # These stay here (rather than in an actions/*.py TOOL dict) because their
@@ -346,18 +373,16 @@ TOOL_DECLARATIONS = [
     {
         "name": "screen_process",
         "description": (
-            "Captures the screen or webcam image and lets you analyze it. "
-            "MUST be called when user asks what is on screen, what you see, "
-            "look at camera, analyze my screen, etc. "
+            "Captures the screen or webcam image and analyzes it to return a factual, detailed visual observation. "
+            "MUST be called when user asks what is on screen, what you see, look at camera, inspect active window, check search results or contacts on screen, etc. "
             "You have NO visual ability without this tool. "
-            "After the image is captured it is sent directly to you — describe what you see and answer the user's question. "
-            "When using camera: the live view stays open until user says close it or calls close_camera."
+            "Returns a precise description of the active application, window title, visible text, contacts/chats, code, buttons, or error messages so you can answer accurately."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
                 "angle": {"type": "STRING", "description": "'screen' to capture display, 'camera' for webcam. Default: 'screen'"},
-                "text":  {"type": "STRING", "description": "The question or instruction about the captured image"}
+                "text":  {"type": "STRING", "description": "The specific question or instruction about the screen/camera state (e.g. 'Is WhatsApp open and is Inferno in the search results?')."}
             },
             "required": ["text"]
         }
@@ -608,7 +633,9 @@ class ZezoLive:
         self.ui.on_file_uploaded  = self._on_ui_file_uploaded
         self.ui.on_remote_clicked = self._make_remote_key
         self.ui.on_interrupt      = self.interrupt
+        self.ui.on_sleep_toggle   = self._on_ui_sleep_toggle
         self.ui.on_voice_change   = self._on_voice_change     # voice picker → rebuild session
+        self.ui.on_pipeline_change = self._on_pipeline_change # pipeline switcher
         self.ui.on_audio_device_change = self._on_audio_device_change
         self._reconnect_event: asyncio.Event | None = None
         self._reconnect_keep = True   # False → next rebuild drops the resumption handle
@@ -634,7 +661,10 @@ class ZezoLive:
         self._sys_monitor      = SystemMonitor()  # persistent cooldown state
         self._proactive        = ProactiveEngine()
         self._last_user_speech = time.monotonic()  # updated on every user utterance
+        self._last_user_in_logged = ""             # deduplication for user text/voice input
+        self._last_user_text_ts: float = 0.0       # timestamp of last typed command for debounce
         self._session_log: list[str] = []          # conversation turns for end-of-session summary
+        self._tool_busy: bool = False              # pauses audio streaming during tool execution
         try:
             sqlite_memory.init_db()
             sqlite_memory.sync_facts_from_dict(load_memory())
@@ -739,6 +769,12 @@ class ZezoLive:
         self.ui.set_state("SLEEPING")
         self.ui.write_log(f"SYS: Sleeping — {reason}. Say 'Hey Zezo' to wake me.")
 
+    def _on_ui_sleep_toggle(self, sleeping: bool) -> None:
+        if sleeping:
+            self.sleep(reason="sleep button clicked")
+        else:
+            self.wake(reason="wake button clicked")
+
     async def _run_sleep_watch(self) -> None:
         """Auto-sleep after the configured silence window (wake-word mode only)."""
         while True:
@@ -830,15 +866,11 @@ class ZezoLive:
             loop.call_soon_threadsafe(ev.set)
 
     def _on_voice_change(self):
-        """Voice picker applied.
-
-        The voice is baked into the session at connect time, so a rebuild is
-        required. It is rebuilt WITHOUT the resumption handle on purpose:
-        resuming restores the server's own session state, and the safe reading
-        is that it restores the voice with it — which would make the picker
-        appear to do nothing. Losing context here is acceptable because changing
-        voice is a deliberate, rare act; losing it on a dropped packet was not."""
         self.request_reconnect(keep_context=False, reason="new voice")
+
+    def _on_pipeline_change(self):
+        """Pipeline mode or custom engine configuration changed in UI."""
+        self.request_reconnect(keep_context=False, reason="pipeline change")
 
     def _on_audio_device_change(self):
         """Microphone or speaker changed. Both streams are opened inside the
@@ -877,12 +909,17 @@ class ZezoLive:
     def _on_text_command(self, text: str):
         if not self._loop or not self.session:
             return
-        # Respect wake-word sleep: a typed command must not be answered while
-        # asleep either (the sleep gate is not just for the mic). Wake first with
-            # "Hey Zezo" or the WAKE NOW button.
         if self._wake_enabled and not self._awake:
-            self.ui.write_log("SYS: I'm asleep — say 'Hey Zezo' or tap WAKE NOW first.")
-            return
+            self.wake(reason="typed text command")
+        clean_text = text.strip()
+        self._last_user_in_logged = clean_text
+        self._last_user_text_ts = time.monotonic()
+        self.ui.write_log(f"You: {text}")
+        self._session_log.append(f"User: {text}")
+        try:
+            sqlite_memory.log_turn("user", text)
+        except Exception:
+            pass
         asyncio.run_coroutine_threadsafe(
             self.session.send_client_content(
                 turns=[{"role": "user", "parts": [{"text": text}]}],
@@ -897,14 +934,19 @@ class ZezoLive:
 
     def set_speaking(self, value: bool):
         with self._speaking_lock:
+            was_speaking = self._is_speaking
             self._is_speaking = value
         if value:
             self._tail_until = 0.0
-        else:
-            # Hold the guard open across the device's own output latency plus a
-            # margin for the room. The microphone is NOT muted during it — the
-            # guard still lets a genuine reply through, so answering instantly
-            # still works. Only our own echo is dropped.
+        elif was_speaking:
+            # Arm the echo tail ONLY on a real speaking -> idle transition. The
+            # idle playback loop calls set_speaking(False) every ~200 ms; arming
+            # on every one of those polls made the tail (latency + margin ≈
+            # 273 ms) outlast the poll interval, so it was permanently active.
+            # The microphone then spent every audio block inside the "our own
+            # voice" guard and dropped the user's quieter speech — only the
+            # loudest phonemes escaped, which is why a spoken turn was never
+            # understood. Arm once, on the transition.
             self._tail_until = time.monotonic() + self._out_latency + _TAIL_MARGIN
         if not value:
             # The echo history is deliberately NOT cleared here: the tail above
@@ -1018,6 +1060,14 @@ class ZezoLive:
         mem_str    = format_memory_for_prompt(memory)
         sys_prompt = _load_system_prompt()
 
+        if not _user_name and memory:
+            _ident = memory.get("identity", {}) or {}
+            _n_val = _ident.get("name")
+            if isinstance(_n_val, dict):
+                _user_name = str(_n_val.get("value", "") or "").strip()
+            elif isinstance(_n_val, str):
+                _user_name = _n_val.strip()
+
         now      = datetime.now()
         tz_name  = time.tzname[time.daylight] if time.tzname else "Local Time"
         time_str = now.strftime("%A, %B %d, %Y — %I:%M:%S %p (%H:%M 24h)")
@@ -1044,6 +1094,8 @@ class ZezoLive:
             f"[IDENTITY]\n"
             f"Your name is {self._asst_name}. "
             f"Always refer to yourself as {self._asst_name}.\n"
+            f"You were created and architected by Hamza Bukhari as a private, native desktop AI Operating System.\n"
+            f"Your live session is running on Google Gemini Live real-time WebSocket audio/vision.\n"
             f"{_addr}\n\n"
         )
 
@@ -1061,10 +1113,12 @@ class ZezoLive:
         resp_lang = get_response_language()
         if resp_lang and resp_lang.lower() != "auto":
             lang_dir = (
-                f"STRICT FIXED RESPONSE LANGUAGE DIRECTIVE:\n"
-                f"- You MUST ALWAYS speak and reply to the user in {resp_lang}, regardless of what language the user speaks in (whether they speak Urdu, Hindi, English, Punjabi, or any other language).\n"
-                f"- Understand their intent in whatever language they speak, but deliver 100% of your voice answers and spoken sentences in {resp_lang} only.\n"
-                f"- Tool parameters and code are in English, but your spoken sentences MUST BE in {resp_lang}."
+                f"STRICT FIXED RESPONSE LANGUAGE DIRECTIVE (MANDATORY):\n"
+                f"- The user has configured the fixed response language to '{resp_lang}'.\n"
+                f"- You MUST speak and reply to the user in {resp_lang} ONLY. Even if the user speaks to you in Urdu, Hindi, Spanish, or any other language, you MUST understand their intent but deliver your spoken response exclusively in {resp_lang}.\n"
+                f"- NEVER reply in Urdu, Hindi, or any other language unless the user explicitly commands a language change (e.g. 'speak in Urdu', 'Hindi mein bolo').\n"
+                f"- If the user explicitly asks to switch language, immediately obey, reply in the newly requested language, and save it via save_memory(category='identity', key='language', value='<Language>').\n"
+                f"- Code syntax, file paths, and tool parameters are in English, but spoken voice MUST be strictly in {resp_lang}."
             )
         else:
             lang_dir = (
@@ -1203,6 +1257,12 @@ class ZezoLive:
             if key and value:
                 update_memory({category: {key: {"value": value}}})
                 print(f"[Memory] 💾 save_memory: {category}/{key} = {value}")
+                if category == "identity" and str(key).lower() == "language":
+                    try:
+                        from memory.config_manager import save_response_language
+                        save_response_language(str(value))
+                    except Exception:
+                        pass
             if not self.ui.muted:
                 self.ui.set_state("LISTENING")
             return types.FunctionResponse(
@@ -1249,16 +1309,16 @@ class ZezoLive:
             elif name == "screen_process":
                 import time as _t_mod
                 _now = _t_mod.monotonic()
-                _cooldown = 2.5  # seconds — responsive cooldown
+                _cooldown = 1.5  # seconds — fast and responsive cooldown
                 if self._vision_busy or (_now - self._vision_last_time) < _cooldown:
                     _wait = max(0, _cooldown - (_now - self._vision_last_time))
                     print(f"[Vision] ⏳ Cooldown active ({_wait:.1f}s remaining) — ignoring duplicate call")
-                    result = "Vision is still processing the previous request. I will not call this again."
+                    result = "Vision is currently analyzing the previous visual frame."
                 else:
                     self._vision_busy      = True
                     self._vision_last_time = _now
                     angle     = args.get("angle", "screen").lower()
-                    user_text = args.get("text", "What do you see?")
+                    user_text = args.get("text", "What is currently visible on the screen?")
                     _stall    = "screen"
                     img_b, mime_t = None, "image/jpeg"
                     try:
@@ -1279,18 +1339,19 @@ class ZezoLive:
                             print(f"[Vision] 🖥️  Screen: {len(img_b):,} bytes")
                             _stall = "screen"
 
-                        self._pending_vision = (img_b, mime_t, user_text, angle)
-                        result = (
-                            f"[VISION_ACTIVE] {_stall.capitalize()} captured and attached to this "
-                            f"same exchange. Do not acknowledge and do not answer yet — the image "
-                            f"is arriving with this result. Reply once, from what you actually see "
-                            f"in it."
+                        # Perform out-of-band one-shot vision analysis via fast REST model
+                        # to keep the live audio session rock-solid without WebSocket 1011 crashes.
+                        v_obs = await loop.run_in_executor(
+                            None, analyze_visual, img_b, mime_t, user_text, _stall
                         )
+                        print(f"[Vision] 👁️  Observed: {v_obs[:100]}...")
+                        result = f"[Visual observation from {_stall}]: {v_obs}"
                     except Exception as e:
-                        print(f"[Vision] ❌ Vision capture error: {e}")
+                        print(f"[Vision] ❌ Vision capture/analysis error: {e}")
+                        result = f"I could not inspect the screen right now: {e}"
+                    finally:
                         self._vision_busy = False
                         self._pending_vision = None
-                        result = f"I could not capture the visual right now: {e}"
 
             elif name == "close_camera":
                 self.ui.stop_camera_stream()
@@ -1412,34 +1473,71 @@ class ZezoLive:
     async def _send_realtime(self):
         while True:
             msg = await self.out_queue.get()
-            # Gemini 3.x Live rejects the old realtime_input.media_chunks field
-            # (what `media=...` maps to) and closes the socket with a 1007. Send
-            # mic / phone PCM through the new `audio` field instead. Queue items
-            # are {"data": <bytes>, "mime_type": <str>} from _listen_audio and
-            # the phone relay.
-            await self.session.send_realtime_input(
-                audio=types.Blob(
-                    data=msg["data"],
-                    mime_type=msg.get("mime_type", "audio/pcm"),
+            if not self.session:
+                await asyncio.sleep(0.02)
+                continue
+            try:
+                await self.session.send_realtime_input(
+                    audio=types.Blob(
+                        data=msg["data"],
+                        mime_type=msg.get("mime_type", "audio/pcm"),
+                    )
                 )
-            )
+            except Exception as e:
+                err_str = str(e).lower()
+                if "closed" in err_str or "1011" in err_str or "1006" in err_str or "timeout" in err_str:
+                    print(f"[Zezo] 🔄 Realtime stream disconnected: {e}")
+                    raise _ReconnectSignal(keep_context=True)
+                raise
+
+    def _enqueue_out_audio(self, item: dict) -> None:
+        """Enqueue one mic audio blob from the PortAudio callback thread.
+
+        ``out_queue`` is bounded (maxsize=200). When the Live send loop is
+        momentarily behind — a reconnect, or a heavy tool turn — ``put_nowait``
+        raises ``asyncio.QueueFull``; because it is scheduled via
+        ``call_soon_threadsafe``, asyncio logs that as
+        "Exception in callback Queue.put_nowait()" once per audio block, which
+        floods the log bus (observed >1000 lines). Drop the OLDEST blob and keep
+        the newest instead: the model always hears current speech, and a slow
+        consumer never turns into an error storm.
+        """
+        try:
+            self.out_queue.put_nowait(item)
+        except asyncio.QueueFull:
+            try:
+                self.out_queue.get_nowait()   # discard the stalest audio
+            except asyncio.QueueEmpty:
+                pass
+            try:
+                self.out_queue.put_nowait(item)
+            except asyncio.QueueFull:
+                pass                          # still saturated — drop this blob
 
     async def _listen_audio(self):
         print("[Zezo] 🎤 Mic started")
         loop = asyncio.get_event_loop()
 
         def callback(indata, frames, time_info, status):
-            # ── Wake-word gate ───────────────────────────────────────────────
+            # Raw mic level first — surfaced to the UI meter BEFORE any gate, so
+            # the user can always see whether the microphone is hearing anything.
+            _lvl = _pcm_level(indata)
+            try:
+                self.ui.set_mic_level(_lvl)
+            except Exception:
+                pass
+
+            # ── Wake-word & Sleep gate ───────────────────────────────────────
             # While asleep, the mic audio NEVER goes to Gemini (nothing is
             # streamed, so ZEZO can't respond to speech not addressed to it and
             # nothing leaves the machine). Frames are instead handed to the local
-            # detector, which runs its model in ITS OWN thread — the cost here is
-            # only a queue push, so the audio path is never slowed. When wake word
-            # is off (default) or we're awake, this is a single boolean check.
-            if self._wake_enabled and not self._awake:
-                det = self._wake_detector
-                if det is not None:
-                    det.feed(indata)
+            # detector if enabled, which runs its model in ITS OWN thread — the cost
+            # here is only a queue push, so the audio path is never slowed.
+            if not self._awake:
+                if self._wake_enabled:
+                    det = self._wake_detector
+                    if det is not None:
+                        det.feed(indata)
                 return
             with self._speaking_lock:
                 zezo_speaking = self._is_speaking  # noqa: F841
@@ -1453,15 +1551,8 @@ class ZezoLive:
             # So the test is not "is the mic loud" but "is the mic louder than
             # the echo of what we are playing right now", sustained long enough
             # that a cough or a keystroke cannot trigger it.
-            if zezo_speaking:
-                # Nothing is streamed while ZEZO talks.
-                #
-                # Interrupting by voice used to live here: `EchoGuard` can pick a
-                # user out from under our own echo, and `core/echo.py` still does
-                # that for the tail below. Re-enabling is small — classify each
-                # block here and call interrupt() after `required_blocks` of
-                # agreement — but it depends on the listener's room, so it stays
-                # out until it can be tried on real hardware.
+            if zezo_speaking or self._tool_busy:
+                # Nothing is streamed while ZEZO talks or while a tool is executing.
                 return
 
             # ── Echo tail ────────────────────────────────────────────────────
@@ -1472,10 +1563,12 @@ class ZezoLive:
             # replying the instant it stops still works.
             if self._tail_active():
                 try:
-                    if not self._echo.is_user_speech(
-                            indata, SEND_SAMPLE_RATE, _pcm_level(indata)):
+                    if _lvl > 0.08:
+                        self._tail_until = 0.0      # Audible voice ends the tail immediately
+                    elif not self._echo.is_user_speech(indata, SEND_SAMPLE_RATE, _lvl):
                         return
-                    self._tail_until = 0.0      # a real voice ends the tail early
+                    else:
+                        self._tail_until = 0.0      # a real voice ends the tail early
                 except Exception:
                     return
             elif self._echo._hist:
@@ -1491,16 +1584,9 @@ class ZezoLive:
             if not self.ui.muted and not self._phone_active:
                 data = indata.tobytes()
                 loop.call_soon_threadsafe(
-                    self.out_queue.put_nowait,
+                    self._enqueue_out_audio,
                     {"data": data, "mime_type": "audio/pcm"}
                 )
-                # Feed the live mic level to the HUD so the waveform reacts to
-                # the user's actual voice while listening. Purely cosmetic — any
-                # failure here must never disturb the mic.
-                try:
-                    self.ui.set_audio_level(_pcm_level(indata))
-                except Exception:
-                    pass
 
         try:
             def _open_mic(dev):
@@ -1545,43 +1631,10 @@ class ZezoLive:
             raise
 
     async def _flush_pending_vision(self) -> bool:
-        """Send a captured frame immediately after its tool response.
-
-        The frame is already in hand by the time `screen_process` returns — the
-        capture happened inside the tool call. The old flow still made the model
-        speak a turn first and only injected the image on that turn's
-        turn_complete, which cost a whole extra round trip AND produced two
-        spoken answers: one improvised without the picture, then the real one.
-        Sending it here means the model has the tool result and the image before
-        it generates anything, so the user gets one answer, sooner.
-        """
-        if not (self._pending_vision and self.session):
-            return False
-
-        import base64 as _b64
-        img_b, mime_t, question, angle = self._pending_vision
+        """No-op: Vision analysis is executed out-of-band via REST in screen_process."""
         self._pending_vision = None
-        b64 = _b64.b64encode(img_b).decode("ascii")
-        print(f"[Vision] 📤 {len(img_b):,} bytes (angle={angle}) → main session")
-
-        # Label the source. Without it the image arrives carrying nothing but
-        # the user's own sentence, and a screenshot of this app — which has a
-        # face in the middle of it — got read as a photo of the user. What the
-        # label *means* is explained once, in the generated [SELF] block.
-        src = ("[IMAGE SOURCE: WEBCAM]" if angle == "camera"
-               else "[IMAGE SOURCE: SCREEN CAPTURE]")
-        await self.session.send_client_content(
-            turns=[{"role": "user", "parts": [
-                {"inline_data": {"mime_type": mime_t, "data": b64}},
-                {"text": f"{src}\n\n{question}"},
-            ]}],
-            turn_complete=True,
-        )
-
         self._vision_busy = False
-        self._vision_cam_active = False
-        self._vision_close_pending = False
-        return True
+        return False
 
     async def _receive_audio(self):
         print("[Zezo] 👂 Recv started")
@@ -1626,7 +1679,10 @@ class ZezoLive:
                             # Log user speech immediately as soon as model starts answering
                             if in_buf and not in_logged:
                                 full_in = " ".join(in_buf).strip()
-                                if full_in:
+                                is_dup = _is_same_user_input(full_in, self._last_user_in_logged)
+                                is_recent_typed = (time.monotonic() - getattr(self, "_last_user_text_ts", 0)) < 5.0
+                                if full_in and not is_dup and not is_recent_typed:
+                                    self._last_user_in_logged = full_in
                                     self._last_out_logged = ""
                                     self.ui.write_log(f"You: {full_in}")
                                     self._session_log.append(f"User: {full_in}")
@@ -1668,7 +1724,10 @@ class ZezoLive:
                                 continue
 
                             full_in = " ".join(in_buf).strip()
-                            if full_in and not in_logged:
+                            is_dup = _is_same_user_input(full_in, self._last_user_in_logged)
+                            is_recent_typed = (time.monotonic() - getattr(self, "_last_user_text_ts", 0)) < 5.0
+                            if full_in and not in_logged and not is_dup and not is_recent_typed:
+                                self._last_user_in_logged = full_in
                                 self._last_out_logged = ""   # new exchange
                                 self.ui.write_log(f"You: {full_in}")
                                 self._session_log.append(f"User: {full_in}")
@@ -1715,19 +1774,42 @@ class ZezoLive:
                                 asyncio.create_task(_cam_close())
 
                     if response.tool_call:
-                        fn_responses = []
-                        for fc in response.tool_call.function_calls:
-                            print(f"[Zezo] 📞 {fc.name}")
-                            fr = await self._execute_tool(fc)
-                            fn_responses.append(fr)
-                        await self.session.send_tool_response(
-                            function_responses=fn_responses
-                        )
-                        await self._flush_pending_vision()
+                        self._tool_busy = True
+                        while not self.out_queue.empty():
+                            try:
+                                self.out_queue.get_nowait()
+                            except Exception:
+                                break
+                        try:
+                            fn_responses = []
+                            for fc in response.tool_call.function_calls:
+                                print(f"[Zezo] 📞 {fc.name}")
+                                fr = await self._execute_tool(fc)
+                                fn_responses.append(fr)
+                            try:
+                                await self.session.send_tool_response(
+                                    function_responses=fn_responses
+                                )
+                            except Exception as e:
+                                err_str = str(e).lower()
+                                if "closed" in err_str or "1011" in err_str or "1008" in err_str or "1006" in err_str or "1000" in err_str or "goaway" in err_str or "timeout" in err_str:
+                                    print(f"[Zezo] 🔄 Tool response failed (session disconnected): {e}")
+                                    if any(k in err_str for k in ("1011", "1008", "1006", "1000", "goaway", "policy violation", "internal error")):
+                                        self._resume_handle = None
+                                        print(f"[Zezo] ⚠️ Termination code in tool response ({err_str[:60]}) — dropping resume_handle for clean session")
+                                        raise _ReconnectSignal(keep_context=False)
+                                    raise _ReconnectSignal(keep_context=True)
+                                raise
+                        finally:
+                            self._tool_busy = False
         except Exception as e:
             err_str = str(e).lower()
-            if "1008" in err_str or "goaway" in err_str or "connection closed" in err_str or "policy violation" in err_str:
+            if "1008" in err_str or "1011" in err_str or "1006" in err_str or "1000" in err_str or "goaway" in err_str or "connection closed" in err_str or "policy violation" in err_str or "keepalive" in err_str or "timeout" in err_str:
                 print(f"[Zezo] 🔄 Session renewal signal received: {e}")
+                if any(k in err_str for k in ("1011", "1008", "1006", "1000", "goaway", "policy violation", "internal error")):
+                    self._resume_handle = None
+                    print(f"[Zezo] ⚠️ Termination code ({err_str[:60]}) — dropping resume_handle for clean session")
+                    raise _ReconnectSignal(keep_context=False)
                 raise _ReconnectSignal(keep_context=True)
             print(f"[Zezo] ❌ Recv: {e}")
             traceback.print_exc()
@@ -1782,16 +1864,13 @@ class ZezoLive:
                 try:
                     chunk = await asyncio.wait_for(
                         self.audio_in_queue.get(),
-                        timeout=0.1
+                        timeout=0.2
                     )
                 except asyncio.TimeoutError:
-                    if (
-                        self._turn_done_event
-                        and self._turn_done_event.is_set()
-                        and self.audio_in_queue.empty()
-                    ):
+                    if self.audio_in_queue.empty():
                         self.set_speaking(False)
-                        self._turn_done_event.clear()
+                        if self._turn_done_event and self._turn_done_event.is_set():
+                            self._turn_done_event.clear()
                     continue
 
                 self.set_speaking(True)
@@ -2040,7 +2119,11 @@ class ZezoLive:
         """Background task: voice alerts when metrics exceed thresholds."""
         while True:
             await asyncio.sleep(10)
-            alert = await asyncio.to_thread(self._sys_monitor.check)
+            try:
+                alert = await asyncio.to_thread(self._sys_monitor.check)
+            except Exception as e:
+                print(f"[Monitor] ⚠️ System check failed: {e}")
+                continue
             if not alert or not self.session or not self._awake:
                 continue
             # Don't interrupt an active conversation
@@ -2075,16 +2158,24 @@ class ZezoLive:
             for task in finished:
                 task.notified = True
                 tool_raw = task.tool or ""
+                from memory.config_manager import get_response_language
+                resp_lang = get_response_language()
+                if resp_lang and resp_lang.lower() != "auto":
+                    lang_hint = f"in {resp_lang} ONLY"
+                else:
+                    lang_hint = "in the user's conversational language"
+
                 if tool_raw == "file_processor":
                     tool_label = "File Processor"
                     repo_path = (task.params.get("file_path", "") if task.params else "") or ""
                     task_prompt = (task.params.get("action", "") if task.params else "") or "File Process"
                     task_kind = "document/file processing"
-                elif tool_raw == "agent_reach":
-                    tool_label = "Social Intelligence"
-                    repo_path = (task.params.get("platform", "") if task.params else "") or ""
-                    task_prompt = (task.params.get("query") or task.params.get("username", "") if task.params else "") or "Social Query"
-                    task_kind = "social research"
+                elif "agent_reach" in tool_raw.lower():
+                    platform_name = (task.params.get("platform") or "Research").title() if task.params else "Research"
+                    tool_label = f"{platform_name} Intelligence"
+                    repo_path = (task.params.get("target") or task.params.get("query") or task.params.get("url") or "") if task.params else ""
+                    task_prompt = repo_path or "Research Query"
+                    task_kind = "research & extraction"
                 elif any(k in tool_raw.lower() for k in ("opencode", "kilo", "antigravity", "coder", "dev_agent", "code_helper")):
                     tool_label = "ZEZO Coder"
                     repo_path = (task.params.get("project_path") or task.params.get("repo", "") if task.params else "") or ""
@@ -2092,36 +2183,30 @@ class ZezoLive:
                     task_kind = "background coding"
                 else:
                     tool_label = tool_raw.replace("_", " ").title() if tool_raw else "Task"
-                    repo_path = (task.params.get("project_path") or task.params.get("file_path") or task.params.get("repo", "") if task.params else "") or ""
-                    task_prompt = (task.params.get("task", "") if task.params else "") or "Task"
+                    repo_path = (task.params.get("project_path") or task.params.get("file_path") or task.params.get("repo", "") or task.params.get("target", "") if task.params else "") or ""
+                    task_prompt = (task.params.get("task") or task.params.get("target", "") if task.params else "") or "Task"
                     task_kind = "background"
 
                 current_model = task.params.get("model", "") if task.params else ""
 
                 res = task.result if isinstance(task.result, dict) else {}
-                summary = res.get("summary") or res.get("result") or res.get("message") or task.message or ""
+                summary = res.get("output") or res.get("full_content") or res.get("summary") or res.get("result") or res.get("message") or task.message or ""
+                summary_str = str(summary or "Done")
+                prompt_summary = summary_str if len(summary_str) <= 3500 else summary_str[:3500] + "\n...(full content displayed on screen canvas and stored in task result)..."
                 files_mod = res.get("files_modified") or res.get("files_created") or []
                 files_str = f"Modified files: {', '.join(files_mod[:3])}" if files_mod else ""
 
                 if task.status.value == "failed":
-                    err_msg = task.error or summary or "Execution failed"
+                    err_msg = str(task.error or summary or "Execution failed")[:150]
                     msg = (
-                        f"[TASK_FAILURE_NOTIFICATION]\n"
-                        f"Background task {task.id} ({tool_label}) FAILED for '{repo_path}'.\n"
-                        f"Original Task: {task_prompt}\n"
-                        f"Error Reason: {err_msg}\n"
-                        f"Current Model: {current_model or 'default'}\n\n"
-                        f"PROTOCOL DIRECTIVE: Tell the user in 1 short sentence why {tool_label} failed. "
-                        f"Then proactively ask them: 'Kya main iska model change karke try karoon, ya doosre engine se run karoon?' "
-                        f"When the user answers, immediately call the selected tool for the same task without making them repeat the prompt."
+                        f"[TASK_FAILURE_NOTIFICATION: Background task #{task.id} ({tool_label}) for '{task_prompt[:60]}' failed ({err_msg}). "
+                        f"Briefly inform the user in 1 short sentence {lang_hint} and ask if they would like to retry with an alternative model.]"
                     )
                     log_text = f"SYS: Task #{task.id} failed."
                 elif task.status.value == "cancelled":
                     msg = (
-                        f"[TASK_CANCELLED_NOTIFICATION]\n"
-                        f"Background task {task.id} ({tool_label}) was CANCELLED by the user for '{repo_path}'.\n\n"
-                        f"PROTOCOL DIRECTIVE: Acknowledge in 1 short conversational sentence in the user's language that the task has been cancelled / stopped. "
-                        f"DO NOT say the task completed."
+                        f"[TASK_CANCELLED_NOTIFICATION: Background task #{task.id} ({tool_label}) was cancelled by the user. "
+                        f"Briefly acknowledge in 1 short conversational sentence {lang_hint}.]"
                     )
                     log_text = f"SYS: Task #{task.id} cancelled."
                 else:
@@ -2131,25 +2216,25 @@ class ZezoLive:
                             remember_repo(repo_path)
                         except Exception:
                             pass
+                    file_info = f" ({files_str})" if files_str else ""
                     msg = (
-                        f"[TASK_NOTIFICATION]\n"
-                        f"Background task {task.id} ({tool_label}) is completed successfully for '{repo_path}'.\n"
-                        f"{files_str}\n"
-                        f"Target / Resource: {repo_path}\n"
-                        f"Result / Summary Content:\n{summary or 'Done'}\n\n"
-                        f"PROTOCOL DIRECTIVE: Inform the user naturally and concisely in 1 sentence in their language that their {task_kind} task is complete for '{repo_path}'. "
-                        f"If the user asks to save, write, or export this summary into a file (e.g. 'summary text file me save karo' or 'desktop pr txt bana do'), "
-                        f"ALWAYS use the exact 'Result / Summary Content' text above as the `content` parameter for `file_controller(action='create_file')` — NEVER invent placeholder text."
+                        f"[TASK_NOTIFICATION: Background task #{task.id} ({tool_label}) for '{task_prompt[:60]}' completed successfully{file_info}. "
+                        f"Briefly tell the user in ONE concise sentence {lang_hint} that their task is ready. "
+                        f"All detailed code and summary have already been posted to the HUD display.]"
                     )
                     log_text = f"SYS: Task #{task.id} finished successfully."
+                    if self.ui and hasattr(self.ui, "show_content") and summary_str and summary_str.strip() not in ("Done.", "Done", ""):
+                        self.ui.show_content(f"{tool_label.upper()}", summary_str)
+
                 try:
-                    await self.session.send_client_content(
-                        turns=[{"role": "user", "parts": [{"text": msg}]}],
-                        turn_complete=True,
-                    )
-                    print(f"[Zezo] 🔔 Task notification sent for {task.id} (status: {task.status.value})")
-                    self.ui.write_log(log_text)
-                    await asyncio.sleep(4)
+                    if self.session and self._awake:
+                        await self.session.send_client_content(
+                            turns=[{"role": "user", "parts": [{"text": msg}]}],
+                            turn_complete=True,
+                        )
+                        print(f"[Zezo] 🔔 Task notification sent for {task.id} (status: {task.status.value})")
+                        self.ui.write_log(log_text)
+                        await asyncio.sleep(1)
                 except Exception as e:
                     print(f"[Zezo] ⚠️ Task notification error: {e}")
 
@@ -2286,72 +2371,39 @@ class ZezoLive:
                 await asyncio.sleep(0.5)
 
     async def _on_dashboard_file_uploaded(self, path) -> None:
-        """Process an image or file uploaded from the remote mobile dashboard."""
+        """A file was uploaded from the remote mobile dashboard.
+
+        Same lazy rule as the desktop dropzone: register the path only, stay
+        silent, and read on demand. No session injection, no auto-describe.
+        """
         try:
             from pathlib import Path
             p = Path(path)
             p_str = str(p)
-            
-            # Update Desktop GUI FileBar & state safely
+
             try:
-                if hasattr(self.ui, "_on_file_selected"):
-                    self.ui._on_file_selected([p_str])
-                else:
-                    self.ui._current_file = p_str
-            except Exception:
                 self.ui._current_file = p_str
+            except Exception:
+                pass
 
-            self.ui.write_log(f"FILE: {p.name} uploaded from mobile remote access.")
+            self.ui.write_log(f"FILE: {p.name} attached from mobile remote. Ask me to read it whenever you want.")
 
-            # Wake ZEZO if asleep
-            if self._wake_enabled and not self._awake:
-                self.wake(reason="mobile file upload")
-
-            # Wait for session to be ready
-            for _ in range(80):
-                if self.session:
-                    break
-                await asyncio.sleep(0.1)
-
-            if not self.session:
-                print(f"[Dashboard] Dropped file upload (no session): {p.name}")
-                return
-
-            ext = p.suffix.lower()
-            is_image = ext in ('.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp')
-
-            if is_image:
-                import base64
-                import mimetypes
-                img_bytes = p.read_bytes()
-                b64 = base64.b64encode(img_bytes).decode("ascii")
-                mime = mimetypes.guess_type(p_str)[0] or "image/jpeg"
-                prompt_text = (
-                    f"[IMAGE SOURCE: MOBILE UPLOAD]\n\n"
-                    f"The user uploaded an image from their mobile remote device: '{p.name}' ({len(img_bytes):,} bytes).\n"
-                    f"Saved path: {p}\n"
-                    f"Analyze this image and describe what you see, and ask the user what they would like to do with it."
-                )
-                await self.session.send_client_content(
-                    turns=[{"role": "user", "parts": [
-                        {"inline_data": {"mime_type": mime, "data": b64}},
-                        {"text": prompt_text},
-                    ]}],
-                    turn_complete=True,
-                )
-            else:
-                prompt_text = (
-                    f"[FILE SOURCE: MOBILE UPLOAD]\n\n"
-                    f"The user uploaded a file from their mobile remote device: '{p.name}' ({p.stat().st_size:,} bytes).\n"
-                    f"Saved path: {p}\n"
-                    f"Acknowledge the upload to the user and offer to inspect, read, or process it."
-                )
-                await self.session.send_client_content(
-                    turns=[{"role": "user", "parts": [{"text": prompt_text}]}],
-                    turn_complete=True,
-                )
+            try:
+                from core.ui_server import get_ui_server
+                get_ui_server().register_attachment({
+                    "name": p.name,
+                    "path": p_str,
+                    "size": p.stat().st_size if p.exists() else 0,
+                    "file_type": p.suffix.lower().lstrip(".") or "file",
+                    "engine": "attached",
+                    "text": "",
+                    "is_truncated": False,
+                    "is_folder": False,
+                })
+            except Exception as e:
+                print(f"[Dashboard] Registry error: {e}")
         except Exception as e:
-            print(f"[Dashboard] Error processing mobile file upload: {e}")
+            print(f"[Dashboard] Error registering mobile file upload: {e}")
 
     def _on_ui_file_uploaded(self, file_info: dict) -> None:
         """Called from UI server thread when a file is dropped/uploaded in desktop UI."""
@@ -2364,76 +2416,38 @@ class ZezoLive:
             print(f"[DesktopUpload] Dispatch error: {e}")
 
     async def _handle_ui_file_uploaded(self, file_info: dict) -> None:
+        """A file was dropped into the desktop payload area.
+
+        Lazy by design: it was registered by path only on the UI server and is NOT
+        read here. ZEZO stays silent and the voice loop is untouched — the content
+        is read later, on demand, when the user asks (file_processor, in the
+        background). Waking the assistant and pushing a Live turn on drop is what
+        used to hijack the conversation, so both are deliberately gone.
+        """
         try:
             name = file_info.get("name", "document")
             path = file_info.get("path", "")
             size = file_info.get("size", 0)
-            text = file_info.get("text", "") or ""
-            engine = file_info.get("engine", "file_reader")
             if path:
                 self.ui.current_file = str(path)
 
-            # Wake ZEZO if asleep
-            if self._wake_enabled and not self._awake:
-                self.wake(reason="desktop file upload")
-
-            # Wait up to 8s for session to become ready
-            for _ in range(80):
-                if self.session:
-                    break
-                await asyncio.sleep(0.1)
-
-            if not self.session:
-                print(f"[DesktopUpload] Dropped upload (no session): {name}")
-                return
-
-            ext = Path(path).suffix.lower() if path else ""
-            is_image = ext in ('.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp')
-
-            if is_image and path:
-                import base64
-                import mimetypes
-                p = Path(path)
-                img_bytes = p.read_bytes()
-                b64 = base64.b64encode(img_bytes).decode("ascii")
-                mime = mimetypes.guess_type(str(p))[0] or "image/jpeg"
-                prompt_text = (
-                    f"[IMAGE SOURCE: DESKTOP DROPZONE]\n\n"
-                    f"The user attached an image via the desktop dropzone: '{name}' ({len(img_bytes):,} bytes).\n"
-                    f"Saved path: {path}\n"
-                    f"Analyze this image and describe what you see, and ask the user what they would like to do with it."
-                )
-                await self.session.send_client_content(
-                    turns=[{"role": "user", "parts": [
-                        {"inline_data": {"mime_type": mime, "data": b64}},
-                        {"text": prompt_text},
-                    ]}],
-                    turn_complete=True,
+            if file_info.get("is_folder"):
+                self.ui.write_log(
+                    f"FOLDER: {name} ({file_info.get('files_count', 0)} files) attached as active workspace."
                 )
             else:
-                preview_text = text[:4000] if text else "No direct text extracted."
-                prompt_text = (
-                    f"[PAYLOAD INGESTION: FILE ATTACHED VIA DESKTOP DROPZONE]\n\n"
-                    f"File: '{name}' ({size:,} bytes) ingested via {engine}.\n"
-                    f"Saved Path: {path}\n"
-                    f"Extracted Content:\n"
-                    f"```text\n{preview_text}\n```\n\n"
-                    f"CRITICAL PROTOCOL DIRECTIVE:\n"
-                    f"- The user just dropped/uploaded this document.\n"
-                    f"- If the user asks to build, create, or code a portfolio, landing page, resume website, or web app based on this file/resume: "
-                    f"DO NOT stall, DO NOT say you are extracting or summarizing details, DO NOT ask clarifying questions. "
-                    f"IMMEDIATELY dispatch `antigravity_run` with the task description and resume details in the VERY FIRST TURN.\n"
-                    f"- If the user asks to inspect, summarize, or extract links, answer immediately using the extracted content above."
-                )
-                await self.session.send_client_content(
-                    turns=[{"role": "user", "parts": [{"text": prompt_text}]}],
-                    turn_complete=True,
-                )
-            self.ui.write_log(f"FILE: {name} ({size:,} bytes) attached & ingested into session context.")
+                self.ui.write_log(f"FILE: {name} ({size:,} bytes) attached. Ask me to read it whenever you want.")
         except Exception as e:
-            print(f"[DesktopUpload] Error processing file upload: {e}")
+            print(f"[DesktopUpload] Error handling file upload: {e}")
 
     # ── main loop ───────────────────────────────────────────────────────────
+
+    # ── Offline voice fallback (used ONLY when Gemini Live is unavailable) ───
+    # Gemini Live is always the primary voice path. When it cannot connect or
+    # drops (and `voice_fallback=auto`), the self-contained local loop in
+    # core/voice_fallback.py runs while we back off, so the user is not left with
+    # no voice at all. It is stopped the moment Live is back, before its audio
+    # ── Main Run Loop ────────────────────────────────────────────────────────────
 
     async def run(self):
         self._loop = asyncio.get_event_loop()
@@ -2459,12 +2473,31 @@ class ZezoLive:
         # for host-API enumeration on the Qt thread.
         audio_devices.prefetch()
 
+        # ── Auto-follow the active device ────────────────────────────────────
+        # By default ZEZO uses whatever the OS currently calls the default
+        # microphone / speaker. A saved name is only honoured while that device
+        # still opens at our rates; once it is unplugged (or cannot open at
+        # 16 / 24 kHz) it is dropped so the active default is used automatically
+        # instead of asking the user to re-pick it on every launch. Choosing a
+        # working device in Settings → Audio Devices pins it again.
+        for _kind, _get, _set in (("input", get_input_device, save_input_device),
+                                  ("output", get_output_device, save_output_device)):
+            try:
+                _saved = _get()
+                if _saved and audio_devices.resolve(_saved, _kind) is None:
+                    print(f"[Audio] {_kind} device '{_saved}' unavailable — "
+                          f"using the active system default")
+                    _set("")
+            except Exception as _e:
+                print(f"[Audio] {_kind} device auto-detect skipped: {_e}")
+
         # Start dashboard (optional — needs: pip install fastapi "uvicorn[standard]" cryptography)
         try:
             from dashboard.server import DashboardServer
             self._dashboard = DashboardServer()
             self._dashboard.set_connect_callback(self._on_phone_connected)
             self._dashboard.set_file_callback(self._on_dashboard_file_uploaded)
+            self.ui.on_remote_clicked = lambda: (self._dashboard.get_url(), self._dashboard.new_key())
             asyncio.create_task(self._dashboard.serve())
             # Runs for the whole lifetime, not just inside an active session
             asyncio.create_task(self._process_dashboard_commands())
@@ -2473,9 +2506,15 @@ class ZezoLive:
             self._dashboard = None
 
         while True:
+            if hasattr(self.ui, "is_alive") and not self.ui.is_alive():
+                print("[Zezo] UI closed — stopping run loop.")
+                break
+            _attempt_t0 = time.monotonic()
+            err_str = ""
+
             try:
                 print("[Zezo] Connecting...")
-                self.ui.set_state("THINKING")
+                self.ui.set_state("CONNECTING")
                 _resumed_with = self._resume_handle is not None
                 config = self._build_config()
 
@@ -2551,7 +2590,19 @@ class ZezoLive:
                 raise
             except SystemExit:
                 raise
+            except RuntimeError as rerr:
+                if "cannot schedule new futures" in str(rerr) or "shutdown" in str(rerr):
+                    print("[Zezo] Event loop executor shut down — exiting run loop.")
+                    break
+                print(f"[Zezo] RuntimeError: {rerr}")
             except BaseException as e:
+                # Unpack ExceptionGroup if present for clear diagnosis
+                if hasattr(e, "exceptions"):
+                    for sub_e in getattr(e, "exceptions", []):
+                        print(f"[Zezo] Sub-Exception ({type(sub_e).__name__}): {sub_e}")
+                        traceback.print_exception(type(sub_e), sub_e, sub_e.__traceback__)
+                else:
+                    traceback.print_exc()
                 # Catches both Exception and BaseExceptionGroup (Python 3.11+
                 # TaskGroup raises BaseExceptionGroup when tasks are cancelled
                 # externally, which `except Exception` would miss, letting the
@@ -2588,7 +2639,6 @@ class ZezoLive:
 
                 err_str = str(e)
                 print(f"[Zezo] Error ({type(e).__name__}): {e}")
-                traceback.print_exc()
 
                 # Turn-taking / media / thinking knobs rejected by the server
                 # (preview API drift) — drop them first, because they are the
@@ -2625,7 +2675,7 @@ class ZezoLive:
                     self.ui.write_log("ERR: API key invalid — please re-enter your key.")
                     self.ui.set_state("SLEEPING")
                     self.ui.prompt_reconfig()
-                    while not self.ui._win._ready:
+                    while hasattr(self.ui, "is_alive") and self.ui.is_alive() and not getattr(self.ui._win, "_ready", True):
                         await asyncio.sleep(1)
                     print("[Zezo] New API key saved — reconnecting...")
                     _conn_backoff = 3
@@ -2651,26 +2701,76 @@ class ZezoLive:
                 if len(self._session_log) >= 3:
                     asyncio.create_task(self._save_session_summary())
 
+            if hasattr(self.ui, "is_alive") and not self.ui.is_alive():
+                print("[Zezo] UI closed — exiting reconnect loop.")
+                break
+
             self.set_speaking(False)
-            self.ui.set_state("SLEEPING")
+            self.ui.set_state("OFFLINE")
 
             if self._dashboard:
-                await self._dashboard.broadcast({"type": "status", "state": "sleeping"})
+                await self._dashboard.broadcast({"type": "status", "state": "offline"})
+
+            if 'err_str' in locals() and err_str:
+                self.ui.write_log(f"ERR: Live connection dropped: {err_str[:140]}")
 
             delay = getattr(self, "_conn_backoff", 3)
             print(f"[Zezo] Reconnecting in {delay}s...")
             await asyncio.sleep(delay)
 
 def main():
+    # ── Single-instance guard ────────────────────────────────────────────────
+    # Two copies of ZEZO mean two audio engines, two WebEngine renderers, two
+    # dashboards and two copies of every background loop — measured at ~4x the
+    # CPU of one. They also fight over ports 8000/8001 and the microphone. The
+    # lock is held for the whole process lifetime; QLockFile reclaims it if a
+    # previous run crashed (it checks the stored PID).
+    _instance_lock = None
+    try:
+        import tempfile as _tempfile
+        from PyQt6.QtCore import QLockFile
+        _instance_lock = QLockFile(
+            str(Path(_tempfile.gettempdir()) / "zezo_instance.lock"))
+        if not _instance_lock.tryLock(200):
+            print("[Zezo] Another instance is already running — exiting.")
+            return
+    except Exception as _e:
+        # Never let the guard itself stop a legitimate launch.
+        print(f"[Zezo] Single-instance guard unavailable: {_e}")
+
     ui = ZezoUI("face.png")
+
+    def _bootstrap_deps():
+        """Install the baseline requirements.txt packages (and Playwright's
+        Chromium) that are missing, off the GUI thread. A no-op when everything
+        is already present, so ordinary launches do nothing here."""
+        try:
+            from core.installer import ensure_requirements, ensure_playwright_browsers
+            _log = lambda m: ui.write_log(m)
+            if ensure_requirements(_log):
+                ensure_playwright_browsers(_log)
+        except Exception as e:
+            print(f"[Setup] Dependency bootstrap skipped: {e}")
+        try:
+            # Verify every configured model once, off the GUI thread, and mark
+            # retired Gemini models so the one-shot ladder skips them.
+            from core.provider_health import start_background_check
+            start_background_check(lambda m: ui.write_log(m))
+        except Exception as e:
+            print(f"[Setup] Provider health-check skipped: {e}")
 
     def runner():
         ui.wait_for_api_key()
+        # Concurrent with the live session: it only works the first time (or
+        # after an upgrade). The session itself stays responsive either way.
+        threading.Thread(target=_bootstrap_deps, daemon=True).start()
         zezo = ZezoLive(ui)
         try:
             asyncio.run(zezo.run())
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, SystemExit):
             print("\n🔴 Shutting down...")
+        except Exception as e:
+            print(f"\n🔴 Zezo live loop stopped: {e}")
 
     threading.Thread(target=runner, daemon=True).start()
     ui.root.mainloop()

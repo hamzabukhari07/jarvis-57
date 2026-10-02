@@ -235,18 +235,32 @@ code = write_antigravity_file(f_info, task, files, repo, written, design_context
 ### 1. Antigravity Agent (`actions/antigravity_agent.py`)
 ```python
 from core.design_resolver import is_ui_task, resolve_design, format_design_prompt
-from core.repo_context import remember_repo
 
 if is_ui_task(task):
     resolved = resolve_design(task, repo_path=repo)
-    if resolved and resolved.raw_html:
-        # 1. Place master reference template in workspace for local CLI inspection
-        (repo / "DESIGN_BLUEPRINT.html").write_text(resolved.raw_html, encoding="utf-8")
-        
-    # 2. Execute native Antigravity CLI ('agy') with --add-dir and Job Object limits
-    # 3. Upon successful code synthesis (index.html, style.css), clean up DESIGN_BLUEPRINT.html
-    # 4. Synchronize active project persistence via remember_repo(str(repo))
+    if resolved and resolved.is_active():
+        # 1a. Direction: place the master raw HTML reference in the workspace for local CLI inspection
+        if resolved.raw_html:
+            (repo / "DESIGN_BLUEPRINT.html").write_text(resolved.raw_html, encoding="utf-8")
+        # 1b. Fallback: spec-only references are written as DESIGN_BLUEPRINT.md so a
+        #     Hamza Taste reference is never silently dropped.
+        else:
+            (repo / "DESIGN_BLUEPRINT.md").write_text(resolved.design_spec + "\n\n" + resolved.anti_slop_rules, encoding="utf-8")
+
+    # 2. Stack-fidelity routing (every branch receives the design blueprint + anti-slop Filter):
+    #    - explicit "single HTML / single-file HTML / no framework" -> ONE self-contained index.html
+    #    - explicit React / Vite / Next.js                               -> component-framework project
+    #    - full-rebuild request on an existing project                   -> new stack WINS over preservation
+    #    - otherwise                                                     -> build or targeted update
+    # 3. Execute native Antigravity CLI ('agy') with --add-dir and Job Object limits
+    # 4. Upon successful code synthesis (index.html), clean up DESIGN_BLUEPRINT.html / .md
+    # 5. Synchronize active project persistence via remember_repo(str(repo))
 ```
+
+> **Regression note (2026-09-25):** the design resolver's explicit-reference matcher now uses
+> word-boundary matching (`\bstem\b`) for stems of 3+ chars. Previously the two-letter `en`
+> stem matched inside ordinary words ("cont**en**t", "**en**tirely", "ag**en**cy"), which
+> hijacked the resolver to the HTML-less `En-DESIGN` reference and blocked the real blueprint.
 
 ### 2. OpenCode Agent (`actions/opencode_agent.py`)
 ```python

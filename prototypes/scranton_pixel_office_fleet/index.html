@@ -1,0 +1,2838 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZEZO • Office Floor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Pixelify+Sans:wght@400;500;600;700&family=Press+Start+2P&family=VT323&family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <script src="https://code.iconify.design/iconify-icon/1.0.8/iconify-icon.min.js"></script>
+
+  <style>
+    /* ── Canonical Scranton Office & ZEZO Tactical Palette Tokens ── */
+    :root {
+      --floor: #7d9989;
+      --tile: #6c8d7d;
+      --wall: #e9e2de;
+      --ink: #171717;
+      --desk: #b78a4d;
+
+      /* ZEZO Tactical Dark Theme Tokens */
+      --bg-deep: #050505;
+      --bg-surface: #0a0a0a;
+      --bg-elevated: #111115;
+      --bg-panel: #0d0d10;
+      --border-subtle: rgba(255, 255, 255, 0.07);
+      --border-default: rgba(255, 255, 255, 0.12);
+      --border-strong: rgba(255, 255, 255, 0.22);
+      --text-primary: #f5f5f7;
+      --text-secondary: #a0a0ab;
+      --text-muted: rgba(255, 255, 255, 0.40);
+      --accent: #f24e1e;
+      --accent-dim: rgba(242, 78, 30, 0.15);
+      --green: #22c55e;
+      --green-dim: rgba(34, 197, 94, 0.15);
+      --cyan: #06b6d4;
+
+      /* Fonts */
+      --font-display: 'Press Start 2P', monospace;
+      --font-pixel: 'Pixelify Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', 'VT323', monospace;
+      --font-sans: 'Inter', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-deep);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top HUD Navigation ── */
+    .top-bar {
+      height: 42px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      flex-shrink: 0;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      z-index: 10;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-badge {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid rgba(242, 78, 30, 0.35);
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 2px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .telemetry-row {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      color: var(--text-muted);
+    }
+
+    .telemetry-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .telemetry-value {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hud-tool-btn {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      color: #fff;
+      font-size: 11px;
+      padding: 5px 12px;
+      border-radius: 3px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .hud-tool-btn:hover {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+    }
+
+    /* ── Main Deck Grid & Slide-Over Inspector ── */
+    .deck-container {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      padding: 8px 10px;
+      min-height: 0;
+      position: relative;
+      transition: grid-template-columns 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .deck-container.inspector-open {
+      grid-template-columns: 1fr 390px;
+    }
+
+    .tactical-sidebar {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+      min-width: 0;
+      height: 100%;
+      animation: slideInRight 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .deck-container.inspector-open .tactical-sidebar {
+      display: flex;
+    }
+
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    /* Section Framing & Corners */
+    .frame {
+      position: relative;
+      background: linear-gradient(to bottom, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02), transparent);
+      padding: 1px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+      display: flex;
+      flex-direction: column;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .frame-inner {
+      background: #0a0a0a;
+      border: 1px solid var(--border-subtle);
+      padding: 8px 10px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .corner {
+      position: absolute;
+      width: 10px;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.4);
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .corner-v {
+      position: absolute;
+      width: 1px;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.4);
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .corner-tl { top: 0; left: 0; }
+    .corner-tr { top: 0; right: 0; }
+    .corner-bl { bottom: 0; left: 0; }
+    .corner-br { bottom: 0; right: 0; }
+    .corner-v-tl { top: 0; left: 0; }
+    .corner-v-tr { top: 0; right: 0; }
+    .corner-v-bl { bottom: 0; left: 0; }
+    .corner-v-br { bottom: 0; right: 0; }
+
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+      flex-shrink: 0;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-subtle);
+    }
+
+    /* ── Scranton Pixel Office Container & Viewport ── */
+    .canvas-wrapper {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #050507;
+      overflow: hidden;
+      border-radius: 2px;
+      padding: 6px;
+    }
+
+    .office {
+      width: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      aspect-ratio: 988/640;
+      position: relative;
+      overflow: hidden;
+      background: var(--wall);
+      border: 4px solid var(--ink);
+      box-shadow: 0 0 0 2px #d8d1cb inset, 0 10px 30px rgba(0, 0, 0, 0.9);
+      image-rendering: pixelated;
+      flex-shrink: 0;
+    }
+
+    .floor {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 12.5%;
+      bottom: 1.4%;
+      background-color: var(--floor);
+      background-image: linear-gradient(90deg, transparent 96%, var(--tile) 96%, var(--tile) 99%, transparent 99%), linear-gradient(0deg, transparent 96%, var(--tile) 96%, var(--tile) 99%, transparent 99%);
+      background-size: 78px 58px;
+    }
+
+    .floor:after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle at 50% 50%, #638779 0 3px, transparent 4px);
+      background-size: 78px 58px;
+      opacity: .9;
+    }
+
+    .wall {
+      position: absolute;
+      background: #f8f6f1;
+      border: 3px solid var(--ink);
+      z-index: 5;
+    }
+
+    .window {
+      position: absolute;
+      top: 7%;
+      width: 4.6%;
+      height: 4.2%;
+      background: linear-gradient(90deg, transparent 46%, #242424 46%, #242424 53%, transparent 53%), linear-gradient(0deg, transparent 46%, #242424 46%, #242424 53%, transparent 53%), #b8dce8;
+      border: 3px solid #292929;
+      box-shadow: inset 2px 2px #e7f4f7;
+      z-index: 3;
+    }
+
+    .plant-pot {
+      position: absolute;
+      width: 15px;
+      height: 9px;
+      background: #c5b7a0;
+      border: 2px solid #38342d;
+      z-index: 7;
+    }
+
+    .plant-pot:before {
+      content: "♣";
+      position: absolute;
+      left: -2px;
+      top: -17px;
+      color: #236f42;
+      font-size: 22px;
+    }
+
+    .desk {
+      position: absolute;
+      width: 7.8%;
+      height: 7.1%;
+      background: #b88b4e;
+      border: 2px solid #4b3421;
+      z-index: 3;
+      box-shadow: inset 0 3px #d5ae70;
+    }
+
+    .desk:before {
+      content: "";
+      position: absolute;
+      left: 7%;
+      right: 7%;
+      bottom: 9%;
+      height: 14%;
+      background: #74502c;
+      border: 1px solid #392a1b;
+    }
+
+    .desk .monitor {
+      position: absolute;
+      left: 23%;
+      top: -48%;
+      width: 54%;
+      height: 55%;
+      background: #080d12;
+      border: 3px solid #292b2d;
+      box-shadow: inset 0 0 0 2px #414b54;
+      overflow: hidden;
+      z-index: 5;
+    }
+
+    .desk .monitor:before {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      background: #080d12;
+    }
+
+    .desk .monitor.on {
+      background: #071521;
+      box-shadow: inset 0 0 0 2px #8bdcff, 0 0 10px rgba(56, 190, 255, .65);
+    }
+
+    .desk .monitor.on:before {
+      background: radial-gradient(ellipse at 50% 35%, rgba(75, 210, 255, .55), transparent 55%), linear-gradient(135deg, #174764, #07131f 65%, #1d5570);
+      animation: monitorWake 3s ease-in-out infinite;
+    }
+
+    .desk .monitor:after {
+      content: "";
+      position: absolute;
+      left: 34%;
+      bottom: -8px;
+      width: 32%;
+      height: 5px;
+      background: #c4b7a0;
+      border: 1px solid #39332e;
+    }
+
+    .desk .keyboard {
+      position: absolute;
+      left: 20%;
+      width: 43%;
+      bottom: 13%;
+      height: 15%;
+      background: repeating-linear-gradient(90deg, #e2dac7 0 3px, #aaa18d 3px 4px);
+      border: 1px solid #4b4439;
+      z-index: 6;
+    }
+
+    .desk .mouse {
+      position: absolute;
+      right: 15%;
+      bottom: 10%;
+      width: 9%;
+      height: 18%;
+      background: #ded8c8;
+      border: 1px solid #4b4439;
+      border-radius: 45%;
+      z-index: 6;
+    }
+
+    .desk .mug {
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      right: 5%;
+      bottom: 20%;
+      background: #eee7d7;
+      border: 1px solid #40372d;
+    }
+
+    .desk-chair {
+      position: absolute;
+      width: 2.6%;
+      height: 2.8%;
+      min-width: 13px;
+      min-height: 10px;
+      background: #a17b43;
+      border: 2px solid #46321f;
+      z-index: 4;
+      box-shadow: inset 0 0 0 2px #c6a36a;
+    }
+
+    .desk-chair:after {
+      content: "";
+      position: absolute;
+      left: 18%;
+      right: 18%;
+      bottom: -4px;
+      height: 3px;
+      background: #493522;
+    }
+
+    .conference {
+      position: absolute;
+      left: 28%;
+      top: 18.5%;
+      width: 18.5%;
+      height: 9.3%;
+      background: #b88a4c;
+      border: 2px solid #4a3320;
+      z-index: 3;
+      box-shadow: inset 0 3px #d5ae70;
+    }
+
+    .conference:before {
+      content: "";
+      position: absolute;
+      left: 8%;
+      top: 15%;
+      width: 7%;
+      height: 12%;
+      background: #2c9b59;
+      border: 1px solid #28472f;
+    }
+
+    .paper {
+      position: absolute;
+      right: 4%;
+      top: 10%;
+      width: 9%;
+      height: 42%;
+      background: #eee5ce;
+      border: 1px solid #443b31;
+      transform: rotate(-8deg);
+    }
+
+    .chair-conf {
+      position: absolute;
+      width: 2.3%;
+      height: 3.8%;
+      background: #914c66;
+      border: 2px solid #49313a;
+      z-index: 2;
+      box-shadow: inset 0 0 0 2px #b76f85;
+    }
+
+    .cooler {
+      position: absolute;
+      right: 1.5%;
+      top: 56%;
+      width: 7.5%;
+      height: 15%;
+      background: #b1f4c9;
+      border: 3px solid #273d32;
+      z-index: 6;
+      box-shadow: inset 0 0 0 5px #d6ffe4;
+    }
+
+    .cooler:before {
+      content: "";
+      position: absolute;
+      left: 23%;
+      top: 23%;
+      width: 54%;
+      height: 54%;
+      background: #0c7654;
+      border: 3px solid #214337;
+    }
+
+    .cooler:after {
+      content: "";
+      position: absolute;
+      right: -7px;
+      bottom: 9%;
+      width: 6px;
+      height: 26%;
+      background: #2c3633;
+      border: 1px solid #101010;
+    }
+
+    .kitchen {
+      position: absolute;
+      right: 3%;
+      bottom: 8%;
+      width: 18%;
+      height: 10%;
+      z-index: 3;
+    }
+
+    .counter {
+      position: absolute;
+      left: 0;
+      top: 28%;
+      width: 47%;
+      height: 48%;
+      background: #b9b9ad;
+      border: 3px solid #363632;
+    }
+
+    .sink {
+      position: absolute;
+      left: 15%;
+      top: 36%;
+      width: 19%;
+      height: 25%;
+      background: #e2e5dc;
+      border: 2px solid #6e7770;
+    }
+
+    .fridge {
+      position: absolute;
+      left: 48%;
+      top: 0;
+      width: 18%;
+      height: 82%;
+      background: #c7c9c6;
+      border: 3px solid #525653;
+    }
+
+    .fridge:after {
+      content: "";
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      top: 49%;
+      border-top: 2px solid #7b817d;
+    }
+
+    .shelf {
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 30%;
+      height: 82%;
+      background: repeating-linear-gradient(0deg, #b6b9b4 0 7px, #474b48 7px 9px);
+      border: 3px solid #535752;
+    }
+
+    .clock {
+      position: absolute;
+      left: 1%;
+      top: 8%;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #a94343;
+      border-radius: 50%;
+      background: #fff;
+      z-index: 6;
+    }
+
+    .clock:after {
+      content: "";
+      position: absolute;
+      left: 7px;
+      top: 2px;
+      width: 2px;
+      height: 7px;
+      background: #222;
+    }
+
+    .calendar {
+      position: absolute;
+      left: 11%;
+      top: 4.5%;
+      width: 3%;
+      height: 6%;
+      background: repeating-linear-gradient(0deg, #eee4c9 0 5px, #d9c8a7 5px 6px);
+      border: 2px solid #8c4946;
+      z-index: 4;
+    }
+
+    .calendar:before {
+      content: "";
+      position: absolute;
+      left: 15%;
+      right: 15%;
+      top: -5px;
+      height: 5px;
+      background: #9b4845;
+    }
+
+    /* ── Character Pixel-Art CSS Sprites & Dynamic States ── */
+    .agent {
+      position: absolute;
+      width: 2.9%;
+      height: 7.2%;
+      min-width: 18px;
+      min-height: 35px;
+      z-index: 8;
+      image-rendering: pixelated;
+      filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, .35));
+      cursor: pointer;
+      box-sizing: border-box;
+      flex: none;
+      transform-origin: 50% 90%;
+      transition: filter .15s ease;
+    }
+
+    .agent.selected {
+      outline: 2px solid #f24e1e;
+      outline-offset: 3px;
+      filter: drop-shadow(0 0 10px rgba(242, 78, 30, 0.9));
+    }
+
+    .agent .head {
+      position: absolute;
+      left: 17%;
+      top: 0;
+      width: 66%;
+      height: 26%;
+      background: var(--skin, #e9bd91);
+      border: 2px solid #342820;
+      border-radius: 2px;
+      z-index: 2;
+    }
+
+    .agent .hair {
+      position: absolute;
+      left: 8%;
+      top: -5%;
+      width: 84%;
+      height: 12%;
+      background: var(--hair, #4a3024);
+      border: 1px solid #29231f;
+      box-shadow: 0 2px 0 #29231f;
+      z-index: 3;
+    }
+
+    .agent .face {
+      position: absolute;
+      left: 28%;
+      top: 12%;
+      width: 10%;
+      height: 4%;
+      background: #29231f;
+      z-index: 4;
+      box-shadow: 5px 0 #29231f;
+    }
+
+    .agent .body {
+      position: absolute;
+      left: 13%;
+      top: 27%;
+      width: 74%;
+      height: 39%;
+      background: var(--shirt, #344b78);
+      border: 2px solid #302b25;
+    }
+
+    .agent .tie {
+      position: absolute;
+      left: 44%;
+      top: 30%;
+      width: 14%;
+      height: 27%;
+      background: var(--tie, #b94440);
+      z-index: 2;
+    }
+
+    .agent .arm {
+      position: absolute;
+      top: 31%;
+      width: 18%;
+      height: 29%;
+      background: var(--shirt, #344b78);
+      border: 1px solid #302b25;
+      transform-origin: 50% 0;
+    }
+
+    .agent .arm.l { left: 0; }
+    .agent .arm.r { right: 0; }
+
+    .agent .leg {
+      position: absolute;
+      top: 65%;
+      height: 29%;
+      width: 27%;
+      background: #414746;
+      border: 1px solid #242827;
+      transform-origin: 50% 0;
+    }
+
+    .agent .leg.l { left: 18%; }
+    .agent .leg.r { right: 18%; }
+
+    .agent .tag {
+      position: absolute;
+      bottom: 105%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #000;
+      border: 1px solid #444;
+      padding: 1px 4px;
+      font: bold 8px 'Press Start 2P', monospace;
+      color: #fff;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 15;
+      box-shadow: 1px 1px 0 #000;
+    }
+
+    /* Pixel Speech Bubble */
+    .agent .bubble {
+      position: absolute;
+      bottom: 115%;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      background: #ffffff;
+      border: 2px solid #111;
+      padding: 3px 6px;
+      font: bold 9px 'Press Start 2P', monospace;
+      color: #171717;
+      z-index: 30;
+      box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
+      pointer-events: none;
+      animation: bubblePop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .agent .bubble:after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -6px;
+      transform: translateX(-50%);
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid #111;
+    }
+
+    @keyframes bubblePop {
+      from { transform: translateX(-50%) scale(0.6); opacity: 0; }
+      to { transform: translateX(-50%) scale(1); opacity: 1; }
+    }
+
+    /* Character-specific Hairstyles & Silhouettes */
+    .agent[data-name="MICHAEL"] .hair { left: 5%; width: 90%; height: 13%; clip-path: polygon(0 45%, 12% 0, 25% 22%, 40% 0, 58% 20%, 78% 0, 100% 35%, 92% 100%, 8% 100%); }
+    .agent[data-name="JIM"] .hair { left: 18%; width: 66%; height: 10%; clip-path: polygon(0 65%, 18% 0, 62% 0, 100% 55%, 85% 100%, 10% 100%); }
+    .agent[data-name="DWIGHT"] .hair { left: 7%; width: 86%; height: 14%; clip-path: polygon(0 80%, 8% 0, 45% 18%, 100% 0, 93% 100%); }
+    .agent[data-name="PAM"] .hair { left: 3%; width: 94%; height: 24%; background: #8b4a2e !important; clip-path: polygon(0 0, 100% 0, 100% 100%, 78% 85%, 72% 40%, 27% 40%, 22% 85%, 0 100%); }
+    .agent[data-name="OSCAR"] .hair { left: 13%; width: 74%; height: 10%; clip-path: polygon(0 0, 100% 0, 86% 100%, 15% 100%); }
+    .agent[data-name="ANGELA"] .hair { left: 0%; width: 100%; height: 18%; background: #c4ad7b !important; clip-path: polygon(0 0, 100% 0, 92% 100%, 75% 75%, 25% 75%, 8% 100%); }
+    .agent[data-name="STANLEY"] .hair { left: 13%; width: 74%; height: 8%; background: #27211e !important; }
+    .agent[data-name="KEVIN"] .head { width: 78%; left: 11%; height: 27%; }
+    .agent[data-name="KEVIN"] .body { left: 5%; width: 90%; height: 42%; border-radius: 3px 3px 0 0; }
+    .agent[data-name="STANLEY"] .body { left: 5%; width: 90%; }
+    .agent[data-name="ANGELA"] .body { left: 22%; width: 56%; }
+    .agent[data-name="PAM"] .body { left: 18%; width: 64%; }
+    .agent[data-name="CREED"] .body { transform: skew(-5deg); }
+    .agent[data-name="PHYLLIS"] .hair { left: 1%; width: 98%; height: 19%; background: #a58b70 !important; clip-path: polygon(0 0, 100% 0, 100% 100%, 80% 75%, 20% 75%, 0 100%); }
+    .agent[data-name="RYAN"] .hair { left: 16%; width: 68%; height: 9%; }
+    .agent[data-name="TOBY"] .hair { left: 5%; width: 90%; height: 14%; background: #5b4737 !important; clip-path: polygon(0 0, 100% 0, 85% 100%, 12% 100%); }
+    .agent[data-name="CREED"] .hair { left: 0%; width: 100%; height: 18%; background: #aaa99c !important; clip-path: polygon(0 60%, 10% 0, 28% 40%, 43% 0, 61% 35%, 80% 0, 100% 55%, 92% 100%, 8% 100%); }
+
+    .agent[data-name="DWIGHT"] .head:after {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 25%;
+      width: 100%;
+      height: 30%;
+      background: linear-gradient(90deg, transparent 0 7%, #2b2925 7% 42%, transparent 42% 56%, #2b2925 56% 91%, transparent 91%);
+      border-top: 1px solid #2b2925;
+      border-bottom: 1px solid #2b2925;
+    }
+
+    .agent[data-name="STANLEY"] .head:after {
+      content: "";
+      position: absolute;
+      left: 18%;
+      top: 25%;
+      width: 64%;
+      height: 2px;
+      background: #29231f;
+    }
+
+    /* ── SEATED WORKSTATION POSE ── */
+    .agent.seated {
+      width: 2.9% !important;
+      height: 5.4% !important;
+      min-height: 27px;
+      z-index: 8;
+      transform: none !important;
+    }
+
+    .agent.seated::before {
+      content: "";
+      position: absolute;
+      left: 18% !important;
+      top: 40% !important;
+      width: 64% !important;
+      height: 27% !important;
+      background: #8c6338;
+      border: 2px solid #3d2c1c;
+      box-sizing: border-box;
+      box-shadow: inset 0 0 0 2px #bd965d, 0 2px 0 #4b3825;
+      z-index: -2;
+    }
+
+    .agent.seated::after {
+      content: "";
+      position: absolute;
+      left: 20% !important;
+      top: 55% !important;
+      width: 60% !important;
+      height: 12% !important;
+      background: #b38b4f;
+      border: 2px solid #3d2c1c;
+      box-sizing: border-box;
+      z-index: -1;
+    }
+
+    .agent.seated .head {
+      left: 28% !important;
+      top: 0 !important;
+      width: 44% !important;
+      height: 24% !important;
+      border-radius: 2px !important;
+      background: var(--hair, #4a3024) !important;
+      border: 2px solid #2b2926 !important;
+      box-shadow: inset 0 -3px 0 rgba(255, 255, 255, .12);
+      animation: focusedBob 1.8s steps(2) infinite;
+    }
+
+    .agent.seated .hair {
+      left: 18% !important;
+      top: -5% !important;
+      width: 64% !important;
+      height: 18% !important;
+    }
+
+    .agent.seated .face,
+    .agent.seated .tie {
+      display: none !important;
+    }
+
+    .agent.seated .body {
+      left: 24% !important;
+      top: 23% !important;
+      width: 52% !important;
+      height: 34% !important;
+      border-radius: 2px 2px 0 0 !important;
+      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .08);
+    }
+
+    .agent.seated .arm {
+      top: 35% !important;
+      width: 34% !important;
+      height: 16% !important;
+      border-radius: 2px !important;
+      transform-origin: 50% 15% !important;
+      animation: forearmTyping .28s steps(2) infinite alternate !important;
+      z-index: 10;
+    }
+
+    .agent.seated .arm.l {
+      left: 1% !important;
+      transform: rotate(-8deg) !important;
+    }
+
+    .agent.seated .arm.r {
+      right: 1% !important;
+      transform: rotate(8deg) !important;
+    }
+
+    .agent.seated .leg {
+      top: 57% !important;
+      height: 18% !important;
+      width: 23% !important;
+      background: #343b3d !important;
+    }
+
+    .agent.seated .leg.l { left: 22% !important; transform: rotate(-3deg) !important; }
+    .agent.seated .leg.r { right: 22% !important; transform: rotate(3deg) !important; }
+
+    .agent.seated .monitor-glow {
+      position: absolute;
+      left: -15%;
+      top: 20%;
+      width: 130%;
+      height: 22%;
+      background: rgba(67, 190, 240, .18);
+      z-index: -2;
+      animation: screenPulse 2.3s ease-in-out infinite;
+    }
+
+    /* Walking & Talking Animations */
+    .agent.walking {
+      animation: walkCycle .24s steps(2) infinite;
+      z-index: 10;
+    }
+
+    .agent.walking .leg.l { animation: legLeft .24s steps(2) infinite alternate; }
+    .agent.walking .leg.r { animation: legRight .24s steps(2) infinite alternate; }
+    .agent.walking .arm.l { animation: armLeft .24s steps(2) infinite alternate; }
+    .agent.walking .arm.r { animation: armRight .24s steps(2) infinite alternate; }
+
+    .agent.talking .head { animation: talkBob .24s steps(2) infinite alternate; }
+
+    @keyframes monitorWake { 0%, 100% { filter: brightness(.8); } 50% { filter: brightness(1.35); } }
+    @keyframes focusedBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(1px); } }
+    @keyframes screenPulse { 0%, 100% { opacity: .2; } 50% { opacity: .8; } }
+    @keyframes forearmTyping { from { margin-top: 0; } to { margin-top: 1px; } }
+    @keyframes walkCycle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1px); } }
+    @keyframes legLeft { from { transform: rotate(-13deg); } to { transform: rotate(13deg); } }
+    @keyframes legRight { from { transform: rotate(13deg); } to { transform: rotate(-13deg); } }
+    @keyframes armLeft { from { transform: rotate(10deg); } to { transform: rotate(-10deg); } }
+    @keyframes armRight { from { transform: rotate(-10deg); } to { transform: rotate(10deg); } }
+    @keyframes talkBob { from { transform: translateY(0); } to { transform: translateY(1px); } }
+
+    /* ── RIGHT PANEL (Aligned with ZEZO Frontend Inspector) ── */
+
+    /* Inspector Card */
+    .agent-dark-card {
+      background: #111115;
+      border: 1px solid var(--border-default);
+      border-radius: 4px;
+      padding: 10px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .agent-avatar-wrap {
+      width: 52px;
+      height: 64px;
+      background: #18181c;
+      border: 1px solid var(--border-strong);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+      box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+    }
+
+    #activePortraitCanvas {
+      width: 44px;
+      height: 56px;
+      image-rendering: pixelated;
+    }
+
+    .agent-meta-group {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .agent-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      margin-bottom: 2px;
+    }
+
+    .agent-name-txt {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .agent-desc-txt {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.3;
+      margin-top: 2px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-accent {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid rgba(242, 78, 30, 0.3);
+    }
+
+    .badge-success {
+      background: var(--green-dim);
+      color: var(--green);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .badge-cyan {
+      background: rgba(6, 182, 212, 0.15);
+      color: var(--cyan);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+    }
+
+    .badge-amber {
+      background: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .badge-purple {
+      background: rgba(192, 132, 252, 0.15);
+      color: #c084fc;
+      border: 1px solid rgba(192, 132, 252, 0.3);
+    }
+
+    .badge-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Spec Grid */
+    .spec-grid {
+      display: grid;
+      grid-template-columns: 100px 1fr;
+      gap: 4px 8px;
+      background: #0d0d10;
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+
+    .spec-label {
+      color: var(--text-muted);
+    }
+
+    .spec-val {
+      color: var(--text-primary);
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .path-action-link {
+      color: var(--cyan);
+      cursor: pointer;
+      text-decoration: underline;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .path-action-link:hover {
+      color: #38bdf8;
+    }
+
+    /* Staged files box */
+    .file-preview-card {
+      margin-top: 8px;
+      background: #0a0a0c;
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+
+    .file-pill-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 6px;
+    }
+
+    .file-pill {
+      background: #141418;
+      border: 1px solid var(--border-subtle);
+      border-radius: 3px;
+      padding: 3px 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .file-pill:hover {
+      border-color: var(--accent);
+      background: var(--bg-elevated);
+      color: #fff;
+    }
+
+    /* Terminal & PTY Log Stream */
+    .stream-frame {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stream-header-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .terminal-window {
+      flex: 1;
+      background: #050507;
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      padding: 8px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .terminal-window::-webkit-scrollbar {
+      display: none;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 6px;
+      line-height: 1.4;
+      word-break: break-all;
+    }
+
+    .log-ts {
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .log-msg {
+      color: var(--text-secondary);
+    }
+
+    .log-msg.highlight {
+      color: var(--accent);
+    }
+
+    .log-msg.success {
+      color: var(--green);
+    }
+
+    .log-msg.warn {
+      color: #f59e0b;
+    }
+
+    .cmd-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+      background: #111115;
+      border: 1px solid var(--border-default);
+      border-radius: 3px;
+      padding: 2px 8px;
+    }
+
+    .cmd-prompt {
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-weight: bold;
+    }
+
+    .cmd-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 4px 0;
+    }
+
+    /* ── Bottom Agent Roster Strip ── */
+    .roster-strip {
+      height: 94px;
+      background: #08080a;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      gap: 8px;
+      padding: 8px 12px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      flex-shrink: 0;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .roster-strip::-webkit-scrollbar {
+      display: none;
+    }
+
+    .roster-card {
+      height: 76px;
+      min-width: 175px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-default);
+      border-radius: 4px;
+      padding: 6px 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .roster-card:hover {
+      border-color: var(--accent);
+      background: var(--bg-elevated);
+      transform: translateY(-2px);
+    }
+
+    .roster-card.active {
+      background: var(--bg-elevated);
+      border-color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-dim);
+    }
+
+    .roster-portrait-canvas {
+      width: 38px;
+      height: 52px;
+      background: #18181c;
+      border: 1px solid var(--border-strong);
+      border-radius: 4px;
+      image-rendering: pixelated;
+      flex-shrink: 0;
+    }
+
+    .roster-info {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .roster-name-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+
+    .roster-name {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .roster-status-pill {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      padding: 1px 4px;
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .roster-status-pill.status-working {
+      color: #22c55e;
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    .roster-status-pill.status-working::before { content: ''; width: 4px; height: 4px; background: #22c55e; border-radius: 50%; }
+
+    .roster-status-pill.status-walking {
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .roster-status-pill.status-walking::before { content: ''; width: 4px; height: 4px; background: #38bdf8; border-radius: 50%; }
+
+    .roster-status-pill.status-talking {
+      color: #c084fc;
+      background: rgba(192, 132, 252, 0.12);
+      border: 1px solid rgba(192, 132, 252, 0.3);
+    }
+    .roster-status-pill.status-talking::before { content: ''; width: 4px; height: 4px; background: #c084fc; border-radius: 50%; }
+
+    .roster-status-pill.status-break {
+      color: #f59e0b;
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .roster-status-pill.status-break::before { content: ''; width: 4px; height: 4px; background: #f59e0b; border-radius: 50%; }
+
+    .roster-status-pill.status-meeting {
+      color: #60a5fa;
+      background: rgba(96, 165, 250, 0.12);
+      border: 1px solid rgba(96, 165, 250, 0.3);
+    }
+    .roster-status-pill.status-meeting::before { content: ''; width: 4px; height: 4px; background: #60a5fa; border-radius: 50%; }
+
+    .roster-role {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .roster-task {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      color: var(--cyan);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+
+    .roster-pips {
+      display: flex;
+      gap: 3px;
+      margin-top: 4px;
+    }
+
+    .roster-pip {
+      flex: 1;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 1px;
+    }
+
+    .roster-pip.filled {
+      background: var(--accent);
+      box-shadow: 0 0 4px rgba(242, 78, 30, 0.4);
+    }
+
+    /* Modal Overlay (Strict Rule 1 & Rule 6) */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-panel {
+      width: 580px;
+      max-width: 90vw;
+      background: #0a0a0a;
+      border: 1px solid var(--border-default);
+      border-radius: 4px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-head {
+      background: #111115;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .modal-body {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .modal-btn {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 3px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .modal-btn.primary {
+      background: var(--accent);
+      border-color: #ff6b3d;
+    }
+
+    .modal-btn:hover {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    /* Context Menu / Agent Radial Wheel */
+    .tactical-context-menu {
+      position: fixed;
+      z-index: 200;
+      background: #0d0d11;
+      border: 1px solid var(--border-default);
+      border-radius: 4px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.85);
+      padding: 4px;
+      display: none;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 180px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+    .tactical-context-menu.open { display: flex; }
+    .ctx-header {
+      padding: 5px 8px;
+      font-weight: bold;
+      color: var(--accent);
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .ctx-item {
+      padding: 6px 8px;
+      color: #ccc;
+      border-radius: 2px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.1s ease, color 0.1s ease;
+    }
+    .ctx-item:hover {
+      background: var(--bg-elevated);
+      color: #fff;
+    }
+    .ctx-item.danger:hover {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+    }
+
+    /* Interactive Office Props */
+    .interactive-prop {
+      cursor: pointer;
+      transition: transform 0.15s ease, filter 0.15s ease;
+    }
+    .interactive-prop:hover {
+      filter: drop-shadow(0 0 6px rgba(242, 78, 30, 0.9));
+      transform: scale(1.05);
+    }
+    .whiteboard {
+      position: absolute;
+      left: 19%;
+      top: 4.5%;
+      width: 6%;
+      height: 6.5%;
+      background: #fdfdfd;
+      border: 2px solid #3a3a3a;
+      z-index: 4;
+      box-shadow: inset 1px 1px 0 #fff;
+    }
+    .whiteboard:after {
+      content: 'TODO';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      font-size: 5px;
+      font-weight: bold;
+      color: #2563eb;
+      letter-spacing: 0.5px;
+    }
+    .server-rack {
+      position: absolute;
+      left: 1%;
+      top: 39%;
+      width: 5%;
+      height: 12%;
+      background: #151518;
+      border: 2px solid #2d2d32;
+      z-index: 4;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-evenly;
+      padding: 2px;
+    }
+    .server-led {
+      height: 2px;
+      background: #22c55e;
+      border-radius: 1px;
+      box-shadow: 0 0 4px #22c55e;
+      animation: screenPulse 1.2s infinite alternate;
+    }
+    .server-led:nth-child(2) { background: #38bdf8; box-shadow: 0 0 4px #38bdf8; animation-delay: 0.4s; }
+    .server-led:nth-child(3) { background: #f59e0b; box-shadow: 0 0 4px #f59e0b; animation-delay: 0.8s; }
+
+    /* Sound notification toast */
+    .sound-toast {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(13, 13, 17, 0.9);
+      border: 1px solid var(--accent);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      z-index: 50;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      pointer-events: none;
+    }
+    .sound-toast.show { opacity: 1; }
+
+    /* Faint Git Branch floor paths */
+    .branch-path-line {
+      position: absolute;
+      height: 2px;
+      background: repeating-linear-gradient(90deg, rgba(242, 78, 30, 0.4) 0 4px, transparent 4px 8px);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <!-- Top Real-time Navigation & Telemetry -->
+  <header class="top-bar">
+    <div class="brand-section">
+      <div class="brand-title">ZEZO OS</div>
+      <span class="brand-badge">OFFICE</span>
+    </div>
+
+    <div class="telemetry-row">
+      <div class="telemetry-item">
+        <span>AGENTS:</span>
+        <span class="telemetry-value" id="hudFleet">12 ACTIVE</span>
+      </div>
+      <div class="telemetry-item">
+        <span>BRANCH:</span>
+        <span class="telemetry-value" id="hudBranch">main</span>
+      </div>
+      <div class="telemetry-item">
+        <span>STATUS:</span>
+        <span style="color: #22c55e; font-weight: 700;">ONLINE</span>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <button class="hud-tool-btn primary" style="background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.6); color: #ef4444;" onclick="triggerAllHandsMeeting()">
+        <iconify-icon icon="solar:users-group-two-rounded-bold" style="color: #ef4444;"></iconify-icon>
+        🚨 ALL HANDS
+      </button>
+      <button class="hud-tool-btn" id="soundToggleBtn" onclick="toggleSound()">
+        <iconify-icon icon="solar:volume-loud-bold" style="color: #38bdf8;"></iconify-icon>
+        Audio: ON
+      </button>
+      <button class="hud-tool-btn primary" style="background: var(--accent); border-color: #ff6b3d; color: #fff; font-weight: bold;" onclick="exitOfficeToHome()">
+        <iconify-icon icon="solar:home-2-bold" style="color: #fff;"></iconify-icon>
+        Home Screen
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Canvas & Inspector Layout -->
+  <main class="deck-container">
+
+    <!-- Center Scranton Pixel Office View -->
+    <div class="frame">
+      <div class="corner corner-tl"></div>
+      <div class="corner-v corner-v-tl"></div>
+      <div class="corner corner-tr"></div>
+      <div class="corner-v corner-v-tr"></div>
+      <div class="corner corner-bl"></div>
+      <div class="corner-v corner-v-bl"></div>
+      <div class="corner corner-br"></div>
+      <div class="corner-v corner-v-br"></div>
+
+      <div class="frame-inner" style="padding: 0; background: #000;">
+        <div
+          style="height: 28px; background: #0a0a0c; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-family: var(--font-mono); font-size: 10px;">
+          <div class="section-label" style="margin-bottom:0; flex: 1;">01 · OFFICE FLOOR</div>
+        </div>
+
+        <div class="canvas-wrapper">
+          <!-- Authentic Scranton Pixel-Art DOM Simulation -->
+          <main class="office" id="office">
+            <div class="floor"></div>
+            <div class="window" style="left:4%"></div>
+            <div class="window" style="left:28%"></div>
+            <div class="window" style="left:40%"></div>
+            <div class="clock"></div>
+            <div class="calendar"></div>
+            <div class="whiteboard interactive-prop" onclick="openPropModal('whiteboard')" title="Whiteboard · Click to view Sprint TODOs"></div>
+            <div class="server-rack interactive-prop" onclick="openPropModal('servers')" title="ZEZO Server Rack · Click for Hardware Telemetry">
+              <div class="server-led"></div>
+              <div class="server-led"></div>
+              <div class="server-led"></div>
+            </div>
+            <div class="plant-pot" style="left:16%;top:11%"></div>
+            <div class="plant-pot" style="left:49%;top:11%"></div>
+
+            <!-- Office partition walls -->
+            <div class="wall" style="left:0;top:12.5%;width:18%;height:2.5%"></div>
+            <div class="wall" style="left:18%;top:12.5%;width:2%;height:13%"></div>
+            <div class="wall" style="left:21%;top:12.5%;width:2%;height:13%"></div>
+            <div class="wall" style="left:18%;top:26%;width:2%;height:12%"></div>
+            <div class="wall" style="left:21%;top:26%;width:2%;height:12%"></div>
+            <div class="wall" style="left:0;top:38%;width:13%;height:4%"></div>
+            <div class="wall" style="left:15%;top:38%;width:22%;height:4%"></div>
+            <div class="wall" style="left:39%;top:38%;width:17%;height:4%"></div>
+            <div class="wall" style="left:52%;top:13%;width:2.4%;height:15%"></div>
+            <div class="wall" style="left:74%;top:13%;width:2.4%;height:29%"></div>
+            <div class="wall" style="left:74%;top:42%;width:26%;height:3.5%"></div>
+            <div class="wall" style="left:73%;top:56%;width:2%;height:14%"></div>
+            <div class="wall" style="left:71%;top:74%;width:2%;height:26%"></div>
+            <div class="wall" style="left:0;bottom:0;width:47%;height:2.5%"></div>
+            <div class="wall" style="left:49%;bottom:0;width:51%;height:2.5%"></div>
+
+            <!-- Conference room -->
+            <div class="conference"><div class="paper"></div></div>
+            <div class="chair-conf" style="left:31%;top:14.5%"></div>
+            <div class="chair-conf" style="left:34%;top:14.5%"></div>
+            <div class="chair-conf" style="left:37%;top:14.5%"></div>
+            <div class="chair-conf" style="left:40%;top:14.5%"></div>
+            <div class="chair-conf" style="left:31%;top:27.5%"></div>
+            <div class="chair-conf" style="left:34%;top:27.5%"></div>
+            <div class="chair-conf" style="left:37%;top:27.5%"></div>
+            <div class="chair-conf" style="left:40%;top:27.5%"></div>
+            <div class="chair-conf" style="left:46.5%;top:21%"></div>
+
+            <!-- Desk stations -->
+            <div class="desk" style="left:4%;top:23%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:56%;top:27.5%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:65%;top:27.5%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:78%;top:16%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:87%;top:16%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:2%;top:55%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:14%;top:55%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:26%;top:55%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:38%;top:55%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:50%;top:55%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:2%;top:79%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:14%;top:79%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:26%;top:79%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:38%;top:79%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:50%;top:79%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:62%;top:79%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+
+            <!-- Workstation Chairs -->
+            <div class="desk-chair" style="left:6.6%;top:29.5%"></div>
+            <div class="desk-chair" style="left:58.6%;top:34.0%"></div>
+            <div class="desk-chair" style="left:67.6%;top:34.0%"></div>
+            <div class="desk-chair" style="left:80.6%;top:22.5%"></div>
+            <div class="desk-chair" style="left:89.6%;top:22.5%"></div>
+            <div class="desk-chair" style="left:4.6%;top:61.5%"></div>
+            <div class="desk-chair" style="left:16.6%;top:61.5%"></div>
+            <div class="desk-chair" style="left:28.6%;top:61.5%"></div>
+            <div class="desk-chair" style="left:40.6%;top:61.5%"></div>
+            <div class="desk-chair" style="left:52.6%;top:61.5%"></div>
+            <div class="desk-chair" style="left:4.6%;top:85.5%"></div>
+            <div class="desk-chair" style="left:16.6%;top:85.5%"></div>
+            <div class="desk-chair" style="left:28.6%;top:85.5%"></div>
+            <div class="desk-chair" style="left:40.6%;top:85.5%"></div>
+            <div class="desk-chair" style="left:52.6%;top:85.5%"></div>
+            <div class="desk-chair" style="left:64.6%;top:85.5%"></div>
+
+            <!-- Kitchen and water cooler -->
+            <div class="cooler interactive-prop" onclick="openPropModal('cooler')" title="Water Cooler · Click to inspect Coffee & Token usage"></div>
+            <div class="kitchen"><div class="counter"></div><div class="sink"></div><div class="fridge"></div><div class="shelf"></div></div>
+            <div class="plant-pot" style="left:1%;bottom:2%"></div>
+            <div class="plant-pot" style="left:68%;bottom:2%"></div>
+            <div class="plant-pot" style="right:3%;bottom:2%"></div>
+          </main>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Tactical Command Panel -->
+    <aside class="tactical-sidebar">
+
+      <!-- 02 · AGENT INSPECTOR FRAME -->
+      <div class="frame" style="flex: 0 0 auto;">
+        <div class="corner corner-tl"></div>
+        <div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div>
+        <div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div>
+        <div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div>
+        <div class="corner-v corner-v-br"></div>
+
+        <div class="frame-inner">
+          <div class="section-label" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>02 · INSPECTOR</span>
+            <button class="hud-tool-btn" style="padding: 2px 6px; font-size: 9px; cursor: pointer;" onclick="closeAgentInspector()" title="Close Inspector View">✕ CLOSE</button>
+          </div>
+
+          <div class="agent-dark-card">
+            <div class="agent-avatar-wrap">
+              <canvas id="activePortraitCanvas" width="44" height="56"></canvas>
+            </div>
+            <div class="agent-meta-group">
+              <div class="agent-title-row">
+                <span class="agent-name-txt" id="activeAgentName">MICHAEL</span>
+                <span class="badge badge-success mono" id="activeAgentStatusBadge">WORKING</span>
+              </div>
+              <div class="agent-desc-txt" id="activeAgentRole">Regional Manager & Orchestrator</div>
+            </div>
+          </div>
+
+          <!-- Spec Grid with Openable OS Sandbox Folder Links -->
+          <div class="spec-grid">
+            <div class="spec-label">BRANCH</div>
+            <div class="spec-val" id="specWorktree">agent/fleet-orchestrator</div>
+
+            <div class="spec-label">PATH</div>
+            <div class="spec-val">
+              <span class="path-action-link" id="specPathLink" onclick="openActiveSandboxModal()"
+                title="Click to inspect sandbox workspace files">
+                <iconify-icon icon="solar:folder-open-bold" style="font-size: 12px;"></iconify-icon>
+                <span id="specPath">.agent_worktrees/task-100/</span>
+              </span>
+            </div>
+
+            <div class="spec-label">ENGINE</div>
+            <div class="spec-val">Tree-Sitter / py_compile</div>
+
+            <div class="spec-label">MODE</div>
+            <div class="spec-val" style="color: var(--green);">FULL AUTONOMY</div>
+          </div>
+
+          <!-- Staged Worktree Files Browser (Agent-Specific) -->
+          <div class="file-preview-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <span style="color: var(--text-muted); font-size: 9px;">FILES IN PROGRESS:</span>
+              <span style="color: var(--green); font-size: 9px;" id="activeFilesCount">3 ACTIVE</span>
+            </div>
+            <div class="file-pill-list" id="activeAgentFileList">
+              <!-- Dynamically populated per agent -->
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 03 · SUBAGENT STREAM FRAME -->
+      <div class="frame stream-frame">
+        <div class="corner corner-tl"></div>
+        <div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div>
+        <div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div>
+        <div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div>
+        <div class="corner-v corner-v-br"></div>
+
+        <div class="frame-inner">
+          <div class="stream-header-strip">
+            <div class="section-label" style="margin-bottom:0; flex: 1;">03 · ACTIVITY</div>
+            <span class="badge badge-cyan mono" style="font-size: 8px;">LIVE</span>
+          </div>
+
+          <div class="terminal-window" id="terminalLog">
+            <div class="log-line">
+              <span class="log-ts">[01:54:10]</span>
+              <span class="log-msg highlight">Scranton pixel office simulation attached</span>
+            </div>
+            <div class="log-line">
+              <span class="log-ts">[01:56:11]</span>
+              <span class="log-msg">AST scanner parsing src/server.py</span>
+            </div>
+            <div class="log-line">
+              <span class="log-ts">[01:54:12]</span>
+              <span class="log-msg">Generating patch diff: +14 / -3 lines</span>
+            </div>
+            <div class="log-line">
+              <span class="log-ts">[01:54:13]</span>
+              <span class="log-msg success">Local test pass: 12/12 assertions verified</span>
+            </div>
+            <div class="log-line">
+              <span class="log-ts">[01:57:49]</span>
+              <span class="log-msg highlight">Autonomous fleet active: working, walking, breaks & banter</span>
+            </div>
+          </div>
+
+          <div class="cmd-bar-row">
+            <span class="cmd-prompt">&gt;</span>
+            <input type="text" class="cmd-input" id="terminalCmdInput" placeholder="Type prompt or voice instruction..."
+              onkeydown="handleTerminalCommand(event)">
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Bottom Agent Roster Strip -->
+  <section class="roster-strip" id="rosterStrip"></section>
+
+  <!-- Agent Context Menu -->
+  <div class="tactical-context-menu" id="agentContextMenu">
+    <div class="ctx-header" id="ctxAgentHeader">AGENT ACTIONS</div>
+    <div class="ctx-item" onclick="ctxAction('assign')">
+      <iconify-icon icon="solar:code-2-bold" style="color: var(--green);"></iconify-icon>
+      Assign Refactor Task
+    </div>
+    <div class="ctx-item" onclick="ctxAction('break')">
+      <iconify-icon icon="solar:cup-bold" style="color: #f59e0b;"></iconify-icon>
+      Send to Coffee Break
+    </div>
+    <div class="ctx-item" onclick="ctxAction('pair')">
+      <iconify-icon icon="solar:users-group-rounded-bold" style="color: #38bdf8;"></iconify-icon>
+      Pair with Coworker
+    </div>
+    <div class="ctx-item" onclick="ctxAction('worktree')">
+      <iconify-icon icon="solar:folder-with-files-bold" style="color: var(--cyan);"></iconify-icon>
+      Inspect Sandbox Worktree
+    </div>
+    <div class="ctx-item danger" onclick="ctxAction('circuit_breaker')">
+      <iconify-icon icon="solar:shield-warning-bold" style="color: #ef4444;"></iconify-icon>
+      Circuit Breaker / Stop
+    </div>
+  </div>
+
+  <!-- Interactive Prop Modal -->
+  <div class="modal-overlay" id="propModal">
+    <div class="modal-panel">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <iconify-icon id="propModalIcon" icon="solar:info-circle-bold" style="font-size: 16px; color: var(--accent);"></iconify-icon>
+          <span id="propModalTitle">Office Telemetry</span>
+        </div>
+        <button class="hud-tool-btn" onclick="closeModal('propModal')">✕</button>
+      </div>
+      <div class="modal-body" id="propModalContent">
+        Prop details loading...
+      </div>
+    </div>
+  </div>
+
+  <div class="sound-toast" id="soundToast">🔊 Mechanical Click</div>
+
+  <!-- Modal: Worktree Folder & File Inspector -->
+  <div class="modal-overlay" id="sandboxModal">
+    <div class="modal-panel">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <iconify-icon icon="solar:folder-with-files-bold" style="font-size: 16px; color: var(--cyan);"></iconify-icon>
+          <span id="modalWorktreeTitle">Worktree Workspace Browser</span>
+        </div>
+        <button class="hud-tool-btn" onclick="closeModal('sandboxModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: var(--text-muted);">MOUNTED LOCAL PATH:</span>
+          <span id="modalPathDisplay" style="color: var(--cyan); font-weight: bold;">.agent_worktrees/task-102/</span>
+        </div>
+        <div class="file-preview-card" id="modalFileContent">
+          Select a file to inspect AST tokens or staged code changes...
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button class="modal-btn" onclick="openInVsCode()">🚀 Open in Editor / VS Code</button>
+          <button class="modal-btn primary" onclick="closeModal('sandboxModal')">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scranton Autonomous Office Simulation Engine -->
+  <script>
+    const office = document.getElementById('office');
+
+    // 12 Full Scranton Agents with Dedicated Desks, Worktrees, Activity Logs & Files
+    const agents = [
+      { name: 'MICHAEL', role: "Regional Manager & Orchestrator", worktree: 'agent/fleet-orchestrator', sandbox: '.agent_worktrees/task-100/', files: ['main.py', 'core/prompt.txt', 'AGENTS.md'], logs: ['[SYSTEM] Fleet Orchestrator attached to workspace.', '[MICHAEL] Sprint priorities aligned across 12 subagents.', '[MICHAEL] That is what she said!'], x: 6.5, y: 17, shirt: '#243b63', hair: '#33251e', skin: '#e9bd91', tie: '#b63e3b', state: 'working', deskX: 4, deskY: 23, isBusy: false },
+      { name: 'JIM', role: 'Lead Code Review & Staging', worktree: 'agent/pr-review-staging', sandbox: '.agent_worktrees/task-101/', files: ['actions/opencode_agent.py', 'core/task_manager.py'], logs: ['[JIM] Reviewing staged diff in opencode_agent.py.', '[JIM] Dwight, your stapler is in Jell-O again.', '[JIM] Staging PR assertions verified (12/12 passing).'], x: 37.5, y: 30, shirt: '#526f9a', hair: '#4b3023', skin: '#e8bd96', tie: '#d5d0c6', state: 'working', deskX: 56, deskY: 27.5, isBusy: false },
+      { name: 'DWIGHT', role: 'OpenCode Refactoring & Security', worktree: 'agent/task-api-refactor', sandbox: '.agent_worktrees/task-102/', files: ['actions/kilo_agent.py', 'core/governance.py', 'core/action_loader.py'], logs: ['[DWIGHT] Scanning AST nodes with Tree-Sitter.', '[DWIGHT] MICHAEL!! Jim put my stapler in Jell-O!', '[DWIGHT] Security policy applied: 0 unsafe shell commands permitted.'], x: 40, y: 30, shirt: '#c49b31', hair: '#32251c', skin: '#e6b98e', tie: '#604b25', state: 'working', deskX: 65, deskY: 27.5, isBusy: false },
+      { name: 'PAM', role: 'UI Token Extractor & Aesthetics', worktree: 'agent/design-tokens-v2', sandbox: '.agent_worktrees/task-103/', files: ['frontend/index.html', 'frontend/css/style.css', 'skills/hamza_taste/SKILL.md'], logs: ['[PAM] Extracted 42 new CSS color tokens from reference.', '[PAM] Fixed contrast ratios to AAA standard.', '[PAM] Rendered new procedural pixel avatars.'], x: 47, y: 68, shirt: '#ce789c', hair: '#80502f', skin: '#edc49f', tie: '#a84e76', state: 'working', deskX: 50, deskY: 55, isBusy: false },
+      { name: 'OSCAR', role: 'Finance & AST Optimizer', worktree: 'agent/ast-optimizer', sandbox: '.agent_worktrees/task-104/', files: ['core/llm_router.py', 'core/provider_health.py'], logs: ['[OSCAR] Actually, AST parser time complexity is O(N).', '[OSCAR] Groq token usage optimized: 184k tkns/sec.', '[OSCAR] Memory ring buffer allocated: 128 MB.'], x: 4, y: 57, shirt: '#537f73', hair: '#30261f', skin: '#b98461', tie: '#344d4a', state: 'working', deskX: 2, deskY: 55, isBusy: false },
+      { name: 'ANGELA', role: 'Strict Governance & Linter', worktree: 'agent/strict-governance', sandbox: '.agent_worktrees/task-105/', files: ['core/confirm.py', 'core/undo.py'], logs: ['[ANGELA] Running flake8 & py_compile static gate.', '[ANGELA] 0 warnings found. Indentation strictly acceptable.', '[ANGELA] Safety checkpoint registered.'], x: 41, y: 57, shirt: '#b8b4a4', hair: '#8b7656', skin: '#f0c9a8', tie: '#857f6c', state: 'working', deskX: 38, deskY: 55, isBusy: false },
+      { name: 'STANLEY', role: 'Circuit Breaker Watchdog', worktree: 'agent/telemetry-watchdog', sandbox: '.agent_worktrees/task-106/', files: ['actions/system_monitor.py', 'core/log_bus.py'], logs: ['[STANLEY] Telemetry watchdog active (0 faults).', '[STANLEY] Is it 5:00 PM yet?', '[STANLEY] CPU telemetry stream passing nominal thresholds.'], x: 65, y: 57, shirt: '#9d593f', hair: '#29231f', skin: '#8b5d43', tie: '#44352e', state: 'working', deskX: 50, deskY: 55, isBusy: false },
+      { name: 'KEVIN', role: 'Fast Kilo Token Math', worktree: 'agent/kilo-fast-refactor', sandbox: '.agent_worktrees/task-107/', files: ['memory/sqlite_memory.py', 'actions/file_processor.py'], logs: ['[KEVIN] Made the famous chili for the server room!', '[KEVIN] Reduced token math overhead by 30%.', '[KEVIN] Staging batch diff chunks.'], x: 73, y: 68, shirt: '#314c6e', hair: '#3b2a22', skin: '#e3b08a', tie: '#b8443b', state: 'working', deskX: 62, deskY: 79, isBusy: false },
+      { name: 'PHYLLIS', role: 'PR Merge Specialist', worktree: 'agent/pr-merge-bot', sandbox: '.agent_worktrees/task-108/', files: ['actions/git_workflow.py', 'core/repo_context.py'], logs: ['[PHYLLIS] Merge bot verified worktree consistency.', '[PHYLLIS] Rebase cleanly completed against main branch.', '[PHYLLIS] Conflict matrix cleared.'], x: 75, y: 68, shirt: '#b66e87', hair: '#a58b70', skin: '#d6a27d', tie: '#85465b', state: 'working', deskX: 62, deskY: 79, isBusy: false },
+      { name: 'RYAN', role: 'Subagent Dispatcher', worktree: 'agent/temp-subagent', sandbox: '.agent_worktrees/task-109/', files: ['core/voice_fallback.py', 'core/llm_client.py'], logs: ['[RYAN] Launching dynamic subagent thread.', '[RYAN] WebSockets live connection verified.', '[RYAN] Dispatching parallel tasks across cores.'], x: 78, y: 68, shirt: '#6d7e82', hair: '#3b2a22', skin: '#d9aa87', tie: '#3d4c51', state: 'working', deskX: 14, deskY: 79, isBusy: false },
+      { name: 'TOBY', role: 'Safety Compliance HR', worktree: 'agent/safety-compliance', sandbox: '.agent_worktrees/task-110/', files: ['core/governance.py', 'docs/SECURITY.md'], logs: ['[TOBY] Safety compliance checklist verified.', '[TOBY] Toby, why are you the way that you are?', '[TOBY] Irreversible action gate active.'], x: 18, y: 58, shirt: '#6c7d83', hair: '#554237', skin: '#e2b994', tie: '#6b6c64', state: 'working', deskX: 14, deskY: 55, isBusy: false },
+      { name: 'CREED', role: 'Legacy Binary Scraper', worktree: 'agent/hex-reverse-eng', sandbox: '.agent_worktrees/task-111/', files: ['actions/website_cloner.py', 'actions/agent_reach.py'], logs: ['[CREED] Nobody steals from Creed Bratton.', '[CREED] Hex decompilation pass complete.', '[CREED] Scraping legacy assets.'], x: 31, y: 69, shirt: '#756d57', hair: '#aaa99c', skin: '#c8a17d', tie: '#595442', state: 'working', deskX: 26, deskY: 79, isBusy: false }
+    ];
+
+    let selectedAgent = agents[0];
+
+    // Authentic Dialogue Scripts & Banter
+    const BANTER_SCRIPTS = [
+      { a: 'JIM', b: 'DWIGHT', aText: 'Dwight, your stapler is in Jell-O.', bText: 'MICHAEL!! HE DID IT AGAIN!' },
+      { a: 'JIM', b: 'PAM', aText: 'Check this PR diff :)', bText: 'Looks perfect, merging!' },
+      { a: 'DWIGHT', b: 'MICHAEL', aText: 'Assistant Regional Manager ready.', bText: 'Assistant TO the Regional Manager.' },
+      { a: 'MICHAEL', b: 'JIM', aText: "That's what she said!", bText: '...classic.' },
+      { a: 'KEVIN', b: 'OSCAR', aText: 'I made the famous chili!', bText: 'Kevin, keep it away from the servers!' },
+      { a: 'OSCAR', b: 'ANGELA', aText: 'Actually, AST time complexity is O(N).', bText: 'Your indentation is unacceptable.' },
+      { a: 'STANLEY', b: 'PHYLLIS', aText: 'Is it 5:00 PM yet?', bText: 'Almost Stanley, 10 more minutes.' },
+      { a: 'RYAN', b: 'MICHAEL', aText: 'Launching WUPHF on WebSockets.', bText: 'Ryan is the future of tech!' },
+      { a: 'TOBY', b: 'MICHAEL', aText: 'We need safety compliance signed.', bText: 'Toby, why are you the way that you are?' },
+      { a: 'CREED', b: 'KEVIN', aText: 'Nobody steals from Creed Bratton.', bText: 'Wait, what did you take?!' },
+      { a: 'PAM', b: 'OSCAR', aText: 'Extracted 42 new CSS color tokens.', bText: 'Contrast ratio passes AAA WCAG.' },
+      { a: 'DWIGHT', b: 'ANGELA', aText: 'Strict linter passed: 0 warnings.', bText: 'Adequate. Carry on.' }
+    ];
+
+    // Create Agent DOM Element
+    function makeAgent(a) {
+      const el = document.createElement('div');
+      el.className = 'agent';
+      el.dataset.name = a.name;
+      el.style.left = a.x + '%';
+      el.style.top = a.y + '%';
+      ['shirt', 'hair', 'skin', 'tie'].forEach(k => el.style.setProperty('--' + k, a[k]));
+      el.innerHTML = '<span class="hair"></span><span class="head"></span><span class="face"></span><span class="body"></span><span class="tie"></span><span class="arm l"></span><span class="arm r"></span><span class="leg l"></span><span class="leg r"></span><span class="tag">' + a.name + '</span>';
+      el.title = a.name + ' · ' + a.state;
+      office.appendChild(el);
+      a.el = el;
+
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        playFoley('click');
+        selectAgent(a.name);
+        showBubble(a, 'Focused!');
+      });
+
+      el.addEventListener('contextmenu', (e) => {
+        openAgentContextMenu(e, a);
+      });
+    }
+
+    // Nearest Desk Finder
+    function nearestDesk(a) {
+      const desks = [...office.querySelectorAll('.desk')];
+      let best = null, dist = Infinity;
+      for (const d of desks) {
+        const r = rectPct(d), cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+        const dd = Math.hypot(cx - (a.deskX + 3.9), cy - (a.deskY + 3.5));
+        if (dd < dist) { dist = dd; best = d; }
+      }
+      return best;
+    }
+
+    // Set State Machine (working, walking, talking, break, meeting, idle)
+    function setState(a, state) {
+      a.state = state;
+      const el = a.el;
+      if (!el) return;
+      el.classList.remove('seated', 'walking', 'talking');
+      const glow = el.querySelector('.monitor-glow'); if (glow) glow.remove();
+
+      const desk = nearestDesk(a);
+      const monitor = desk && desk.querySelector('.monitor');
+      if (monitor) monitor.classList.remove('on');
+
+      if (state === 'working') {
+        el.classList.add('seated');
+        const g = document.createElement('span');
+        g.className = 'monitor-glow';
+        el.appendChild(g);
+        if (monitor) monitor.classList.add('on');
+      }
+      if (state === 'walking') el.classList.add('walking');
+      if (state === 'talking') el.classList.add('talking');
+      el.title = a.name + ' · ' + state;
+
+      // Update Inspector Badge if selected
+      if (selectedAgent && selectedAgent.name === a.name) {
+        const badge = document.getElementById('activeAgentStatusBadge');
+        badge.innerText = state.toUpperCase();
+        badge.className = 'badge mono ' + (
+          state === 'working' ? 'badge-success' :
+          state === 'walking' ? 'badge-cyan' :
+          state === 'talking' ? 'badge-purple' :
+          state === 'break' ? 'badge-amber' : 'badge-accent'
+        );
+      }
+
+      // Update Roster status pill
+      const pill = document.getElementById('pill-' + a.name.toLowerCase());
+      if (pill) {
+        pill.innerText = state.toUpperCase();
+        pill.className = 'roster-status-pill status-' + (
+          state === 'working' ? 'working' :
+          state === 'walking' ? 'walking' :
+          state === 'talking' ? 'talking' :
+          state === 'break' ? 'break' :
+          state === 'meeting' ? 'meeting' : 'working'
+        );
+      }
+    }
+
+    function showBubble(a, text, duration = 3200) {
+      if (!a.el) return;
+      const old = a.el.querySelector('.bubble');
+      if (old) old.remove();
+      const b = document.createElement('span');
+      b.className = 'bubble';
+      b.textContent = text;
+      a.el.appendChild(b);
+      setTimeout(() => { if (b.parentNode) b.remove(); }, duration);
+    }
+
+    // ── Fixed Navigation & A* Collision Masks ──
+    const GRID = 2;
+    function rectPct(el) {
+      const r = el.getBoundingClientRect(), o = office.getBoundingClientRect();
+      return { x: (r.left - o.left) / o.width * 100, y: (r.top - o.top) / o.height * 100, w: r.width / o.width * 100, h: r.height / o.height * 100 };
+    }
+
+    function pointBlocked(x, y) {
+      // Boundaries of walkable office
+      if (x < 2 || x > 96 || y < 14 || y > 94) return true;
+
+      // Solid walls, conference table, water cooler, kitchen fixtures
+      const solidBlockers = [...office.querySelectorAll('.wall,.conference,.cooler,.kitchen')];
+      const hitsSolid = solidBlockers.some(el => {
+        const r = rectPct(el);
+        return x > r.x - 0.6 && x < r.x + r.w + 0.6 && y > r.y - 0.6 && y < r.y + r.h + 0.6;
+      });
+      if (hitsSolid) return true;
+
+      // Desk table surfaces: only the top 65% of desk box is impassable wood;
+      // the chair/seating area in front (bottom 35%) is walkable floor!
+      const desks = [...office.querySelectorAll('.desk')];
+      const hitsDeskTop = desks.some(el => {
+        const r = rectPct(el);
+        return x > r.x - 0.5 && x < r.x + r.w + 0.5 && y > r.y - 0.5 && y < r.y + r.h * 0.65;
+      });
+      return hitsDeskTop;
+    }
+
+    function toGrid(x, y) { return { x: Math.round(x / GRID), y: Math.round(y / GRID) }; }
+    function toPct(p) { return { x: p.x * GRID, y: p.y * GRID }; }
+    function key(p) { return p.x + ',' + p.y; }
+
+    function findPath(from, to) {
+      const start = toGrid(from.x, from.y), goal = toGrid(to.x, to.y);
+      const open = [start], came = new Map(), g = new Map([[key(start), 0]]), f = new Map([[key(start), Math.abs(start.x - goal.x) + Math.abs(start.y - goal.y)]]);
+      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      let loops = 0;
+      while (open.length && loops++ < 5000) {
+        open.sort((a, b) => (f.get(key(a)) ?? 1e9) - (f.get(key(b)) ?? 1e9));
+        const cur = open.shift(), ck = key(cur);
+        if (Math.abs(cur.x - goal.x) <= 1 && Math.abs(cur.y - goal.y) <= 1) {
+          const path = [cur]; let k = ck;
+          while (came.has(k)) { const prev = came.get(k); path.unshift(prev); k = key(prev); }
+          return path.map(toPct);
+        }
+        for (const [dx, dy] of dirs) {
+          const n = { x: cur.x + dx, y: cur.y + dy }, p = toPct(n), nk = key(n);
+          if (pointBlocked(p.x, p.y) && !(Math.abs(n.x - goal.x) <= 1 && Math.abs(n.y - goal.y) <= 1)) continue;
+          const ng = (g.get(ck) ?? 1e9) + 1;
+          if (ng < (g.get(nk) ?? 1e9)) {
+            came.set(nk, cur); g.set(nk, ng); f.set(nk, ng + Math.abs(n.x - goal.x) + Math.abs(n.y - goal.y));
+            if (!open.some(v => key(v) === nk)) open.push(n);
+          }
+        }
+      }
+      return [];
+    }
+
+    function moveAlong(a, path, done) {
+      if (!path.length) { done?.(); return; }
+      setState(a, 'walking');
+      let i = 0;
+      const step = () => {
+        if (i >= path.length) { done?.(); return; }
+        const p = path[i++];
+        a.el.style.left = p.x + '%';
+        a.el.style.top = p.y + '%';
+        setTimeout(step, 65);
+      };
+      step();
+    }
+
+    function goToDesk(a, callback) {
+      const target = { x: a.deskX + 3.9 - 1.45, y: a.deskY + 5.1 };
+      const from = { x: parseFloat(a.el.style.left), y: parseFloat(a.el.style.top) };
+      const path = findPath(from, target);
+      if (!path.length) {
+        a.el.style.left = target.x + '%';
+        a.el.style.top = target.y + '%';
+        setState(a, 'working');
+        a.isBusy = false;
+        callback?.();
+        return;
+      }
+      moveAlong(a, path, () => {
+        a.el.style.left = target.x + '%';
+        a.el.style.top = target.y + '%';
+        setState(a, 'working');
+        a.isBusy = false;
+        callback?.();
+      });
+    }
+
+    // Autonomous Action 1: Visit Coworker for Banter
+    function startBanter(a, b, script) {
+      if (a.isBusy || b.isBusy) return;
+      a.isBusy = true;
+      b.isBusy = true;
+
+      const ax = parseFloat(a.el.style.left), ay = parseFloat(a.el.style.top);
+      const bx = parseFloat(b.el.style.left), by = parseFloat(b.el.style.top);
+
+      // Walk agent A towards agent B's desk/location
+      const targetA = { x: Math.max(3, bx - 3.5), y: Math.min(88, by + 1) };
+      const pathA = findPath({ x: ax, y: ay }, targetA);
+
+      if (!pathA.length) {
+        a.isBusy = false;
+        b.isBusy = false;
+        return;
+      }
+
+      appendLog(a.name, `Walking over to ${b.name}'s station for collaboration.`);
+
+      moveAlong(a, pathA, () => {
+        setState(a, 'talking');
+        setState(b, 'talking');
+        showBubble(a, script.aText, 3500);
+
+        setTimeout(() => {
+          showBubble(b, script.bText, 3500);
+          appendLog(b.name, `"${script.bText}" (in response to ${a.name})`, 'highlight');
+        }, 1800);
+
+        setTimeout(() => {
+          setState(a, 'walking');
+          setState(b, 'working');
+          b.isBusy = false;
+
+          // Agent A walks back to their own desk
+          appendLog(a.name, `Finished discussion. Returning to workstation to resume coding.`, 'success');
+          goToDesk(a);
+        }, 5200);
+      });
+    }
+
+    // Autonomous Action 2: Coffee / Water Cooler Break
+    function startCoffeeBreak(a) {
+      if (a.isBusy) return;
+      a.isBusy = true;
+
+      const ax = parseFloat(a.el.style.left), ay = parseFloat(a.el.style.top);
+      // Cooler is at right: 1.5% (left: ~91%), top: 56%, bottom: 71%. Stand right in front of cooler at left: 88%, top: 62%
+      const coolerTarget = { x: 88, y: 62 };
+      const path = findPath({ x: ax, y: ay }, coolerTarget);
+
+      if (!path.length) {
+        a.isBusy = false;
+        return;
+      }
+
+      appendLog(a.name, `Heading to water cooler & kitchen for coffee break.`);
+
+      moveAlong(a, path, () => {
+        setState(a, 'break');
+        const coffeeQuotes = ['Mmm, fresh coffee!', 'Need caffeine to review this PR.', 'Water cooler talk...', 'Hydrating before deploy.'];
+        showBubble(a, coffeeQuotes[Math.floor(Math.random() * coffeeQuotes.length)], 3200);
+
+        setTimeout(() => {
+          appendLog(a.name, `Break over. Returning to desk.`);
+          goToDesk(a);
+        }, 4500);
+      });
+    }
+
+    // Autonomous Action 3: Boardroom Meeting / Roadmap Check
+    function startBoardroomCheck(a) {
+      if (a.isBusy) return;
+      a.isBusy = true;
+
+      const ax = parseFloat(a.el.style.left), ay = parseFloat(a.el.style.top);
+      // Conference room chairs are seated along bottom row (top: 28%) or top row (top: 14.5%)
+      const confChairs = [
+        { x: 31, y: 28.5 },
+        { x: 34, y: 28.5 },
+        { x: 37, y: 28.5 },
+        { x: 40, y: 28.5 },
+        { x: 34, y: 14.0 },
+        { x: 37, y: 14.0 }
+      ];
+      const chair = confChairs[Math.floor(Math.random() * confChairs.length)];
+      const path = findPath({ x: ax, y: ay }, chair);
+
+      if (!path.length) {
+        a.isBusy = false;
+        return;
+      }
+
+      appendLog(a.name, `Entering boardroom to check sprint roadmap.`);
+
+      moveAlong(a, path, () => {
+        setState(a, 'meeting');
+        showBubble(a, 'Reviewing sprint goals...', 3000);
+
+        setTimeout(() => {
+          goToDesk(a);
+        }, 4200);
+      });
+    }
+
+    // Autonomous Action 4: Code Review Collaboration
+    function startCodeReviewVisit(a, b) {
+      if (a.isBusy || b.isBusy) return;
+      a.isBusy = true;
+      b.isBusy = true;
+
+      const ax = parseFloat(a.el.style.left), ay = parseFloat(a.el.style.top);
+      const bx = parseFloat(b.el.style.left), by = parseFloat(b.el.style.top);
+      const targetA = { x: Math.max(3, bx - 3.5), y: Math.min(88, by + 1) };
+      const pathA = findPath({ x: ax, y: ay }, targetA);
+
+      if (!pathA.length) {
+        a.isBusy = false;
+        b.isBusy = false;
+        return;
+      }
+
+      appendLog(a.name, `Walking to ${b.name}'s monitor for pair programming.`);
+
+      moveAlong(a, pathA, () => {
+        setState(a, 'talking');
+        showBubble(a, 'Let us check this diff.', 3000);
+        setTimeout(() => {
+          showBubble(b, 'Tests passing: 12/12!', 3000);
+        }, 1500);
+        setTimeout(() => {
+          setState(b, 'working');
+          b.isBusy = false;
+          goToDesk(a);
+        }, 4800);
+      });
+    }
+
+    // Master Autonomous Fleet Scheduler (Runs continuously every 3.5s)
+    function runAutonomousFleetCycle() {
+      const available = agents.filter(ag => !ag.isBusy);
+      if (available.length < 1) return;
+
+      const rand = Math.random();
+
+      if (rand < 0.40 && available.length >= 2) {
+        // Run dialogue banter between 2 agents
+        const script = BANTER_SCRIPTS[Math.floor(Math.random() * BANTER_SCRIPTS.length)];
+        const agentA = agents.find(ag => ag.name === script.a);
+        const agentB = agents.find(ag => ag.name === script.b);
+
+        if (agentA && agentB && !agentA.isBusy && !agentB.isBusy) {
+          startBanter(agentA, agentB, script);
+        }
+      } else if (rand < 0.65 && available.length >= 2) {
+        // Pair code review
+        const idxA = Math.floor(Math.random() * available.length);
+        const agentA = available[idxA];
+        const remaining = available.filter(ag => ag.name !== agentA.name);
+        if (remaining.length > 0) {
+          const agentB = remaining[Math.floor(Math.random() * remaining.length)];
+          startCodeReviewVisit(agentA, agentB);
+        }
+      } else if (rand < 0.85) {
+        // Water cooler break
+        const luckyAgent = available[Math.floor(Math.random() * available.length)];
+        startCoffeeBreak(luckyAgent);
+      } else {
+        // Boardroom visit
+        const luckyAgent = available[Math.floor(Math.random() * available.length)];
+        startBoardroomCheck(luckyAgent);
+      }
+    }
+
+    // Render Procedural Pixel Bust for Roster and Active Inspector
+    function drawPixelPortrait(canvasEl, a) {
+      if (!canvasEl) return;
+      const ctx = canvasEl.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+      const w = canvasEl.width, h = canvasEl.height;
+
+      // Dark background
+      ctx.fillStyle = '#18181c';
+      ctx.fillRect(0, 0, w, h);
+
+      // Shirt / Shoulders
+      ctx.fillStyle = a.shirt;
+      ctx.fillRect(w * 0.15, h * 0.55, w * 0.7, h * 0.45);
+
+      // Tie
+      ctx.fillStyle = a.tie;
+      ctx.fillRect(w * 0.42, h * 0.58, w * 0.16, h * 0.35);
+
+      // Neck
+      ctx.fillStyle = a.skin;
+      ctx.fillRect(w * 0.35, h * 0.45, w * 0.3, h * 0.15);
+
+      // Head
+      ctx.fillStyle = a.skin;
+      ctx.fillRect(w * 0.25, h * 0.18, w * 0.5, h * 0.32);
+
+      // Hair
+      ctx.fillStyle = a.hair;
+      ctx.fillRect(w * 0.22, h * 0.12, w * 0.56, h * 0.15);
+
+      // Eyes
+      ctx.fillStyle = '#222';
+      ctx.fillRect(w * 0.35, h * 0.28, 2, 2);
+      ctx.fillRect(w * 0.58, h * 0.28, 2, 2);
+
+      // Glasses for Dwight / Stanley
+      if (a.name === 'DWIGHT' || a.name === 'STANLEY') {
+        ctx.strokeStyle = '#111';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(w * 0.32, h * 0.26, 4, 4);
+        ctx.strokeRect(w * 0.56, h * 0.26, 4, 4);
+      }
+    }
+
+    // Close Agent Inspector Drawer
+    function closeAgentInspector() {
+      playFoley('click');
+      const deck = document.querySelector('.deck-container');
+      if (deck) deck.classList.remove('inspector-open');
+      document.querySelectorAll('.agent').forEach(n => n.classList.remove('selected'));
+      document.querySelectorAll('.roster-card').forEach(n => n.classList.remove('active'));
+      selectedAgent = null;
+    }
+
+    // Select Agent Handler (Opens Inspector Specifically for Clicked Agent)
+    function selectAgent(name) {
+      const ag = agents.find(a => a.name.toUpperCase() === name.toUpperCase()) || agents[0];
+      selectedAgent = ag;
+
+      // 1. Open Right Inspector Side Drawer
+      const deck = document.querySelector('.deck-container');
+      if (deck) deck.classList.add('inspector-open');
+
+      // 2. Highlight Agent Sprite and Roster Card
+      document.querySelectorAll('.agent').forEach(n => n.classList.remove('selected'));
+      if (ag.el) ag.el.classList.add('selected');
+
+      document.querySelectorAll('.roster-card').forEach(n => n.classList.remove('active'));
+      const activeCard = document.getElementById('card-' + ag.name.toLowerCase());
+      if (activeCard) activeCard.classList.add('active');
+
+      // 3. Update Meta & Spec
+      document.getElementById('activeAgentName').innerText = ag.name;
+      document.getElementById('activeAgentRole').innerText = ag.role;
+      document.getElementById('specWorktree').innerText = ag.worktree;
+      document.getElementById('specPath').innerText = ag.sandbox;
+
+      const badge = document.getElementById('activeAgentStatusBadge');
+      badge.innerText = ag.state.toUpperCase();
+      badge.className = 'badge mono ' + (
+        ag.state === 'working' ? 'badge-success' :
+        ag.state === 'walking' ? 'badge-cyan' :
+        ag.state === 'talking' ? 'badge-purple' :
+        ag.state === 'break' ? 'badge-amber' : 'badge-accent'
+      );
+
+      // 4. Populate Agent-Specific Working Files
+      const fileListEl = document.getElementById('activeAgentFileList');
+      if (fileListEl && ag.files) {
+        document.getElementById('activeFilesCount').innerText = ag.files.length + ' ACTIVE';
+        fileListEl.innerHTML = ag.files.map(f => `
+          <div class="file-pill" onclick="openActiveSandboxModal()" title="Click to inspect ${f}">
+            <iconify-icon icon="solar:document-bold"></iconify-icon>
+            <span>${f}</span>
+          </div>
+        `).join('');
+      }
+
+      // 5. Populate Agent-Specific Activity Log Stream
+      const logContainer = document.getElementById('terminalLog');
+      if (logContainer) {
+        logContainer.innerHTML = '';
+        if (ag.logs && ag.logs.length) {
+          const now = new Date();
+          const timeStr = `[${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}]`;
+          ag.logs.forEach(l => {
+            const row = document.createElement('div');
+            row.className = 'log-line';
+            row.innerHTML = `<span class="log-ts">${timeStr}</span><span class="log-msg highlight">${l}</span>`;
+            logContainer.appendChild(row);
+          });
+        }
+        appendLog(ag.name, `Mounted worktree ${ag.sandbox} active.`, 'success');
+      }
+
+      drawPixelPortrait(document.getElementById('activePortraitCanvas'), ag);
+    }
+
+    // Render Bottom Roster Strip
+    function renderRoster() {
+      const strip = document.getElementById('rosterStrip');
+      strip.innerHTML = '';
+
+      agents.forEach(a => {
+        const card = document.createElement('div');
+        card.className = 'roster-card' + (a.name === selectedAgent.name ? ' active' : '');
+        card.id = 'card-' + a.name.toLowerCase();
+        card.onclick = () => selectAgent(a.name);
+
+        card.innerHTML = `
+          <canvas class="roster-portrait-canvas" id="portrait-${a.name.toLowerCase()}" width="38" height="52"></canvas>
+          <div class="roster-info">
+            <div class="roster-name-row">
+              <span class="roster-name">${a.name}</span>
+              <span class="roster-status-pill status-${a.state}" id="pill-${a.name.toLowerCase()}">${a.state.toUpperCase()}</span>
+            </div>
+            <span class="roster-role">${a.role}</span>
+            <span class="roster-task">${a.worktree.split('/')[1] || a.worktree}</span>
+            <div class="roster-pips">
+              <div class="roster-pip filled"></div>
+              <div class="roster-pip filled"></div>
+              <div class="roster-pip ${['MICHAEL', 'DWIGHT', 'JIM', 'PAM'].includes(a.name) ? 'filled' : ''}"></div>
+              <div class="roster-pip ${['MICHAEL', 'DWIGHT'].includes(a.name) ? 'filled' : ''}"></div>
+              <div class="roster-pip"></div>
+            </div>
+          </div>
+        `;
+        strip.appendChild(card);
+        setTimeout(() => {
+          drawPixelPortrait(document.getElementById(`portrait-${a.name.toLowerCase()}`), a);
+        }, 10);
+      });
+    }
+
+    // Terminal Logging
+    function appendLog(agentName, text, type) {
+      const logContainer = document.getElementById('terminalLog');
+      const row = document.createElement('div');
+      row.className = 'log-line';
+
+      const now = new Date();
+      const timeStr = `[${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}]`;
+      const typeClass = type ? ` ${type}` : '';
+
+      row.innerHTML = `
+        <span class="log-ts">${timeStr}</span>
+        <span class="log-msg${typeClass}">[${agentName}] ${text}</span>
+      `;
+      logContainer.appendChild(row);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    function handleTerminalCommand(event) {
+      if (event.key === 'Enter') {
+        const input = document.getElementById('terminalCmdInput');
+        const cmd = input.value.trim();
+        if (!cmd) return;
+
+        appendLog('USER', cmd, 'highlight');
+        input.value = '';
+
+        setTimeout(() => {
+          appendLog(selectedAgent.name, `Executing command in worktree ${selectedAgent.sandbox}: "${cmd}"`, 'success');
+          showBubble(selectedAgent, 'Executing!');
+        }, 400);
+      }
+    }
+
+    function triggerStaplerEasterEgg() {
+      appendLog('DWIGHT', 'MICHAEL! Jim put my stapler in Jell-O again!', 'warn');
+      const dwight = agents.find(a => a.name === 'DWIGHT');
+      const jim = agents.find(a => a.name === 'JIM');
+      if (dwight && jim) {
+        startBanter(jim, dwight, { a: 'JIM', b: 'DWIGHT', aText: 'Nice stapler, Dwight :)', bText: 'MICHAEL!!' });
+      }
+    }
+
+    function openActiveSandboxModal() {
+      document.getElementById('sandboxModal').classList.add('open');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+    }
+
+    function openInVsCode() {
+      alert(`Opening sandbox in VS Code at: ${selectedAgent.sandbox}`);
+    }
+
+    // Startup Initialization
+    agents.forEach(makeAgent);
+    renderRoster();
+    // Initial state: full office canvas, drawer closed until agent selected
+    // selectAgent('MICHAEL');
+
+    // Seat all agents at their desks initially with glowing screens & typing animations
+    agents.forEach(a => {
+      const target = { x: a.deskX + 3.9 - 1.45, y: a.deskY + 5.1 };
+      a.el.style.left = target.x + '%';
+      a.el.style.top = target.y + '%';
+      setState(a, 'working');
+    });
+
+    // Start Autonomous Cycle (Every 3.5 seconds an agent transitions between working, walking, break & banter)
+    setInterval(runAutonomousFleetCycle, 3500);
+
+    // Initial warm-up action after 1.2 seconds: Jim visits Dwight!
+    setTimeout(() => {
+      const jim = agents.find(a => a.name === 'JIM');
+      const dwight = agents.find(a => a.name === 'DWIGHT');
+      if (jim && dwight) {
+        startBanter(jim, dwight, BANTER_SCRIPTS[0]);
+      }
+    }, 1200);
+
+    // Secondary warm-up after 3.5 seconds: Kevin takes a water-cooler coffee break!
+    setTimeout(() => {
+      const kevin = agents.find(a => a.name === 'KEVIN');
+      if (kevin) startCoffeeBreak(kevin);
+    }, 3500);
+
+
+    // ── Audio Web Synthesizer (Retro Micro-Foley) ──
+    let soundEnabled = true;
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playFoley(type) {
+      if (!soundEnabled || !audioCtx) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      const now = audioCtx.currentTime;
+
+      if (type === 'click' || type === 'keystroke') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(600 + Math.random() * 200, now);
+        osc.frequency.exponentialRampToValueAtTime(100, now + 0.04);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+        osc.start(now);
+        osc.stop(now + 0.04);
+      } else if (type === 'alert' || type === 'siren') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.linearRampToValueAtTime(880, now + 0.15);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+        osc.start(now);
+        osc.stop(now + 0.2);
+      } else if (type === 'coffee') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(250, now);
+        osc.frequency.exponentialRampToValueAtTime(450, now + 0.08);
+        gain.gain.setValueAtTime(0.09, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      }
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const btn = document.getElementById('soundToggleBtn');
+      if (soundEnabled) {
+        btn.innerHTML = '<iconify-icon icon="solar:volume-loud-bold" style="color: #38bdf8;"></iconify-icon> Audio: ON';
+        playFoley('click');
+        showSoundToast('Audio Enabled 🔊');
+      } else {
+        btn.innerHTML = '<iconify-icon icon="solar:volume-cross-bold" style="color: var(--text-muted);"></iconify-icon> Audio: OFF';
+        showSoundToast('Audio Muted 🔇');
+      }
+    }
+
+    function showSoundToast(msg) {
+      const t = document.getElementById('soundToast');
+      if (!t) return;
+      t.innerText = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 1500);
+    }
+
+    // ── Context Menu (Right Click on Agent) ──
+    let contextAgent = null;
+    window.addEventListener('click', () => {
+      const menu = document.getElementById('agentContextMenu');
+      if (menu) menu.classList.remove('open');
+    });
+
+    function openAgentContextMenu(e, a) {
+      e.preventDefault();
+      e.stopPropagation();
+      contextAgent = a;
+      selectAgent(a.name);
+      playFoley('click');
+
+      const menu = document.getElementById('agentContextMenu');
+      document.getElementById('ctxAgentHeader').innerText = a.name + ' · ACTIONS';
+      menu.style.left = Math.min(window.innerWidth - 190, e.clientX) + 'px';
+      menu.style.top = Math.min(window.innerHeight - 200, e.clientY) + 'px';
+      menu.classList.add('open');
+    }
+
+    function ctxAction(type) {
+      const menu = document.getElementById('agentContextMenu');
+      if (menu) menu.classList.remove('open');
+      if (!contextAgent) return;
+
+      if (type === 'assign') {
+        playFoley('click');
+        appendLog(contextAgent.name, `Manual task assigned: Running AST code refactoring cycle.`, 'success');
+        showBubble(contextAgent, 'Task Assigned! ⚡');
+        goToDesk(contextAgent);
+      } else if (type === 'break') {
+        playFoley('coffee');
+        startCoffeeBreak(contextAgent);
+      } else if (type === 'pair') {
+        playFoley('click');
+        const others = agents.filter(x => x.name !== contextAgent.name && !x.isBusy);
+        if (others.length) startCodeReviewVisit(contextAgent, others[0]);
+      } else if (type === 'worktree') {
+        openActiveSandboxModal();
+      } else if (type === 'circuit_breaker') {
+        playFoley('alert');
+        contextAgent.isBusy = false;
+        setState(contextAgent, 'working');
+        appendLog(contextAgent.name, `🚨 Circuit breaker triggered! Agent execution halted & sanitized.`, 'warn');
+        showBubble(contextAgent, 'Circuit Breaker Stop!');
+      }
+    }
+
+    // ── All-Hands Emergency Boardroom Meeting ──
+    function triggerAllHandsMeeting() {
+      playFoley('siren');
+      appendLog('MICHAEL', `🚨 ALL-HANDS EMERGENCY SPRINT MEETING IN BOARDROOM!`, 'warn');
+      showSoundToast('🚨 All-Hands Boardroom Meeting Called!');
+
+      const confChairs = [
+        { x: 31, y: 28.5 }, { x: 34, y: 28.5 }, { x: 37, y: 28.5 }, { x: 40, y: 28.5 },
+        { x: 31, y: 14.0 }, { x: 34, y: 14.0 }, { x: 37, y: 14.0 }, { x: 40, y: 14.0 },
+        { x: 28, y: 21.0 }, { x: 43, y: 21.0 }, { x: 35, y: 32.0 }, { x: 38, y: 32.0 }
+      ];
+
+      agents.forEach((ag, idx) => {
+        ag.isBusy = true;
+        const target = confChairs[idx % confChairs.length];
+        const from = { x: parseFloat(ag.el.style.left), y: parseFloat(ag.el.style.top) };
+        const path = findPath(from, target);
+        moveAlong(ag, path, () => {
+          setState(ag, 'meeting');
+          if (ag.name === 'MICHAEL') showBubble(ag, 'Alright team, sprint review time!', 4000);
+          else if (ag.name === 'DWIGHT') showBubble(ag, 'Standing by Regional Manager!', 3500);
+        });
+      });
+
+      setTimeout(() => {
+        appendLog('FLEET', `All-hands meeting concluded. Agents returning to workstations.`, 'success');
+        agents.forEach(ag => goToDesk(ag));
+      }, 7000);
+    }
+
+    // ── Interactive Prop Modals (Whiteboard, Servers, Water Cooler) ──
+    function openPropModal(type) {
+      playFoley('click');
+      const modal = document.getElementById('propModal');
+      const title = document.getElementById('propModalTitle');
+      const icon = document.getElementById('propModalIcon');
+      const body = document.getElementById('propModalContent');
+
+      if (type === 'whiteboard') {
+        title.innerText = 'Scranton Sprint Whiteboard';
+        icon.setAttribute('icon', 'solar:clipboard-list-bold');
+        icon.style.color = '#38bdf8';
+        body.innerHTML = `
+          <div style="font-weight: bold; color: #fff; margin-bottom: 6px;">📋 Active Autonomous Sprint Goals:</div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div style="background:var(--bg-elevated); padding:6px 10px; border-radius:3px; border-left:3px solid var(--green);">
+              <span style="color:var(--green); font-weight:bold;">[DONE]</span> A* Pathfinding Collision Matrix calibrated
+            </div>
+            <div style="background:var(--bg-elevated); padding:6px 10px; border-radius:3px; border-left:3px solid var(--accent);">
+              <span style="color:var(--accent); font-weight:bold;">[IN PROGRESS]</span> Multi-agent cross-worktree git merge conflict solver
+            </div>
+            <div style="background:var(--bg-elevated); padding:6px 10px; border-radius:3px; border-left:3px solid var(--cyan);">
+              <span style="color:var(--cyan); font-weight:bold;">[READY]</span> SQLite BM25 + MiniLM Vector Memory recall
+            </div>
+          </div>
+        `;
+      } else if (type === 'servers') {
+        title.innerText = 'ZEZO Node Telemetry & Vector DB';
+        icon.setAttribute('icon', 'solar:server-square-bold');
+        icon.style.color = 'var(--green)';
+        body.innerHTML = `
+          <div class="spec-grid">
+            <div class="spec-label">CPU LOAD</div>
+            <div class="spec-val" style="color:var(--green);">14.2% · 8 Cores Active</div>
+            <div class="spec-label">MEMORY BUS</div>
+            <div class="spec-val">128 MB Ring Buffer (log_bus.py)</div>
+            <div class="spec-label">SQLITE FTS5</div>
+            <div class="spec-val" style="color:var(--cyan);">zezo_brain.db (4,280 chunks indexed)</div>
+            <div class="spec-label">CIRCUIT BREAKER</div>
+            <div class="spec-val" style="color:var(--green);">HEALTHY (0 FAULTS)</div>
+          </div>
+        `;
+      } else if (type === 'cooler') {
+        title.innerText = 'Kitchenette & Token Economy';
+        icon.setAttribute('icon', 'solar:cup-bold');
+        icon.style.color = '#f59e0b';
+        body.innerHTML = `
+          <div class="spec-grid">
+            <div class="spec-label">COFFEE CONSUMED</div>
+            <div class="spec-val">42 Pots Fresh Columbian Roast</div>
+            <div class="spec-label">GROQ TOKENS</div>
+            <div class="spec-val" style="color:var(--green);">184,200 tkns/sec · Latency: 120ms</div>
+            <div class="spec-label">ACTIVE BREAKS</div>
+            <div class="spec-val">Kevin (Famous Chili), Stanley (Pretzel Day)</div>
+          </div>
+        `;
+      }
+      modal.classList.add('open');
+    }
+
+    // ── Navigate Back to ZEZO OS Home Interface ──
+    function exitOfficeToHome() {
+      playFoley('click');
+      showSoundToast('Returning to Home Screen...');
+      appendLog('SYSTEM', 'Transitioning from Scranton Office view to ZEZO Primary Workspace.', 'highlight');
+
+      setTimeout(() => {
+        // If loaded in iframe or child window
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'ZEZO_NAVIGATE', view: 'home' }, '*');
+        } else if (document.referrer && document.referrer.includes('index.html')) {
+          window.location.href = document.referrer;
+        } else {
+          // Fallback redirect to primary frontend or close view
+          window.location.href = '../frontend/index.html';
+        }
+      }, 400);
+    }
+
+  </script>
+</body>
+
+</html>

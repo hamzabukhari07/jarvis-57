@@ -1,0 +1,31 @@
+{
+    "gemini_api_key": "",
+    "groq_api_key": "",
+    "elevenlabs_api_key": "",
+    "os_system": "windows",
+    "wake_word_enabled": false,
+    "push_to_talk_enabled": false,
+    "assistant_name": "ZEZO",
+    "user_name": "",
+    "ui_color": "#f24e1e",
+    "morning_brief_enabled": false,
+    "voice_name": "Charon",
+    "opencode_model": "opencode/big-pickle",
+    "input_device": "",
+    "output_device": "",
+    "kilo_model": "kilo/stepfun/step-3.7-flash:free",
+    "camera_index": 0,
+    "antigravity_model": "gemini-3.6-flash-medium",
+    "autostart_enabled": true,
+    "response_language": "auto",
+    "proactive_audio": false,
+    "turn_tuning": {
+        "enabled": true,
+        "silence_ms": 450,
+        "prefix_ms": 100,
+        "end_sensitivity": "high",
+        "start_sensitivity": "default"
+    },
+    "preferred_creation_agent": "antigravity",
+    "preferred_edit_agent": "groq_helper"
+}

@@ -34,32 +34,12 @@ def _get_api_key() -> str:
         return json.load(f)["gemini_api_key"]
 
 
-def _get_gemini(tier: str = gemini.SMART):
-    """Writing and fixing code is the reasoning tier; a 60s deadline because a
-    whole file can come back."""
-    class _W:
-        def generate_content(self, contents):
-            resp = gemini.call(contents, tier=tier, timeout_ms=60000)
-            if resp is None:
-                raise RuntimeError("every Gemini model on the ladder failed")
-            return resp
-
-    return _W()
-
-
 def _generate_text(prompt: str, system: str | None = None) -> str:
-    """Generate text/code using Groq LPU if configured; transparently fallback to Gemini REST."""
-    from memory.config_manager import get_groq_api_key
-    if get_groq_api_key():
-        try:
-            from core.llm_client import call_groq_text
-            return call_groq_text(prompt, system=system)
-        except Exception as e:
-            print(f"[Code] ⚠️ Groq LPU call failed ({e}) — falling back to Gemini REST")
-
-    full_prompt = f"{system}\n\n{prompt}" if system else prompt
-    resp = _get_gemini().generate_content(full_prompt)
-    return resp.text or ""
+    """Background code/text generation via the provider router
+    (Groq → Gemini → Ollama). Writing and fixing code is the reasoning tier, so
+    a 60s deadline because a whole file can come back."""
+    from core.llm_router import generate_text
+    return generate_text(prompt, system=system, tier="smart", timeout_ms=60_000)
 
 
 def _clean_code(text: str) -> str:
@@ -236,6 +216,7 @@ Rules:
 - Add helpful inline comments.
 - Handle errors and edge cases properly.
 - Use modern best practices.
+- For web scraping, web requests, or HTTP downloads (e.g. requests, urllib, aiohttp), ALWAYS include a realistic browser User-Agent header (e.g. headers={{"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}}) to prevent 403 Forbidden errors.
 
 Description: {description}
 
@@ -252,6 +233,7 @@ def _fix_code(code: str, error_output: str, description: str) -> str:
     prompt = f"""You are an expert debugger.
 The code below failed with the following error. Fix it.
 Return ONLY the corrected code — no explanation, no markdown, no backticks.
+If the error is 403 Forbidden or a scraping block, add realistic browser User-Agent headers.
 
 Original goal: {description}
 
@@ -356,14 +338,28 @@ def _build(description, language, output_path, args, timeout, speak=None, player
     if speak: speak(msg)
     return f"{msg}\n\nLast code saved to: {path}"
 
-def _write_action(description, language, output_path, player) -> str:
+def _write_action(description, language, output_path, code_str="", player=None) -> str:
+    path = _resolve_path(output_path, language)
+    
+    # 1. If explicit code string was already provided in parameters, save it immediately
+    if code_str and str(code_str).strip():
+        code = _clean_code(code_str)
+        _save_file(path, code)
+        print(f"[Code] ✅ Written directly: {path}")
+        if player and hasattr(player, "show_content"):
+            player.show_content(f"CODE WRITTEN · {path.name}", code)
+        return f"Code written. Saved to: {path}\n\nPreview:\n{_preview(code)}"
+
+    # 2. Otherwise generate code via Groq / LLM router
     if not description:
         return "Please describe what you want me to write, sir."
     if player:
-        player.write_log("[Code] Writing code...")
+        player.write_log("[Code] Writing code via Groq LPU...")
     try:
         code, path = _write(description, language, output_path, player)
         print(f"[Code] ✅ Written: {path}")
+        if player and hasattr(player, "show_content"):
+            player.show_content(f"CODE WRITTEN · {path.name}", code)
         return f"Code written. Saved to: {path}\n\nPreview:\n{_preview(code)}"
     except Exception as e:
         return f"Could not generate code: {e}"
@@ -572,6 +568,53 @@ Be specific and actionable. If you see an error message, quote it exactly."""
         return f"Screen analysis failed: {e}"
 
 
+def _execute_command(command: str, cwd: str = "", timeout: int = 60, player=None) -> str:
+    cmd_str = (command or "").strip()
+    if not cmd_str:
+        return "No command provided to execute, sir."
+
+    target_dir = Path.home() / "Desktop"
+    if cwd:
+        try:
+            p = _resolve_path(cwd)
+            if p.exists() and p.is_dir():
+                target_dir = p
+            elif p.parent.exists():
+                target_dir = p.parent
+        except Exception:
+            pass
+
+    if player:
+        player.write_log(f"[Code] Executing command: {cmd_str}")
+
+    print(f"[Code] ⚡ Running background command: {cmd_str} in {target_dir}")
+    try:
+        flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        res = subprocess.run(
+            cmd_str,
+            shell=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=min(timeout, 120),
+            cwd=str(target_dir),
+            creationflags=flags
+        )
+        out = (res.stdout or "").strip()
+        err = (res.stderr or "").strip()
+        parts = []
+        if out: parts.append(f"Output:\n{out}")
+        if err: parts.append(f"Stderr:\n{err}")
+
+        result_str = "\n\n".join(parts) if parts else "Executed silently with exit code 0."
+        return f"Executed command in background (`{cmd_str}`). Exit code: {res.returncode}\n\n{result_str}"
+    except subprocess.TimeoutExpired:
+        return f"Command '{cmd_str}' timed out after {timeout} seconds."
+    except Exception as e:
+        return f"Command execution error: {e}"
+
+
 def code_helper(
     parameters: dict,
     response=None,
@@ -583,31 +626,40 @@ def code_helper(
     Called from main.py.
 
     parameters:
-        action      : write | edit | explain | run | build | screen_debug | optimize | auto
+        action      : write | edit | explain | run | command | build | screen_debug | optimize | auto
         description : What the code should do / what change to make / what problem to analyze
+        command     : CLI / Terminal command to run in background (for action='command')
         language    : Programming language (default: python)
         output_path : Where to save — user specifies full path or filename
         file_path   : Path to existing file (edit / explain / run / build / optimize)
         code        : Raw code string (explain/optimize without a file)
-        args        : CLI argument list for run/build
+        args        : CLI argument list or command string for run/command
         timeout     : Execution timeout in seconds (default: 30)
     """
     p           = parameters or {}
     action      = p.get("action", "auto").lower().strip()
-    description = p.get("description", "").strip()
+    description = (p.get("description") or p.get("task") or p.get("instruction") or "").strip()
     language    = p.get("language", "python").strip()
-    output_path = p.get("output_path", "").strip()
-    file_path   = p.get("file_path", "").strip()
-    code        = p.get("code", "").strip()
+    output_path = (p.get("output_path") or p.get("file_path") or "").strip()
+    file_path   = (p.get("file_path") or p.get("output_path") or "").strip()
+    code        = (p.get("code") or p.get("code_str") or "").strip()
     args        = p.get("args", [])
+    command_arg = p.get("command", "").strip()
     timeout     = int(p.get("timeout", 30))
+
+    cmd_val = command_arg or (description if action in ("command", "execute", "exec", "terminal") else "")
+    if not cmd_val and not file_path and isinstance(args, str) and args.strip():
+        cmd_val = args.strip()
+
+    if action in ("command", "execute", "exec", "terminal") or (action == "run" and not file_path and cmd_val):
+        return _execute_command(cmd_val, cwd=output_path or file_path, timeout=timeout, player=player)
 
     if action == "auto":
         action = _detect_intent(description, file_path, code)
         print(f"[Code] 🤖 Auto-detected: {action}")
 
-    if action == "write":
-        return _write_action(description, language, output_path, player)
+    if action in ("write", "create"):
+        return _write_action(description, language, output_path, code_str=code, player=player)
 
     elif action == "edit":
         return _edit_action(
@@ -620,6 +672,8 @@ def code_helper(
         return _explain_action(file_path, code, player)
 
     elif action == "run":
+        if not file_path and cmd_val:
+            return _execute_command(cmd_val, cwd=output_path or file_path, timeout=timeout, player=player)
         return _run_action(file_path, args, timeout, player)
 
     elif action == "build":
@@ -632,19 +686,23 @@ def code_helper(
         return _screen_debug_action(description, file_path, player, speak)
 
     else:
-        return f"Unknown action: '{action}'. Use write, edit, explain, run, build, optimize, or screen_debug."
+        return f"Unknown action: '{action}'. Use write, edit, explain, run, command, build, optimize, or screen_debug."
 
 
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "code_helper",
-    "description": "Writes, edits, explains, runs, or builds code files.",
+    "description": "Writes, edits, explains, runs code files or executes terminal/CLI commands silently in background (e.g. venv creation, git init, pip install).",
     "parameters": {
         "type": "OBJECT",
         "properties": {
             "action": {
                 "type": "STRING",
-                "description": "write | edit | explain | run | build | auto (default: auto)"
+                "description": "write | edit | explain | run | command | build | auto (default: auto)"
+            },
+            "command": {
+                "type": "STRING",
+                "description": "Terminal / CLI command string to execute silently in background (e.g. 'cd desktop/test_project && python -m venv venv && git init')"
             },
             "description": {
                 "type": "STRING",
@@ -656,7 +714,7 @@ TOOL = {
             },
             "output_path": {
                 "type": "STRING",
-                "description": "Where to save the file"
+                "description": "Where to save the file or working directory for command"
             },
             "file_path": {
                 "type": "STRING",
@@ -668,7 +726,7 @@ TOOL = {
             },
             "args": {
                 "type": "STRING",
-                "description": "CLI arguments for run/build"
+                "description": "CLI arguments for run/build/command"
             },
             "timeout": {
                 "type": "INTEGER",

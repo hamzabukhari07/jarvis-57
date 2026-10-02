@@ -106,6 +106,8 @@ flowchart TD
 | `core/viseme.py` | `core/viseme.py` | Transcript-to-mouth-shape fusion, phoneme mapping, VisemeStream class |
 | `core/echo.py` | `core/echo.py` | Self-echo detection, distinguishing user voice from assistant's own echo |
 | `core/hotkey.py` | `core/hotkey.py` | Push-to-talk chord detection (Ctrl+Space), global on Windows |
+| `core/dispatcher.py` | `core/dispatcher.py` | Central Task & Semantic Action Dispatcher routing creation/edit tasks to preferred engines (OpenCode, Antigravity, Kilo, Groq Code Helper) |
+| `core/task_manager.py` | `core/task_manager.py` | Thread-safe background task registry, async sub-agent execution, progress telemetry & watchdog |
 | `core/wake_word.py` | `core/wake_word.py` | Local "Hey Jarvis" wake-word detection using openwakeword |
 | `core/undo.py` | `core/undo.py` | Shared undo stack for reversible actions |
 | `core/confirm.py` | `core/confirm.py` | Irreversible-action confirmation gate (UI-issued tokens) |
@@ -119,12 +121,16 @@ flowchart TD
 | `core/design_extractor.py` | `core/design_extractor.py` | On-demand deterministic token extractor for custom HTML files, live URLs, and generating standalone `DESIGN.md` specs |
 | `core/design_resolver.py` | `core/design_resolver.py` | Reference-first design resolver, raw HTML blueprint injector (`skills/hamza_taste/references/html/`), redesign override detector, and domain routing matrix |
 | `core/repo_context.py` | `core/repo_context.py` | Active workspace resolver and persistence (`memory/repo_context.json`) |
+| `core/computer/windows_native.py` | `core/computer/` | Win32 OS integration, DWM physical frame bounds calibration, DPI awareness |
+| `core/computer/windows_uia.py` | `core/computer/` | Windows UI Automation driver (L1 UIA) in dedicated STA COM worker thread (0.8s timeout, depth=6) |
+| `core/computer/ocr_engine.py` | `core/computer/` | Multilingual CPU RapidOCR (L1.5 OCR) with Urdu/Arabic unicode normalizer (0 MB GPU VRAM) |
+| `core/computer/pyautogui_driver.py` | `core/computer/` | Hardware input simulation, Unicode clipboard typing, key action aliases |
 | `memory/sqlite_memory.py` | `memory/sqlite_memory.py` | SQLite FTS5 database (`zezo_brain.db`) with BM25 fast lexical indexing and secret scrubbing |
 | `memory/memory_manager.py` | `memory/memory_manager.py` | Long-term memory storage, indexing, search, and session summaries |
 | `memory/config_manager.py` | `memory/config_manager.py` | api_keys.json read/write, model configurations, and assistant preferences |
 
-| `actions/*.py` | `actions/` | 23 auto-discovered action modules (antigravity_agent, opencode_agent, kilo_agent, design_extractor, task_status, etc.) |
-| `skills/*/` | `skills/` | 10 declarative skill packages (hamza_taste, antigravity_agent, opencode, kilo_code, git_workflow, social_research, etc.) |
+| `actions/*.py` | `actions/` | 24 auto-discovered action modules (antigravity_agent, opencode_agent, kilo_agent, design_extractor, computer_control, task_status, etc.) |
+| `skills/*/` | `skills/` | 11 declarative skill packages (hamza_taste, antigravity_agent, opencode, kilo_code, figma_helper, git_workflow, social_research, etc.) |
 | `plugins/*.py` | `plugins/` | Drop-in user plugin files |
 | `dashboard/server.py` | `dashboard/server.py` | FastAPI HTTP server for remote phone control |
 

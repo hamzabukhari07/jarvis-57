@@ -23,6 +23,21 @@ logger = logging.getLogger(__name__)
 
 _STORE_KEY = "last_active_repo"
 _STORE_PATH = Path(__file__).resolve().parent.parent / "memory" / "repo_context.json"
+_ZEZO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def is_zezo_source_dir(p: Path | str) -> bool:
+    """True if p is the Zezo assistant's own codebase/installation folder, which must NEVER be used as a target user repo."""
+    try:
+        cand = Path(p).resolve()
+        if cand == _ZEZO_ROOT or _ZEZO_ROOT in cand.parents:
+            return True
+        # Also check signature files of Zezo repo
+        if (cand / "main.py").exists() and (cand / "actions").is_dir() and (cand / "core").is_dir():
+            return True
+    except Exception:
+        pass
+    return False
 
 
 # ── store ────────────────────────────────────────────────────────
@@ -47,12 +62,15 @@ def _save(data: dict) -> None:
 
 
 def remember_repo(path: str) -> None:
-    """Persist a repo path as the last active one."""
+    """Persist a repo path as the last active one (never Zezo installation directory)."""
+    if not path or is_zezo_source_dir(path):
+        logger.debug("repo_context: ignoring request to remember Zezo root or empty path: %s", path)
+        return
     resolved_path = str(Path(path).resolve())
     data = _load()
     data[_STORE_KEY] = resolved_path
     _save(data)
-    logger.info("repo_context: remembered %s", path)
+    logger.info("repo_context: remembered %s", resolved_path)
     try:
         from memory.memory_manager import remember
         remember("active_project", resolved_path, category="projects")
@@ -61,8 +79,25 @@ def remember_repo(path: str) -> None:
 
 
 
+def forget_repo(path: Optional[str] = None) -> None:
+    """Clear or reset the remembered repo path."""
+    data = _load()
+    if not path or data.get(_STORE_KEY) == str(Path(path).resolve()):
+        data.pop(_STORE_KEY, None)
+        _save(data)
+        logger.info("repo_context: cleared remembered repo")
+        try:
+            from memory.memory_manager import forget
+            forget("active_project", category="projects")
+        except Exception:
+            pass
+
+
 def get_last_repo() -> Optional[str]:
-    return _load().get(_STORE_KEY)
+    repo = _load().get(_STORE_KEY)
+    if repo and is_zezo_source_dir(repo):
+        return None
+    return repo
 
 
 # ── resolution ───────────────────────────────────────────────────
@@ -121,16 +156,17 @@ def _expand(raw: str) -> Optional[Path]:
         Path.home() / "dev",
         Path.cwd(),
     ):
-        if not root.exists():
+        if not root.exists() or is_zezo_source_dir(root):
             continue
         cand = root / raw
-        if cand.exists():
+        if cand.exists() and not is_zezo_source_dir(cand):
             return cand.resolve()
         try:
             for child in root.iterdir():
                 child_norm = re.sub(r"[\s_\-]+", "", child.name.lower())
                 if target_norm and (target_norm == child_norm or target_norm in child_norm or child_norm in target_norm):
-                    return child.resolve()
+                    if not is_zezo_source_dir(child):
+                        return child.resolve()
         except Exception:
             pass
 
@@ -146,12 +182,12 @@ def resolve(
     """
     Returns (path, source).
 
-    source ∈ {"explicit", "memory", "cwd", "none"}
+    source ∈ {"explicit", "memory", "cwd", "default", "none"}
     """
     # 1. explicit
     if explicit:
         p = _expand(explicit)
-        if p:
+        if p and not is_zezo_source_dir(p):
             # Auto-create project folder if specified explicitly
             p.mkdir(parents=True, exist_ok=True)
             if require_git and not _is_git_repo(p):
@@ -161,14 +197,50 @@ def resolve(
 
     # 2. memory
     last = get_last_repo()
-    if last:
+    if last and not is_zezo_source_dir(last):
         p = Path(last)
         if p.is_dir():
             return p, "memory"
 
-    # 3. cwd (only if it's already a git repo or explicitly active)
+    # 3. cwd (only if it's already a git repo and NOT Zezo source)
     cwd = Path.cwd()
-    if cwd.is_dir() and (not require_git or _is_git_repo(cwd)):
+    if cwd.is_dir() and not is_zezo_source_dir(cwd) and (not require_git or _is_git_repo(cwd)):
         return cwd, "cwd"
 
-    return None, "none"
+    # 4. Clean user project default fallback (Desktop/website)
+    fallback = (Path.home() / "Desktop" / "website").resolve()
+    fallback.mkdir(parents=True, exist_ok=True)
+    remember_repo(str(fallback))
+    return fallback, "default"
+
+
+def get_unique_clone_dir(domain_or_name: str) -> Path:
+    """Generate a collision-safe Desktop/<domain>_clone directory path (e.g. apple_clone, apple_clone_1)."""
+    import re
+    clean_name = re.sub(r"[^\w\-]", "_", (domain_or_name or "website").strip().lower())
+    clean_name = re.sub(r"_+", "_", clean_name).strip("_") or "website"
+    base_name = f"{clean_name}_clone"
+
+    desktop = Path.home() / "Desktop"
+    desktop.mkdir(parents=True, exist_ok=True)
+
+    target = desktop / base_name
+    if not target.exists():
+        return target.resolve()
+
+    counter = 1
+    while True:
+        cand = desktop / f"{base_name}_{counter}"
+        if not cand.exists():
+            return cand.resolve()
+        counter += 1
+
+
+def register_clone(clone_path: str | Path) -> Path:
+    """Register and persist a newly cloned website directory as the active workspace."""
+    p = Path(clone_path).resolve()
+    p.mkdir(parents=True, exist_ok=True)
+    remember_repo(str(p))
+    logger.info("repo_context: registered cloned workspace at %s", p)
+    return p
+

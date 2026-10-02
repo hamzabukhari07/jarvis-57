@@ -218,3 +218,23 @@ def register_repo_undo(repo_path: str | Path, snapshot: dict[str, bytes], tool_l
     push_undo(label, _undo_repo)
     return total_changed
 
+
+def register_clone_snapshot(clone_dir: str | Path, tool_label: str = "Website clone") -> None:
+    """Register an undo handler for newly cloned website directories."""
+    import shutil
+    from pathlib import Path
+    root = Path(clone_dir).resolve()
+
+    def _undo_clone() -> str:
+        if root.exists() and root.is_dir():
+            try:
+                shutil.rmtree(root)
+                return f"Removed cloned directory {root.name}."
+            except Exception as e:
+                return f"Could not remove {root.name}: {e}"
+        return f"{root.name} already removed."
+
+    label = f"{tool_label} in {root.name}"
+    push_undo(label, _undo_clone)
+
+
