@@ -39,6 +39,7 @@ class FleetAgent:
     default_tool: str
     risk_tier: str
     prompt_prefix: str
+    model_id: str = ""
     status: str = "idle"
     current_task_id: Optional[str] = None
     current_task_title: Optional[str] = None
@@ -95,6 +96,7 @@ class FleetManager:
                         default_tool=info.get("default_tool", "dev_agent"),
                         risk_tier=info.get("risk_tier", "L0_READ_ONLY"),
                         prompt_prefix=info.get("prompt_prefix", ""),
+                        model_id=info.get("model_id", ""),
                         desk_x=info.get("desk_x", 0),
                         desk_y=info.get("desk_y", 0),
                     )
@@ -117,6 +119,7 @@ class FleetManager:
                         "default_tool": a.default_tool,
                         "risk_tier": a.risk_tier,
                         "prompt_prefix": a.prompt_prefix,
+                        "model_id": a.model_id,
                         "desk_x": a.desk_x,
                         "desk_y": a.desk_y,
                     }
@@ -162,6 +165,7 @@ class FleetManager:
         name_str = str(data.get("name") or clean_id.title()).strip()[:40] or clean_id.title()
         role_str = str(data.get("role") or "Autonomous Specialist").strip()[:80]
         specialty_str = str(data.get("specialty") or role_str).strip()[:120]
+        model_id = str(data.get("model_id") or "").strip()
 
         with self._lock:
             existing = self.agents.get(clean_id)
@@ -186,6 +190,7 @@ class FleetManager:
                 default_tool=tool,
                 risk_tier=risk_tier,
                 prompt_prefix=prompt_prefix,
+                model_id=model_id or (existing.model_id if existing else ""),
                 desk_x=desk_x,
                 desk_y=desk_y,
                 status=existing.status if existing else "idle",
@@ -287,8 +292,40 @@ class FleetManager:
             "memories": memories,
         }
 
-    def dispatch_task(self, agent_id: str, prompt: str, path: Optional[str] = None) -> Dict[str, Any]:
+    def decompose_and_dispatch(self, prompt: str, path: Optional[str] = None) -> Dict[str, Any]:
+        """High-level Michael task decomposition into specialized subtasks."""
+        subtasks = []
+        low = prompt.lower()
+        if any(w in low for w in ("ui", "frontend", "landing", "page", "css", "html", "react", "view")):
+            subtasks.append(("ali", "Design and build responsive frontend user interface and components: " + prompt))
+        if any(w in low for w in ("api", "backend", "database", "crud", "endpoint", "server", "model", "auth")):
+            subtasks.append(("ahmad", "Implement robust backend APIs, database schemas, and service logic: " + prompt))
+        if any(w in low for w in ("test", "qa", "verify", "audit", "security", "bug", "check")):
+            subtasks.append(("dwight", "Conduct end-to-end test verification, security review, and edge case audit: " + prompt))
+
+        # Default fallback if no specific keywords matched
+        if not subtasks:
+            subtasks = [("ahmad", prompt)]
+
+        dispatched = []
+        for target_id, sub_prompt in subtasks:
+            target_agent = self.get_agent(target_id) or self.get_agent("ahmad") or list(self.agents.values())[0]
+            res = self.dispatch_task(target_agent.id, sub_prompt, path=path)
+            dispatched.append(res)
+
+        return {
+            "success": True,
+            "orchestrator": "MICHAEL",
+            "decomposed_count": len(dispatched),
+            "tasks": dispatched,
+        }
+
+    def dispatch_task(self, agent_id: str, prompt: str, path: Optional[str] = None, model_override: Optional[str] = None) -> Dict[str, Any]:
         """Launch an autonomous task executed by this agent's designated tool."""
+        # Check if Michael orchestrator should auto-decompose multi-faceted full-stack tasks
+        if agent_id.upper() in ("MICHAEL", "MANAGER") and any(w in prompt.lower() for w in ("full-stack", "fullstack", "entire app", "both frontend and backend")):
+            return self.decompose_and_dispatch(prompt, path)
+
         agent = self.get_agent(agent_id)
         if not agent:
             return {"success": False, "error": f"Agent '{agent_id}' not found."}
@@ -310,6 +347,7 @@ class FleetManager:
 
         target_dir = worktree_path or path or str(Path.cwd())
         enriched_prompt = f"[{agent.name} • {agent.role}]\n{agent.prompt_prefix}\n\nTask: {prompt}"
+        active_model = model_override or agent.model_id or None
 
         # Submit task to background TaskManager
         from core.task_manager import get_task_manager
@@ -319,14 +357,19 @@ class FleetManager:
             try:
                 from core.action_loader import discover_actions
                 reg = discover_actions(Path(__file__).parent.parent / "actions")
-                res = reg.run(agent.default_tool, {
+                call_params = {
                     "task": enriched_prompt,
                     "prompt": enriched_prompt,
                     "project_path": target_dir,
                     "repo_path": target_dir,
                     "target_dir": target_dir,
                     "path": target_dir,
-                })
+                }
+                if active_model:
+                    call_params["model"] = active_model
+                    call_params["model_id"] = active_model
+
+                res = reg.run(agent.default_tool, call_params)
                 task_ctx.report(100, "Completed successfully")
                 return {"status": "success", "result": str(res)}
             except Exception as ex:
@@ -341,6 +384,7 @@ class FleetManager:
                 "agent_id": agent.id,
                 "agent_name": agent.name,
                 "target_dir": target_dir,
+                "model_id": active_model,
             },
             group_title=f"[{agent.name}] {prompt[:40]}...",
         )
@@ -357,6 +401,7 @@ class FleetManager:
             "agent_id": agent.id,
             "agent_name": agent.name,
             "tool": agent.default_tool,
+            "model_id": active_model,
             "worktree": worktree_path,
         }
 
@@ -417,6 +462,7 @@ class FleetManager:
                     "avatar_pixel": a.avatar_pixel,
                     "default_tool": a.default_tool,
                     "risk_tier": a.risk_tier,
+                    "model_id": a.model_id,
                     "status": a.status,
                     "task_id": a.current_task_id,
                     "task_title": a.current_task_title,
@@ -438,6 +484,7 @@ class FleetManager:
             "default_tool": a.default_tool,
             "risk_tier": a.risk_tier,
             "prompt_prefix": a.prompt_prefix,
+            "model_id": a.model_id,
             "status": a.status,
             "current_task_id": a.current_task_id,
             "active_worktree": a.active_worktree,
@@ -447,3 +494,4 @@ class FleetManager:
 
 
 fleet_manager = FleetManager()
+

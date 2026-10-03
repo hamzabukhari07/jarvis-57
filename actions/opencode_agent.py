@@ -381,7 +381,7 @@ def opencode_agent(parameters: dict, player=None, speak=None) -> str:
             "opencode auth login --provider zen"
         )
 
-    model = _resolve_model(parameters.get("model"))
+    model = _resolve_model(parameters.get("model") or parameters.get("model_id"))
 
     # Resolve design system tokens if UI/Web task
     from core.design_resolver import is_ui_task, resolve_design, format_design_prompt

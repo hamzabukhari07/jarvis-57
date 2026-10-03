@@ -371,7 +371,7 @@ def kilo_agent(parameters: dict, player=None, speak=None) -> str:
             "Kilo Code from https://kilo.ai"
         )
 
-    model = _resolve_model(parameters.get("model"))
+    model = _resolve_model(parameters.get("model") or parameters.get("model_id"))
 
     tm = get_task_manager()
     task_id = tm.submit(

@@ -862,7 +862,7 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
             "(for example 'Desktop/website' or a dedicated project folder)."
         )
 
-    model = _resolve_model(parameters.get("model"))
+    model = _resolve_model(parameters.get("model") or parameters.get("model_id"))
     tm = get_task_manager()
     task_id = tm.submit(
         "antigravity_agent",

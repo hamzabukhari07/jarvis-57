@@ -1,3 +1,27 @@
+## [2026-10-03] — Feature & Architecture: Phase 4 — Autonomous Specialist Fleet, Dynamic Model Binding & White-Label ZEZO Coder (`core/fleet_manager.py`, `actions/fleet_control.py`, `config/fleet_agents.json`, `core/prompt.txt`, `tests/test_phase4_specialist_fleet_suite.py`)
+
+### What was built / updated:
+1. **Dynamic Engine & Model Binding in Fleet (`core/fleet_manager.py`, `actions/fleet_control.py`):**
+   - Enabled custom model overrides (`model_id`) alongside execution engine tools (`default_tool`) for every fleet specialist.
+   - Updated roster in `config/fleet_agents.json`:
+     - **Michael Scott:** Regional Manager & Master Orchestrator (auto-decomposes full-stack requests across the fleet).
+     - **Ali:** Frontend & Studio UI Specialist (`antigravity_run` bound to `gemini-3.7-flash-medium`).
+     - **Ahmad:** Full-Stack & Backend Specialist (`opencode_run` bound to `opencode/mimo-v2.5-free`).
+     - **Dwight Schrute:** Safety, Security & QA Auditor (`kilo_run` bound to `kilo/stepfun/step-3.7-flash:free`).
+     - **Jim Halpert:** Senior Refactoring Lead (`kilo_run`).
+     - **Pam Beesly:** Design System & Token Architect (`extract_design_system`).
+2. **Autonomous Task Decomposition (`fleet_manager.decompose_and_dispatch`):**
+   - High-level multi-faceted prompts dispatched to Michael automatically decompose into parallel specialized tasks targeting Frontend (Ali), Backend (Ahmad), and QA (Dwight).
+3. **100% White-Label Persona & Zero Voice Quota Burn (`core/prompt.txt`):**
+   - Prohibits raw CLI names in voice output and public UI cards; all operations are spoken and shown under the unified **`ZEZO Coder`** identity.
+   - Offloads multi-file coding builds entirely from Gemini Live voice loop to background CLI specialist processes.
+4. **Strict 3-Layer Verification Passed 100%:**
+   - **Layer 1 (Static):** Clean compilation across all touched files via `python -m py_compile`.
+   - **Layer 2 (Unit Suite):** All 12 tests in `tests/test_fleet_control_suite.py` and `tests/test_phase4_specialist_fleet_suite.py` passed in 1.81s.
+   - **Layer 3 (Full Regression):** 107/107 pytest suite tests passed across the entire workspace.
+
+---
+
 ## [2026-10-03] — Bugfix: Non-Blocking Daemon Command Execution & Auto-Package Scaffolding (`actions/code_helper.py`, `actions/dev_agent.py`, `tests/test_daemon_command_and_scaffold_suite.py`)
 
 ### What was built / updated:

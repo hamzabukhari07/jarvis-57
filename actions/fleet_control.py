@@ -26,14 +26,20 @@ def _broadcast_ui(event: str, data: Dict[str, Any]) -> None:
 def _handle_dispatch(params: Dict[str, Any]) -> str:
     agent_id = str(params.get("agent_id") or "").strip()
     task = str(params.get("task") or "").strip()
+    model_id = str(params.get("model_id") or params.get("model") or "").strip() or None
     if not agent_id:
         return "Error: agent_id is required to dispatch a task. Available agents can be queried with action='list_agents'."
     if not task:
         return "Error: task instruction is required to dispatch work to an agent."
 
-    res = fleet_manager.dispatch_task(agent_id=agent_id, prompt=task)
+    res = fleet_manager.dispatch_task(agent_id=agent_id, prompt=task, model_override=model_id)
     if not res.get("success"):
         return f"Fleet dispatch failed: {res.get('error', 'Unknown error')}"
+
+    # Handle Michael multi-task decomposition result
+    if res.get("orchestrator") == "MICHAEL":
+        count = res.get("decomposed_count", 0)
+        return f"Michael Scott decomposed and dispatched {count} specialist tasks to the fleet."
 
     task_id = res.get("task_id")
     agent_name = res.get("agent_name", agent_id)
@@ -45,6 +51,7 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
         "agent_id": agent_id.upper(),
         "task": task,
         "tool": tool,
+        "model_id": model_id,
         "worktree": worktree,
     })
 
@@ -56,6 +63,7 @@ def _handle_hire(params: Dict[str, Any]) -> str:
     name = str(params.get("agent_id") or params.get("name") or "Agent").strip()
     role = str(params.get("role") or "Autonomous Specialist").strip()
     tool = str(params.get("default_tool") or "kilo_run").strip()
+    model_id = str(params.get("model_id") or params.get("model") or "").strip()
     specialty = str(params.get("specialty") or role).strip()
 
     profile_data = {
@@ -64,6 +72,7 @@ def _handle_hire(params: Dict[str, Any]) -> str:
         "role": role,
         "specialty": specialty,
         "default_tool": tool,
+        "model_id": model_id,
         "risk_tier": "L1_MUTATION" if tool in ("kilo_run", "opencode_run", "antigravity_run") else "L0_READ_ONLY",
     }
     res = fleet_manager.save_agent_profile(profile_data)

@@ -112,6 +112,60 @@ User Speech ──► Gemini Live (Voice Dispatcher) ──► Immediate 1-Word 
 - **TASK-302 (Step 2 Migration - Batch File Parsing):** Migrate `actions/file_processor.py` to Groq LPU with automatic Gemini fallback on context overflow.
 - **TASK-303 (Step 3 Migration - Dev Agent Bug Hunter):** Migrate `actions/dev_agent.py` to Groq LPU for rapid codebase exploration.
 
+### Phase 4: Autonomous Specialist Fleet, Dynamic Engine/Model Binding & White-Label "ZEZO Coder" Facade (`core/fleet_manager.py`, `actions/fleet_control.py`, `core/prompt.txt`, `actions/code_helper.py`, `actions/opencode_agent.py`, `actions/antigravity_agent.py`, `core/task_manager.py`, `frontend/office.html`)
+
+```
+                               ┌──────────────────────────────────────────────┐
+                               │             USER VOICE / PROMPT              │
+                               │ "Build full-stack app / research / refactor" │
+                               └──────────────────────┬───────────────────────┘
+                                                      │
+                                                      ▼
+                                       [ MICHAEL (HEAD MANAGER) ]
+                                 • Analyzes requirement & breaks tasks
+                                 • Dispatches to specialized team agents
+                                                      │
+                        ┌─────────────────────────────┼─────────────────────────────┐
+                        ▼                             ▼                             ▼
+               [ AGENT 1: ALI ]               [ AGENT 2: AHMAD ]            [ AGENT 3: USMAN ]
+            Role: Frontend Specialist      Role: Full-Stack / Backend      Role: QA & Bug Hunter
+            Engine: Antigravity CLI        Engine: OpenCode CLI           Engine: Kilo Code CLI
+            Model: Claude 3.5 Sonnet       Model: DeepSeek Coder          Model: Qwen 2.5 Coder
+            Instance: Desktop/app_ui       Instance: Desktop/app_api      Instance: Desktop/tests
+                        │                             │                             │
+                        └─────────────────────────────┼─────────────────────────────┘
+                                                      ▼
+                                    ┌───────────────────────────────────┐
+                                    │    SCRANTON PIXEL OFFICE FLOOR    │
+                                    │ • Live Avatars walking to desks   │
+                                    │ • Real-time Task progress cards   │
+                                    │ • Git Worktree status & logs      │
+                                    └───────────────────────────────────┘
+```
+
+- **TASK-401 (Specialist Fleet Manager & Dynamic Engine/Model Matrix):**
+  - Implement dynamic binding in `core/fleet_manager.py` and `actions/fleet_control.py`: Each agent (e.g. *Ali*, *Ahmad*, *Dwight*, *Michael*) has a configurable **Role**, **CLI Engine** (Antigravity, OpenCode, Kilo), and **Model ID** (Claude 3.5 Sonnet, DeepSeek Coder, GPT-4o, Qwen 2.5).
+  - Enable multiple agents to run parallel tasks concurrently on the same or different CLI engines in isolated Git worktrees.
+- **TASK-402 (Michael Master Dispatcher & Task Decomposition):**
+  - When given high-level complex prompts (*"Build a full-stack e-commerce app"*), Michael automatically decomposes the task:
+    * Dispatches Frontend/UI to `antigravity` specialist (e.g. Ali).
+    * Dispatches Backend/API to `opencode` specialist (e.g. Ahmad).
+    * Dispatches QA/Testing to `kilo` specialist (e.g. Usman).
+- **TASK-403 (Scranton Pixel Office Real-Time Synchronization):**
+  - Connect agent lifecycle events (`fleet_control`) to `frontend/office.html` WebSocket stream:
+    * Desk assignment and walking pixel avatar animations.
+    * Live progress percentages, tool micro-logs, and Git worktree diffs rendered on individual office desks.
+- **TASK-404 (100% White-Label Brand Protection & Persona Masking):**
+  - Enforce zero-leakage persona rule: Raw engine names (`Antigravity`, `OpenCode`, `Kilo`) are **strictly prohibited** in spoken voice output and front-facing UI task cards.
+  - All operations, status cards, and verbal summaries are delivered under the single unified **`ZEZO Coder`** brand.
+- **TASK-405 (Retire Redundant In-Memory Scratch Builders):**
+  - Transition full-stack and scratch builds from in-memory generator (`dev_agent.py`) to the unified fleet CLI orchestrator.
+  - Offload heavy multi-file code generation to dedicated coding models with infinite context, protecting Gemini Live voice quota (0% voice tokens burned for coding).
+- **TASK-406 (Dedicated Fast CLI Terminal Runner):**
+  - Streamline `actions/code_helper.py` exclusively for instant shell/CLI execution (e.g. `git`, `pip`, `npm`, `uvicorn`, background daemons) without in-memory code generation ladders.
+- **TASK-407 (Unified Verification & Deprecation Clean-Up):**
+  - Run complete 3-Layer verification test suite and verify end-to-end multi-agent fleet dispatching through background `TaskManager` and live Scranton Office Floor synchronization.
+
 ---
 
 ## 🧪 4. Traceability & 3-Layer Verification Matrix
@@ -122,6 +176,7 @@ User Speech ──► Gemini Live (Voice Dispatcher) ──► Immediate 1-Word 
 | **REQ-UIA-002** | TASK-104 | `actions/computer_control.py` | **Layer 1:** `py_compile`<br>**Layer 2:** Verify random string is actively written to Notepad canvas.<br>**Layer 3:** Full pytest run. |
 | **REQ-VOICE-001** | TASK-201, TASK-202 | `main.py`, `core/task_manager.py` | **Layer 1:** `py_compile`<br>**Layer 2:** Measure continuous mic packet stream (>500 packets) during background tool execution.<br>**Layer 3:** Zero audio underruns or WebSocket 1011 disconnects. |
 | **REQ-GROQ-001** | TASK-301, TASK-302, TASK-303 | `core/llm_router.py` | **Layer 1:** `py_compile`<br>**Layer 2:** Verify YouTube & file processor logs confirm `[LLM] served by Groq`.<br>**Layer 3:** All 22 test suites pass. |
+| **REQ-CLI-001** | TASK-401 to TASK-407 | `core/fleet_manager.py`, `actions/fleet_control.py`, `core/prompt.txt`, `actions/code_helper.py` | **Layer 1:** `py_compile`<br>**Layer 2:** Multi-instance specialist fleet executes via unified ZEZO Coder facade, syncing live with Scranton Office Floor without burning Gemini voice quota.<br>**Layer 3:** Zero command blocking & instant task_id returns. |
 
 ---
 
@@ -133,3 +188,9 @@ User Speech ──► Gemini Live (Voice Dispatcher) ──► Immediate 1-Word 
 | **RISK-002** | UIA ValuePattern unsupported by custom editor (e.g. VS Code, Chrome) | Medium | Automatic Tier-2 fallback to Clipboard-Safe Paste (`Ctrl+V`). |
 | **RISK-003** | Gemini Live drops session if tool response is delayed | High | Enforce task_id return for long tasks to maintain WebSocket protocol synchronization. |
 | **RISK-004** | Groq rate limits on free-tier RPM | Low | Automatic fallback ladder in `core/llm_router.py`: Groq → Gemini Flash → Local Ollama. |
+| **RISK-005** | External CLI (OpenCode/Kilo) not installed on host machine | Medium | Graceful fallback error reporting through TaskManager to prompt user installation. |
+| **RISK-006** | Engine name leakage in voice output | Low | Strict zero-leakage prompt rules enforce white-label "ZEZO Coder" identity across all speech. |
+| **RISK-007** | Parallel fleet tasks colliding on same directory | Medium | Enforce isolated Git worktree or subfolder path for each active agent instance. |
+
+
+

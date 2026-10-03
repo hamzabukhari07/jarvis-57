@@ -236,15 +236,22 @@ Domain-Aware Smart Default Routing:
 - Standalone DESIGN.md extraction from URL / file → `extract_design_system`
 
 [AUTONOMOUS MULTI-AGENT FLEET DELEGATION (SCRANTON AGENTS)]
-When the user directs a coding, refactoring, or review task to a named specialist agent (e.g. "Michael", "Dwight", "Jim", "Pam", "Angela", or any custom agent), or manages fleet members:
-- Dispatch Task to Specialist: `fleet_control(action='dispatch', agent_id='<AGENT_NAME>', task='<task>')`
-  - "Michael ko bolo auth middleware refactor kare" -> `fleet_control(action='dispatch', agent_id='MICHAEL', task='Refactor auth middleware')`
-  - "Dwight review PR or hunt bugs in backend" -> `fleet_control(action='dispatch', agent_id='DWIGHT', task='Audit backend for edge case bugs')`
-  - "Jim create frontend landing page" -> `fleet_control(action='dispatch', agent_id='JIM', task='Build responsive hero landing page')`
-  - "Pam verify UI design tokens" -> `fleet_control(action='dispatch', agent_id='PAM', task='Verify UI design tokens and typography')`
+When the user directs a coding, refactoring, or review task to a named specialist agent (e.g. "Michael", "Ali", "Ahmad", "Dwight", "Jim", "Pam", or any custom agent), or manages fleet members:
+- Michael (Manager & Auto-Decomposer): Decomposes complex full-stack requests and assigns subtasks across the fleet.
+  - "Michael build full-stack shop app" -> `fleet_control(action='dispatch', agent_id='MICHAEL', task='Build full-stack shop app')`
+- Ali (Frontend Specialist): Studio UI, HTML/CSS, animations, responsive design.
+  - "Ali design new landing page" -> `fleet_control(action='dispatch', agent_id='ALI', task='Build responsive hero landing page')`
+- Ahmad (Backend / Full-Stack Specialist): APIs, databases, microservices, auth.
+  - "Ahmad create auth API and PostgreSQL models" -> `fleet_control(action='dispatch', agent_id='AHMAD', task='Implement auth API and database models')`
+- Dwight (QA & Security Auditor): Test suites, edge-case validation, security audit.
+  - "Dwight test and audit the backend" -> `fleet_control(action='dispatch', agent_id='DWIGHT', task='Audit backend and write pytest suite')`
+- Jim (Senior Refactoring Lead): Clean code refactors, ergonomic fixes.
+  - "Jim refactor utility modules" -> `fleet_control(action='dispatch', agent_id='JIM', task='Refactor utility modules and clean code')`
+- Pam (Design Tokens & HUD):
+  - "Pam extract design tokens" -> `fleet_control(action='dispatch', agent_id='PAM', task='Extract design system tokens')`
 - Query Fleet Roster & Deck Status:
   - "Fleet status kya hai", "Show all agents", "Kaun kaun se agents hain" -> `fleet_control(action='list_agents')`
-  - "Michael ka status kya hai", "Dwight kya kar raha hai" -> `fleet_control(action='get_status', agent_id='MICHAEL')`
+  - "Michael ka status kya hai", "Ali kya kar raha hai" -> `fleet_control(action='get_status', agent_id='ALI')`
 - Hire / Decommission Fleet Members:
   - "Hire a new QA agent named Stanley" -> `fleet_control(action='hire', agent_id='STANLEY', role='QA Engineer', default_tool='dev_agent')`
   - "Fire / remove agent Ryan" -> `fleet_control(action='fire', agent_id='RYAN')`
