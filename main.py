@@ -1570,8 +1570,8 @@ class ZezoLive:
             # So the test is not "is the mic loud" but "is the mic louder than
             # the echo of what we are playing right now", sustained long enough
             # that a cough or a keystroke cannot trigger it.
-            if zezo_speaking or self._tool_busy:
-                # Nothing is streamed while ZEZO talks or while a tool is executing.
+            if zezo_speaking:
+                # Nothing is streamed while ZEZO talks.
                 return
 
             # ── Echo tail ────────────────────────────────────────────────────

@@ -597,20 +597,52 @@ def dev_agent(
     if not description:
         return "Please describe the project you want me to build, sir."
 
-    return _build_project(
-        description  = description,
-        language     = language,
-        project_name = project_name,
-        timeout      = timeout,
-        speak        = speak,
-        player       = player,
+    from core.task_manager import get_task_manager
+    tm = get_task_manager()
+
+    def _worker(params: dict, ctx):
+        ctx.report(10, "Planning and scaffolding project files...")
+        res = _build_project(
+            description=params.get("description", ""),
+            language=params.get("language", "python"),
+            project_name=params.get("project_name", ""),
+            timeout=int(params.get("timeout", 30)),
+            speak=None,
+            player=player,
+        )
+        ctx.report(100, "Project scaffold and build complete.")
+        return {"result": res, "summary": res}
+
+    task_id = tm.submit(
+        "dev_agent",
+        _worker,
+        {
+            "description": description,
+            "language": language,
+            "project_name": project_name,
+            "timeout": timeout,
+        },
+    )
+
+    proj_label = project_name or "New Project"
+    if player and hasattr(player, "show_content"):
+        player.show_content(
+            "DEV AGENT (QUEUED)",
+            f"Building project: {proj_label}\nTask ID: {task_id}\nLanguage: {language}\nDescription: {description}",
+        )
+
+    return (
+        f"Dev Agent project build task {task_id} has started for '{proj_label}'. "
+        "It is running in the background. I will notify you once all files and dependencies are verified."
     )
 
 
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "dev_agent",
-    "description": "Builds complete multi-file projects from scratch: plans, writes files, installs deps, opens VSCode, runs and fixes errors.",
+    "description": "Builds complete multi-file projects from scratch in the background: plans, writes files, installs deps, opens VSCode, runs and fixes errors. Returns a task_id immediately.",
+    "behavior": "NON_BLOCKING",
+    "scheduling": "WHEN_IDLE",
     "parameters": {
         "type": "OBJECT",
         "properties": {
@@ -637,3 +669,4 @@ TOOL = {
     },
     "handler": dev_agent,
 }
+

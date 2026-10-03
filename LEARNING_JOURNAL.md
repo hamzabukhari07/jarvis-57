@@ -1,3 +1,21 @@
+## [2026-10-03] — Feature & Architecture: Phase 2 — Non-Blocking Tool Protocol, Audio Pipeline Continuity, & Async Dev Agent (`main.py`, `actions/dev_agent.py`, `tests/test_phase2_async_tools_and_audio_suite.py`)
+
+### What was built / updated:
+1. **Unblocked Audio Pipeline Continuity During Tool Execution (`main.py:1573`):**
+   - **Problem:** `self._tool_busy = True` was dropping incoming PortAudio mic packets during tool execution, causing user speech to be lost and preventing barge-in interruptions.
+   - **Resolution:** Decoupled mic audio streaming from `_tool_busy`. Mic audio packets now stream continuously at `audio/pcm;rate=16000` to Gemini Live, only pausing when ZEZO is actively speaking (`zezo_speaking`) to prevent self-echo.
+2. **Asynchronous TaskManager Migration for Dev Agent (`actions/dev_agent.py`):**
+   - Converted `dev_agent` from blocking synchronous execution to background `TaskManager.submit()`, returning an immediate `task_id` verbal confirmation while scaffolding multi-file projects in the background.
+   - Added `behavior: NON_BLOCKING` and `scheduling: WHEN_IDLE` tool declarations.
+3. **Background Notification & State Telemetry Continuity:**
+   - Background tasks automatically report status through `_run_task_completion_watcher` in `main.py`, delivering concise verbal updates and HUD canvas summaries without interrupting active conversations.
+4. **Strict 3-Layer Verification Passed 100%:**
+   - **Layer 1 (Static):** Clean compilation via `python -m py_compile main.py actions/dev_agent.py core/task_manager.py`.
+   - **Layer 2 (Unit Suite):** All tests in `tests/test_phase2_async_tools_and_audio_suite.py` passed in 0.23s.
+   - **Layer 3 (Full Regression):** Existing test suites passed (UIA suite 7/7, Concurrency guard 3/3, Dispatcher 5/5, Task UI 3/3).
+
+---
+
 ## [2026-10-03] — Feature & Architecture: Phase 1 — Native Windows UIA Desktop Control, Serialized Input Queue, & Direct Text Injection (`core/computer/windows_uia.py`, `actions/computer_control.py`, `tests/test_uia_desktop_control_suite.py`)
 
 ### What was built / updated:
