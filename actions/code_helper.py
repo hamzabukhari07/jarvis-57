@@ -568,6 +568,11 @@ Be specific and actionable. If you see an error message, quote it exactly."""
         return f"Screen analysis failed: {e}"
 
 
+_SERVER_COMMAND_KEYWORDS = {
+    "uvicorn", "gunicorn", "runserver", "flask run", "npm start", "npm run dev",
+    "yarn dev", "vite", "http.server", "fastapi dev", "next dev"
+}
+
 def _execute_command(command: str, cwd: str = "", timeout: int = 60, player=None) -> str:
     cmd_str = (command or "").strip()
     if not cmd_str:
@@ -588,6 +593,31 @@ def _execute_command(command: str, cwd: str = "", timeout: int = 60, player=None
         player.write_log(f"[Code] Executing command: {cmd_str}")
 
     print(f"[Code] ⚡ Running background command: {cmd_str} in {target_dir}")
+    
+    # 1. Daemon / Long-running server command detection (uvicorn, dev servers, etc.)
+    cmd_lower = cmd_str.lower()
+    is_server = any(k in cmd_lower for k in _SERVER_COMMAND_KEYWORDS) or "--reload" in cmd_lower
+
+    if is_server:
+        try:
+            flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+            proc = subprocess.Popen(
+                cmd_str,
+                shell=True,
+                cwd=str(target_dir),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=flags
+            )
+            time.sleep(0.5)
+            if proc.poll() is None:
+                return f"Server command started and running in background (`{cmd_str}`). Process ID: {proc.pid}. Project directory: {target_dir}"
+            else:
+                return f"Server command exited early with return code {proc.returncode}."
+        except Exception as e:
+            return f"Failed to start server command: {e}"
+
+    # 2. Short / build commands (pip install, venv, git init, etc.)
     try:
         flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
         res = subprocess.run(

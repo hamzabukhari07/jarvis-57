@@ -227,9 +227,22 @@ Code for {file_path}:"""
     try:
         response = model.generate_content(prompt)
         code = _strip_fences(response.text)
-
         full_path = project_dir / file_path
         full_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Ensure __init__.py exists in all parent package folders within project_dir
+        if full_path.suffix == ".py":
+            curr = full_path.parent
+            while curr != project_dir and curr.is_relative_to(project_dir):
+                init_file = curr / "__init__.py"
+                if not init_file.exists():
+                    try:
+                        init_file.write_text("", encoding="utf-8")
+                        print(f"[DevAgent] 📦 Created package init: {init_file.relative_to(project_dir)}")
+                    except Exception:
+                        pass
+                curr = curr.parent
+
         full_path.write_text(code, encoding="utf-8")
 
         print(f"[DevAgent] ✅ Written: {file_path} ({len(code)} chars)")
@@ -303,12 +316,17 @@ def _run_project(run_command: str, project_dir: Path, timeout: int = 30) -> str:
         if parts[0].lower() == "python":
             parts[0] = sys.executable
 
+        import os
+        env = os.environ.copy()
+        env["PYTHONPATH"] = f"{str(project_dir)}{os.pathsep}{env.get('PYTHONPATH', '')}"
+
         result = subprocess.run(
             parts,
             capture_output=True, text=True,
             encoding="utf-8", errors="replace",
             timeout=timeout,
-            cwd=str(project_dir)
+            cwd=str(project_dir),
+            env=env
         )
 
         stdout = result.stdout.strip()

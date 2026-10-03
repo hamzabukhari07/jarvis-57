@@ -1,3 +1,21 @@
+## [2026-10-03] — Bugfix: Non-Blocking Daemon Command Execution & Auto-Package Scaffolding (`actions/code_helper.py`, `actions/dev_agent.py`, `tests/test_daemon_command_and_scaffold_suite.py`)
+
+### What was built / updated:
+1. **Asynchronous Daemon Command Execution in `code_helper.py`:**
+   - **Problem:** Long-running server commands (`uvicorn`, `npm start`, `runserver`) were executed via blocking `subprocess.run(timeout=120)`. This blocked the Gemini Live tool execution loop for 45+ seconds, stalling keepalive pings and triggering WebSocket `1011 (internal error) keepalive ping timeout`.
+   - **Resolution:** Added `_SERVER_COMMAND_KEYWORDS` detection in `actions/code_helper.py:_execute_command`. Long-running servers are spawned detached via non-blocking `subprocess.Popen`, returning immediate process PID confirmations without starving the Live WebSocket loop.
+2. **Automated Package Scaffolding & `PYTHONPATH` Injection in `dev_agent.py`:**
+   - **Problem:** Multi-file scaffoldings (e.g. `tests/client.py`, `app/schemas.py`) failed with `ModuleNotFoundError: tests.client` during runtime testing because parent subdirectories lacked `__init__.py` and the project root was not on `PYTHONPATH`.
+   - **Resolution:**
+     - `dev_agent._write_file` now auto-creates `__init__.py` in all intermediate package subdirectories.
+     - `dev_agent._run_project` injects `PYTHONPATH="<project_dir>"` into the subprocess environment for seamless intra-project package resolution.
+3. **Strict 3-Layer Verification Passed 100%:**
+   - **Layer 1 (Static):** Clean compilation via `python -m py_compile actions/code_helper.py actions/dev_agent.py`.
+   - **Layer 2 (Unit Suite):** All tests in `tests/test_daemon_command_and_scaffold_suite.py` passed.
+   - **Layer 3 (Full Regression):** 16/16 tests passed across Phase 1, 2, and 3 regression test suites.
+
+---
+
 ## [2026-10-03] — Feature & Architecture: Phase 3 — Groq LPU Background LLM Router Migration (`actions/youtube_video.py`, `actions/flight_finder.py`, `actions/file_processor.py`, `actions/dev_agent.py`, `tests/test_phase3_groq_migration_suite.py`)
 
 ### What was built / updated:
