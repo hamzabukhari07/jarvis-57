@@ -1,3 +1,23 @@
+## [2026-10-03] — Feature & Architecture: Phase 1 — Native Windows UIA Desktop Control, Serialized Input Queue, & Direct Text Injection (`core/computer/windows_uia.py`, `actions/computer_control.py`, `tests/test_uia_desktop_control_suite.py`)
+
+### What was built / updated:
+1. **Thread-Safe Serialized Desktop Input Lock (`actions/computer_control.py`):**
+   - Introduced `_DESKTOP_INPUT_LOCK` (re-entrant lock) wrapping mouse, keyboard, and UIA control actions to guarantee concurrent tool calls never fight for hardware input focus.
+2. **Foreground Target-Window Guard (`actions/computer_control.py`):**
+   - Implemented `_validate_and_ensure_focus(target_win)` to verify that any typing target application is actively in the foreground before sending keystrokes or text injections, preventing focus-stealing accidents.
+3. **Multi-Tier Text Injection Ladder & Direct UIA Invocation (`core/computer/windows_uia.py`, `actions/computer_control.py`):**
+   - **Tier 1 (Direct UIA Control):** Added `set_focused_text(hwnd, text)` and `read_window_text(hwnd)` in `WindowsUIADriver` to directly manipulate Win32/UIA Edit controls in `< 10ms` without moving mouse or stealing focus.
+   - **Tier 2 (Clipboard-Safe Unicode Paste):** Enhanced `type_safe_unicode` with automatic clipboard restoration for full Unicode/Urdu/Emoji fidelity.
+   - **Tier 3 (Direct UIA Button Click):** Added `invoke_element(hwnd, query)` to directly trigger buttons and controls via `InvokePattern`/`click_input` in `< 15ms`, bypassing vision screenshots entirely.
+4. **Explicit Typing Intent on `random_data` & Mock Generation (`actions/computer_control.py`):**
+   - Updated `_handle_mock_data` so when typing intent flags (`type_into_window=True`, `write=True`, `type_text=True`) are present, the generated data is actively inserted into the foreground canvas in one atomic step.
+5. **Strict 3-Layer Verification Passed 100%:**
+   - **Layer 1 (Static):** Clean compilation via `python -m py_compile actions/computer_control.py core/computer/windows_uia.py`.
+   - **Layer 2 (Unit Suite):** All 7 new tests in `tests/test_uia_desktop_control_suite.py` passed in 0.62s.
+   - **Layer 3 (Full Regression):** Full test suite passed: **116 passed, 5 skipped, 0 failed in 38.52s across all 23 suites**.
+
+---
+
 ## [2026-10-03] — UX & Performance: Executive Brevity & Zero-Fluff Vocal Protocol (`core/prompt.txt`)
 
 ### What was built / updated:

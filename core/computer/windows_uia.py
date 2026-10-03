@@ -139,6 +139,124 @@ class WindowsUIADriver:
         except (concurrent.futures.TimeoutError, Exception) as e:
             return None
 
+    def invoke_element(
+        self,
+        hwnd: int,
+        query: str,
+        depth: int = 6,
+        timeout_seconds: float = 0.8,
+    ) -> bool:
+        """Directly invoke/click a control via UIA InvokePattern / TogglePattern without moving mouse."""
+        if not self.is_available or not hwnd or not query:
+            return False
+
+        def _worker() -> bool:
+            _init_com_sta()
+            cleaned_query = query.lower().strip()
+            try:
+                app = Application(backend="uia").connect(handle=hwnd, timeout=timeout_seconds)
+                win = app.window(handle=hwnd)
+                for el in win.descendants(depth=depth):
+                    try:
+                        name = (el.window_text() or "").strip().lower()
+                        auto_id = str(getattr(el.element_info, "automation_id", "") or "").strip().lower()
+                        if cleaned_query in (name, auto_id) or (name and cleaned_query in name):
+                            if hasattr(el, "invoke"):
+                                el.invoke()
+                                return True
+                            if hasattr(el, "click_input"):
+                                el.click_input()
+                                return True
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+            return False
+
+        future = _UIA_EXECUTOR.submit(_worker)
+        try:
+            return bool(future.result(timeout=timeout_seconds + 0.2))
+        except Exception:
+            return False
+
+    def set_focused_text(
+        self,
+        hwnd: int,
+        text: str,
+        timeout_seconds: float = 0.8,
+    ) -> bool:
+        """Set text in active/focused UIA Edit control via ValuePattern or set_edit_text."""
+        if not self.is_available or not hwnd:
+            return False
+
+        def _worker() -> bool:
+            _init_com_sta()
+            try:
+                app = Application(backend="uia").connect(handle=hwnd, timeout=timeout_seconds)
+                win = app.window(handle=hwnd)
+                # First check if focused element is an edit
+                for el in win.descendants(depth=4):
+                    try:
+                        ctrl_type = (el.friendly_class_name() or "").strip().lower()
+                        if "edit" in ctrl_type or "document" in ctrl_type:
+                            if hasattr(el, "set_edit_text"):
+                                el.set_edit_text(text)
+                                return True
+                            if hasattr(el, "set_text"):
+                                el.set_text(text)
+                                return True
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+            return False
+
+        future = _UIA_EXECUTOR.submit(_worker)
+        try:
+            return bool(future.result(timeout=timeout_seconds + 0.2))
+        except Exception:
+            return False
+
+    def read_window_text(
+        self,
+        hwnd: int,
+        focused_only: bool = False,
+        depth: int = 6,
+        timeout_seconds: float = 0.8,
+    ) -> Optional[str]:
+        """Directly extract text from window controls via UIA without OCR or screenshot."""
+        if not self.is_available or not hwnd:
+            return None
+
+        def _worker() -> Optional[str]:
+            _init_com_sta()
+            try:
+                app = Application(backend="uia").connect(handle=hwnd, timeout=timeout_seconds)
+                win = app.window(handle=hwnd)
+                texts = []
+                for el in win.descendants(depth=depth):
+                    try:
+                        ctrl_type = (el.friendly_class_name() or "").strip().lower()
+                        t = (el.window_text() or "").strip()
+                        if t and ctrl_type in ("edit", "document", "text", "static"):
+                            if t not in texts:
+                                texts.append(t)
+                                if focused_only:
+                                    break
+                    except Exception:
+                        continue
+                if texts:
+                    return "\n".join(texts)
+            except Exception:
+                pass
+            return None
+
+        future = _UIA_EXECUTOR.submit(_worker)
+        try:
+            return future.result(timeout=timeout_seconds + 0.2)
+        except Exception:
+            return None
+
     def dump_interactive_elements(
         self,
         hwnd: int,
@@ -192,3 +310,4 @@ class WindowsUIADriver:
 
 # Global singleton instance
 windows_uia = WindowsUIADriver()
+

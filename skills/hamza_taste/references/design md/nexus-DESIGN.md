@@ -3,7 +3,7 @@ version: "3.0"
 name: "Nexus"
 theme: "light"
 source: "D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/nexus.html"
-extracted_at: "2026-10-03T15:00:14.516364+00:00"
+extracted_at: "2026-10-03T16:39:11.109156+00:00"
 description: "Refined editorial light design system extracted deterministically from Nexus. Features clean #f8f9fa cream canvas, high-contrast #0f172a ink typography, and elegant Inter headings."
 colors:
   primary: "#fd6703"

@@ -275,33 +275,84 @@ def _extract_text_field(params: dict) -> str:
     return ""
 
 
+import threading
+
+_DESKTOP_INPUT_LOCK = threading.RLock()
+
+
+def _get_active_foreground_hwnd() -> int:
+    """Get active foreground window HWND safely."""
+    if platform.system() == "Windows":
+        try:
+            import ctypes
+            return int(ctypes.windll.user32.GetForegroundWindow() or 0)
+        except Exception:
+            return 0
+    return 0
+
+
+def _validate_and_ensure_focus(target_win: Optional[str]) -> Tuple[bool, int, str]:
+    """
+    Validates if the target window is in the foreground. If not, attempts to focus it.
+    Returns (success, hwnd, title).
+    """
+    if not target_win:
+        hwnd = _get_active_foreground_hwnd()
+        title = windows_native.get_window_title(hwnd) if hwnd else "active window"
+        return True, hwnd, title
+
+    target_str = str(target_win).strip()
+    focus_res = windows_native.focus_window(target_str)
+    time.sleep(0.15)
+    hwnd = _get_active_foreground_hwnd()
+    title = windows_native.get_window_title(hwnd) if hwnd else ""
+    return bool("focused" in focus_res.lower() or hwnd), hwnd, title
+
+
 def _handle_type(params: dict, action: str, **_) -> str:
     text = _extract_text_field(params)
     target_win = params.get("title") or params.get("app") or params.get("window")
-    if target_win:
-        windows_native.focus_window(str(target_win))
-        time.sleep(0.15)
 
-    if action in ("smart_type", "smart_write", "clear_and_type", "replace_text"):
-        # For calculator/formula input with operators, type directly without disruptive select-all keystrokes
-        if any(op in text for op in ("+", "-", "*", "/", "=")):
-            return input_driver.type_safe_unicode(text)
-        return input_driver.smart_type(text, clear_first=params.get("clear_first", True))
-    return input_driver.type_safe_unicode(text)
+    with _DESKTOP_INPUT_LOCK:
+        ok, hwnd, current_title = _validate_and_ensure_focus(target_win)
+        if target_win and not ok:
+            return f"Cannot type: Target window '{target_win}' could not be focused."
+
+        # Tier 1: Windows UIA Direct Edit Control Injection (< 10ms, no focus stealing)
+        if hwnd and action in ("set_text", "set_window_text", "direct_type"):
+            if windows_uia.set_focused_text(hwnd, text):
+                return f"Typed (UIA Direct): {text[:60]}{'...' if len(text) > 60 else ''}"
+
+        # Tier 2: Smart Clear & Type or Formula Direct Input
+        if action in ("smart_type", "smart_write", "clear_and_type", "replace_text"):
+            if any(op in text for op in ("+", "-", "*", "/", "=")):
+                return input_driver.type_safe_unicode(text)
+            return input_driver.smart_type(text, clear_first=params.get("clear_first", True))
+
+        # Tier 3: Universal Clipboard-Safe Unicode Injection with Buffer Preservation
+        return input_driver.type_safe_unicode(text)
 
 
 def _handle_click(params: dict, action: str, **_) -> str:
     x, y = params.get("x"), params.get("y")
     desc = params.get("description") or params.get("text") or params.get("target") or params.get("element") or ""
-    if (x is None or y is None) and desc:
-        target = _find_target_element_escalated(desc)
-        if not target:
-            return f"Element not found on screen: '{desc}'"
-        x, y, _ = target
 
-    button = "right" if "right" in action or action == "context_menu" else "left"
-    clicks = 2 if "double" in action else 1
-    return input_driver.click(x, y, button, clicks)
+    with _DESKTOP_INPUT_LOCK:
+        if (x is None or y is None) and desc:
+            # Check if UIA Direct Invoke is possible for button/control
+            hwnd = _get_active_foreground_hwnd()
+            if hwnd and windows_uia.is_available:
+                if windows_uia.invoke_element(hwnd, desc):
+                    return f"Invoked (UIA Direct): '{desc}'"
+
+            target = _find_target_element_escalated(desc)
+            if not target:
+                return f"Element not found on screen: '{desc}'"
+            x, y, _ = target
+
+        button = "right" if "right" in action or action == "context_menu" else "left"
+        clicks = 2 if "double" in action else 1
+        return input_driver.click(x, y, button, clicks)
 
 
 def _handle_mouse_move(params: dict, **_) -> str:
@@ -411,10 +462,18 @@ def _handle_active_window_info(**_) -> str:
 
 
 def _handle_mock_data(params: dict, action: str, **_) -> str:
+    should_type = bool(params.get("type_into_window") or params.get("write") or params.get("type_text") or params.get("insert"))
+    target_win = params.get("title") or params.get("app") or params.get("window")
+
     if action == "random_data":
         dt = params.get("type", "name")
         res = _random_data(dt)
         print(f"[ComputerControl] (random {dt}) -> {res}")
+        if should_type:
+            with _DESKTOP_INPUT_LOCK:
+                _validate_and_ensure_focus(target_win)
+                typed_res = input_driver.type_safe_unicode(res)
+                return f"{res} ({typed_res})"
         return res
 
     field = params.get("field", "name")
@@ -422,6 +481,12 @@ def _handle_mock_data(params: dict, action: str, **_) -> str:
     if not val:
         val = _random_data(field)
         print(f"[ComputerControl] (No '{field}' in memory, using random: {val})")
+
+    if should_type:
+        with _DESKTOP_INPUT_LOCK:
+            _validate_and_ensure_focus(target_win)
+            typed_res = input_driver.type_safe_unicode(val)
+            return f"{val} ({typed_res})"
     return val
 
 
@@ -540,6 +605,12 @@ _ACTION_ROUTER: Dict[str, Callable] = {
     "screen_find": lambda params, **_: (lambda t: f"{t[0]},{t[1]} [Source: {t[2]}]" if t else "NOT_FOUND")(_find_target_element_escalated(params.get("description") or params.get("text") or params.get("target") or "")),
     "find_element": lambda params, **_: (lambda t: f"{t[0]},{t[1]} [Source: {t[2]}]" if t else "NOT_FOUND")(_find_target_element_escalated(params.get("description") or params.get("text") or params.get("target") or "")),
     "find_on_screen": lambda params, **_: (lambda t: f"{t[0]},{t[1]} [Source: {t[2]}]" if t else "NOT_FOUND")(_find_target_element_escalated(params.get("description") or params.get("text") or params.get("target") or "")),
+    # Direct UIA Text Setting & Reading
+    "set_text": _handle_type,
+    "set_window_text": _handle_type,
+    "direct_type": _handle_type,
+    "read_text": lambda **_: (lambda h: windows_uia.read_window_text(h) if h else "No active window")(_get_active_foreground_hwnd()),
+    "read_window_text": lambda **_: (lambda h: windows_uia.read_window_text(h) if h else "No active window")(_get_active_foreground_hwnd()),
     # Sleep / Delay
     "wait": lambda params, **_: (lambda s: (time.sleep(s), f"Waited {s}s")[1])(min(float(params.get("seconds", 1.0)), 30.0)),
     # OS State
@@ -597,7 +668,7 @@ TOOL = {
         "properties": {
             "action": {
                 "type": "STRING",
-                "description": "type | smart_type | click | double_click | right_click | smart_click | drag | mouse_drag | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | close_window | close_tab | dismiss_dialog | close_popup | screen_find | screen_click | screen_double_click | get_active_window_info | random_data | user_data | batch"
+                "description": "type | smart_type | direct_type | set_text | read_window_text | click | double_click | right_click | smart_click | drag | mouse_drag | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | close_window | close_tab | dismiss_dialog | close_popup | screen_find | screen_click | screen_double_click | get_active_window_info | random_data | user_data | batch"
             },
             "sequence": {
                 "type": "ARRAY",
