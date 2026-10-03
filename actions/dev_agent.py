@@ -17,25 +17,26 @@ API_CONFIG_PATH  = BASE_DIR / "config" / "api_keys.json"
 PROJECTS_DIR     = Path.home() / "Desktop" / "JarvisProjects"
 MAX_FIX_ATTEMPTS = 5
 # Model choice, timeout and fallback ladder all live in core/gemini.py.
-from core import gemini
+from core.llm_router import generate_text, SMART
 
-MODEL_PLANNER    = gemini.SMART
-MODEL_WRITER     = gemini.SMART
+MODEL_PLANNER = SMART
+MODEL_WRITER  = SMART
 
-def _get_api_key() -> str:
-    with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)["gemini_api_key"]
+def _generate_text(prompt: str, tier: str = SMART, timeout_ms: int = 60000) -> str:
+    """Planning and writing whole files — routes to Groq first, then Gemini ladder, then Ollama."""
+    return generate_text(prompt, tier=tier, timeout_ms=timeout_ms)
 
 
-def _get_model(model_name: str = gemini.SMART):
-    """Planning and writing whole files — the reasoning tier, and a long
-    deadline because the answer is a source file rather than a sentence."""
+def _get_model(model_name: str = SMART):
+    """Adapter class providing generate_content interface via LLM router."""
     class _W:
         def generate_content(self, contents):
-            resp = gemini.call(contents, tier=model_name, timeout_ms=60000)
-            if resp is None:
-                raise RuntimeError("every Gemini model on the ladder failed")
-            return resp
+            prompt = contents if isinstance(contents, str) else str(contents)
+            text_out = _generate_text(prompt, tier=model_name, timeout_ms=60000)
+            class _Resp:
+                def __init__(self, text):
+                    self.text = text
+            return _Resp(text_out)
 
     return _W()
 

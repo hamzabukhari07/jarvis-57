@@ -1,3 +1,21 @@
+## [2026-10-03] — Feature & Architecture: Phase 3 — Groq LPU Background LLM Router Migration (`actions/youtube_video.py`, `actions/flight_finder.py`, `actions/file_processor.py`, `actions/dev_agent.py`, `tests/test_phase3_groq_migration_suite.py`)
+
+### What was built / updated:
+1. **Background LLM Router Unification (`core/llm_router.py`):**
+   - Migrated background text generation, document analysis, code planning, and flight extraction across action tools to utilize `core.llm_router.generate_text()`.
+   - Priority Order: **Groq LPU (800+ tok/s @ 0 Gemini quota)** &rarr; **Gemini SMART fallback ladder** &rarr; **Local Ollama**.
+2. **Action Modules Migrated to Groq LPU:**
+   - **`actions/youtube_video.py`:** Video transcript summarization now executes via Groq LPU for sub-second responses without burning Gemini quota.
+   - **`actions/flight_finder.py`:** Web flight text parsing to JSON migrated to Groq LPU with automatic Gemini fallback.
+   - **`actions/file_processor.py`:** Document & text file analysis/summarization (`docx`, `pdf`, `txt`, `json`, `code`) routed to Groq LPU while preserving Gemini for raw image/audio multimodal buffers.
+   - **`actions/dev_agent.py`:** Multi-file project planning and file code generation routed through Groq LPU.
+3. **Strict 3-Layer Verification Passed 100%:**
+   - **Layer 1 (Static):** Clean compilation via `python -m py_compile actions/youtube_video.py actions/file_processor.py actions/dev_agent.py actions/flight_finder.py`.
+   - **Layer 2 (Unit Suite):** All 5 tests in `tests/test_phase3_groq_migration_suite.py` passed in 0.007s.
+   - **Layer 3 (Full Regression):** 22/22 pytest suite tests passed across UIA control, concurrency guards, dispatchers, and Phase 2/3 async pipelines.
+
+---
+
 ## [2026-10-03] — Feature & Architecture: Phase 2 — Non-Blocking Tool Protocol, Audio Pipeline Continuity, & Async Dev Agent (`main.py`, `actions/dev_agent.py`, `tests/test_phase2_async_tools_and_audio_suite.py`)
 
 ### What was built / updated:

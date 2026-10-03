@@ -25,8 +25,8 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 
-# Model choice, timeout and fallback ladder all live in core/gemini.py.
 from core import gemini
+from core.llm_router import generate_text, SMART
 from core.file_reader import read_file, resolve_path
 from core.task_manager import get_task_manager, TaskContext
 
@@ -36,11 +36,20 @@ def _get_api_key() -> str:
         return json.load(f)["gemini_api_key"]
 
 
-def _gemini_client(tier: str = gemini.SMART):
-    """Summarising documents and reading images — the reasoning tier, with a
-    long deadline because the input can be a whole file."""
+def _gemini_client(tier: str = SMART):
+    """Summarising documents and text files — routes to Groq LPU first, with Gemini and local LLM fallback.
+    Multimodal calls (with raw bytes / images / audio dicts) automatically pass to Gemini."""
     class _W:
         def generate_content(self, contents):
+            # Check if contents is purely text or contains multimodal parts
+            if isinstance(contents, str):
+                text_res = generate_text(contents, tier=tier, timeout_ms=90000)
+                class _TextResp:
+                    def __init__(self, t):
+                        self.text = t
+                return _TextResp(text_res)
+            
+            # Multimodal fallback directly to Gemini
             resp = gemini.call(contents, tier=tier, timeout_ms=90000)
             if resp is None:
                 raise RuntimeError("every Gemini model on the ladder failed")

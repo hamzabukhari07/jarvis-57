@@ -149,9 +149,6 @@ def _parse_flights_with_gemini(
     destination: str,
     date:        str,
 ) -> list[dict]:
-    from google import genai as _genai
-    from google.genai import types
-
     prompt  = (
         f"Extract flight options from {origin} to {destination} on {date} "
         f"from this Google Flights page text:\n\n{raw_text[:12000]}\n\n"
@@ -162,24 +159,23 @@ def _parse_flights_with_gemini(
     )
 
     try:
-        from core import gemini
-        response = gemini.call(
-            prompt,
-            tier=gemini.SMART,
-            timeout_ms=30_000,
-            config=types.GenerateContentConfig(
-                system_instruction=(
-                    "You are a flight data extraction expert. "
-                    "Extract flight information from raw webpage text. "
-                    "Return ONLY valid JSON — no markdown, no explanation."
-                )
-            ),
+        from core.llm_router import generate_text
+        system_instruction = (
+            "You are a flight data extraction expert. "
+            "Extract flight information from raw webpage text. "
+            "Return ONLY valid JSON — no markdown, no explanation."
         )
-        text     = re.sub(r"```(?:json)?", "", response.text).strip().rstrip("`").strip()
+        response_text = generate_text(
+            prompt,
+            system=system_instruction,
+            tier="smart",
+            timeout_ms=30_000,
+        )
+        text     = re.sub(r"```(?:json)?", "", response_text).strip().rstrip("`").strip()
         flights  = json.loads(text)
         return flights if isinstance(flights, list) else []
     except Exception as e:
-        print(f"[FlightFinder] ⚠️ Gemini parse failed: {e}")
+        print(f"[FlightFinder] ⚠️ Flight parse failed: {e}")
         return []
 
 def _format_spoken(
