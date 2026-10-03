@@ -44,6 +44,7 @@ _SECRET_PATTERNS = [
     # ── Known key shapes ────────────────────────────────────────────────────
     (re.compile(r"AIzaSy[A-Za-z0-9_-]{33}", re.IGNORECASE),                      _REDACT),  # Google API Key (legacy AIzaSy)
     (re.compile(r"AQ\.[A-Za-z0-9_-]{20,}", re.IGNORECASE),                       _REDACT),  # Google API Key (current AQ. format)
+    (re.compile(r"tvly-[A-Za-z0-9_-]{20,}", re.IGNORECASE),                      _REDACT),  # Tavily Search API Key
     (re.compile(r"sk-[A-Za-z0-9_-]{20,64}", re.IGNORECASE),                      _REDACT),  # OpenAI / Generic Secret
     (re.compile(r"ghp_[A-Za-z0-9]{20,}", re.IGNORECASE),                         _REDACT),  # GitHub Personal Access Token
     (re.compile(r"(Bearer\s+)[A-Za-z0-9\._\-]{20,}", re.IGNORECASE),      r"\1" + _REDACT),  # Bearer Tokens
@@ -154,6 +155,49 @@ def init_db() -> None:
                         VALUES (new.id, new.content, new.tool_name, new.tool_result);
                     END;
                 """)
+
+                # 5. Immutable User Explicit Rules table (Phase 3 Memory Palace)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS user_explicit_rules (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        rule_text TEXT NOT NULL,
+                        category TEXT DEFAULT 'general',
+                        source_turn_id INTEGER,
+                        created_at TEXT NOT NULL,
+                        is_active INTEGER DEFAULT 1,
+                        origin TEXT DEFAULT 'user_explicit'
+                    );
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_rules_active ON user_explicit_rules(is_active);")
+
+                # 6. Memory Conflict Graph / Pending Resolution table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS memory_conflicts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        existing_rule_id INTEGER,
+                        existing_fact_key TEXT,
+                        existing_content TEXT NOT NULL,
+                        contradicting_content TEXT NOT NULL,
+                        source_session_id TEXT NOT NULL,
+                        status TEXT DEFAULT 'PENDING',
+                        detected_at TEXT NOT NULL,
+                        resolved_at TEXT,
+                        resolution_notes TEXT
+                    );
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_conflicts_status ON memory_conflicts(status);")
+
+                # 7. Session Condensation Log table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS session_condensations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        session_id TEXT NOT NULL,
+                        last_condensed_turn_id INTEGER NOT NULL,
+                        summary TEXT NOT NULL,
+                        condensed_at TEXT NOT NULL
+                    );
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_cond_sess ON session_condensations(session_id);")
         finally:
             conn.close()
 
@@ -358,3 +402,171 @@ def search_unified_memory(query: str, limit: int = 8) -> str:
         return f"Nothing stored or found in past history about '{query_str}'."
 
     return "\n\n".join(sections)
+
+
+def insert_explicit_rule(rule_text: str, category: str = "general", source_turn_id: Optional[int] = None) -> int:
+    """Store an immutable user directive that cannot be altered or purged by AI summaries."""
+    if not rule_text or not rule_text.strip():
+        return 0
+    clean_rule = redact_secrets(rule_text.strip())
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with _db_lock:
+        conn = _get_connection()
+        try:
+            with conn:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO user_explicit_rules (rule_text, category, source_turn_id, created_at, is_active, origin)
+                    VALUES (?, ?, ?, ?, 1, 'user_explicit')
+                    """,
+                    (clean_rule, category.strip() or "general", source_turn_id, ts),
+                )
+                return cursor.lastrowid or 0
+        finally:
+            conn.close()
+
+
+def get_explicit_rules(active_only: bool = True) -> list[dict]:
+    """Retrieve immutable user-defined directives."""
+    with _db_lock:
+        conn = _get_connection()
+        try:
+            sql = "SELECT id, rule_text, category, source_turn_id, created_at, is_active FROM user_explicit_rules"
+            if active_only:
+                sql += " WHERE is_active = 1"
+            sql += " ORDER BY id ASC"
+            cursor = conn.execute(sql)
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+
+def set_explicit_rule_status(rule_id: int, is_active: bool) -> bool:
+    """Toggle activation state of an explicit rule upon direct human action."""
+    with _db_lock:
+        conn = _get_connection()
+        try:
+            with conn:
+                cursor = conn.execute(
+                    "UPDATE user_explicit_rules SET is_active = ? WHERE id = ?",
+                    (1 if is_active else 0, rule_id),
+                )
+                return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+
+def insert_memory_conflict(
+    existing_content: str,
+    contradicting_content: str,
+    source_session_id: str,
+    existing_rule_id: Optional[int] = None,
+    existing_fact_key: Optional[str] = None,
+) -> int:
+    """Record a detected factual or directive contradiction for explicit human resolution."""
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with _db_lock:
+        conn = _get_connection()
+        try:
+            with conn:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO memory_conflicts (
+                        existing_rule_id, existing_fact_key, existing_content,
+                        contradicting_content, source_session_id, status, detected_at
+                    ) VALUES (?, ?, ?, ?, ?, 'PENDING', ?)
+                    """,
+                    (
+                        existing_rule_id,
+                        existing_fact_key,
+                        redact_secrets(existing_content),
+                        redact_secrets(contradicting_content),
+                        source_session_id,
+                        ts,
+                    ),
+                )
+                return cursor.lastrowid or 0
+        finally:
+            conn.close()
+
+
+def get_pending_conflicts() -> list[dict]:
+    """Fetch all unresolved memory conflicts."""
+    with _db_lock:
+        conn = _get_connection()
+        try:
+            cursor = conn.execute(
+                """
+                SELECT id, existing_rule_id, existing_fact_key, existing_content,
+                       contradicting_content, source_session_id, status, detected_at
+                FROM memory_conflicts
+                WHERE status = 'PENDING'
+                ORDER BY id ASC
+                """
+            )
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
+
+def resolve_memory_conflict(conflict_id: int, status: str, notes: str = "") -> bool:
+    """Resolve a conflict node (RESOLVED_OVERWRITE, RESOLVED_KEEP_OLD, RESOLVED_MERGE)."""
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with _db_lock:
+        conn = _get_connection()
+        try:
+            with conn:
+                cursor = conn.execute(
+                    """
+                    UPDATE memory_conflicts
+                    SET status = ?, resolved_at = ?, resolution_notes = ?
+                    WHERE id = ?
+                    """,
+                    (status.upper(), ts, redact_secrets(notes), conflict_id),
+                )
+                return cursor.rowcount > 0
+        finally:
+            conn.close()
+
+
+def get_uncondensed_turns(limit: int = 150) -> list[dict]:
+    """Retrieve historical turns that have not yet been compacted into session summaries."""
+    with _db_lock:
+        conn = _get_connection()
+        try:
+            cursor = conn.execute("SELECT MAX(last_condensed_turn_id) AS last_id FROM session_condensations")
+            row = cursor.fetchone()
+            last_id = (row["last_id"] if row and row["last_id"] is not None else 0)
+
+            cursor = conn.execute(
+                """
+                SELECT id, session_id, role, content, tool_name, tool_args, tool_result, timestamp
+                FROM turns
+                WHERE id > ?
+                ORDER BY id ASC
+                LIMIT ?
+                """,
+                (last_id, limit),
+            )
+            return [dict(r) for r in cursor.fetchall()]
+        finally:
+            conn.close()
+
+
+def record_condensation(session_id: str, last_turn_id: int, summary: str) -> None:
+    """Persist session distillation checkpoint."""
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with _db_lock:
+        conn = _get_connection()
+        try:
+            with conn:
+                conn.execute(
+                    """
+                    INSERT INTO session_condensations (session_id, last_turn_id, summary, condensed_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (session_id, last_turn_id, redact_secrets(summary), ts),
+                )
+        finally:
+            conn.close()
+

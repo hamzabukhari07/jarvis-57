@@ -92,6 +92,7 @@ from core                      import undo as undo_stack
 from core                      import confirm as confirm_gate
 from core                      import governance
 from core                      import audio_devices
+from core                      import log_bus
 from core.skill_loader         import get_skill_registry
 from core.action_loader        import discover_actions
 from core.echo                 import EchoGuard
@@ -1161,11 +1162,6 @@ class ZezoLive:
             session_resumption=types.SessionResumptionConfig(
                 handle=self._resume_handle
             ),
-            # Sliding-window compression: session never dies from a full context
-            # window — ZEZO can stay in one conversation for hours
-            context_window_compression=types.ContextWindowCompressionConfig(
-                sliding_window=types.SlidingWindow(),
-            ),
             speech_config=types.SpeechConfig(
                 voice_config=types.VoiceConfig(
                     prebuilt_voice_config=types.PrebuiltVoiceConfig(
@@ -1204,21 +1200,33 @@ class ZezoLive:
         # before a reply actually is, and the default has to suit everybody, so
         # it is necessarily cautious.
         turn = get_turn_tuning()
-        if turn.get("enabled", True):
-            detect = types.AutomaticActivityDetection(
-                silence_duration_ms=turn["silence_ms"],
-                prefix_padding_ms=turn["prefix_ms"],
-            )
-            if turn["end_sensitivity"] == "high":
-                detect.end_of_speech_sensitivity = types.EndSensitivity.END_SENSITIVITY_HIGH
-            elif turn["end_sensitivity"] == "low":
-                detect.end_of_speech_sensitivity = types.EndSensitivity.END_SENSITIVITY_LOW
-            if turn["start_sensitivity"] == "high":
-                detect.start_of_speech_sensitivity = types.StartSensitivity.START_SENSITIVITY_HIGH
-            elif turn["start_sensitivity"] == "low":
-                detect.start_of_speech_sensitivity = types.StartSensitivity.START_SENSITIVITY_LOW
-            out["realtime_input_config"] = types.RealtimeInputConfig(
-                automatic_activity_detection=detect)
+        if turn.get("enabled", False):
+            # Only attach custom AutomaticActivityDetection if non-default tuning is requested
+            end_sens = turn.get("end_sensitivity")
+            start_sens = turn.get("start_sensitivity")
+            silence_ms = turn.get("silence_ms")
+            prefix_ms = turn.get("prefix_ms")
+
+            if end_sens in ("high", "low") or start_sens in ("high", "low") or silence_ms or prefix_ms:
+                detect_kwargs = {}
+                if silence_ms is not None:
+                    detect_kwargs["silence_duration_ms"] = max(int(silence_ms), 500)
+                if prefix_ms is not None:
+                    detect_kwargs["prefix_padding_ms"] = max(int(prefix_ms), 20)
+                
+                detect = types.AutomaticActivityDetection(**detect_kwargs)
+                if end_sens == "high":
+                    detect.end_of_speech_sensitivity = types.EndSensitivity.END_SENSITIVITY_HIGH
+                elif end_sens == "low":
+                    detect.end_of_speech_sensitivity = types.EndSensitivity.END_SENSITIVITY_LOW
+                if start_sens == "high":
+                    detect.start_of_speech_sensitivity = types.StartSensitivity.START_SENSITIVITY_HIGH
+                elif start_sens == "low":
+                    detect.start_of_speech_sensitivity = types.StartSensitivity.START_SENSITIVITY_LOW
+                
+                out["realtime_input_config"] = types.RealtimeInputConfig(
+                    automatic_activity_detection=detect
+                )
 
         # Screenshots and camera frames are tokenised at this resolution and then
         # stay in the session's context. 'medium' keeps on-screen text legible
@@ -1471,20 +1479,31 @@ class ZezoLive:
         )
 
     async def _send_realtime(self):
+        _last_mic_log = 0.0
+        _packets_sent = 0
         while True:
             msg = await self.out_queue.get()
             if not self.session:
                 await asyncio.sleep(0.02)
                 continue
             try:
+                # Standardize to clean PCM blob format with explicit sample rate for Gemini Live
                 await self.session.send_realtime_input(
                     audio=types.Blob(
                         data=msg["data"],
-                        mime_type=msg.get("mime_type", "audio/pcm"),
+                        mime_type=f"audio/pcm;rate={SEND_SAMPLE_RATE}",
                     )
                 )
+                _packets_sent += 1
+                now = time.monotonic()
+                if now - _last_mic_log > 3.0:
+                    _last_mic_log = now
+                    if log_bus is not None:
+                        log_bus.emit("DEBUG", "audio.mic", f"Streaming mic audio to Gemini Live ({_packets_sent} packets sent, q_size={self.out_queue.qsize()})")
             except Exception as e:
                 err_str = str(e).lower()
+                if log_bus is not None:
+                    log_bus.emit("ERROR", "audio.live", f"Mic stream error during send_realtime_input: {e}")
                 if "closed" in err_str or "1011" in err_str or "1006" in err_str or "timeout" in err_str:
                     print(f"[Zezo] 🔄 Realtime stream disconnected: {e}")
                     raise _ReconnectSignal(keep_context=True)
@@ -1585,8 +1604,9 @@ class ZezoLive:
                 data = indata.tobytes()
                 loop.call_soon_threadsafe(
                     self._enqueue_out_audio,
-                    {"data": data, "mime_type": "audio/pcm"}
+                    {"data": data, "mime_type": f"audio/pcm;rate={SEND_SAMPLE_RATE}"}
                 )
+
 
         try:
             def _open_mic(dev):
@@ -1685,6 +1705,7 @@ class ZezoLive:
                                     self._last_user_in_logged = full_in
                                     self._last_out_logged = ""
                                     self.ui.write_log(f"You: {full_in}")
+                                    self.ui.stream_transcript("user", full_in, done=True)
                                     self._session_log.append(f"User: {full_in}")
                                     try:
                                         sqlite_memory.log_turn("user", full_in)
@@ -1700,6 +1721,7 @@ class ZezoLive:
 
                             if txt and not _is_repeat_chunk(txt, out_buf):
                                 out_buf.append(txt)
+                                self.ui.stream_transcript("zezo", txt, done=False)
                                 self._visemes.feed_text(txt)
 
                         if sc.input_transcription and sc.input_transcription.text:
@@ -1707,6 +1729,7 @@ class ZezoLive:
                             if txt:
                                 in_buf.append(txt)
                                 self._last_user_speech = time.monotonic()
+                                self.ui.stream_transcript("user", txt, done=False)
                                 in_logged = False
 
                         if sc.turn_complete:
@@ -1721,6 +1744,8 @@ class ZezoLive:
                                 out_buf = []
                                 in_logged = False
                                 self._visemes.reset()
+                                self.ui.stream_transcript("user", "", done=True)
+                                self.ui.stream_transcript("zezo", "", done=True)
                                 continue
 
                             full_in = " ".join(in_buf).strip()
@@ -1730,6 +1755,7 @@ class ZezoLive:
                                 self._last_user_in_logged = full_in
                                 self._last_out_logged = ""   # new exchange
                                 self.ui.write_log(f"You: {full_in}")
+                                self.ui.stream_transcript("user", full_in, done=True)
                                 self._session_log.append(f"User: {full_in}")
                                 try:
                                     sqlite_memory.log_turn("user", full_in)
@@ -1741,6 +1767,8 @@ class ZezoLive:
                                         "text": full_in,
                                         "ts": datetime.now().isoformat(),
                                     }))
+                            else:
+                                self.ui.stream_transcript("user", "", done=True)
                             in_buf = []
                             in_logged = False
 
@@ -1751,6 +1779,7 @@ class ZezoLive:
                             if full_out:
                                 self._last_out_logged = full_out
                                 self.ui.write_log(f"{self._asst_name}: {full_out}")
+                                self.ui.stream_transcript("zezo", full_out, done=True)
                                 self._session_log.append(f"{self._asst_name}: {full_out}")
                                 try:
                                     sqlite_memory.log_turn("assistant", full_out)
@@ -1762,6 +1791,8 @@ class ZezoLive:
                                         "text": full_out,
                                         "ts": datetime.now().isoformat(),
                                     }))
+                            else:
+                                self.ui.stream_transcript("zezo", "", done=True)
                             out_buf = []
 
                             if self._vision_close_pending:
@@ -1804,6 +1835,8 @@ class ZezoLive:
                             self._tool_busy = False
         except Exception as e:
             err_str = str(e).lower()
+            if log_bus is not None:
+                log_bus.emit("ERROR" if "1011" in err_str or "policy" in err_str else "WARN", "audio.recv", f"Gemini Live recv error: {e}")
             if "1008" in err_str or "1011" in err_str or "1006" in err_str or "1000" in err_str or "goaway" in err_str or "connection closed" in err_str or "policy violation" in err_str or "keepalive" in err_str or "timeout" in err_str:
                 print(f"[Zezo] 🔄 Session renewal signal received: {e}")
                 if any(k in err_str for k in ("1011", "1008", "1006", "1000", "goaway", "policy violation", "internal error")):
@@ -2218,9 +2251,10 @@ class ZezoLive:
                             pass
                     file_info = f" ({files_str})" if files_str else ""
                     msg = (
-                        f"[TASK_NOTIFICATION: Background task #{task.id} ({tool_label}) for '{task_prompt[:60]}' completed successfully{file_info}. "
-                        f"Briefly tell the user in ONE concise sentence {lang_hint} that their task is ready. "
-                        f"All detailed code and summary have already been posted to the HUD display.]"
+                        f"[TASK_NOTIFICATION: Background task #{task.id} ({tool_label}) for '{task_prompt[:60]}' completed successfully{file_info}.\n"
+                        f"Task Output / Summary Content:\n{prompt_summary}\n\n"
+                        f"Briefly tell the user in ONE concise sentence {lang_hint} that their task is ready and highlight the core finding. "
+                        f"All detailed content has been posted to the HUD display.]"
                     )
                     log_text = f"SYS: Task #{task.id} finished successfully."
                     if self.ui and hasattr(self.ui, "show_content") and summary_str and summary_str.strip() not in ("Done.", "Done", ""):
@@ -2518,12 +2552,10 @@ class ZezoLive:
                 _resumed_with = self._resume_handle is not None
                 config = self._build_config()
 
-                # Fresh client on every reconnect — avoids stale HTTP session state
-                # v1alpha carries proactive audio; if it gets rejected we fall
-                # back to v1beta.
+                # Live WebSocket client on stable v1beta endpoint for robust audio streaming
                 client = genai.Client(
                     api_key=_get_api_key(),
-                    http_options={"api_version": "v1alpha" if self._enhanced_live else "v1beta"}
+                    http_options={"api_version": "v1beta"}
                 )
 
                 async with (
@@ -2596,6 +2628,17 @@ class ZezoLive:
                     break
                 print(f"[Zezo] RuntimeError: {rerr}")
             except BaseException as e:
+                # Voluntary reconnect (voice change) or server session renewal — not an unhandled crash.
+                # Rebuild the session immediately with no backoff and clean logging.
+                if _is_reconnect_signal(e):
+                    print("[Zezo] 🔄 Session renewal / voluntary reconnect requested.")
+                    if not _keep_context_of(e):
+                        # A deliberate clean slate (voice change) — drop the
+                        # handle so the next connect really does start empty.
+                        self._resume_handle = None
+                    self._conn_backoff = 0
+                    continue
+
                 # Unpack ExceptionGroup if present for clear diagnosis
                 if hasattr(e, "exceptions"):
                     for sub_e in getattr(e, "exceptions", []):
@@ -2603,21 +2646,6 @@ class ZezoLive:
                         traceback.print_exception(type(sub_e), sub_e, sub_e.__traceback__)
                 else:
                     traceback.print_exc()
-                # Catches both Exception and BaseExceptionGroup (Python 3.11+
-                # TaskGroup raises BaseExceptionGroup when tasks are cancelled
-                # externally, which `except Exception` would miss, letting the
-                # exception escape the while-loop and causing asyncio.run() to
-                # start shutdown — resulting in "executor after shutdown" errors).
-                # Voluntary reconnect (voice change) — not an error. Rebuild the
-                # session immediately with no backoff and no scary logs.
-                if _is_reconnect_signal(e):
-                    print("[Zezo] Voluntary reconnect requested.")
-                    if not _keep_context_of(e):
-                        # A deliberate clean slate (voice change) — drop the
-                        # handle so the next connect really does start empty.
-                        self._resume_handle = None
-                    self._conn_backoff = 0
-                    continue
 
                 # A resumption handle the server will not accept — expired, or
                 # belonging to a session it has since dropped. Without this, the
@@ -2773,7 +2801,11 @@ def main():
             print(f"\n🔴 Zezo live loop stopped: {e}")
 
     threading.Thread(target=runner, daemon=True).start()
-    ui.root.mainloop()
+    try:
+        ui.root.mainloop()
+    except (KeyboardInterrupt, SystemExit):
+        print("\n[Zezo] 🔴 Shutting down cleanly...")
+
 
 if __name__ == "__main__":
     main()

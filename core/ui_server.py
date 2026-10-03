@@ -112,8 +112,15 @@ class ZezoUIServer:
         app = web.Application()
         app.router.add_get("/", self._index_handler)
         app.router.add_get("/index.html", self._index_handler)
+        app.router.add_get("/office", self._office_view_handler)
         app.router.add_get("/ws", self._ws_handler)
         app.router.add_get("/api/health", self._health_handler)
+        app.router.add_get("/api/fleet/state", self._fleet_state_handler)
+        app.router.add_get("/api/fleet/agent", self._fleet_agent_profile_handler)
+        app.router.add_post("/api/fleet/save_agent", self._fleet_save_agent_handler)
+        app.router.add_post("/api/fleet/save_soul", self._fleet_save_soul_handler)
+        app.router.add_post("/api/fleet/dispatch_task", self._fleet_dispatch_task_handler)
+        app.router.add_post("/api/fleet/delete_agent", self._fleet_delete_agent_handler)
         app.router.add_post("/api/upload", self._upload_handler)
         app.router.add_post("/api/settings/assistant", self._save_assistant_settings_handler)
         app.router.add_post("/api/settings/agents", self._save_agents_settings_handler)
@@ -336,17 +343,20 @@ class ZezoUIServer:
             data = await request.json()
             from memory.config_manager import (
                 save_api_keys_transactional, is_configured, get_masked_gemini_key,
-                get_masked_groq_key, get_masked_elevenlabs_key, get_groq_api_key, get_elevenlabs_api_key,
+                get_masked_groq_key, get_masked_elevenlabs_key, get_masked_tavily_key,
+                get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
             )
 
             gemini_key = data.get("gemini_api_key")
             groq_key = data.get("groq_api_key")
             elevenlabs_key = data.get("elevenlabs_api_key")
+            tavily_key = data.get("tavily_api_key")
 
             ok, err = save_api_keys_transactional(
                 gemini_api_key=gemini_key,
                 groq_api_key=groq_key,
                 elevenlabs_api_key=elevenlabs_key,
+                tavily_api_key=tavily_key,
                 validate=True,
             )
             if not ok:
@@ -359,6 +369,8 @@ class ZezoUIServer:
                 "groq_api_key_masked": get_masked_groq_key(),
                 "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
                 "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
+                "has_tavily_key": bool(get_tavily_api_key()),
+                "tavily_api_key_masked": get_masked_tavily_key(),
             }
             self.broadcast("api_keys_updated", res_payload)
             return web.json_response({"status": "success", "data": res_payload})
@@ -377,18 +389,20 @@ class ZezoUIServer:
             from memory.config_manager import (
                 save_assistant_config, save_voice, save_response_language,
                 save_api_keys_transactional, is_configured, get_masked_gemini_key, get_masked_groq_key,
-                get_masked_elevenlabs_key, save_fallback_voice, get_fallback_voice,
-                save_voice_fallback_mode, get_voice_fallback_mode, get_groq_api_key, get_elevenlabs_api_key,
+                get_masked_elevenlabs_key, get_masked_tavily_key, save_fallback_voice, get_fallback_voice,
+                save_voice_fallback_mode, get_voice_fallback_mode, get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
             )
 
             gemini_key = data.get("gemini_api_key")
             groq_key = data.get("groq_api_key")
             elevenlabs_key = data.get("elevenlabs_api_key")
-            if gemini_key is not None or groq_key is not None or elevenlabs_key is not None:
+            tavily_key = data.get("tavily_api_key")
+            if gemini_key is not None or groq_key is not None or elevenlabs_key is not None or tavily_key is not None:
                 ok, err = save_api_keys_transactional(
                     gemini_api_key=gemini_key,
                     groq_api_key=groq_key,
                     elevenlabs_api_key=elevenlabs_key,
+                    tavily_api_key=tavily_key,
                     validate=True,
                 )
                 if not ok:
@@ -560,6 +574,80 @@ class ZezoUIServer:
         if idx.exists():
             return web.FileResponse(idx)
         return web.Response(text="<h1>ZEZO UI Engine Online</h1><p>Frontend assets initializing...</p>", content_type="text/html")
+
+    async def _office_view_handler(self, request: web.Request) -> web.Response:
+        office_prod = self.frontend_dir / "office.html"
+        if office_prod.exists():
+            return web.FileResponse(office_prod)
+        office_fallback = BASE_DIR / "prototypes" / "scranton_pixel_office_fleet" / "index.html"
+        if office_fallback.exists():
+            return web.FileResponse(office_fallback)
+        return web.Response(text="<h1>Scranton Office Deck</h1><p>Deck layout file not found.</p>", content_type="text/html")
+
+    async def _fleet_state_handler(self, request: web.Request) -> web.Response:
+        try:
+            from core.fleet_manager import fleet_manager
+            return web.json_response({
+                "status": "success",
+                "fleet": fleet_manager.get_fleet_deck_state()
+            })
+        except Exception as e:
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _fleet_agent_profile_handler(self, request: web.Request) -> web.Response:
+        agent_id = request.query.get("id", "").strip()
+        try:
+            from core.fleet_manager import fleet_manager
+            res = fleet_manager.get_agent_full_profile(agent_id)
+            return web.json_response(res)
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _fleet_save_agent_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            from core.fleet_manager import fleet_manager
+            res = fleet_manager.save_agent_profile(data)
+            self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
+            return web.json_response(res)
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _fleet_save_soul_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
+            soul = str(data.get("soul_prompt") or data.get("soul_md") or data.get("prompt_prefix") or "").strip()
+            from core.fleet_manager import fleet_manager
+            res = fleet_manager.save_agent_soul(agent_id, soul)
+            self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
+            return web.json_response(res)
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _fleet_dispatch_task_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
+            prompt = str(data.get("prompt") or data.get("task") or "").strip()
+            path = data.get("path")
+            from core.fleet_manager import fleet_manager
+            res = fleet_manager.dispatch_task(agent_id, prompt, path)
+            self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
+            return web.json_response(res)
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _fleet_delete_agent_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
+            from core.fleet_manager import fleet_manager
+            res = fleet_manager.delete_agent(agent_id)
+            self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
+            return web.json_response(res)
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
 
     async def _favicon_handler(self, request: web.Request) -> web.Response:
         fav = self.frontend_dir / "favicon.ico"
@@ -877,6 +965,49 @@ class ZezoUIServer:
             except Exception as e:
                 logger.warning("Failed to save API keys from WS: %s", e)
 
+        elif msg_type == "get_fleet_state":
+            try:
+                from core.fleet_manager import fleet_manager
+                await ws.send_str(json.dumps({
+                    "type": "fleet_state",
+                    "data": {"fleet": fleet_manager.get_fleet_deck_state()}
+                }))
+            except Exception as e:
+                logger.warning("Failed to send fleet state: %s", e)
+
+        elif msg_type == "get_agent_profile":
+            agent_id = str(payload.get("agent_id") or payload.get("id") or "").strip()
+            try:
+                from core.fleet_manager import fleet_manager
+                profile = fleet_manager.get_agent_full_profile(agent_id)
+                await ws.send_str(json.dumps({
+                    "type": "agent_profile_data",
+                    "data": profile
+                }))
+            except Exception as e:
+                logger.warning("Failed to get agent profile: %s", e)
+
+        elif msg_type == "save_agent_soul":
+            agent_id = str(payload.get("agent_id") or payload.get("id") or "").strip()
+            soul = str(payload.get("soul_prompt") or payload.get("soul_md") or "").strip()
+            try:
+                from core.fleet_manager import fleet_manager
+                res = fleet_manager.save_agent_soul(agent_id, soul)
+                self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
+            except Exception as e:
+                logger.warning("Failed to save agent soul: %s", e)
+
+        elif msg_type == "dispatch_fleet_task":
+            agent_id = str(payload.get("agent_id") or payload.get("id") or "").strip()
+            prompt = str(payload.get("prompt") or payload.get("task") or "").strip()
+            path = payload.get("path")
+            try:
+                from core.fleet_manager import fleet_manager
+                res = fleet_manager.dispatch_task(agent_id, prompt, path)
+                self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
+            except Exception as e:
+                logger.warning("Failed to dispatch fleet task: %s", e)
+
         elif msg_type == "get_audio_devices":
             try:
                 await ws.send_str(json.dumps({
@@ -971,14 +1102,14 @@ class ZezoUIServer:
             get_assistant_name, get_voice, get_response_language,
             get_autostart_enabled, get_brief_enabled,
             get_wake_word_enabled, get_push_to_talk_enabled,
-            get_masked_gemini_key, get_masked_groq_key, get_masked_elevenlabs_key, is_configured,
+            get_masked_gemini_key, get_masked_groq_key, get_masked_elevenlabs_key, get_masked_tavily_key, is_configured,
             get_opencode_model, get_kilo_model, get_antigravity_model,
             get_fallback_voice, FALLBACK_VOICES, get_voice_fallback_mode,
             get_preferred_creation_agent, get_preferred_edit_agent,
             CREATION_AGENTS, EDIT_AGENTS,
             get_pipeline_mode, get_stt_engine, get_llm_engine, get_tts_engine, get_tts_voice,
             PIPELINE_MODES, STT_ENGINES, LLM_ENGINES, TTS_ENGINES,
-            get_groq_api_key, get_elevenlabs_api_key,
+            get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
         )
         return {
             "state": "OFFLINE",
@@ -1003,6 +1134,7 @@ class ZezoUIServer:
             "gemini_api_key_masked": get_masked_gemini_key(),
             "groq_api_key_masked": get_masked_groq_key(),
             "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
+            "tavily_api_key_masked": get_masked_tavily_key(),
             "opencode_model": get_opencode_model(),
             "kilo_model": get_kilo_model(),
             "antigravity_model": get_antigravity_model(),
@@ -1017,6 +1149,7 @@ class ZezoUIServer:
             "tts_engines": list(TTS_ENGINES),
             "has_groq_key": bool(get_groq_api_key()),
             "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
+            "has_tavily_key": bool(get_tavily_api_key()),
             "tasks": tasks,
             "timestamp": time.time(),
             **self._collect_audio_state(),

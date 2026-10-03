@@ -49,6 +49,11 @@
       <button class="btn btn-icon btn-sm" onclick="openModal('task-modal')" title="Task Matrix & Registry">
         <iconify-icon icon="solar:layers-minimalistic-linear" style="font-size: 16px;"></iconify-icon>
       </button>
+      <!-- Dedicated Main Screen Switcher (Dashboard <-> Agent Office View) -->
+      <button class="btn btn-sm" id="view-toggle-btn" onclick="toggleMainView()" title="Switch to Scranton Agent Office Screen (Ctrl+O)" style="font-size: 10px; padding: 3px 8px; border-color: rgba(242,78,30,0.4); background: rgba(242,78,30,0.08); color: var(--accent); font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+        <iconify-icon icon="solar:users-group-two-rounded-linear" style="font-size: 13px;"></iconify-icon>
+        <span id="view-toggle-label">OFFICE VIEW</span>
+      </button>
       <button class="btn btn-icon btn-sm" onclick="openModal('qr-modal')" title="Mobile Remote Control & Key">
         <iconify-icon icon="solar:qr-code-linear" style="font-size: 16px;"></iconify-icon>
       </button>
@@ -68,9 +73,9 @@
   </header>
 
   <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <!-- 2. MASTER 3-COLUMN TACTICAL WORKSPACE -->
+  <!-- 2. MASTER SCREENS (Tactical Dashboard vs Scranton Office Screen) -->
   <!-- ═══════════════════════════════════════════════════════════════════ -->
-  <main class="workspace-grid">
+  <main class="workspace-grid" id="main-tactical-view">
     
     <!-- ── LEFT PANEL: Hardware Telemetry & Task Queue ── -->
     <aside style="display: flex; flex-direction: column; gap: 8px; overflow: hidden; min-width: 0;">
@@ -326,6 +331,11 @@
 
     </aside>
 
+  </main>
+
+  <!-- ── 2B. FULL SCRANTON AGENT OFFICE VIEW SCREEN (Dedicated Main Screen) ── -->
+  <main class="workspace-office-screen" id="main-office-view" style="display: none; flex: 1; min-height: 0; position: relative; width: 100%; height: calc(100vh - 58px); overflow: hidden; padding: 0; margin: 0;">
+    <iframe id="main-office-iframe" src="/office" style="width: 100%; height: 100%; border: none; background: transparent; display: block;" title="Scranton Agent Office Floor Screen"></iframe>
   </main>
 
 </div>
@@ -887,6 +897,23 @@
           <input type="password" id="keys-groq-input" class="input-field" placeholder="gsk_... (Paste key to update)" style="width: 100%; font-family: var(--font-mono); font-size: 11px;">
           <div style="font-size: 9.5px; color: var(--text-muted); line-height: 1.4;">
             Powers ultra-fast LPU inference for Cascade LLM (Llama 3.3 / Qwen) & Groq Whisper STT.
+          </div>
+        </div>
+
+        <!-- Tavily AI Search Key Box -->
+        <div class="card" style="padding: 12px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="type-label" style="font-size: 11px; font-weight: 700; color: var(--text-primary);">Tavily AI Search API Key</span>
+              <span id="keys-tavily-status" class="badge" style="font-size: 8.5px;">CHECKING...</span>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="togglePasswordVisibility('keys-tavily-input', this)" style="padding: 2px 6px; font-size: 10px; color: var(--text-muted);">
+              <iconify-icon icon="solar:eye-linear"></iconify-icon> Show
+            </button>
+          </div>
+          <input type="password" id="keys-tavily-input" class="input-field" placeholder="tvly-... (Paste key to update)" style="width: 100%; font-family: var(--font-mono); font-size: 11px;">
+          <div style="font-size: 9.5px; color: var(--text-muted); line-height: 1.4;">
+            Powers ultra-fast AI web search (&lt; 500ms) with direct topic synthesis and zero IP blocks.
           </div>
         </div>
 
@@ -2489,6 +2516,9 @@ socket.on('disconnect', () => {
 
   socket.on('init', (data) => {
     if (!data) return;
+    if (typeof syncApiKeysUI === 'function') {
+      syncApiKeysUI(data);
+    }
     if (data.muted !== undefined) {
       window.isMuted = !!data.muted;
     }
@@ -2550,6 +2580,12 @@ socket.on('disconnect', () => {
       }
       if (groqInput && !groqInput.value) {
         groqInput.placeholder = `${data.groq_api_key_masked} (Paste to replace)`;
+      }
+    }
+    if (data.tavily_api_key_masked) {
+      const tavilyInput = document.getElementById('keys-tavily-input');
+      if (tavilyInput && !tavilyInput.value) {
+        tavilyInput.placeholder = `${data.tavily_api_key_masked} (Paste to replace)`;
       }
     }
 
@@ -2685,6 +2721,78 @@ socket.on('disconnect', () => {
     if (m.tmp !== undefined) updateBar('tmp', m.tmp >= 0 ? m.tmp : 0, m.tmp >= 0 ? `${m.tmp.toFixed(0)}°C` : 'N/A');
   });
 
+  let _activeStreams = { user: null, zezo: null };
+
+  socket.on('transcript_stream', (data) => {
+    if (!data) return;
+    const speaker = (data.speaker || 'user').toLowerCase();
+    const text = data.text || '';
+    const done = !!data.done;
+    const box = document.getElementById('stream-box');
+    if (!box) return;
+
+    const streamKey = (speaker === 'ai' || speaker === 'zezo') ? 'zezo' : 'user';
+    const isZezo = streamKey === 'zezo';
+    const tagLabel = isZezo ? 'ZEZO AI' : 'USER';
+    const tagIcon = isZezo ? 'solar:atom-bold' : 'solar:user-linear';
+    const msgClass = isZezo ? 'stream-msg-zezo' : 'stream-msg-user';
+
+    let activeEl = _activeStreams[streamKey];
+
+    if (!done && text) {
+      if (!activeEl || !document.body.contains(activeEl)) {
+        const now = new Date().toTimeString().split(' ')[0];
+        const wrapper = document.createElement('div');
+        wrapper.className = `stream-msg ${msgClass} streaming-active`;
+        wrapper.id = `stream-bubble-${streamKey}`;
+        wrapper.innerHTML = `
+          <div class="stream-msg-header">
+            <div class="stream-msg-meta">
+              <span class="mono text-muted">${now}</span>
+              <span class="stream-msg-tag"><iconify-icon icon="${tagIcon}" style="font-size: 10px;"></iconify-icon> ${tagLabel}</span>
+              <span class="badge badge-accent mono" style="font-size: 8px; padding: 1px 4px; animation: pulse 1s infinite;">LIVE</span>
+            </div>
+            <button class="msg-copy-btn" style="opacity: 0.5;"><iconify-icon icon="solar:copy-linear"></iconify-icon></button>
+          </div>
+          <div class="stream-msg-body"><span class="stream-text"></span><span class="streaming-cursor" style="display:inline-block; width:6px; height:12px; background:var(--accent); margin-left:4px; vertical-align:middle; animation: pulse 0.8s infinite;"></span></div>
+        `;
+        box.appendChild(wrapper);
+        activeEl = wrapper;
+        _activeStreams[streamKey] = activeEl;
+      }
+
+      const textSpan = activeEl.querySelector('.stream-text');
+      if (textSpan) {
+        textSpan.textContent = (textSpan.textContent ? textSpan.textContent + ' ' : '') + text;
+      }
+      box.scrollTop = box.scrollHeight;
+    }
+
+    if (done && activeEl) {
+      const cursor = activeEl.querySelector('.streaming-cursor');
+      if (cursor) cursor.remove();
+      const liveBadge = activeEl.querySelector('.badge');
+      if (liveBadge) liveBadge.remove();
+      activeEl.classList.remove('streaming-active');
+
+      const textSpan = activeEl.querySelector('.stream-text');
+      const finalMsg = textSpan ? textSpan.textContent.trim() : text;
+      if (text && textSpan && (!textSpan.textContent || finalMsg.length < text.length)) {
+        textSpan.textContent = text;
+      }
+
+      const copyBtn = activeEl.querySelector('.msg-copy-btn');
+      if (copyBtn) {
+        copyBtn.style.opacity = '1';
+        const safeCopy = (textSpan ? textSpan.textContent : finalMsg).replace(/'/g, "\\'");
+        copyBtn.onclick = function() { copySingleMessage(this, safeCopy); };
+      }
+
+      _activeStreams[streamKey] = null;
+      box.scrollTop = box.scrollHeight;
+    }
+  });
+
   socket.on('log_entry', (entry) => {
     if (!entry || !entry.message) return;
     const tag = (entry.tag || 'SYS').toUpperCase();
@@ -2694,6 +2802,28 @@ socket.on('disconnect', () => {
 
     // Suppress internal state transitions
     if (msg.startsWith('State changed to') || msg.startsWith('SYS: State changed to')) return;
+
+    // If this log_entry is from user or AI and matches an active or recently finalized stream, avoid duplicate card
+    const speakerKey = (tag === 'AI' || tag === 'ZEZO') ? 'zezo' : (tag === 'USER' ? 'user' : null);
+    if (speakerKey && _activeStreams[speakerKey]) {
+      // Seal active stream with this message
+      const activeEl = _activeStreams[speakerKey];
+      const textSpan = activeEl.querySelector('.stream-text');
+      if (textSpan) textSpan.textContent = msg;
+      const cursor = activeEl.querySelector('.streaming-cursor');
+      if (cursor) cursor.remove();
+      const liveBadge = activeEl.querySelector('.badge');
+      if (liveBadge) liveBadge.remove();
+      activeEl.classList.remove('streaming-active');
+      const copyBtn = activeEl.querySelector('.msg-copy-btn');
+      if (copyBtn) {
+        copyBtn.style.opacity = '1';
+        const safeCopy = msg.replace(/'/g, "\\'");
+        copyBtn.onclick = function() { copySingleMessage(this, safeCopy); };
+      }
+      _activeStreams[speakerKey] = null;
+      return;
+    }
 
     const now = new Date().toTimeString().split(' ')[0];
     const safeMsg = msg.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -3743,16 +3873,19 @@ socket.on('disconnect', () => {
   window.saveApiKeysConfiguration = async function() {
     const geminiInput = document.getElementById('keys-gemini-input');
     const groqInput = document.getElementById('keys-groq-input');
+    const tavilyInput = document.getElementById('keys-tavily-input');
     const elevenInput = document.getElementById('keys-elevenlabs-input');
     const btn = document.getElementById('btn-save-api-keys');
 
     const geminiKey = geminiInput ? geminiInput.value.trim() : '';
     const groqKey = groqInput ? groqInput.value.trim() : '';
+    const tavilyKey = tavilyInput ? tavilyInput.value.trim() : '';
     const elevenKey = elevenInput ? elevenInput.value.trim() : '';
 
     const payload = {};
     if (geminiKey) payload.gemini_api_key = geminiKey;
     if (groqKey) payload.groq_api_key = groqKey;
+    if (tavilyKey) payload.tavily_api_key = tavilyKey;
     if (elevenKey) payload.elevenlabs_api_key = elevenKey;
 
     if (Object.keys(payload).length === 0) {
@@ -3777,6 +3910,7 @@ socket.on('disconnect', () => {
       if (data.status === 'success') {
         if (geminiInput) geminiInput.value = '';
         if (groqInput) groqInput.value = '';
+        if (tavilyInput) tavilyInput.value = '';
         if (elevenInput) elevenInput.value = '';
 
         if (data.data) {
@@ -3805,11 +3939,13 @@ socket.on('disconnect', () => {
     if (!data) return;
 
     const hasGroq = !!(data.has_groq_key || (data.groq_api_key_masked && !data.groq_api_key_masked.startsWith('NOT')));
+    const hasTavily = !!(data.has_tavily_key || (data.tavily_api_key_masked && !data.tavily_api_key_masked.startsWith('OPTIONAL')));
     const hasEleven = !!(data.has_elevenlabs_key || (data.elevenlabs_api_key_masked && !data.elevenlabs_api_key_masked.startsWith('OPTIONAL')));
     const hasGemini = !!(data.has_gemini_key || (data.gemini_api_key_masked && !data.gemini_api_key_masked.startsWith('MISSING')));
 
     window._geminiKeyConfigured = hasGemini;
     window._groqKeyConfigured = hasGroq;
+    window._tavilyKeyConfigured = hasTavily;
     window._elevenLabsKeyConfigured = hasEleven;
 
     if (typeof window.setGroqKeyConfigured === 'function') {
@@ -3830,6 +3966,12 @@ socket.on('disconnect', () => {
     if (keysGroq) {
       keysGroq.className = hasGroq ? 'badge badge-success' : 'badge badge-warning';
       keysGroq.innerText = data.groq_api_key_masked ? `✓ ${data.groq_api_key_masked}` : (hasGroq ? '✓ ACTIVE' : 'NOT CONFIGURED');
+    }
+
+    const keysTavily = document.getElementById('keys-tavily-status');
+    if (keysTavily) {
+      keysTavily.className = hasTavily ? 'badge badge-success' : 'badge';
+      keysTavily.innerText = data.tavily_api_key_masked ? `✓ ${data.tavily_api_key_masked}` : (hasTavily ? '✓ ACTIVE' : 'OPTIONAL (DDG BACKUP)');
     }
 
     const keysEleven = document.getElementById('keys-elevenlabs-status');
@@ -4057,6 +4199,78 @@ socket.on('disconnect', () => {
       if (data.has_elevenlabs_key !== undefined) {
         window._elevenLabsKeyConfigured = !!data.has_elevenlabs_key;
       }
+    }
+  });
+
+  // ── DEDICATED MAIN SCREEN SWITCHER (Dashboard <-> Scranton Office Screen) ──
+  window.currentActiveView = 'home';
+
+  window.switchMainView = function(viewName) {
+    const tacticalEl = document.getElementById('main-tactical-view');
+    const officeEl = document.getElementById('main-office-view');
+    const toggleBtn = document.getElementById('view-toggle-btn');
+    const toggleLbl = document.getElementById('view-toggle-label');
+    const avatarGif = document.getElementById('vortex-gif');
+
+    if (viewName === 'office') {
+      window.currentActiveView = 'office';
+      if (tacticalEl) tacticalEl.style.display = 'none';
+      if (officeEl) officeEl.style.display = 'flex';
+      if (toggleLbl) toggleLbl.textContent = 'DASHBOARD';
+      if (toggleBtn) {
+        toggleBtn.title = 'Switch back to Tactical Dashboard';
+        toggleBtn.style.color = '#22c55e';
+        toggleBtn.style.borderColor = 'rgba(34,197,94,0.4)';
+        toggleBtn.style.background = 'rgba(34,197,94,0.08)';
+      }
+      if (avatarGif) avatarGif.style.visibility = 'hidden';
+      window._zezoAnimActive = false;
+    } else {
+      window.currentActiveView = 'home';
+      if (officeEl) officeEl.style.display = 'none';
+      if (tacticalEl) tacticalEl.style.display = 'grid';
+      if (toggleLbl) toggleLbl.textContent = 'OFFICE VIEW';
+      if (toggleBtn) {
+        toggleBtn.title = 'Switch to Scranton Agent Office Screen (Ctrl+O)';
+        toggleBtn.style.color = 'var(--accent)';
+        toggleBtn.style.borderColor = 'rgba(242,78,30,0.4)';
+        toggleBtn.style.background = 'rgba(242,78,30,0.08)';
+      }
+      if (avatarGif) avatarGif.style.visibility = 'visible';
+      window._zezoAnimActive = !document.hidden && !window._zezoDragging;
+    }
+  };
+
+  window.toggleMainView = function() {
+    window.switchMainView(window.currentActiveView === 'home' ? 'office' : 'home');
+  };
+
+  // Remote screen switch from voice / backend
+  socket.on('switch_view', (data) => {
+    if (data && data.view) {
+      window.switchMainView(data.view);
+    }
+  });
+
+  // Dynamic Remote Modal Opener from Backend Voice / Actions
+  socket.on('open_modal', (data) => {
+    if (data && data.modal && typeof openModal === 'function') {
+      openModal(data.modal);
+    }
+  });
+
+  // Global Ctrl+O Hotkey to toggle Scranton Agent Office Screen
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'o' || e.key === 'O')) {
+      e.preventDefault();
+      window.toggleMainView();
+    }
+  });
+
+  // Handle postMessage from embedded Scranton Office iframe (e.g. Home Button clicked)
+  window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'ZEZO_NAVIGATE' && e.data.view === 'home') {
+      window.switchMainView('home');
     }
   });
 

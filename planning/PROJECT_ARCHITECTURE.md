@@ -28,16 +28,12 @@ zezo version 2/
 │                               # Coordinates Gemini Live WebSocket, audio I/O threads,
 │                               # Push-to-Talk (Ctrl+Space), viseme stream, and tool routing.
 │
-├── ui.py                       # 🖥️ PyQt6 GUI & HUD Interface
-│                               # Renders the holographic 3D avatar head, live audio visualizer,
-│                               # activity transcript logs, and sliding settings drawer.
+├── ui.py                       # 🖥️ PyQt6 GUI & Tactical Workspace
+│                               # Desktop window container, WebEngine host, telemetry, and command dock.
 │
 ├── core/                       # 🧠 Core Engines & Subsystems
 │   ├── gemini.py               # Gemini one-shot API client with fallback model ladder.
 │   ├── llm_client.py           # Multi-provider LLM interface (Ollama, OpenAI, Groq).
-│   ├── viseme.py               # Audio formant & text phoneme extractor for lip-sync.
-│   ├── avatar.py               # 3D software rasterizer & facial expression engine.
-│   ├── avatar_mesh.py          # 3D vector geometry definitions for the avatar head.
 │   ├── wake_word.py            # Local "Hey Jarvis" hotword detector (openWakeWord).
 │   ├── echo.py                 # Self-echo cancellation & mic bleed suppression.
 │   ├── hotkey.py               # Global hotkey listener (Ctrl+Space Push-to-Talk).

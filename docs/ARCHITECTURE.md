@@ -25,10 +25,10 @@ flowchart TD
     end
 
     subgraph UI["🎨 PyQt6 HUD (ui.py)"]
-        UIC["Main Window"]
-        AV["HoloAvatar (core/avatar.py)"]
-        VIS["VisemeStream (core/viseme.py)"]
-        WV["Waveform / Reactive HUD"]
+        UIC["Tactical Workspace Window"]
+        VORTEX["Fluid Vortex Core & Dock"]
+        CANVAS["Live Display Canvas"]
+        WV["Waveform / Reactive Matrix"]
         LOG["Activity Log"]
         SETT["Settings Drawer"]
         DT["Dashboard (remote)"]
@@ -99,11 +99,8 @@ flowchart TD
 
 | Component | File(s) | Responsibility |
 |-----------|---------|---------------|
-| `main.py` | `main.py` | Application entry point, JarvisLive class, Gemini Live session management, audio I/O loop, tool dispatch, viseme extraction |
-| `ui.py` | `ui.py` | PyQt6 HUD, main window, avatar canvas, waveform, activity log, settings drawer, all Qt widgets |
-| `core/avatar.py` | `core/avatar.py` | Renders the holographic head using QPainter, handles facial animation, eye movement, brow tracking |
-| `core/avatar_mesh.py` | `core/avatar_mesh.py` | Builds the head geometry from MediaPipe canonical face model (face_model.obj) |
-| `core/viseme.py` | `core/viseme.py` | Transcript-to-mouth-shape fusion, phoneme mapping, VisemeStream class |
+| `main.py` | `main.py` | Application entry point, JarvisLive class, Gemini Live session management, audio I/O loop, tool dispatch |
+| `ui.py` | `ui.py` | PyQt6 QWebEngine host, tactical workspace, hardware telemetry, command dock, activity log, settings |
 | `core/echo.py` | `core/echo.py` | Self-echo detection, distinguishing user voice from assistant's own echo |
 | `core/hotkey.py` | `core/hotkey.py` | Push-to-talk chord detection (Ctrl+Space), global on Windows |
 | `core/dispatcher.py` | `core/dispatcher.py` | Central Task & Semantic Action Dispatcher routing creation/edit tasks to preferred engines (OpenCode, Antigravity, Kilo, Groq Code Helper) |
@@ -117,7 +114,9 @@ flowchart TD
 | `core/gemini.py` | `core/gemini.py` | One-shot Gemini calls (non-live), model ladder, quota management |
 | `core/llm_client.py` | `core/llm_client.py` | Local LLM client (Ollama/OpenAI-compatible) for planning and agent tasks |
 | `core/log_bus.py` | `core/log_bus.py` | Ring buffer log bus (20,000 lines) with zero-leak secret redaction, level filtering, export, and UI console sink |
-| `core/task_manager.py` | `core/task_manager.py` | Thread-safe background task registry, watchdog, CPU throttling, process tree termination, and ANSI cleansing |
+| `core/fleet_manager.py` | `core/fleet_manager.py` | Autonomous multi-agent fleet orchestrator, Git worktree isolation, dynamic agent roster & desk allocation |
+| `frontend/office.html` | `frontend/office.html` | Scranton Pixel Office 2D visual fleet monitoring canvas with WebSocket event streaming |
+| `core/task_manager.py` | `core/task_manager.py` | Thread-safe background task registry, watchdog, CPU throttling, process tree termination, concurrency limiter (MAX_CONCURRENT=2), and ANSI cleansing |
 | `core/design_extractor.py` | `core/design_extractor.py` | On-demand deterministic token extractor for custom HTML files, live URLs, and generating standalone `DESIGN.md` specs |
 | `core/design_resolver.py` | `core/design_resolver.py` | Reference-first design resolver, raw HTML blueprint injector (`skills/hamza_taste/references/html/`), redesign override detector, and domain routing matrix |
 | `core/repo_context.py` | `core/repo_context.py` | Active workspace resolver and persistence (`memory/repo_context.json`) |

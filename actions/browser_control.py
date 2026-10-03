@@ -104,12 +104,12 @@ def _real_profile_dir(browser: str) -> str:
 
     for p in candidates:
         if p.exists():
-            print(f"[Browser] ✅ Real profile found for {browser}: {p}")
+            print(f"[Browser] [OK] Real profile found for {browser}: {p}")
             return str(p)
 
     fallback = home / ".jarvis_profiles" / browser
     fallback.mkdir(parents=True, exist_ok=True)
-    print(f"[Browser] ⚠️  Real profile not found for {browser}, using: {fallback}")
+    print(f"[Browser] [WARN] Real profile not found for {browser}, using: {fallback}")
     return str(fallback)
 
 def _firefox_profile_dir() -> Optional[str]:
@@ -213,6 +213,64 @@ def _find_exe_windows(prog_name: str) -> Optional[str]:
     except Exception:
         pass
     return None
+
+
+def _open_native(url: str, browser: str | None = None) -> str:
+    """
+    Opens a URL or launches a browser in the native desktop environment
+    without starting an isolated Playwright automation session.
+    """
+    clean_url = _normalize_url(url) if url and url.strip() else ""
+
+    if browser:
+        b_clean = browser.lower().strip()
+        exe = None
+        if _OS == "Windows":
+            exe = _find_exe_windows(b_clean) or shutil.which(b_clean)
+            if not exe and b_clean in ("opera", "operagx"):
+                exe = _find_opera_windows()
+        else:
+            exe = shutil.which(b_clean)
+
+        if exe:
+            try:
+                cmd = [exe]
+                if clean_url and clean_url != "about:blank":
+                    cmd.append(clean_url)
+                flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if _OS == "Windows" else 0
+                subprocess.Popen(cmd, creationflags=flags)
+                return f"Opened {clean_url or 'browser'} in {browser}."
+            except Exception as e:
+                print(f"[Browser] Direct launch failed for {browser}: {e}")
+
+        try:
+            from actions.open_app import open_application
+            res = open_application(browser)
+            if clean_url and clean_url != "about:blank":
+                import webbrowser
+                webbrowser.open(clean_url)
+            return res
+        except Exception:
+            pass
+
+    if clean_url and clean_url != "about:blank":
+        try:
+            import webbrowser
+            webbrowser.open(clean_url)
+            return f"Opened {clean_url} in default browser."
+        except Exception as e:
+            return f"Failed to open {clean_url}: {e}"
+    else:
+        try:
+            from core.computer.windows_native import windows_native
+            if windows_native.focus_browser_or_app_window():
+                return "Focused active browser window."
+            import webbrowser
+            webbrowser.open("about:blank")
+            return "Opened new browser window."
+        except Exception as e:
+            return f"Failed to launch browser: {e}"
+
 
 _BROWSER_SPECS: dict[str, dict] = {
     "Windows": {
@@ -553,7 +611,7 @@ class _BrowserSession:
                 self._context = await engine_obj.launch_persistent_context(jarvis, **kwargs)
 
             self._page = await self._adopt_page()
-            print(f"[Browser] ✅ Firefox launched")
+            print(f"[Browser] [OK] Firefox launched")
             return
 
         if engine_name == "webkit":
@@ -568,7 +626,7 @@ class _BrowserSession:
             }
             self._context = await engine_obj.launch_persistent_context(safari_profile, **kwargs)
             self._page = await self._adopt_page()
-            print(f"[Browser] ✅ Safari launched")
+            print(f"[Browser] [OK] Safari launched")
             return
 
         profile = _real_profile_dir(self.browser_name)
@@ -602,10 +660,10 @@ class _BrowserSession:
         try:
             self._context = await engine_obj.launch_persistent_context(profile, **kwargs)
             self._page = await self._adopt_page()
-            print(f"[Browser] ✅ Launched [{label}] profile={profile}")
+            print(f"[Browser] [OK] Launched [{label}] profile={profile}")
             return
         except Exception as e:
-            print(f"[Browser] ⚠️  Real profile failed for {label}: {e}")
+            print(f"[Browser] [WARN] Real profile failed for {label}: {e}")
 
         # The real profile could not be opened (browser already open / locked
         # profile / newer Chrome versions block the real profile under
@@ -618,7 +676,7 @@ class _BrowserSession:
         try:
             self._context = await engine_obj.launch_persistent_context(jarvis_profile, **kwargs)
             self._page = await self._adopt_page()
-            print(f"[Browser] ✅ Launched [{label}] with JARVIS profile "
+            print(f"[Browser] [OK] Launched [{label}] with JARVIS profile "
                   f"(sign-ins persist across sessions)")
         except Exception as e2:
             raise RuntimeError(f"Could not launch {self.browser_name}: {e2}") from e2
@@ -803,7 +861,6 @@ class _BrowserSession:
                 return "Tab closed."
             except Exception:
                 pass
-        # Fallback to universal hotkey (Ctrl+W / Cmd+W) on the active window
         try:
             import pyautogui
             modifier = "command" if platform.system() == "Darwin" else "ctrl"
@@ -811,6 +868,65 @@ class _BrowserSession:
             return "Closed active browser tab."
         except Exception:
             return "No active tab to close."
+
+    async def prev_tab(self) -> str:
+        page = self._page
+        if page and not page.is_closed():
+            try:
+                pages = page.context.pages
+                if len(pages) > 1:
+                    idx = pages.index(page)
+                    new_page = pages[(idx - 1) % len(pages)]
+                    await new_page.bring_to_front()
+                    self._page = new_page
+                    return f"Switched to previous tab: {new_page.url}"
+            except Exception:
+                pass
+        try:
+            import pyautogui
+            modifier = "command" if platform.system() == "Darwin" else "ctrl"
+            pyautogui.hotkey(modifier, "shift", "tab")
+            return "Switched to previous tab."
+        except Exception:
+            return "Could not switch tab."
+
+    async def next_tab(self) -> str:
+        page = self._page
+        if page and not page.is_closed():
+            try:
+                pages = page.context.pages
+                if len(pages) > 1:
+                    idx = pages.index(page)
+                    new_page = pages[(idx + 1) % len(pages)]
+                    await new_page.bring_to_front()
+                    self._page = new_page
+                    return f"Switched to next tab: {new_page.url}"
+            except Exception:
+                pass
+        try:
+            import pyautogui
+            modifier = "command" if platform.system() == "Darwin" else "ctrl"
+            pyautogui.hotkey(modifier, "tab")
+            return "Switched to next tab."
+        except Exception:
+            return "Could not switch tab."
+
+    async def switch_tab(self, query: str = "") -> str:
+        page = self._page
+        if page and not page.is_closed() and query:
+            q = query.lower().strip()
+            pages = page.context.pages
+            for p in pages:
+                try:
+                    title = (await p.title()).lower()
+                    url = p.url.lower()
+                    if q in title or q in url:
+                        self._page = p
+                        await p.bring_to_front()
+                        return f"Switched to tab: '{await p.title()}'"
+                except Exception:
+                    continue
+        return await self.next_tab()
 
     async def screenshot(self, path: str = None) -> str:
         page = await self._get_page()
@@ -895,7 +1011,7 @@ class _SessionRegistry:
         browser_name = _ALIASES.get(browser_name.lower().strip(), browser_name.lower().strip())
         self._get_or_create(browser_name)
         self._active_browser = browser_name
-        return f"Active browser → {browser_name}"
+        return f"Active browser -> {browser_name}"
 
     def close_one(self, browser_name: str) -> str:
         with self._lock:
@@ -975,14 +1091,54 @@ def browser_control(
     player=None,
     session_memory=None,
 ) -> str:
-    params  = parameters or {}
-    action  = params.get("action", "").lower().strip()
+    params  = dict(parameters or {})
+    raw_action = str(params.get("action", "")).strip()
+
+    # Sanitize malformed LLM outputs (e.g. action="click',description:'address bar")
+    import re
+    if "'" in raw_action or '"' in raw_action or "," in raw_action:
+        parts = re.split(r"['\",]+", raw_action)
+        action = parts[0].strip().lower()
+        for p in parts[1:]:
+            if ":" in p:
+                k, _, v = p.partition(":")
+                if k.strip() and v.strip() and k.strip() not in params:
+                    params[k.strip()] = v.strip()
+    else:
+        action = raw_action.lower().strip()
+
     browser = params.get("browser", "").lower().strip() or None
     result  = "Unknown action."
 
-    if action == "switch":
-        target = browser or params.get("target", "").lower().strip()
-        result = _registry.switch(target) if target else "Please specify a browser."
+    if action in ("switch", "switch_tab", "focus_tab", "select_tab"):
+        tab_query = params.get("title") or params.get("url") or params.get("target") or params.get("text") or ""
+        # 1. If tab_query is a browser name (e.g. "edge", "chrome", "firefox"), switch browser
+        if tab_query and tab_query.lower() in _ALIASES:
+            result = _registry.switch(tab_query)
+            _log(player, result)
+            return result
+
+        # 2. Check if active automation session has this tab
+        if _registry.has(browser):
+            sess = _registry.get(browser)
+            try:
+                result = sess.run(sess.switch_tab(tab_query))
+                _log(player, result)
+                return result
+            except Exception:
+                pass
+
+        # 3. Native desktop window / tab search
+        from core.computer.windows_native import windows_native
+        if tab_query:
+            f_res = windows_native.focus_window(tab_query)
+            if f_res.startswith("Focused window:"):
+                result = f"Switched to: {f_res}"
+                _log(player, result)
+                return result
+
+        target = browser or _registry._active_browser or "chrome"
+        result = _registry.switch(target)
         _log(player, result)
         return result
 
@@ -1003,11 +1159,6 @@ def browser_control(
         return result
 
     # ── Navigation is ALWAYS native ──────────────────────────────────────────
-    # go_to / search / new_tab open the site in the user's own browser —
-    # their own profile, logged-in accounts and start page; exactly as if the
-    # user had opened it themselves. A controlled window with about:blank never
-    # opens here. The only exception: if an automation flow is already running,
-    # navigation continues in that window (so multi-step tasks aren't split).
     if action in ("go_to", "search", "new_tab"):
         if action == "search":
             base    = _SEARCH_ENGINES.get(params.get("engine", "google").lower(),
@@ -1048,7 +1199,50 @@ def browser_control(
             _log(player, result)
             return result
 
-        result = _open_native(nav_url, browser)
+        from core.computer.windows_native import windows_native
+        from core.computer.pyautogui_driver import input_driver
+        mod = "command" if _OS == "Darwin" else "ctrl"
+
+        if action == "new_tab":
+            focused = False
+            if browser:
+                f_res = windows_native.focus_window(browser)
+                focused = f_res.startswith("Focused window:")
+            if not focused:
+                focused = windows_native.focus_browser_or_app_window()
+
+            if focused:
+                input_driver.hotkey(mod, "t")
+                if nav_url and nav_url != "about:blank":
+                    import time
+                    time.sleep(0.25)
+                    input_driver.type_safe_unicode(_normalize_url(nav_url))
+                    time.sleep(0.05)
+                    input_driver.press("enter")
+                result = f"Opened new tab in active browser{': ' + nav_url if nav_url else ''}."
+            else:
+                result = _open_native(nav_url, browser)
+        elif action == "go_to" and nav_url:
+            focused = False
+            if browser:
+                f_res = windows_native.focus_window(browser)
+                focused = f_res.startswith("Focused window:")
+            if not focused:
+                focused = windows_native.focus_browser_or_app_window()
+
+            if focused:
+                import time
+                input_driver.hotkey(mod, "l")
+                time.sleep(0.15)
+                input_driver.type_safe_unicode(_normalize_url(nav_url))
+                time.sleep(0.05)
+                input_driver.press("enter")
+                result = f"Opened {nav_url} in current browser tab."
+            else:
+                result = _open_native(nav_url, browser)
+        else:
+            result = _open_native(nav_url, browser)
+
         if result.startswith("Opened") and nav_url:
             _registry.note_native_url(_normalize_url(nav_url))
         with _last_nav_lock:
@@ -1058,11 +1252,101 @@ def browser_control(
         _log(player, result)
         return result
 
+    if action in ("close_tab", "close_tab_by_title"):
+        tab_query = params.get("title") or params.get("url") or params.get("target") or params.get("text") or ""
+        if _registry.has(browser):
+            sess = _registry.get(browser)
+            try:
+                if tab_query:
+                    sess.run(sess.switch_tab(tab_query))
+                result = sess.run(sess.close_tab())
+            except Exception as e:
+                result = f"Browser error (close_tab): {e}"
+        else:
+            from core.computer.windows_native import windows_native
+            from core.computer.pyautogui_driver import input_driver
+            if tab_query:
+                windows_native.focus_window(tab_query)
+            elif browser:
+                windows_native.focus_window(browser)
+            else:
+                windows_native.focus_browser_or_app_window()
+            mod = "command" if _OS == "Darwin" else "ctrl"
+            input_driver.hotkey(mod, "w")
+            result = f"Closed active tab{' (' + tab_query + ')' if tab_query else ''} in {browser or 'browser'}."
+        _log(player, result)
+        return result
+
+    if action in ("prev_tab", "previous_tab", "next_tab"):
+        if _registry.has(browser):
+            sess = _registry.get(browser)
+            try:
+                if action in ("prev_tab", "previous_tab"):
+                    result = sess.run(sess.prev_tab())
+                else:
+                    result = sess.run(sess.next_tab())
+            except Exception as e:
+                result = f"Browser error ({action}): {e}"
+        else:
+            from core.computer.windows_native import windows_native
+            from core.computer.pyautogui_driver import input_driver
+            if browser:
+                windows_native.focus_window(browser)
+            else:
+                windows_native.focus_browser_or_app_window()
+            mod = "command" if _OS == "Darwin" else "ctrl"
+            if action in ("prev_tab", "previous_tab"):
+                input_driver.hotkey(mod, "shift", "tab")
+                result = f"Switched to previous tab in {browser or 'browser'}."
+            else:
+                input_driver.hotkey(mod, "tab")
+                result = f"Switched to next tab in {browser or 'browser'}."
+        _log(player, result)
+        return result
+
+    # Address bar typing or quick controls on active desktop browser
+    desc_text = f"{params.get('description', '')} {params.get('selector', '')} {params.get('text', '')}".lower()
+    if not _registry.has(browser) and any(k in desc_text for k in ("address bar", "omnibox", "url bar", "search bar")):
+        from core.computer.windows_native import windows_native
+        from core.computer.pyautogui_driver import input_driver
+        if browser:
+            windows_native.focus_window(browser)
+        else:
+            windows_native.focus_browser_or_app_window()
+        mod = "command" if _OS == "Darwin" else "ctrl"
+        input_driver.hotkey(mod, "l")
+        t_val = params.get("text") or params.get("query") or params.get("url") or ""
+        if t_val:
+            import time
+            time.sleep(0.15)
+            input_driver.type_safe_unicode(_normalize_url(t_val))
+            time.sleep(0.05)
+            input_driver.press("enter")
+        result = f"Navigated address bar to {t_val or 'URL'}."
+        _log(player, result)
+        return result
+
+    if not _registry.has(browser) and action in ("reload", "refresh", "back", "forward"):
+        from core.computer.windows_native import windows_native
+        from core.computer.pyautogui_driver import input_driver
+        if browser:
+            windows_native.focus_window(browser)
+        else:
+            windows_native.focus_browser_or_app_window()
+        mod = "command" if _OS == "Darwin" else "ctrl"
+        if action in ("reload", "refresh"):
+            input_driver.hotkey(mod, "r")
+            result = "Reloaded current page."
+        elif action == "back":
+            input_driver.hotkey("alt", "left")
+            result = "Navigated back."
+        elif action == "forward":
+            input_driver.hotkey("alt", "right")
+            result = "Navigated forward."
+        _log(player, result)
+        return result
 
     # ── Interactive actions (click/type/read…) ───────────────────────────────
-    # These require a physically controllable browser; the automation window
-    # only opens here, and as soon as it opens it goes to the user's last
-    # navigated page — it doesn't sit on a blank page.
     try:
         sess = _registry.get(browser)
     except Exception as e:
@@ -1097,8 +1381,10 @@ def browser_control(
             result = sess.run(sess.get_url())
         elif action == "press":
             result = sess.run(sess.press(params.get("key", "Enter")))
-        elif action == "close_tab":
-            result = sess.run(sess.close_tab())
+        elif action in ("prev_tab", "previous_tab"):
+            result = sess.run(sess.prev_tab())
+        elif action == "next_tab":
+            result = sess.run(sess.next_tab())
         elif action == "screenshot":
             result = sess.run(sess.screenshot(params.get("path")))
         elif action == "back":
@@ -1121,7 +1407,8 @@ def browser_control(
 
 def _log(player, text: str):
     short = str(text)[:80]
-    print(f"[Browser] {short}")
+    safe_short = short.encode("ascii", errors="replace").decode("ascii")
+    print(f"[Browser] {safe_short}")
     if player:
         player.write_log(f"[browser] {short[:60]}")
 
@@ -1135,7 +1422,7 @@ TOOL = {
         "properties": {
             "action": {
                 "type": "STRING",
-                "description": "go_to | search (open search in browser) | click | type | scroll | fill_form | smart_click | smart_type | get_text | get_url | press | new_tab | close_tab | screenshot | back | forward | reload | switch | list_browsers | close | close_all"
+                "description": "go_to | search (open search in browser) | click | type | scroll | fill_form | smart_click | smart_type | get_text | get_url | press | new_tab | close_tab | prev_tab | next_tab | screenshot | back | forward | reload | switch | list_browsers | close | close_all"
             },
             "browser": {
                 "type": "STRING",

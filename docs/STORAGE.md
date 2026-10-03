@@ -37,14 +37,6 @@ Everything stored locally on the user's machine. No cloud storage.
 **Git-ignored**: Yes
 **Security**: Self-signed, never leaves machine
 
-### 4. Face Model
-
-| Storage | Location | Format | Purpose |
-|---------|----------|--------|---------|
-| Face mesh | `core/face_model.obj` | OBJ | MediaPipe canonical face model (468 vertices) |
-
-**Git-tracked**: Yes (Apache 2.0 license)
-**Size**: 25 KB
 
 ### 5. Playwright Browsers
 
@@ -112,7 +104,6 @@ write to memory/long_term.json
 api_keys.json: Config, API key, toggles (git-ignored)
 long_term.json: All memory facts and sessions (git-ignored)
 certs/: Dashboard TLS (git-ignored)
-face_model.obj: 3D face mesh (git-tracked, Apache 2.0)
 Playwright: Browser binaries for automation
 Wake word: ONNX models (optional)
 Ollama: GGUF models (optional)

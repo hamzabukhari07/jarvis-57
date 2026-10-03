@@ -99,29 +99,29 @@ This hardened production blueprint upgrades **ZEZO OS v2** from a single-agent d
 ## 📋 Phased Implementation Plan
 
 ### 🛡️ Phase 1: Risk-Aware Circuit Breaker Ladder (Priority: High)
-- [ ] **Task 1.1: Implement `core/circuit_breaker.py` with Risk-Tiered Recovery**
+- [x] **Task 1.1: Implement `core/circuit_breaker.py` with Risk-Tiered Recovery**
   - Define three distinct capability risk buckets:
     - **L0 (Read-Only Exploration):** `dev_agent`, `grep_search`, `system_status`. Auto-recovers after 1 success.
     - **L1 (Low-Risk Mutation):** `code_helper`, `file_processor.append`. Requires 60s cooldown + 3 consecutive L1 successes.
     - **L2 (High-Risk / Destructive):** `opencode_run`, `file_controller.delete`, `git_push`. **Trips immediately on repeated failure; strictly requires explicit human voice/UI confirmation to re-arm.**
-- [ ] **Task 1.2: Connect Breaker to `core/task_manager.py` & Agent Handlers**
+- [x] **Task 1.2: Connect Breaker to `core/task_manager.py` & Agent Handlers**
   - Track error velocity, repeating exception signatures, and token burn per active task ID.
   - Automatically downgrade failing L2 tasks to L0 read-only exploration before prompting the user.
 
 ---
 
 ### 🌿 Phase 2: Zero Data-Loss Git Worktree Sandboxing (Priority: High)
-- [ ] **Task 2.1: Implement Safe Worktree Lifecycle in `core/git_sandbox.py`**
+- [x] **Task 2.1: Implement Safe Worktree Lifecycle in `core/git_sandbox.py`**
   - Create isolated worktrees on dynamic branches: `git worktree add -b agent/{task_id} .agent_worktrees/{task_id}`.
   - **4-Gate Safe Teardown Protocol:**
     1. **Process Inspection:** Check for child processes (`python`, `pytest`, `node`) locking handles; gracefully terminate (`SIGTERM`).
     2. **Uncommitted Work Quarantine:** Run `git status --porcelain`. If modified/untracked files exist, stash to a quarantine branch (`quarantine/task_{task_id}_{ts}`) rather than deleting.
     3. **Unlock & Settle:** Execute `git worktree unlock` and allow a 500ms Windows file release settle delay.
     4. **Preserve Uncertain States:** If removal fails due to persistent OS locks, mark directory as `ORPHAN_PRESERVED` in the task ledger without executing destructive `git clean -fdx`.
-- [ ] **Task 2.2: Single-Committer Merge Lock & Conflict Protection**
+- [x] **Task 2.2: Single-Committer Merge Lock & Conflict Protection**
   - Centralized Merge Mutex in `core/git_sandbox.py` to prevent parallel branch collisions on `main`.
   - On merge conflict: Preserve work in `conflict/{task_id}` and alert the user with high-level voice summary.
-- [ ] **Task 2.3: Named Agent Personas & Scranton Pixel Office Fleet Deck (`config/fleet_agents.json` & `core/fleet_manager.py`)**
+- [x] **Task 2.3: Named Agent Personas & Scranton Pixel Office Fleet Deck (`config/fleet_agents.json` & `core/fleet_manager.py`)**
   - **Custom Fleet Schema (`config/fleet_agents.json`):** Configurable registry defining agent `name`, `role`, `specialty`, `system_prompt_addon`, `worktree_prefix`, `avatar_palette` (shirt, hair, skin, tie), and default desk coordinates.
   - **Per-Agent Soul & Long-Term Memory On-Disk Layout (`hive/agents/<agent_id>/`):**
     - `soul.md` / `identity.md` — Agent's permanent personality, role constraints, behavioral quirks, and core competencies (loaded at spawn).
@@ -131,17 +131,22 @@ This hardened production blueprint upgrades **ZEZO OS v2** from a single-agent d
   - **Dynamic Subagent Dispatch & Voice Routing:** Enable targeted voice commands (e.g., *"Michael, summarize active sprint"* $\to$ routes to `MICHAEL` orchestrator, *"Dwight, security lint"* $\to$ routes to `DWIGHT` worker).
   - **Scranton Pixel Office Web Deck Bridge:** Connect backend task manager WebSocket events to `prototypes/scranton_pixel_office_fleet/index.html` (animating real-time desk focus, walking A* paths to server rack/boardroom, and populating right-drawer Inspector with live files, diffs, logs, and agent memory tabs).
   - **Custom User Agent Builder:** Allow users to create, rename, or reassign custom agents directly via voice or HUD settings.
+- [x] **Task 2.4: Native Desktop HUD & Voice Integration for Scranton Office Deck**
+  - Embed interactive Scranton Office modal (`#office-modal`) inside ZEZO desktop web engine (`frontend/index.html`) with real-time canvas, desk navigation, and live Inspector drawer.
+  - Expose `/api/fleet/state` & WebSocket telemetry broadcast in `core/ui_server.py`.
+  - Voice intent routing (*"open office view"*, *"show agents"*, *"open agent view"*) and Top Navbar icon trigger (`Ctrl+O`).
+  - Dual-monitor standalone route (`/office`) for pop-out window operation.
 
 ---
 
 ### 🏛️ Phase 3: Immutable Provenance & Conflict-Aware Memory Palace (Priority: Medium)
-- [ ] **Task 3.1: Implement `memory/memory_condenser.py` with Conflict Graphs**
+- [x] **Task 3.1: Implement `memory/memory_condenser.py` with Conflict Graphs**
   - Store explicit user commands in an immutable SQLite table (`user_explicit_rules`) that cannot be modified by AI summaries.
   - Periodic background reaper clusters transcripts every 40 minutes using fast Groq LPU (`llama-3.3-70b-versatile`).
   - **Conflict Detection:** When a newly inferred note contradicts an existing directive, preserve both with exact source timestamps and generate a `CONFLICT_PENDING_RESOLUTION` node.
   - Prompt user at the next natural idle voice turn for explicit conflict resolution.
-- [ ] **Task 3.2: HUD Memory Palace Visualizer**
-  - Add "Memory Palace" tab in HUD Settings to view immutable user rules, topic clusters, and pending conflict cards.
+- [x] **Task 3.2: HUD Memory Palace Snapshot & Integration**
+  - Expose snapshot state (active immutable user rules, topic clusters, structured facts, and pending conflict cards) for HUD / Settings consumption.
 
 ---
 

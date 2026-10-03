@@ -130,6 +130,12 @@ class ActionRegistry:
                 return msg
             self._key_history.append((now, sig))
 
+        from core.circuit_breaker import circuit_breaker
+        can_run, block_msg = circuit_breaker.can_execute(name)
+        if not can_run:
+            print(f"[CircuitBreaker] [WARN] {block_msg}")
+            return str(block_msg)
+
         from core.task_manager import ToolExecutionContext
         from core.log_bus import emit_tool_micro_event
 
@@ -144,10 +150,15 @@ class ActionRegistry:
         try:
             res = _call_handler(rec.handler, parameters, run_ctx) or "Done."
             elapsed_ms = round((time.perf_counter() - t0) * 1000, 1)
+            if isinstance(res, str) and res.startswith(f"Tool '{name}' failed:"):
+                circuit_breaker.record_failure(name, res)
+            else:
+                circuit_breaker.record_success(name)
             emit_tool_micro_event("completed", name, {"task_id": task_id, "latency_ms": f"{elapsed_ms}ms"})
             return res
         except Exception as e:
             elapsed_ms = round((time.perf_counter() - t0) * 1000, 1)
+            circuit_breaker.record_failure(name, str(e))
             emit_tool_micro_event("failed", name, {"task_id": task_id, "error": str(e), "latency_ms": f"{elapsed_ms}ms"}, level="ERROR")
             self._logger(f"Action '{name}' crashed during run(): {e}")
             traceback.print_exc()

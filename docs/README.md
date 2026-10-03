@@ -50,9 +50,10 @@ User speaks → Microphone → Audio gates (wake/echo/PTT) → Gemini Live → S
 
 ## Tools & Perception
 
-- **24 built-in actions** auto-discovered from `actions/*.py` (0 tool bloat)
+- **25 built-in actions** auto-discovered from `actions/*.py` (including autonomous `fleet_control`, `opencode_agent`, `kilo_agent`, `antigravity_agent`)
+- **Multi-Agent Fleet Orchestrator** & **Scranton Agent Office Floor** (`frontend/office.html`) for real-time visual desk monitoring
 - **11 declarative skill packages** in `skills/` (including `figma_helper`, `hamza_taste`, `opencode`)
-- **4-Tier Escalated Perception Engine**: L0 OS Native (1ms) ➔ L1 Windows UIA (<15ms) ➔ L1.5 Multilingual RapidOCR (<80ms, 0 VRAM) ➔ L2 Gemini Vision (~2.0s)
+- **4-Tier Escalated Perception Engine**: L0 OS Native (1ms) ➔ L1 Windows UIA (<15ms) ➔ L1.5 Multilingual RapidOCR (<80ms, 0 VRAM) ➔ L2 Gemini Vision (5.0s per model attempt timeout ladder)
 - **Plugins** auto-discovered from `plugins/*.py`
 - **Inline tools** in `main.py` for live-session state
 - **All tools** declared as `function_declarations` and sent to Gemini
@@ -118,13 +119,15 @@ Volume, brightness, WiFi, keyboard, mouse, windows, applications, browser, files
 | `main.py` | Application orchestrator & Gemini Live WebSockets loop |
 | `ui.py` | PyQt6 HUD, holographic avatar, multi-file dropzone & task inspector |
 | `core/prompt.txt` | System prompt template |
-| `core/action_loader.py` | Action auto-discovery (23 actions) |
-| `core/skill_loader.py` | Declarative skill loader (10 skills) |
+| `core/action_loader.py` | Action auto-discovery (25 actions) |
+| `core/fleet_manager.py` | Autonomous multi-agent fleet orchestrator & workspace isolation |
+| `core/skill_loader.py` | Declarative skill loader (11 skills) |
 | `core/plugin_loader.py` | Plugin auto-discovery |
-| `core/task_manager.py` | Background task registry, process watchdog, CPU throttle, cancellation |
+| `core/task_manager.py` | Background task registry, concurrency limiter (MAX_CONCURRENT=2), process watchdog |
 | `core/log_bus.py` | Ring buffer log bus (20,000 lines) with zero-leak secret redaction |
 | `core/design_resolver.py` | Design token resolver & anti-slop preset injector |
 | `core/design_extractor.py` | Deterministic HTML/Tailwind token extractor |
+| `frontend/office.html` | Scranton Pixel Office 2D visual fleet monitoring canvas |
 | `core/viseme.py` | Lip-sync engine |
 | `core/echo.py` | Self-echo guard |
 | `core/wake_word.py` | Wake word detection |

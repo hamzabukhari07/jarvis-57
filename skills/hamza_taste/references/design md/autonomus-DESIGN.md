@@ -2,8 +2,8 @@
 version: "3.0"
 name: "Autonomus"
 theme: "dark"
-source: "C:/Users/Hamza Bukhari/Documents/antigravity/zezo latest/skills/hamza_taste/references/html/autonomus.html"
-extracted_at: "2026-10-01T12:03:37.296557+00:00"
+source: "D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/autonomus.html"
+extracted_at: "2026-10-03T15:00:14.584059+00:00"
 description: "High-precision studio design system extracted deterministically from Autonomus. Features deep #050505 void canvas, high-contrast #f5f5f7 typography, vibrant #f24e1e accents, and glassy elevation."
 colors:
   primary: "#f24e1e"
@@ -95,7 +95,7 @@ components:
 # Autonomus — Design Specification
 
 > **Aesthetic Profile:** Dark Studio / High-Precision Void  
-> **Extracted Source:** C:/Users/Hamza Bukhari/Documents/antigravity/zezo latest/skills/hamza_taste/references/html/autonomus.html  
+> **Extracted Source:** D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/autonomus.html  
 > **Theme:** DARK  
 
 ---

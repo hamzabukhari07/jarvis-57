@@ -27,7 +27,7 @@ _WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 # Semantic Category Mapping for the 13 HTML Reference Templates
 _SEMANTIC_ROUTES: list[tuple[list[str], str]] = [
     (["saas", "b2b", "subscription", "software", "crm", "api service", "cloud platform", "developer platform"], "saas"),
-    (["dub", "conversion", "marketing", "link", "real estate", "property", "properties", "mortgage", "realtor", "broker", "sales", "affiliate", "home"], "dub landing page"),
+    (["dub", "conversion", "marketing", "link", "real estate", "property", "properties", "mortgage", "realtor", "broker", "sales", "affiliate", "home"], "dub"),
     (["ai", "agent", "autonomous", "bot", "assistant", "robot", "robotics", "machine learning", "deep learning", "neural", "automations"], "autonomus"),
     (["dashboard", "ecosystem", "analytics", "admin", "metrics", "platform", "infrastructure", "backend console", "portal", "monitoring"], "Standalone Ecosystem"),
     (["os", "operating system", "window", "desktop", "terminal", "desktop app", "workspace", "file manager"], "froma os "),
@@ -336,8 +336,8 @@ def resolve_design(
     for keywords, target_stem in _SEMANTIC_ROUTES:
         if any(kw in task_clean for kw in keywords):
             target_norm = _norm_stem(target_stem)
-            cat_html = next((h for h in available_html if target_norm in _norm_stem(h.name)), None)
-            cat_md = next((m for m in available_md if target_norm in _norm_stem(m.name)), None)
+            cat_html = next((h for h in available_html if target_norm in _norm_stem(h.name) or _norm_stem(h.name) in target_norm), None)
+            cat_md = next((m for m in available_md if target_norm in _norm_stem(m.name) or _norm_stem(m.name) in target_norm), None)
             cat_res = _load_or_extract_reference(cat_html, cat_md, md_dir)
             if cat_res:
                 name, stype, spec, raw_h = cat_res

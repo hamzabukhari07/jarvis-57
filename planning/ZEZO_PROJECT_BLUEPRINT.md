@@ -550,9 +550,6 @@ zezo latest/
 │   ├── llm_router.py                # Background text router: Groq → Gemini → Ollama
 │   ├── laya_router.py               # Secondary intent router with confidence
 │   ├── voice_fallback.py            # Offline voice loop (VAD → STT → LLM → TTS)
-│   ├── viseme.py                    # Audio formant & text phoneme extractor
-│   ├── avatar.py                    # Holographic head rasterizer (QPainter)
-│   ├── avatar_mesh.py               # 3D vector geometry for facial acting
 │   ├── wake_word.py                 # Local "Hey Jarvis" detector
 │   ├── echo.py                      # Self-echo filter & mic bleed suppression
 │   ├── hotkey.py                    # Global hotkey listener (Ctrl+Space)
@@ -570,7 +567,6 @@ zezo latest/
 │   ├── ui_server.py                 # Local UI WebSocket & static HTTP server
 │   ├── installer.py                 # Dependency auto-installer
 │   ├── mcp_runtime.py               # Async MCP client on dedicated event loop thread
-│   ├── face_model.obj               # MediaPipe canonical face mesh (468 vertices)
 │   └── computer/                    # 🖱️ Modular Computer Control Drivers
 │       ├── __init__.py              # Unified driver export & registry
 │       ├── windows_native.py        # Win32 HWND, focus attachment, safe close

@@ -168,9 +168,7 @@ _ONE_SHOT_SYSTEM = (
     "and whitespace of anything you are asked to copy or return."
 )
 
-# Milliseconds. Not a preference: the API rejects anything under ten seconds
-# with "Minimum allowed deadline is 10s", so this is the tightest bound it will
-# accept. Callers with a long job (a whole document, a big image) pass more.
+# Milliseconds. 10.0s per model attempt timeout bound complies with Gemini API minimum deadline.
 DEFAULT_TIMEOUT_MS = 10_000
 MIN_TIMEOUT_MS = 10_000
 

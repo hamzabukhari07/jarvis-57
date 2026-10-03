@@ -14,9 +14,6 @@ JARVIS/
 ├── core/
 │   ├── __init__.py                  # Core module init
 │   ├── prompt.txt                   # System prompt template (160 lines)
-│   ├── face_model.obj               # MediaPipe face mesh (25 KB, Apache 2.0)
-│   ├── avatar.py                    # Holographic avatar renderer
-│   ├── avatar_mesh.py               # Head geometry builder
 │   ├── models.py                    # Single source of truth for model ids (Gemini/Antigravity/Groq)
 │   ├── provider_health.py           # Startup provider/model health-check
 │   ├── gemini.py                    # One-shot Gemini calls, model ladder
@@ -30,10 +27,11 @@ JARVIS/
 │   ├── wake_word.py                 # Local "Hey Jarvis" detector
 │   ├── hotkey.py                    # Push-to-talk chord detection
 │   ├── audio_devices.py             # Mic/speaker enumeration and selection
-│   ├── action_loader.py             # Auto-discovers actions/*.py
+│   ├── action_loader.py             # Auto-discovers actions/*.py (25 actions)
+│   ├── fleet_manager.py             # Autonomous multi-agent fleet orchestrator & workspace isolation
 │   ├── plugin_loader.py             # Auto-discovers plugins/*.py
 │   ├── skill_loader.py              # Declarative skill registry & context manager
-│   ├── task_manager.py              # Background task execution & status tracker
+│   ├── task_manager.py              # Background task execution, concurrency limiter & status tracker
 │   ├── log_bus.py                   # In-memory ring buffer with secret redaction
 │   ├── repo_context.py              # Active workspace resolver & persistence
 │   ├── design_resolver.py           # Raw HTML blueprint injector & adaptive resolver
@@ -47,6 +45,7 @@ JARVIS/
 │   ├── confirm.py                   # Irreversible-action confirmation gate
 │   └── installer.py                 # OS-specific post-install setup
 ├── actions/
+│   ├── fleet_control.py             # Multi-agent fleet orchestrator (spawn, instruct, status, cancel)
 │   ├── antigravity_agent.py         # Google Antigravity autonomous coding agent
 │   ├── opencode_agent.py            # OpenCode CLI multi-file implementation agent
 │   ├── kilo_agent.py                # Kilo Code multi-file refactoring agent
@@ -117,18 +116,36 @@ JARVIS/
 **Key class**: `JarvisUI` (inherits `QMainWindow`)
 **Key classes**: `C` (color palette), `apply_ui_accent()`
 
-**Dependencies**: `PyQt6`, `psutil`, `core/avatar.py`, `memory/config_manager.py`
+**Dependencies**: `PyQt6`, `psutil`, `core/ui_server.py`, `memory/config_manager.py`
 
 **Called by**: `main.py` creates `JarvisUI()` instance
 
 ### core/action_loader.py (221 lines)
 
-**Purpose**: Auto-discovers `actions/*.py` files with `TOOL` dict. Validates and registers actions.
+**Purpose**: Auto-discovers `actions/*.py` files with `TOOL` dict. Validates and registers actions (25 discovered actions).
 
 **Key classes**: `ActionRegistry`, `ActionRecord`
 **Key functions**: `discover_actions()`, `_validate()`, `_call_handler()`
 
 **Called by**: `main.py` in `JarvisLive.__init__()`
+
+### core/fleet_manager.py
+
+**Purpose**: Autonomous multi-agent fleet orchestrator. Manages named agent instances, Git worktree isolation, dynamic agent roster registration, desk allocation, and live status streaming for the Scranton pixel office.
+
+**Key classes**: `FleetManager`, `FleetAgent`, `AgentDesk`
+**Key functions**: `get_fleet()`, `spawn_agent()`, `instruct_agent()`, `cancel_agent()`, `get_status()`, `register_agent()`, `broadcast_event()`
+
+**Called by**: `actions/fleet_control.py`, `core/ui_server.py`
+
+### actions/fleet_control.py
+
+**Purpose**: Built-in voice & text action for controlling autonomous multi-agent fleets (`fleet_control`). Enables Jarvis to spawn, query, instruct, and terminate specialized autonomous agents operating across isolated workspaces.
+
+**Key dictionary**: `TOOL` (`fleet_control`)
+**Key functions**: `handler()` (sub-actions: `status`, `spawn`, `instruct`, `cancel`, `report`)
+
+**Called by**: `main.py:_execute_tool()`, Gemini Live function calling
 
 ### core/plugin_loader.py (285 lines)
 

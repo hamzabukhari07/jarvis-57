@@ -224,11 +224,12 @@ PLUGIN_SETTINGS = {
 
 All settings accessed via getter/setter functions:
 - `get_gemini_key()`, `save_api_keys()`, `save_api_keys_transactional()`, `is_configured()`
-- `validate_gemini_key()`, `validate_groq_key()`, `validate_elevenlabs_key()`
-- `get_masked_gemini_key()`, `get_masked_groq_key()`
+- `validate_gemini_key()`, `validate_groq_key()`, `validate_elevenlabs_key()`, `validate_tavily_key()`
+- `get_masked_gemini_key()`, `get_masked_groq_key()`, `get_masked_elevenlabs_key()`, `get_masked_tavily_key()`, `get_tavily_api_key()`
 - `get_groq_api_key()`, `get_groq_model()`, `get_groq_vision_model()`, `get_groq_whisper_model()`, `save_groq_config()`
 - `get_opencode_model()`, `get_kilo_model()`, `get_antigravity_model()`
 - `get_voice()`, `save_voice()`
+- `get_fallback_voice()`, `save_fallback_voice()`
 - `get_response_language()`, `save_response_language()`
 - `get_wake_word_enabled()`, `save_wake_word_enabled()`
 - `get_push_to_talk_enabled()`, `save_push_to_talk_enabled()`
@@ -248,8 +249,9 @@ All config in: config/api_keys.json (git-ignored, template: config/api_keys.exam
 Transactional: Pre-flight live probes + atomic staging (_atomic_write_config)
 No env vars for app configuration
 All access via memory/config_manager.py
-Settings: API keys, name, voice, response language, models, toggles, devices, tuning, LLM
+Settings: API keys, name, voice, fallback voice, response language, models, toggles, devices, tuning, LLM
 Voices: Charon, Puck, Kore, Fenrir, Aoede
+Fallback Voices: Kokoro (af_heart, af_bella, am_adam, etc.), EdgeTTS, ElevenLabs
 Masking: get_masked_gemini_key(), get_masked_groq_key() for secure UI status display
 Onboarding: Automatic #onboarding-modal trigger when is_configured() is False
 Toggles: wake_word, push_to_talk, thinking, proactive_audio

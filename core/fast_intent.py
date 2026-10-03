@@ -83,6 +83,20 @@ APP_CANONICAL_MAP: Dict[str, str] = {
     "obsidian": "obsidian",
     "notion": "notion",
     "vlc": "vlc",
+    "office view": "office_view",
+    "agent view": "office_view",
+    "agents view": "office_view",
+    "office": "office_view",
+    "office floor": "office_view",
+    "scranton office": "office_view",
+    "fleet view": "office_view",
+    "fleet": "office_view",
+    "agents": "office_view",
+    "home view": "home_view",
+    "home screen": "home_view",
+    "home": "home_view",
+    "dashboard": "home_view",
+    "tactical view": "home_view",
 }
 
 # Filler prefixes and polite phrases to strip cleanly

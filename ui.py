@@ -152,6 +152,7 @@ class MainWindow(QMainWindow):
     """Main desktop container window hosting the HTML5/CSS/JS frontend via QWebEngineView."""
 
     _log_sig = pyqtSignal(str)
+    _stream_sig = pyqtSignal(str, str, bool)
     _state_sig = pyqtSignal(str)
     _content_sig = pyqtSignal(str, str)
 
@@ -240,6 +241,7 @@ class MainWindow(QMainWindow):
 
         # Connect internal signals
         self._log_sig.connect(self._on_log_emitted)
+        self._stream_sig.connect(self._on_stream_emitted)
         self._state_sig.connect(self._on_state_emitted)
         self._content_sig.connect(self._on_content_emitted)
 
@@ -468,6 +470,14 @@ class MainWindow(QMainWindow):
             tag, msg = "SYS", text[4:].strip()
 
         self._server.broadcast("log_entry", {"tag": tag, "message": msg})
+        self._server.broadcast("transcript_stream", {"speaker": tag.lower(), "text": msg, "done": True})
+
+    def _on_stream_emitted(self, speaker: str, text: str, done: bool):
+        self._server.broadcast("transcript_stream", {
+            "speaker": (speaker or "user").lower(),
+            "text": text,
+            "done": done,
+        })
 
     def _on_content_emitted(self, title: str, text: str):
         self._server.broadcast("content_display", {"title": title, "text": text})
@@ -736,6 +746,14 @@ class ZezoUI:
             return
         try:
             self._win._log_sig.emit(text)
+        except (RuntimeError, AttributeError):
+            pass
+
+    def stream_transcript(self, speaker: str, text: str, done: bool = False):
+        if not self.is_alive():
+            return
+        try:
+            self._win._stream_sig.emit(str(speaker), str(text), bool(done))
         except (RuntimeError, AttributeError):
             pass
 

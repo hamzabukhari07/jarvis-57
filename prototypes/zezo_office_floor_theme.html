@@ -2592,23 +2592,10 @@
       setState(a, 'working');
     });
 
-    // Start Autonomous Cycle (Every 3.5 seconds an agent transitions between working, walking, break & banter)
-    setInterval(runAutonomousFleetCycle, 3500);
-
-    // Initial warm-up action after 1.2 seconds: Jim visits Dwight!
-    setTimeout(() => {
-      const jim = agents.find(a => a.name === 'JIM');
-      const dwight = agents.find(a => a.name === 'DWIGHT');
-      if (jim && dwight) {
-        startBanter(jim, dwight, BANTER_SCRIPTS[0]);
-      }
-    }, 1200);
-
-    // Secondary warm-up after 3.5 seconds: Kevin takes a water-cooler coffee break!
-    setTimeout(() => {
-      const kevin = agents.find(a => a.name === 'KEVIN');
-      if (kevin) startCoffeeBreak(kevin);
-    }, 3500);
+    // Grounded idle seating on desk
+    agents.forEach(a => {
+      setState(a, 'idle');
+    });
 
 
     // ── Audio Web Synthesizer (Retro Micro-Foley) ──

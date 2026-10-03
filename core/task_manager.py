@@ -75,8 +75,14 @@ class ToolExecutionContext:
             raise TimeoutError(f"Tool '{self.tool_name}' ({self.task_id}) timed out after {self.timeout_seconds}s.")
 
 
-CODING_TOOLS = {"opencode_agent", "kilo_agent", "dev_agent", "antigravity_agent"}
-MAX_CONCURRENT_CODING_TASKS = 1
+CODING_TOOLS = {
+    "opencode_agent", "opencode_run",
+    "kilo_agent", "kilo_run",
+    "dev_agent",
+    "antigravity_agent", "antigravity_run",
+    "code_helper",
+}
+MAX_CONCURRENT_CODING_TASKS = 2
 
 CLONER_TOOLS = {"website_cloner", "clone_website"}
 MAX_CONCURRENT_CLONES = 2
@@ -279,6 +285,15 @@ class TaskManager:
                     pos = len(self._coding_queue)
                     state.message = f"queued (position #{pos})"
                     logger.info("task %s [%s] queued at position %d", task_id, tool_name, pos)
+                    try:
+                        from core.log_bus import emit_tool_micro_event
+                        emit_tool_micro_event(
+                            "task_queued",
+                            tool_name,
+                            {"task_id": task_id, "position": pos, "queue_len": len(self._coding_queue)}
+                        )
+                    except Exception as e:
+                        logger.debug("Failed emitting task_queued event: %s", e)
                     return task_id
 
             self._start_task_thread(task_id, fn, params, ctx, state)
@@ -395,11 +410,12 @@ class TaskManager:
             s for s in self._tasks.values()
             if s.tool in CODING_TOOLS and s.status == TaskStatus.RUNNING and not s.finished_at
         ]
-        if len(active_coding) < MAX_CONCURRENT_CODING_TASKS and self._coding_queue:
+        while len(active_coding) < MAX_CONCURRENT_CODING_TASKS and self._coding_queue:
             next_task_id, next_fn, next_params, next_ctx, next_state = self._coding_queue.pop(0)
             for idx, item in enumerate(self._coding_queue, 1):
                 item[4].message = f"queued (position #{idx})"
             self._start_task_thread(next_task_id, next_fn, next_params, next_ctx, next_state)
+            active_coding.append(next_state)
 
     def status(self, task_id: str) -> Optional[dict]:
         with self._lock:
@@ -430,7 +446,11 @@ class TaskManager:
                 TaskStatus.DONE, TaskStatus.FAILED, TaskStatus.CANCELLED
             ):
                 return False
+            was_in_queue = any(item[0] == task_id for item in self._coding_queue)
             self._coding_queue = [item for item in self._coding_queue if item[0] != task_id]
+            if was_in_queue:
+                for idx, item in enumerate(self._coding_queue, 1):
+                    item[4].message = f"queued (position #{idx})"
             s.cancel_event.set()
             s.status = TaskStatus.CANCELLED
             s.finished_at = time.time()

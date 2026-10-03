@@ -120,6 +120,10 @@ class ZezoApp {
             this.appendLog(entry.tag || 'SYS', entry.message || '');
         });
 
+        socket.on('transcript_stream', (data) => {
+            this.handleStreamTranscript(data);
+        });
+
         socket.on('content_display', (payload) => {
             this.showInspectorContent(payload.title, payload.text);
         });
@@ -241,6 +245,53 @@ class ZezoApp {
         const countEl = document.getElementById('logCountLabel');
         if (countEl) {
             countEl.textContent = `${stream.children.length} lines`;
+        }
+    }
+
+    handleStreamTranscript(data) {
+        if (!data) return;
+        const speaker = (data.speaker || 'user').toLowerCase();
+        const text = data.text || '';
+        const done = !!data.done;
+        const stream = document.getElementById('activityStream');
+        if (!stream) return;
+
+        const isZezo = speaker === 'ai' || speaker === 'zezo';
+        const streamId = isZezo ? 'live_stream_zezo' : 'live_stream_user';
+        const tagUpper = isZezo ? 'ZEZO' : 'USER';
+        const tagClass = isZezo ? 'ai' : 'user';
+
+        let row = document.getElementById(streamId);
+        if (!done && text) {
+            if (!row) {
+                const now = new Date();
+                const ts = now.toTimeString().split(' ')[0];
+                row = document.createElement('div');
+                row.id = streamId;
+                row.className = 'log-entry live-stream-row';
+                row.innerHTML = `
+                    <span class="log-ts">${ts}</span>
+                    <span class="log-tag ${tagClass}">[${tagUpper}]</span>
+                    <span class="log-msg"><span class="stream-text"></span><span class="live-cursor" style="display:inline-block; width:5px; height:10px; background:var(--accent); margin-left:3px; vertical-align:middle;"></span></span>
+                `;
+                stream.appendChild(row);
+            }
+            const txtSpan = row.querySelector('.stream-text');
+            if (txtSpan) {
+                txtSpan.textContent = (txtSpan.textContent ? txtSpan.textContent + ' ' : '') + text;
+            }
+            stream.scrollTop = stream.scrollHeight;
+        }
+
+        if (done && row) {
+            const cursor = row.querySelector('.live-cursor');
+            if (cursor) cursor.remove();
+            row.removeAttribute('id');
+            const txtSpan = row.querySelector('.stream-text');
+            if (text && txtSpan && (!txtSpan.textContent || txtSpan.textContent.length < text.length)) {
+                txtSpan.textContent = text;
+            }
+            stream.scrollTop = stream.scrollHeight;
         }
     }
 

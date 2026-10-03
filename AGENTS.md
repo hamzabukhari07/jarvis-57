@@ -37,9 +37,6 @@ zezo version 2/
 │   ├── llm_client.py           # Multi-provider LLM interface (Ollama, OpenAI, Groq)
 │   ├── llm_router.py           # Background text router: Groq → Gemini → Ollama (live voice untouched)
 │   ├── voice_fallback.py       # Offline fallback voice loop (VAD → STT → LLM → TTS) when Gemini Live is down
-│   ├── viseme.py               # Audio formant & text phoneme extractor for avatar lip-sync
-│   ├── avatar.py               # Holographic head rasterizer & face state animator
-│   ├── avatar_mesh.py          # 3D vector geometry for facial acting
 │   ├── wake_word.py            # Local "Hey Jarvis" detector (openWakeWord)
 │   ├── echo.py                 # Self-echo filter & mic bleed suppression
 │   ├── hotkey.py               # Global hotkey listener (Ctrl+Space Push-to-Talk)
@@ -51,12 +48,13 @@ zezo version 2/
 │   ├── log_bus.py              # Backend log ring buffer (stdlib logging + stdout/stderr tee)
 │   └── governance.py           # Path validation, dangerous-command DENY patterns, policy matrix
 │
-├── actions/                    # 🛠️ Self-Describing Tools (24 Discovered Actions)
+├── actions/                    # 🛠️ Self-Describing Tools (25 Discovered Actions)
 │   ├── opencode_agent.py       # [opencode_run] Autonomous multi-file coding agent
 │   ├── kilo_agent.py           # [kilo_run] Multi-file refactoring & editing agent
 │   ├── antigravity_agent.py    # [antigravity_run] Studio UI & Antigravity synthesis agent
 │   ├── code_helper.py          # [code_helper] Single function / inline snippet generator
 │   ├── dev_agent.py            # [dev_agent] Read-only codebase exploration & bug hunter
+│   ├── fleet_control.py        # [fleet_control] Autonomous named multi-agent fleet orchestrator
 │   ├── design_extractor.py     # [extract_design_system] HTML/CSS design token extractor
 │   ├── task_status.py          # [task_status] Background task status / progress query
 │   ├── website_cloner.py       # [clone_website] Offline site cloner & asset localizer
@@ -131,13 +129,38 @@ zezo version 2/
 7. **Creator Attribution:**
    - Always document and acknowledge **Hamza Bukhari** as the creator and lead architect.
 8. **Strict 3-Layer Verification Rule:**
-   - After ANY code change, invoke the `verify` skill (`.antigravity/skills/verify.md`).
-   - The verify skill requires:
-     - **Layer 1:** static checks (compile, import, discovery)
-     - **Layer 2:** runtime evidence (actual log lines, real file outputs, API responses)
-     - **Layer 3:** regression checks (2+ existing features)
+   - After ANY code change, verify all 3 layers yourself before reporting success:
+     - **Layer 1 (static):** `python -m py_compile` on every touched file, plus `core/action_loader.py` discovery if `actions/` changed.
+     - **Layer 2 (runtime):** real evidence — actual log lines, real file outputs, real API responses. Never claim a run you did not perform.
+     - **Layer 3 (regression):** confirm 2+ existing features still work.
    - You may NOT write "FIXED" until all 3 layers pass.
    - If you cannot run runtime tests, write "UNVERIFIED" with reason — do NOT write "FIXED".
+9. **Mandatory Code Graph (CGC) Pre-Flight Query:**
+   - Before modifying, refactoring, or **debugging** any module, you MUST query the Code Graph first to inspect callers, callees, and dependency blast radius.
+   - The graph is exposed as MCP tools prefixed `codegraph_` (opencode namespace):
+     | Tool | Use for |
+     | :--- | :--- |
+     | `codegraph_find_code` | locate a symbol / search code content |
+     | `codegraph_analyze_code_relationships` | **callers & callees — the main blast-radius tool** |
+     | `codegraph_calculate_cyclomatic_complexity` | complexity of one function |
+     | `codegraph_find_most_complex_functions` | hunt complexity hotspots |
+     | `codegraph_find_dead_code` | find unused code |
+     | `codegraph_execute_cypher_query` | custom Cypher when the above are not enough |
+     | `codegraph_list_indexed_repositories` | confirm the graph actually covers this repo |
+   - **Debugging protocol (follow in order, do not skip to grep):**
+     1. `codegraph_find_code` — find the symbol and confirm the graph is not stale.
+     2. `codegraph_analyze_code_relationships` — enumerate every caller before you edit.
+     3. Read only the files that query points to.
+     4. Edit, then re-run the caller query to confirm you did not miss a call site.
+   - **CLI fallback** (when MCP tools are absent): `cgc -db kuzudb analyze callers <fn>`, `cgc -db kuzudb find name <symbol>`, `cgc -db kuzudb find content "<query>"`, `cgc -db kuzudb analyze complexity`.
+   - **If you see `Could not set lock on file`:** the embedded KùzuDB is single-owner and another process (e.g. an IDE's own CGC server) holds it. Do NOT retry — fall back to `grep`/`glob` immediately and say so in your summary. Only one IDE can hold the KùzuDB graph at a time.
+   - Refresh a stale graph with `cgc -db kuzudb update` (auto-watch is enabled, so this is usually unnecessary).
+
+10. **Anti-Slop Code Hygiene Enforcement:**
+   - All code changes must strictly adhere to `.agents/skills/antislop_code/SKILL.md`:
+     - Function cyclomatic complexity must stay **< 15**.
+     - No massive `if/elif` ladders (use dictionary dispatch).
+     - No bloated boilerplate or obvious echo comments.
 
 ---
 
@@ -156,25 +179,58 @@ zezo version 2/
 
 ---
 
-## 🔄 4. Standard Feature Workflow
+## 🔄 4. Integrated Skill System & Automatic Workflow Routing
+
+The ZEZO development ecosystem operates through an integrated two-tier skill architecture located in `.agents/skills/`.
 
 ```
-[ 1. SCOPE ] ──► Define the feature, inputs, outputs, and constraints.
-      │
-[ 2. AUDIT ] ──► Inspect existing actions, schemas, and dependencies.
-      │
-[ 3. DESIGN ] ──► Ensure every generated value has a clear source; check ADRs.
-      │
-[ 4. DEVELOP ] ──► Write minimum required code; adhere to TOOL contract.
-      │
-[ 5. VERIFY ] ──► Run py_compile, import checks, and action_loader discovery.
-      │
-[ 6. DOCUMENT ] ──► Update docs/<FILE>.md, docs/README.md, AGENTS.md, prompt.txt & LEARNING_JOURNAL.md.
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                       WORKFLOW SKILLS (STAGES)                                         │
+├───────────────────┬─────────────────────────┬───────────────────┬───────────────────┬──────────────────┤
+│ vision_suggestions│ repo_opportunity_audit  │ debug_diagnosis   │ feature_planning  │ implementation   │
+│ • Idea exploration│ • External repo audit   │ • Bug root cause  │ • Architecture doc│ • Code authoring │
+│ • UX brainstorming│ • Feature extraction    │ • Log diagnosis   │ • Dependency steps│ • Schema & docs  │
+│ • Read-only       │ • Target comparison     │ • Read-only       │ • Read-only       │ • Active mutation│
+└─────────┬─────────┴───────────┬─────────────┴─────────┬─────────┴─────────┬─────────┴────────┬─────────┘
+          │                     │                       │                   │                  │
+          ▼                     ▼                       ▼                   ▼                  ▼
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                     FOUNDATIONAL SKILLS (PILLARS)                                      │
+├─────────────────────────────────────────────────────┬──────────────────────────────────────────────────┤
+│ code_graph_intelligence                             │ antislop_code                                    │
+│ • KùzuDB CGC graph pre-flight                       │ • Cyclomatic complexity < 15                     │
+│ • Caller & callee blast radius                      │ • Dictionary dispatch tables                     │
+│ • Symbol definition & complexity hotspots           │ • Zero decorative/echo comments                  │
+└─────────────────────────────────────────────────────┴──────────────────────────────────────────────────┘
 ```
+
+### Automatic Request Routing Table
+
+| User Intent / Request Pattern | Active Workflow Skill | Foundational Skills Applied | Execution Boundary |
+| :--- | :--- | :--- | :--- |
+| Exploring an idea, clarifying vision, or asking "how could we build X?" | `vision_suggestions` | `code_graph_intelligence` | **Strictly Read-Only** (No code changes) |
+| Investigating a cloned repo or third-party project for reusable features | `repo_opportunity_audit` | `code_graph_intelligence` | **Strictly Read-Only** (No copying code) |
+| Debugging an error, diagnosing logs, or investigating "why is X failing?" | `debug_diagnosis` | `code_graph_intelligence` | **Strictly Read-Only** (No code edits) |
+| Turning an approved idea into a technical roadmap or architecture plan | `feature_planning` | `code_graph_intelligence` | **Strictly Read-Only** (Generates plan only) |
+| Implementing an approved feature, coding a phase, or authorized refactor | `implementation` | `antislop_code` + `code_graph_intelligence` | **Authorized Mutation** (Requires prior plan/approval) |
+| Checking if something works, running tests, or hunting regressions | `verification` | `code_graph_intelligence` | **Strictly Read-Only** (3-Layer verification evidence) |
+| Authoring or modifying any code file (`.py`, `.js`, `.css`) | (Auto-Enforced) | `antislop_code` | **Mandatory Quality Standard** |
+| Assessing blast radius, callers, or refactoring impact | (Auto-Enforced) | `code_graph_intelligence` | **Structural Navigation & Invariants** |
 
 ---
 
-## 📋 5. Known Quirks & Architectural Constraints
+## 🛡️ 5. Approval & Safety Boundaries
+
+1. **Discovery is Read-Only:** `vision_suggestions` and `repo_opportunity_audit` produce analysis and options. They MUST NOT modify project files or install packages without authorization.
+2. **Planning is Read-Only:** `feature_planning` creates structured roadmap documents in `planning/`. It MUST NOT modify application source code until implementation is explicitly authorized.
+3. **Implementation Requires Explicit Authorization:** The agent must only modify code when the user explicitly instructs execution (e.g. *"Implement Phase 1"*, *"Apply the approved plan"*).
+4. **Verification-Only is Read-Only:** When asked to verify, test, or check status, report test results and failures. Do NOT silently apply code fixes without authorization.
+5. **Clean-Room Integration:** `repo_opportunity_audit` must never copy third-party code directly. Re-implement cleanly following ZEZO's architecture and Anti-Slop principles.
+6. **Material Scope Change Gate:** If an unexpected roadblock or breaking change is discovered during implementation, STOP and seek user alignment before expanding scope.
+
+---
+
+## 📋 6. Known Quirks & Architectural Constraints
 
 - **Windows Subprocess Hiding:** Windows requires `CREATE_NO_WINDOW` (`_WIN_HIDE`) on background child processes to prevent terminal window popups.
 - **PyAutoGUI Fail-Safe:** Set `pyautogui.FAILSAFE = False` for simple key presses to avoid coordinate boundary exceptions.
@@ -183,7 +239,7 @@ zezo version 2/
 
 ---
 
-## 📖 6. Learning Journal Convention
+## 📖 7. Learning Journal Convention
 
 After completing each feature, create or append to `LEARNING_JOURNAL.md` at the repo root.
 
@@ -201,7 +257,7 @@ Keep it human-readable. Update it as part of the `verify` step.
 
 ---
 
-## 🚨 REGRESSION RULES — DO NOT BREAK
+## 🚨 8. Regression Rules — DO NOT BREAK
 
 These rules exist because bugs were fixed. Breaking any of them will
 reintroduce a previously-fixed bug.
@@ -246,3 +302,22 @@ reintroduce a previously-fixed bug.
 ### Rule 7: QtWebEngine does not support `vh` reliably
 - Prefer `position: fixed` with `inset: 0` over `vh`-based heights.
 - If you must use `vh`, add a JS fallback on `window.resize`.
+
+### Rule 8: Gemini Live Audio Streaming Requires Explicit Sample Rate
+- `main.py` streaming mic audio blobs to Google Gemini Live API (`gemini-3.1-flash-live-preview`) MUST always specify the explicit sample rate parameter:
+  `types.Blob(data=..., mime_type=f"audio/pcm;rate={SEND_SAMPLE_RATE}")` (e.g. `audio/pcm;rate=16000`).
+- NEVER send bare `audio/pcm` without `rate=` — omitting it triggers gateway 1011 internal server disconnects.
+- `send_realtime_input()` must use `audio=types.Blob(...)` keyword format.
+
+
+
+**Code Graph is available in this project. Use it before making any code changes.**
+
+1. Analyze the Code Graph to trace the relevant functions, dependencies, callers, and affected files.
+2. Use the graph to identify the complete execution flow before modifying anything.
+3. Cross-check graph findings against the actual source code. Do not assume the graph is fully up to date.
+4. Identify potential side effects and regression risks in connected modules.
+5. Make only the changes required for Phase 1. Avoid unrelated refactoring.
+6. After implementation, run relevant tests and report the exact files changed and test results.
+
+Do not skip Code Graph analysis, and do not modify code until you have completed the dependency analysis.

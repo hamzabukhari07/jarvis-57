@@ -116,6 +116,107 @@ def _gemini_search(query: str) -> str:
     return text
 
 
+# ── Tavily AI Search (Tier 1 — Ultra-Fast REST API) ─────────────────────────
+
+def _tavily_search(
+    query: str,
+    search_depth: str = "basic",
+    max_results: int = 6,
+    topic: str = "general",
+    timeout: float = 3.0,
+) -> list[dict]:
+    """Execute low-latency direct query against Tavily AI Search REST API (zero PyPI deps)."""
+    from memory.config_manager import get_tavily_api_key
+    api_key = get_tavily_api_key()
+    if not api_key:
+        return []
+
+    import urllib.request
+    import urllib.error
+
+    url = "https://api.tavily.com/search"
+    payload = {
+        "api_key": api_key,
+        "query": query,
+        "search_depth": search_depth,
+        "max_results": max_results,
+        "topic": topic,
+        "include_answer": True,
+    }
+    req_data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=req_data,
+        headers={"Content-Type": "application/json", "User-Agent": "ZEZO-OS/2.0"},
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            if response.status == 200:
+                raw_data = json.loads(response.read().decode("utf-8"))
+                results = []
+                # Include Tavily AI direct synthesis answer if provided
+                ai_answer = raw_data.get("answer")
+                for r in raw_data.get("results", []):
+                    results.append({
+                        "title": r.get("title", ""),
+                        "snippet": r.get("content", ""),
+                        "url": r.get("url", ""),
+                        "score": r.get("score", 0.0),
+                        "answer": ai_answer,
+                    })
+                return results
+    except Exception as e:
+        _safe_print(f"[WebSearch] ⚠️ Tavily search failed ({e}) — falling back to next tier")
+    return []
+
+
+def _tavily_news(query: str, max_results: int = 6) -> list[dict]:
+    """Fetch latest news articles using Tavily topic='news'."""
+    return _tavily_search(query, search_depth="basic", max_results=max_results, topic="news")
+
+
+def _format_tavily(query: str, results: list[dict]) -> str:
+    if not results:
+        return f"No results found for: {query}"
+
+    lines = []
+    # If Tavily synthesized direct answer, put it right at the top
+    first_ans = results[0].get("answer") if results else None
+    if first_ans:
+        lines.append(f"Summary: {first_ans}\n")
+
+    lines.append(f"Search results for: {query}\n")
+    for i, r in enumerate(results, 1):
+        if r.get("title"):   lines.append(f"{i}. {r['title']}")
+        if r.get("snippet"): lines.append(f"   {r['snippet']}")
+        if r.get("url"):     lines.append(f"   Source: {r['url']}")
+        lines.append("")
+    return "\n".join(lines).strip()
+
+
+def _synthesize_with_groq(query: str, context_text: str, mode: str = "research") -> str:
+    """Fast synthesis via Groq LPU (300+ tokens/sec) for conversational summaries."""
+    from memory.config_manager import get_groq_api_key
+    if not get_groq_api_key():
+        return context_text
+
+    try:
+        from core.llm_client import call_groq_text
+        sys_prompt = (
+            "You are ZEZO's high-speed real-time web research assistant. "
+            "Synthesize the provided web search excerpts into a clear, accurate, 2-3 paragraph answer. "
+            "Cite key facts, dates, prices, and sources clearly. Never invent information not present in the snippets."
+        )
+        user_prompt = f"Topic / Query: {query}\n\nSearch Excerpts:\n{context_text}\n\nSynthesized Intelligence Report:"
+        groq_out = call_groq_text(user_prompt, system=sys_prompt, timeout=8, max_tokens=600)
+        if groq_out and len(groq_out.strip()) > 30:
+            return groq_out.strip()
+    except Exception as e:
+        _safe_print(f"[WebSearch] ⚠️ Groq synthesis skipped ({e}) — serving raw search text")
+    return context_text
+
+
 def _get_ddgs():
     """
     Returns the DDGS class.  The package was renamed duckduckgo-search -> ddgs;
@@ -217,6 +318,14 @@ def _gemini_headlines(n: int = 5) -> tuple[list[str], str]:
     import re
     from core import gemini
 
+    # Fast Tavily News check if key exists
+    tav_res = _tavily_news("top world headlines today", max_results=n)
+    if tav_res:
+        headlines = [r["title"] for r in tav_res if r.get("title")]
+        if headlines:
+            raw_text = _format_news("top world headlines today", tav_res)
+            return headlines[:n], raw_text
+
     response = gemini.call(
         f"Current world news: {n} headlines. Numbered list, titles only.",
         tier=gemini.SEARCH,
@@ -247,36 +356,33 @@ def _gemini_headlines(n: int = 5) -> tuple[list[str], str]:
     return headlines[:n], raw.strip()
 
 
-# ── Modes ──────────────────────────────────────────────────────────────────────
+# ── Modes (3-Tier Hierarchy: Tavily AI -> Gemini Grounded -> DuckDuckGo) ──────
 
 def _search(query: str) -> str:
-    """Default search — Gemini grounded, DDG fallback."""
+    """Default search: Tier 1 Tavily AI -> Tier 2 Gemini Grounded -> Tier 3 DuckDuckGo."""
+    # Tier 1: Tavily AI Search (<500ms)
+    tavily_res = _tavily_search(query, search_depth="basic", max_results=6)
+    if tavily_res:
+        return _format_tavily(query, tavily_res)
+
+    # Tier 2: Gemini Grounded Search
     try:
         return _gemini_search(query)
     except Exception as e:
         _log_gemini_failure("Gemini search", e)
-        results = _ddg_search(query)
-        return _format_ddg(query, results)
+
+    # Tier 3: DuckDuckGo Fallback
+    results = _ddg_search(query)
+    return _format_ddg(query, results)
 
 
 def _news(query: str) -> str:
-    """
-    DDG first, Gemini as backup.
+    """News search: Tier 1 Tavily News -> Tier 2 DDG News -> Tier 3 Gemini."""
+    tav_news = _tavily_news(query if query else "world news today", max_results=8)
+    if tav_news:
+        return _format_news(query if query else "world news today", tav_news)
 
-    The old version raced both backends in parallel and kept the first answer.
-    That burned one google_search grounding call on *every* news request —
-    including the startup briefing — even when DDG had already won the race.
-    Grounding has a small quota, so it ran dry after a handful of launches and
-    then 429'd for everything else (research/compare), which are the modes that
-    actually need a synthesised answer.
-
-    DDG news returns in well under a second and gives raw headlines, which is
-    exactly what the briefing wants, so it goes first and Gemini is only touched
-    when DDG comes back empty.
-    """
-    gemini_query = f"latest news today: {query}" if query else "top world news today"
-    ddg_query    = query if query else "world news today"
-
+    ddg_query = query if query else "world news today"
     def _ddg_attempt() -> str:
         return _format_news(ddg_query, _ddg_news(ddg_query, max_results=8))
 
@@ -284,6 +390,7 @@ def _news(query: str) -> str:
     if text and len(text) > 60 and not text.startswith("No news found"):
         return text
 
+    gemini_query = f"latest news today: {query}" if query else "top world news today"
     text = _run_bounded(
         lambda: _gemini_search(gemini_query), timeout=6.0, label="Gemini news"
     )
@@ -295,9 +402,18 @@ def _news(query: str) -> str:
 
 def _research(query: str) -> str:
     """
-    Deep dive — asks Gemini for a comprehensive answer with context.
-    Falls back to a wider DDG fetch.
+    Deep dive research mode:
+    Tier 1: Tavily Advanced Search + Groq LPU Synthesis (< 700ms total).
+    Tier 2: Gemini Grounded Detailed Search.
+    Tier 3: DDG Search + Groq / Raw formatting.
     """
+    # Tier 1: Tavily Advanced
+    tav_res = _tavily_search(query, search_depth="advanced", max_results=8)
+    if tav_res:
+        formatted = _format_tavily(query, tav_res)
+        return _synthesize_with_groq(query, formatted, mode="research")
+
+    # Tier 2: Gemini Grounded
     research_query = (
         f"Comprehensive, detailed explanation of: {query}. "
         "Include background context, key facts, current state, and important nuances."
@@ -306,26 +422,41 @@ def _research(query: str) -> str:
         return _gemini_search(research_query)
     except Exception as e:
         _log_gemini_failure("Gemini research", e)
-        results = _ddg_search(query, max_results=10)
-        return _format_ddg(query, results)
+
+    # Tier 3: DDG Fallback + Groq Synthesis
+    results = _ddg_search(query, max_results=10)
+    raw_ddg = _format_ddg(query, results)
+    return _synthesize_with_groq(query, raw_ddg, mode="research")
 
 
 def _price(query: str) -> str:
-    """Product price lookup — searches for current market prices."""
-    price_query = f"current price of {query} — how much does it cost today"
+    """Product price lookup: Tier 1 Tavily -> Tier 2 Gemini -> Tier 3 DDG."""
+    price_q = f"current price of {query} cost buy today"
+    tav_res = _tavily_search(price_q, search_depth="basic", max_results=6)
+    if tav_res:
+        return _format_tavily(query, tav_res)
+
     try:
-        return _gemini_search(price_query)
+        return _gemini_search(f"current price of {query} — how much does it cost today")
     except Exception as e:
         _log_gemini_failure("Gemini price", e)
-        results = _ddg_search(f"{query} price buy", max_results=6)
-        return _format_ddg(query, results)
+
+    results = _ddg_search(f"{query} price buy", max_results=6)
+    return _format_ddg(query, results)
 
 
 def _compare(items: list[str], aspect: str) -> str:
+    """Side-by-side comparison: Tier 1 Tavily + Groq -> Tier 2 Gemini -> Tier 3 DDG."""
     query = (
         f"Compare {', '.join(items)} in terms of {aspect}. "
         "Give specific facts and data."
     )
+
+    tav_res = _tavily_search(query, search_depth="advanced", max_results=8)
+    if tav_res:
+        formatted = _format_tavily(query, tav_res)
+        return _synthesize_with_groq(query, formatted, mode="compare")
+
     try:
         return _gemini_search(query)
     except Exception as e:
@@ -346,7 +477,8 @@ def _compare(items: list[str], aspect: str) -> str:
                 lines.append(f"  • {r['snippet']}")
             if r.get("url"):
                 lines.append(f"    {r['url']}")
-    return "\n".join(lines)
+    raw_comp = "\n".join(lines)
+    return _synthesize_with_groq(query, raw_comp, mode="compare")
 
 
 # ── Public entry point ─────────────────────────────────────────────────────────

@@ -106,6 +106,21 @@ class WindowsNativeDriver:
             return False
         if owner != 0 and not (ex_style & WS_EX_APPWINDOW):
             return False
+
+        # Filter out cloaked/suspended UWP background windows (DWMWA_CLOAKED = 14)
+        try:
+            cloaked = ctypes.c_int(0)
+            ctypes.windll.dwmapi.DwmGetWindowAttribute(
+                wintypes.HWND(hwnd),
+                wintypes.DWORD(14),  # DWMWA_CLOAKED
+                ctypes.byref(cloaked),
+                ctypes.sizeof(cloaked),
+            )
+            if cloaked.value != 0:
+                return False
+        except Exception:
+            pass
+
         return True
 
     def get_window_title(self, hwnd: int) -> str:
@@ -407,7 +422,20 @@ class WindowsNativeDriver:
                             w_title = self.get_window_title(hwnd)
                             w_lower = w_title.lower().strip()
                             pattern = r"\b" + re.escape(cleaned_title) + r"\b"
-                            if cleaned_title == w_lower or re.search(pattern, w_lower):
+                            is_match = (cleaned_title == w_lower or re.search(pattern, w_lower) or cleaned_title in w_lower)
+                            
+                            # Also check process name if title matching fails
+                            if not is_match and _PSUTIL:
+                                try:
+                                    pid = ctypes.c_ulong()
+                                    self.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                                    pname = (psutil.Process(pid.value).name() or "").lower()
+                                    if cleaned_title in pname or pname.startswith(cleaned_title):
+                                        is_match = True
+                                except Exception:
+                                    pass
+
+                            if is_match:
                                 matched_hwnd = hwnd
                                 matched_title = w_title
                                 return False
@@ -423,7 +451,7 @@ class WindowsNativeDriver:
                     if matched_hwnd:
                         self.user32.PostMessageW(matched_hwnd, WM_CLOSE, 0, 0)
                         self.user32.PostMessageW(matched_hwnd, WM_COMMAND, IDCANCEL, 0)
-                        return f"Closed window / dialog: {matched_title}"
+                        return f"Closed window: {matched_title}"
 
                     if is_dialog_target:
                         return "Dismissed active dialog / reminder popup."

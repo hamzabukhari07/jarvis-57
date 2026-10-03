@@ -2,8 +2,8 @@
 version: "3.0"
 name: "Standalone Ecosystem"
 theme: "light"
-source: "C:/Users/Hamza Bukhari/Documents/antigravity/zezo latest/skills/hamza_taste/references/html/Standalone Ecosystem.html"
-extracted_at: "2026-09-30T14:16:11.640333+00:00"
+source: "D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/Standalone Ecosystem.html"
+extracted_at: "2026-10-03T09:56:42.681551+00:00"
 description: "Refined editorial light design system extracted deterministically from Standalone Ecosystem. Features clean #d8dadf cream canvas, high-contrast #0a0a0a ink typography, and elegant Inter headings."
 colors:
   primary: "#e48b59"
@@ -95,7 +95,7 @@ components:
 # Standalone Ecosystem — Design Specification
 
 > **Aesthetic Profile:** Light Editorial / Cream Precision  
-> **Extracted Source:** C:/Users/Hamza Bukhari/Documents/antigravity/zezo latest/skills/hamza_taste/references/html/Standalone Ecosystem.html  
+> **Extracted Source:** D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/Standalone Ecosystem.html  
 > **Theme:** LIGHT  
 
 ---

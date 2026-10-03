@@ -395,3 +395,49 @@ On reconnect:
 - Screenshots and camera frames are tokenised at low/medium/high resolution
 - Default: "medium"
 - Controlled by `get_media_resolution()` from config
+
+---
+
+## REST Fallback & Timeout Ladder (`core/gemini.py`)
+
+When one-shot vision or text generation is executed via REST:
+- **Strict Attempt Timeout**: `MIN_TIMEOUT_MS = 5_000` (5.0s per model attempt).
+- If a model call stalls (e.g. cold start or hung socket), the attempt is aborted cleanly after 5.0 seconds and the ladder immediately falls back to the next model in the tier (`FAST` / `SMART` / `SEARCH`).
+- Models that fail with 429/503 are placed on a 5-minute cooldown.
+- When all vision models in the ladder time out or fail, the system falls back gracefully to deterministic OS ground-truth telemetry (L0 active window title/process) to prevent stalling the voice loop.
+
+---
+
+## Autonomous Multi-Agent Fleet & Workspace Isolation
+
+```
+                   Voice / Text Command
+                           │
+                 fleet_control (Action)
+                           │
+              FleetManager (core/fleet_manager.py)
+                           │
+       ┌───────────────────┼───────────────────┐
+       ▼                   ▼                   ▼
+  Claude Code        Antigravity         OpenCode / Kilo
+(Git Worktree 1)   (Git Worktree 2)    (Git Worktree 3)
+       │                   │                   │
+       └───────────────────┼───────────────────┘
+                           │
+             Scranton Pixel Office Event Stream
+                  (frontend/office.html)
+```
+
+- **Thread-Safe Roster (`threading.RLock()`)**: Manages isolated autonomous coding agents.
+- **Git Worktree Isolation**: Spawns distinct temporary worktrees so multiple agents can modify the codebase in parallel without colliding or dirtying the active working directory.
+- **Scranton Pixel Office Visualizer**: Real-time push events (`agent_spawned`, `agent_status`, `agent_finished`, `task_created`) broadcast to `frontend/office.html` over WebSocket.
+- **Concurrency Limiter**: Background coding tasks are throttled by `MAX_CONCURRENT_CODING_TASKS = 2` in `core/task_manager.py`, queuing surplus tasks into a thread-safe FIFO queue to avoid CPU/memory starvation.
+
+---
+
+## Temporal Grounding & Zero-Overhead Local Time
+
+- Injected directly into the system prompt via `{temporal_context}`:
+  `[SYSTEM LOCAL DATE & TIME]: Today is Monday, Oct 03, 2026. Current machine time: 16:15:35.`
+- **Zero Tool Overhead**: Time and date queries are answered instantaneously from the injected prompt header without calling `reminder`, `web_search`, or Python subprocesses.
+- **Anti-Stale Facts**: Real-time queries regarding current entity versions or release dates must use `web_search` with exact user terms rather than training knowledge.

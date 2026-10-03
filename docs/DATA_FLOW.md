@@ -39,9 +39,9 @@ flowchart TB
     end
 
     subgraph UI["🎨 UI/HUD"]
-        QT["PyQt6 MainWindow"]
-        AVATAR["HoloAvatar<br/>core/avatar.py"]
-        VIS["VisemeStream<br/>core/viseme.py"]
+        QT["PyQt6 WebEngine Host"]
+        VORTEX["Fluid Vortex & Dock"]
+        CANVAS["Live Display Canvas"]
         LOG["Activity Log"]
     end
 

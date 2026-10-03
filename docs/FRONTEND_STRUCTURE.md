@@ -179,3 +179,21 @@ All modals use standard `.modal-overlay` structure (`background: rgba(0,0,0,0.92
 5. **No Recursive Self-Close in `openModal`:** `openModal(id)` must never call any function that invokes `closeModal` for the same ID.
 6. **Settings is a Modal:** The settings panel is `#settings-modal` (never reintroduce anchored dropdown drawers).
 7. **QtWebEngine Viewport Handling:** Avoid un-fallback `vh` calculations on critical modal wrappers; use `position: fixed` with explicit `inset: 0` or bounded `max-height`.
+
+---
+
+## 9. Scranton Office Deck (`frontend/office.html`)
+
+- **Route:** `GET /office` (served directly by `core/ui_server.py`).
+- **Purpose:** Dedicated full-screen multi-agent office deck with real-time floor telemetry, desk workstations, and live inspector.
+- **WebSocket Event Architecture (`ws://127.0.0.1:8765/ws`):**
+  - `agent_task_started`: Dynamically activates agent monitor glow, displays task speech bubble, and streams log entry.
+  - `task_progress`: Real-time task progress tracking.
+  - `task_done`: Deactivates task, seats sprite in idle state, and reports summary.
+  - `fleet_updated`: Auto-syncs agent roster from `config/fleet_agents.json`.
+- **4-Tab Inspector:**
+  - `OVERVIEW`: Live task, sandbox worktree, model engine, and risk tier.
+  - `SOUL.MD`: Real-time persona editor with `/api/fleet/save_soul` persistence.
+  - `MEMORY`: SQLite FTS5 episodic memories and knowledge query.
+  - `DISPATCH`: Instant task assignment to isolated Git worktrees via `/api/fleet/dispatch_task`.
+- **Zero Simulation:** Purely event-driven; no fake client-side `Math.random()` loops.

@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import subprocess
 import platform
@@ -76,8 +77,9 @@ def _normalize(raw: str) -> str:
     if key in _APP_ALIASES:
         return _APP_ALIASES[key].get(_SYSTEM, raw)
 
+    # Check for multi-word phrase matching (e.g. "open visual studio code please")
     for alias_key, os_map in _APP_ALIASES.items():
-        if alias_key in key or key in alias_key:
+        if " " in alias_key and alias_key in key:
             return os_map.get(_SYSTEM, raw)
 
     return raw  
@@ -422,6 +424,40 @@ def open_app(
     if not app_name:
         return "No application name provided."
 
+    clean_token = re.sub(r"[\s_\-]+", "", (app_name or "").lower())
+
+    # ── Scranton Agent Office Screen Voice Navigation (Full Main Screen) ──
+    if clean_token in ("officeview", "officefloor", "agentview", "agentsview", "agentviews", "fleet", "fleetdeck", "fleetview", "scrantonoffice", "scranton", "agents", "office"):
+        if action in ("close", "exit", "stop", "hide", "back"):
+            try:
+                from core.ui_server import get_ui_server
+                get_ui_server().broadcast("switch_view", {"view": "home"})
+                if player:
+                    player.write_log("[open_app] Closed Scranton Agent Office Floor and returned to Tactical Dashboard")
+                return "Closed office view and returned to Tactical Dashboard."
+            except Exception as e:
+                return f"Failed to switch to dashboard: {e}"
+
+        try:
+            from core.ui_server import get_ui_server
+            get_ui_server().broadcast("switch_view", {"view": "office"})
+            if player:
+                player.write_log("[open_app] Switched to Scranton Agent Office Floor screen")
+            return "Switched display to Scranton Agent Office Floor screen."
+        except Exception as e:
+            return f"Failed to switch to office view: {e}"
+
+    # ── Tactical Dashboard / Home Screen Voice Navigation (Full Main Screen) ──
+    if clean_token in ("homeview", "homescreen", "dashboard", "tacticalview", "tactical", "home"):
+        try:
+            from core.ui_server import get_ui_server
+            get_ui_server().broadcast("switch_view", {"view": "home"})
+            if player:
+                player.write_log("[open_app] Switched to Tactical Dashboard screen")
+            return "Switched display to Tactical Dashboard screen."
+        except Exception as e:
+            return f"Failed to switch to home view: {e}"
+
     if action in ("close", "exit", "kill", "terminate", "stop"):
         if close_application_by_name(app_name):
             if player:
@@ -429,8 +465,9 @@ def open_app(
             return f"Closed {app_name}."
         return f"Could not find or close {app_name}."
 
-    path_arg = params.get("path") or params.get("target") or ""
     normalized = _normalize(app_name)
+
+    path_arg = params.get("path") or params.get("target") or ""
 
     if path_arg:
         raw_p = str(path_arg).strip().strip("\"'")

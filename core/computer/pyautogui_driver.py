@@ -204,6 +204,10 @@ class InputDriver:
         display_preview = text[:60] + ("..." if len(text) > 60 else "")
         return f"Typed: {display_preview}"
 
+    def type_text(self, text: str, interval: float = 0.02) -> str:
+        """Alias for type_safe_unicode for resilient cross-module compatibility."""
+        return self.type_safe_unicode(text, interval=interval)
+
     def smart_type(
         self,
         text: str,

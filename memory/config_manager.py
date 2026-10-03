@@ -179,10 +179,38 @@ def validate_elevenlabs_key(api_key: str, timeout: float = 5.0) -> tuple[bool, s
         return False, f"ElevenLabs probe connection error: {str(e)}"
 
 
+def validate_tavily_key(api_key: str, timeout: float = 5.0) -> tuple[bool, str]:
+    """Pre-flight probe to Tavily search API with a 1-result query."""
+    c_key = clean_api_key(api_key)
+    if not c_key or len(c_key) < 10:
+        return False, "Invalid Tavily API key format (must be at least 10 chars)"
+    try:
+        import requests
+        url = "https://api.tavily.com/search"
+        payload = {
+            "api_key": c_key,
+            "query": "ping",
+            "search_depth": "basic",
+            "max_results": 1
+        }
+        resp = requests.post(url, json=payload, timeout=timeout)
+        if resp.status_code == 200:
+            return True, "Tavily API key is valid"
+        elif resp.status_code in (401, 403):
+            return False, f"Tavily authentication failed (HTTP {resp.status_code})"
+        elif resp.status_code == 429:
+            return False, "Tavily rate limit or monthly quota exceeded (HTTP 429)"
+        else:
+            return False, f"Tavily server returned HTTP {resp.status_code}: {resp.text[:120]}"
+    except Exception as e:
+        return False, f"Tavily probe connection error: {str(e)}"
+
+
 def save_api_keys_transactional(
     gemini_api_key: str | None = None,
     groq_api_key: str | None = None,
     elevenlabs_api_key: str | None = None,
+    tavily_api_key: str | None = None,
     validate: bool = True,
 ) -> tuple[bool, str]:
     """Validate candidate API keys with real live probes, then write atomically.
@@ -226,11 +254,27 @@ def save_api_keys_transactional(
         elif str(elevenlabs_api_key).strip() == "":
             data["elevenlabs_api_key"] = ""
 
+    # Tavily key validation
+    if tavily_api_key is not None:
+        c_tav = clean_api_key(tavily_api_key)
+        if c_tav and "••••" not in c_tav:
+            if validate:
+                ok, err = validate_tavily_key(c_tav)
+                if not ok:
+                    return False, f"Tavily Key Error: {err}"
+            data["tavily_api_key"] = c_tav
+        elif str(tavily_api_key).strip() == "":
+            data["tavily_api_key"] = ""
+
     _atomic_write_config(data)
     return True, "API keys validated and saved successfully"
 
 
-def save_api_keys(gemini_api_key: str | None = None, groq_api_key: str | None = None) -> None:
+def save_api_keys(
+    gemini_api_key: str | None = None,
+    groq_api_key: str | None = None,
+    tavily_api_key: str | None = None,
+) -> None:
     """Save keys directly with atomic write (non-validating fallback for backward compatibility)."""
     ensure_config_dir()
     data: dict = load_api_keys()
@@ -245,6 +289,12 @@ def save_api_keys(gemini_api_key: str | None = None, groq_api_key: str | None = 
             data["groq_api_key"] = c_groq
         elif str(groq_api_key).strip() == "":
             data["groq_api_key"] = ""
+    if tavily_api_key is not None:
+        c_tav = clean_api_key(tavily_api_key)
+        if c_tav and "••••" not in c_tav:
+            data["tavily_api_key"] = c_tav
+        elif str(tavily_api_key).strip() == "":
+            data["tavily_api_key"] = ""
 
     _atomic_write_config(data)
 
@@ -260,6 +310,10 @@ def load_api_keys() -> dict:
 
 def get_gemini_key() -> str | None:
     return load_api_keys().get("gemini_api_key")
+
+def get_tavily_api_key() -> str | None:
+    key = load_api_keys().get("tavily_api_key", "").strip()
+    return key if key else None
 
 def get_masked_gemini_key() -> str:
     key = get_gemini_key()
@@ -278,6 +332,12 @@ def get_masked_elevenlabs_key() -> str:
     if not key or len(key) < 8:
         return ""
     return key[:4] + "••••••••••••" + key[-4:]
+
+def get_masked_tavily_key() -> str:
+    key = load_api_keys().get("tavily_api_key", "")
+    if not key or len(key) < 8:
+        return ""
+    return key[:5] + "••••••••••••" + key[-4:]
 
 def is_configured() -> bool:
     key = get_gemini_key()
@@ -471,6 +531,10 @@ def save_proactive_audio_enabled(enabled: bool) -> None:
 # ── Voice Engine Defaults (Pure Gemini Live WebSocket Mode) ───────────────────
 PIPELINE_MODES = ("live",)
 DEFAULT_PIPELINE_MODE = "live"
+FALLBACK_VOICES = ("af_heart", "af_bella", "am_adam", "am_michael")
+STT_ENGINES = ("gemini_live",)
+LLM_ENGINES = ("gemini_live",)
+TTS_ENGINES = ("gemini_live",)
 
 
 def get_voice_fallback_mode() -> str:

@@ -223,6 +223,18 @@ def format_memory_for_prompt(memory: dict | None) -> str:
 
     core_lines: list[str] = []
 
+    # 0. Immutable User Directives (Phase 3 Memory Palace)
+    try:
+        from memory.sqlite_memory import get_explicit_rules
+        rules = get_explicit_rules(active_only=True)
+        if rules:
+            core_lines.append("IMMUTABLE USER DIRECTIVES:")
+            for r in rules[:6]:
+                core_lines.append(f"  • {r['rule_text']}")
+            core_lines.append("")
+    except Exception:
+        pass
+
     # 1. Identity - always, in full
     identity = memory.get("identity", {}) or {}
     for field in _IDENTITY_FIELDS:

@@ -1070,4 +1070,19 @@
 * **Consequence:** 100% elimination of modal background flickering, smooth 60 FPS transitions, zero CPU/GPU overhead behind open modals, and complete visibility and usability of all settings drawer controls.
 * **Verification:** Validated CSS selector integrity (`grep -c "@keyframes modalIn"` = 1, `grep -c "backdrop-filter: blur"` = 1). Full ZEZO system boot passed cleanly with all 24 actions and 10 skills active.
 
+---
+
+## ADR-065: Dead 3D Software Avatar Subsystem Deprecation & Cleanup (`core/avatar.py`, `core/avatar_mesh.py`, `core/face_model.obj`, `core/robot_head_fast.obj`, `setup.py`, `readme.md`, `docs/`)
+
+* **Date:** 2026-10-02
+* **Lead Architect:** Hamza Bukhari
+* **Context:**
+  1. The legacy QPainter 3D software rasterizer (`core/avatar.py`, `core/avatar_mesh.py`, `core/face_model.obj`, `core/robot_head_fast.obj`) was replaced by the modern GPU-accelerated HTML5/PyQt6 tactical workspace with the Fluid Vortex Core and Unified Command Dock.
+  2. The old avatar files remained in the repository as dead, unexecuted artifacts and added unnecessary clutter to documentation and asset validation scripts.
+* **Decision:**
+  1. Removed `core/avatar.py`, `core/avatar_mesh.py`, `core/face_model.obj`, and `core/robot_head_fast.obj`.
+  2. Removed `_check_assets()` face mesh verification from `setup.py`.
+  3. Synchronized `readme.md`, `AGENTS.md`, `docs/HUD_AND_AVATAR.md`, `docs/CODEBASE_MAP.md`, `docs/ARCHITECTURE.md`, `docs/DEPENDENCIES.md`, `docs/DATA_FLOW.md`, `docs/STORAGE.md`, `planning/PROJECT_ARCHITECTURE.md`, and `planning/ZEZO_PROJECT_BLUEPRINT.md` to reflect the active tactical workspace architecture.
+* **Consequence:** Cleaned codebase of ~147 KB of dead assets, removed outdated references across all documentation, and retained 100% functionality and test stability across all active modules.
+
 

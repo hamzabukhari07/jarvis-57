@@ -17,7 +17,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from core.computer import (
     WindowsNativeDriver,
@@ -154,84 +154,32 @@ def _screenshot(save_path: str | None = None) -> str:
 
 
 def _clean_target_queries(description: str) -> List[str]:
-    """Extract search candidates from descriptive phrases like "'File' menu item" or "Width input field"."""
     queries: List[str] = []
     d = (description or "").strip()
     if not d:
         return []
 
-    # 1. Quoted text e.g. "'File' menu item" -> "File"
     quoted = re.findall(r"['\"`]([^'\"`]+)['\"`]", d)
     for q in quoted:
         qc = q.strip()
         if qc and qc not in queries:
             queries.append(qc)
 
-    # 2. Stripped noise suffixes (e.g. " menu item", " button", " in Notepad")
     cleaned = re.sub(r"(?i)\s+(menu\s+item|menu|button|tab|icon|input\s+field|input|field|link|option|header)(\s+in\s+[\w\s\.\*]+)?$", "", d).strip()
     cleaned = re.sub(r"(?i)^(click|find|locate|the|open|select)\s+", "", cleaned).strip()
     cleaned = cleaned.strip("'\"`")
     if cleaned and cleaned not in queries:
         queries.append(cleaned)
 
-    # 3. Individual alphanumeric word tokens if single keyword present
     tokens = [w for w in re.split(r"[^\w\u0600-\u06FF]", d) if len(w) >= 3 and w.lower() not in ("menu", "item", "button", "click", "notepad", "window", "field", "input", "icon", "the")]
     for t in tokens:
         if t not in queries:
             queries.append(t)
 
-    # 4. Original description as fallback
     if d not in queries:
         queries.append(d)
 
     return queries
-
-
-def _find_target_element_escalated(description: str) -> Optional[Tuple[int, int, str]]:
-    """
-    3-Tier Element Finder:
-      1. L1 Windows UIA (10ms) -> inspects UI tree of foreground window.
-      2. L1.5 Local RapidOCR (60ms) -> locates text/labels on screen via normalized OCR on CPU (0 MB VRAM).
-      3. L2 Gemini Multimodal Vision (2s) -> takes screenshot and passes to cloud VLM for non-text icons.
-    Returns: (x, y, source_layer)
-    """
-    if not description:
-        return None
-
-    candidates = _clean_target_queries(description)
-
-    # Step 1: L1 Windows UIA Fast Lookup
-    try:
-        from actions.screen_processor import get_active_window_context
-        ctx = get_active_window_context()
-        hwnd = ctx.get("hwnd")
-        if hwnd:
-            for q in candidates:
-                el = windows_uia.find_element(hwnd, q, depth=6, timeout_seconds=0.8)
-                if el and "center_x" in el and "center_y" in el:
-                    print(f"[ComputerControl] Found '{q}' (query: '{description}') via L1 UIA in {el.get('latency_ms')}ms -> ({el['center_x']}, {el['center_y']})")
-                    return (el["center_x"], el["center_y"], "l1_uia")
-    except Exception as e:
-        print(f"[ComputerControl] UIA search error: {e}")
-
-    # Step 2: L1.5 Local RapidOCR Multilingual Text Matching (0 MB VRAM)
-    try:
-        from core.computer.ocr_engine import ocr_engine
-        if ocr_engine.is_available:
-            for q in candidates:
-                ocr_res = ocr_engine.find_text_coordinates(q, fuzzy_threshold=0.75)
-                if ocr_res and "center_x" in ocr_res and "center_y" in ocr_res:
-                    print(f"[ComputerControl] Found '{q}' (query: '{description}') via L1.5 RapidOCR in {ocr_res.get('latency_ms')}ms -> ({ocr_res['center_x']}, {ocr_res['center_y']})")
-                    return (ocr_res["center_x"], ocr_res["center_y"], "l1.5_ocr")
-    except Exception as e:
-        print(f"[ComputerControl] OCR text match error: {e}")
-
-    # Step 3: L2 Gemini Multimodal Vision Fallback
-    coords = _screen_find_vision(description)
-    if coords:
-        return (coords[0], coords[1], "l2_vision")
-
-    return None
 
 
 def _screen_find_vision(description: str) -> Optional[Tuple[int, int]]:
@@ -241,15 +189,13 @@ def _screen_find_vision(description: str) -> Optional[Tuple[int, int]]:
         return None
 
     try:
+        from core.computer.screen_capture import capture_screen_bytes
         import pyautogui
-        from google import genai
-        from google.genai import types as gtypes
 
         w, h = pyautogui.size()
-        img = pyautogui.screenshot()
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        image_bytes = buf.getvalue()
+        image_bytes = capture_screen_bytes()
+        if not image_bytes:
+            return None
 
         prompt = (
             f"This is a screenshot of a {w}x{h} pixel screen. "
@@ -280,14 +226,331 @@ def _screen_find_vision(description: str) -> Optional[Tuple[int, int]]:
     return None
 
 
-def _safe_close_tab() -> str:
-    if windows_native.is_self_or_console_window():
-        focused = windows_native.focus_browser_or_app_window()
-        if not focused:
-            return "ZEZO window is protected. No active browser or app window found to close tab."
-    modifier = "command" if platform.system() == "Darwin" else "ctrl"
-    res = input_driver.hotkey(modifier, "w")
-    return f"Closed tab ({res})."
+def _find_target_element_escalated(description: str) -> Optional[Tuple[int, int, str]]:
+    if not description:
+        return None
+
+    candidates = _clean_target_queries(description)
+
+    # L1: Windows UIA Fast Lookup
+    try:
+        from actions.screen_processor import get_active_window_context
+        ctx = get_active_window_context()
+        hwnd = ctx.get("hwnd")
+        if hwnd:
+            for q in candidates:
+                el = windows_uia.find_element(hwnd, q, depth=6, timeout_seconds=0.8)
+                if el and "center_x" in el and "center_y" in el:
+                    print(f"[ComputerControl] Found '{q}' via L1 UIA in {el.get('latency_ms')}ms -> ({el['center_x']}, {el['center_y']})")
+                    return (el["center_x"], el["center_y"], "l1_uia")
+    except Exception as e:
+        print(f"[ComputerControl] UIA search error: {e}")
+
+    # L1.5: Local RapidOCR Multilingual Text Matching (0 MB VRAM)
+    try:
+        from core.computer.ocr_engine import ocr_engine
+        if ocr_engine.is_available:
+            for q in candidates:
+                ocr_res = ocr_engine.find_text_coordinates(q, fuzzy_threshold=0.75)
+                if ocr_res and "center_x" in ocr_res and "center_y" in ocr_res:
+                    print(f"[ComputerControl] Found '{q}' via L1.5 RapidOCR in {ocr_res.get('latency_ms')}ms -> ({ocr_res['center_x']}, {ocr_res['center_y']})")
+                    return (ocr_res["center_x"], ocr_res["center_y"], "l1.5_ocr")
+    except Exception as e:
+        print(f"[ComputerControl] OCR text match error: {e}")
+
+    # L2: Gemini Multimodal Vision Fallback
+    coords = _screen_find_vision(description)
+    if coords:
+        return (coords[0], coords[1], "l2_vision")
+
+    return None
+
+
+def _extract_text_field(params: dict) -> str:
+    if params.get("text") is not None:
+        return str(params.get("text"))
+    for key in ("value", "input", "content"):
+        if params.get(key) is not None:
+            return str(params.get(key))
+    return ""
+
+
+def _handle_type(params: dict, action: str, **_) -> str:
+    text = _extract_text_field(params)
+    target_win = params.get("title") or params.get("app") or params.get("window")
+    if target_win:
+        windows_native.focus_window(str(target_win))
+        time.sleep(0.15)
+
+    if action in ("smart_type", "smart_write", "clear_and_type", "replace_text"):
+        # For calculator/formula input with operators, type directly without disruptive select-all keystrokes
+        if any(op in text for op in ("+", "-", "*", "/", "=")):
+            return input_driver.type_safe_unicode(text)
+        return input_driver.smart_type(text, clear_first=params.get("clear_first", True))
+    return input_driver.type_safe_unicode(text)
+
+
+def _handle_click(params: dict, action: str, **_) -> str:
+    x, y = params.get("x"), params.get("y")
+    desc = params.get("description") or params.get("text") or params.get("target") or params.get("element") or ""
+    if (x is None or y is None) and desc:
+        target = _find_target_element_escalated(desc)
+        if not target:
+            return f"Element not found on screen: '{desc}'"
+        x, y, _ = target
+
+    button = "right" if "right" in action or action == "context_menu" else "left"
+    clicks = 2 if "double" in action else 1
+    return input_driver.click(x, y, button, clicks)
+
+
+def _handle_mouse_move(params: dict, **_) -> str:
+    return input_driver.move(int(params.get("x", 0)), int(params.get("y", 0)))
+
+
+def _handle_mouse_drag(params: dict, **_) -> str:
+    x1 = params.get("x1") if params.get("x1") is not None else (params.get("from_x") or params.get("start_x") or params.get("x") or 400)
+    y1 = params.get("y1") if params.get("y1") is not None else (params.get("from_y") or params.get("start_y") or params.get("y") or 300)
+    x2 = params.get("x2") if params.get("x2") is not None else (params.get("to_x") or params.get("end_x"))
+    y2 = params.get("y2") if params.get("y2") is not None else (params.get("to_y") or params.get("end_y"))
+
+    if x2 is None or y2 is None:
+        w = params.get("width") or params.get("w") or 600
+        h = params.get("height") or params.get("h") or 400
+        x2 = int(x1) + int(w)
+        y2 = int(y1) + int(h)
+
+    return input_driver.drag(int(x1), int(y1), int(x2), int(y2))
+
+
+def _handle_hotkey(params: dict, **_) -> str:
+    raw = params.get("keys", "") or params.get("key", "") or params.get("hotkey", "") or params.get("text", "")
+    keys = [k.strip() for k in raw.split("+")] if isinstance(raw, str) else raw
+    return input_driver.hotkey(*keys)
+
+
+def _handle_press(params: dict, action: str, **_) -> str:
+    if action in ("enter", "escape", "space", "backspace", "tab", "delete"):
+        return input_driver.press(action)
+    key_to_press = params.get("key") or params.get("text") or params.get("value") or params.get("keys") or "enter"
+    return input_driver.press(str(key_to_press))
+
+
+def _handle_window(params: dict, action: str, **_) -> str:
+    target_title = params.get("title") or params.get("text") or params.get("app") or params.get("app_name") or ""
+    if action in ("close_tab", "close_current_tab", "close_browser_tab"):
+        return _safe_close_tab()
+    if action in ("close_window", "close_active_window", "close_current_window"):
+        return windows_native.close_window_by_title_or_active(target_title)
+    if action in ("dismiss_dialog", "close_popup", "dismiss_popup", "close_dialog", "close_reminder", "dismiss_reminder"):
+        return windows_native.close_window_by_title_or_active(target_title or "reminder")
+    if action in ("focus_window", "bring_to_front", "activate_window"):
+        return windows_native.focus_window(str(target_title))
+    return f"Unknown window action: {action}"
+
+
+def _handle_open_folder(params: dict, **_) -> str:
+    target_path = params.get("path") or params.get("target") or params.get("text", "")
+    app = params.get("app") or params.get("app_name", "")
+    p = Path(target_path).expanduser()
+    if not p.is_absolute():
+        desk_p = Path.home() / "Desktop" / target_path
+        if desk_p.exists():
+            p = desk_p
+
+    if app:
+        # Prevent terminal window popups on Windows
+        creationflags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+        subprocess.Popen(f'{app} "{p}"', shell=True, creationflags=creationflags)
+        return f"Opened {p} in {app}."
+
+    if platform.system() == "Windows":
+        subprocess.Popen(f'explorer "{p}"', shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+    else:
+        subprocess.Popen(["xdg-open", str(p)])
+    return f"Opened folder: {p}"
+
+
+def _handle_scroll(params: dict, action: str, **_) -> str:
+    direction = params.get("direction") or ("up" if "up" in action else "down")
+    return input_driver.scroll(direction=direction, amount=int(params.get("amount", 3)))
+
+
+def _handle_clipboard(params: dict, action: str, **_) -> str:
+    if action in ("copy", "clipboard_get", "get_clipboard"):
+        return input_driver.get_clipboard()
+    paste_txt = _extract_text_field(params)
+    return input_driver.set_clipboard(paste_txt)
+
+
+def _handle_active_window_info(**_) -> str:
+    from actions.screen_processor import get_active_window_context, get_display_metrics
+    ctx = get_active_window_context()
+    metrics = get_display_metrics()
+    r = ctx.get("rect", {})
+    hwnd = ctx.get("hwnd", 0)
+
+    uia_preview = ""
+    if hwnd:
+        try:
+            uia_elements = windows_uia.dump_interactive_elements(hwnd, depth=2, max_elements=5)
+            if uia_elements:
+                elements_str = ", ".join(f"{el['control_type']}('{el['name']}')" for el in uia_elements if el.get("name"))
+                if elements_str:
+                    uia_preview = f"\nUIA Interactive Elements: {elements_str}"
+        except Exception:
+            pass
+
+    return (
+        f"Active Window: '{ctx.get('foreground_title')}' (Process: {ctx.get('foreground_process')}, HWND: {hwnd})\n"
+        f"Bounds: x={r.get('x')}, y={r.get('y')}, w={r.get('width')}, h={r.get('height')}\n"
+        f"Display: {metrics.get('width')}x{metrics.get('height')} (DPI Scale: {metrics.get('dpi_scale')}x)\n"
+        f"Visible Windows: {', '.join(ctx.get('visible_windows', []))}"
+        f"{uia_preview}"
+    )
+
+
+def _handle_mock_data(params: dict, action: str, **_) -> str:
+    if action == "random_data":
+        dt = params.get("type", "name")
+        res = _random_data(dt)
+        print(f"[ComputerControl] (random {dt}) -> {res}")
+        return res
+
+    field = params.get("field", "name")
+    val = _user_profile().get(field, "")
+    if not val:
+        val = _random_data(field)
+        print(f"[ComputerControl] (No '{field}' in memory, using random: {val})")
+    return val
+
+
+def _handle_batch(params: dict, dispatcher_fn: Callable, **kwargs) -> str:
+    steps = params.get("sequence") or params.get("steps") or params.get("actions") or []
+    if not isinstance(steps, list) or not steps:
+        return "Error: 'batch' action requires a non-empty 'sequence' list of action steps."
+
+    executed = []
+    for idx, step in enumerate(steps):
+        if not isinstance(step, dict):
+            continue
+        s_action = step.get("action", "")
+        if not s_action or s_action in ("batch", "sequence", "macro"):
+            continue
+
+        step_res = dispatcher_fn(step, **kwargs)
+        step_str = str(step_res)
+        executed.append(f"Step {idx+1} ({s_action}): {step_str}")
+        if "failed" in step_str.lower() or "not_found" in step_str.lower():
+            return f"Batch aborted at step {idx+1} ({s_action}): {step_str}. Executed so far: " + " -> ".join(executed[:-1])
+
+        delay = float(step.get("delay") or 0.08)
+        if delay > 0:
+            time.sleep(delay)
+
+    return f"Executed {len(executed)} batch steps successfully: " + " -> ".join(executed)
+
+
+# Dispatch map routing action strings to modular sub-handlers
+_ACTION_ROUTER: Dict[str, Callable] = {
+    # Typing
+    "type": _handle_type,
+    "type_text": _handle_type,
+    "write": _handle_type,
+    "write_text": _handle_type,
+    "input_text": _handle_type,
+    "typing": _handle_type,
+    "text": _handle_type,
+    "smart_type": _handle_type,
+    "smart_write": _handle_type,
+    "clear_and_type": _handle_type,
+    "replace_text": _handle_type,
+    # Mouse clicks
+    "click": _handle_click,
+    "left_click": _handle_click,
+    "smart_click": _handle_click,
+    "screen_click": _handle_click,
+    "double_click": _handle_click,
+    "screen_double_click": _handle_click,
+    "double_screen_click": _handle_click,
+    "right_click": _handle_click,
+    "screen_right_click": _handle_click,
+    "context_menu": _handle_click,
+    # Mouse movements
+    "move": _handle_mouse_move,
+    "mouse_move": _handle_mouse_move,
+    "drag": _handle_mouse_drag,
+    "mouse_drag": _handle_mouse_drag,
+    # Keyboard
+    "hotkey": _handle_hotkey,
+    "shortcut": _handle_hotkey,
+    "press_hotkey": _handle_hotkey,
+    "send_hotkey": _handle_hotkey,
+    "press": _handle_press,
+    "key": _handle_press,
+    "press_key": _handle_press,
+    "keypress": _handle_press,
+    "key_press": _handle_press,
+    "send_key": _handle_press,
+    "enter": _handle_press,
+    "escape": _handle_press,
+    "space": _handle_press,
+    "backspace": _handle_press,
+    "tab": _handle_press,
+    "delete": _handle_press,
+    "clear_field": lambda **_: input_driver.clear_field(),
+    "clear_text": lambda **_: input_driver.clear_field(),
+    "empty_field": lambda **_: input_driver.clear_field(),
+    # Window management
+    "close_tab": _handle_window,
+    "close_current_tab": _handle_window,
+    "close_browser_tab": _handle_window,
+    "close_window": _handle_window,
+    "close_active_window": _handle_window,
+    "close_current_window": _handle_window,
+    "dismiss_dialog": _handle_window,
+    "close_popup": _handle_window,
+    "dismiss_popup": _handle_window,
+    "close_dialog": _handle_window,
+    "close_reminder": _handle_window,
+    "dismiss_reminder": _handle_window,
+    "focus_window": _handle_window,
+    "bring_to_front": _handle_window,
+    "activate_window": _handle_window,
+    # Filesystem & Launch
+    "open_folder": _handle_open_folder,
+    "open_path": _handle_open_folder,
+    "open_in_app": _handle_open_folder,
+    # Scrolling
+    "scroll": _handle_scroll,
+    "page_scroll": _handle_scroll,
+    "mouse_scroll": _handle_scroll,
+    "scroll_down": _handle_scroll,
+    "scroll_up": _handle_scroll,
+    # Clipboard
+    "copy": _handle_clipboard,
+    "clipboard_get": _handle_clipboard,
+    "get_clipboard": _handle_clipboard,
+    "paste": _handle_clipboard,
+    "clipboard_paste": _handle_clipboard,
+    # Screenshot & Vision
+    "screenshot": lambda params, **_: _screenshot(params.get("path")),
+    "take_screenshot": lambda params, **_: _screenshot(params.get("path")),
+    "capture_screen": lambda params, **_: _screenshot(params.get("path")),
+    "screen_find": lambda params, **_: (lambda t: f"{t[0]},{t[1]} [Source: {t[2]}]" if t else "NOT_FOUND")(_find_target_element_escalated(params.get("description") or params.get("text") or params.get("target") or "")),
+    "find_element": lambda params, **_: (lambda t: f"{t[0]},{t[1]} [Source: {t[2]}]" if t else "NOT_FOUND")(_find_target_element_escalated(params.get("description") or params.get("text") or params.get("target") or "")),
+    "find_on_screen": lambda params, **_: (lambda t: f"{t[0]},{t[1]} [Source: {t[2]}]" if t else "NOT_FOUND")(_find_target_element_escalated(params.get("description") or params.get("text") or params.get("target") or "")),
+    # Sleep / Delay
+    "wait": lambda params, **_: (lambda s: (time.sleep(s), f"Waited {s}s")[1])(min(float(params.get("seconds", 1.0)), 30.0)),
+    # OS State
+    "get_active_window_info": lambda **_: _handle_active_window_info(),
+    "active_window_info": lambda **_: _handle_active_window_info(),
+    "window_info": lambda **_: _handle_active_window_info(),
+    "os_state": lambda **_: _handle_active_window_info(),
+    # Mock data
+    "random_data": _handle_mock_data,
+    "user_data": _handle_mock_data,
+}
 
 
 def computer_control(
@@ -297,7 +560,7 @@ def computer_control(
     session_memory=None,
 ) -> str:
     """
-    Dispatch table for all computer control actions with 4-tier escalation.
+    Modular dispatch table for all computer control actions with 4-tier escalation.
     """
     params = parameters or {}
     action = params.get("action", "").lower().strip()
@@ -311,242 +574,12 @@ def computer_control(
     print(f"[ComputerControl] > {action}  {params}")
 
     try:
-        # Typing actions (Safe Unicode Clipboard by default)
-        if action in ("type", "type_text", "write", "write_text", "input_text", "typing", "text"):
-            text_to_type = (
-                params.get("text")
-                if params.get("text") is not None
-                else (params.get("value") or params.get("input") or params.get("content") or "")
-            )
-            return input_driver.type_safe_unicode(str(text_to_type))
-
-        if action in ("smart_type", "smart_write", "clear_and_type", "replace_text"):
-            text_to_type = (
-                params.get("text")
-                if params.get("text") is not None
-                else (params.get("value") or params.get("input") or params.get("content") or "")
-            )
-            return input_driver.smart_type(
-                str(text_to_type),
-                clear_first=params.get("clear_first", True),
-            )
-
-        # Mouse Click Actions (Tiered: Coordinates -> L1 UIA -> L2 Vision)
-        if action in ("click", "left_click", "smart_click", "screen_click"):
-            x, y = params.get("x"), params.get("y")
-            desc = params.get("description") or params.get("text") or params.get("target") or params.get("element") or ""
-            if (x is None or y is None) and desc:
-                target = _find_target_element_escalated(desc)
-                if not target:
-                    return f"Element not found on screen: '{desc}'"
-                x, y, src = target
-            return input_driver.click(x, y, "left", 1)
-
-        if action in ("double_click", "screen_double_click", "double_screen_click"):
-            x, y = params.get("x"), params.get("y")
-            desc = params.get("description") or params.get("text") or params.get("target") or params.get("element") or ""
-            if (x is None or y is None) and desc:
-                target = _find_target_element_escalated(desc)
-                if not target:
-                    return f"Element not found on screen: '{desc}'"
-                x, y, src = target
-            return input_driver.click(x, y, "left", 2)
-
-        if action in ("right_click", "screen_right_click", "context_menu"):
-            x, y = params.get("x"), params.get("y")
-            desc = params.get("description") or params.get("text") or params.get("target") or ""
-            if (x is None or y is None) and desc:
-                target = _find_target_element_escalated(desc)
-                if not target:
-                    return f"Element not found on screen: '{desc}'"
-                x, y, src = target
-            return input_driver.click(x, y, "right", 1)
-
-        # Mouse Movement Actions (With Post-Move Coordinate Verification)
-        if action in ("move", "mouse_move"):
-            return input_driver.move(int(params.get("x", 0)), int(params.get("y", 0)))
-
-        if action in ("drag", "mouse_drag"):
-            x1 = params.get("x1") if params.get("x1") is not None else (params.get("from_x") or params.get("start_x"))
-            y1 = params.get("y1") if params.get("y1") is not None else (params.get("from_y") or params.get("start_y"))
-            x2 = params.get("x2") if params.get("x2") is not None else (params.get("to_x") or params.get("end_x"))
-            y2 = params.get("y2") if params.get("y2") is not None else (params.get("to_y") or params.get("end_y"))
-
-            # If single coordinate x, y is passed
-            if x1 is None and params.get("x") is not None:
-                x1 = params.get("x")
-            if y1 is None and params.get("y") is not None:
-                y1 = params.get("y")
-
-            # Fallback for start position if completely omitted: start at (400, 300)
-            if x1 is None:
-                x1 = 400
-            if y1 is None:
-                y1 = 300
-
-            # Fallback for end position: drag a standard 600x400 box if not explicitly specified
-            if x2 is None or y2 is None:
-                w = params.get("width") or params.get("w") or 600
-                h = params.get("height") or params.get("h") or 400
-                x2 = int(x1) + int(w)
-                y2 = int(y1) + int(h)
-
-            return input_driver.drag(int(x1), int(y1), int(x2), int(y2))
-
-        # Keyboard Actions
-        if action in ("hotkey", "shortcut", "press_hotkey", "send_hotkey"):
-            raw = params.get("keys", "") or params.get("key", "") or params.get("hotkey", "") or params.get("text", "")
-            keys = [k.strip() for k in raw.split("+")] if isinstance(raw, str) else raw
-            return input_driver.hotkey(*keys)
-
-        if action in ("press", "key", "press_key", "keypress", "key_press", "send_key"):
-            key_to_press = params.get("key") or params.get("text") or params.get("value") or params.get("keys") or "enter"
-            return input_driver.press(str(key_to_press))
-
-        # Direct Single-Key Action Aliases
-        if action in ("enter", "escape", "space", "backspace", "tab", "delete"):
-            return input_driver.press(action)
-
-        if action in ("clear_field", "clear_text", "empty_field"):
-            return input_driver.clear_field()
-
-        # Window & Tab Lifecycle Actions
-        if action in ("close_tab", "close_current_tab", "close_browser_tab"):
-            return _safe_close_tab()
-
-        if action in ("close_window", "close_active_window", "close_current_window"):
-            target_t = params.get("title") or params.get("text") or params.get("app") or params.get("app_name") or ""
-            return windows_native.close_window_by_title_or_active(target_t)
-
-        if action in ("dismiss_dialog", "close_popup", "dismiss_popup", "close_dialog", "close_reminder", "dismiss_reminder"):
-            target_t = params.get("title") or params.get("text") or "reminder"
-            return windows_native.close_window_by_title_or_active(target_t)
-
-        if action in ("focus_window", "bring_to_front", "activate_window"):
-            target_t = params.get("title") or params.get("app") or params.get("app_name") or params.get("text") or ""
-            return windows_native.focus_window(str(target_t))
-
-        # Filesystem & Folder Launch
-        if action in ("open_folder", "open_path", "open_in_app"):
-            target_path = params.get("path") or params.get("target") or params.get("text", "")
-            app = params.get("app") or params.get("app_name", "")
-            p = Path(target_path).expanduser()
-            if not p.is_absolute():
-                desk_p = Path.home() / "Desktop" / target_path
-                if desk_p.exists():
-                    p = desk_p
-            if app:
-                subprocess.Popen(f'{app} "{p}"', shell=True, creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0)
-                return f"Opened {p} in {app}."
-            if platform.system() == "Windows":
-                subprocess.Popen(f'explorer "{p}"', shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
-            else:
-                subprocess.Popen(["xdg-open", str(p)])
-            return f"Opened folder: {p}"
-
-        # Scrolling Actions
-        if action in ("scroll", "page_scroll", "mouse_scroll", "scroll_down", "scroll_up"):
-            direction = params.get("direction") or ("up" if "up" in action else "down")
-            return input_driver.scroll(
-                direction=direction,
-                amount=int(params.get("amount", 3)),
-            )
-
-        # Clipboard Actions
-        if action in ("copy", "clipboard_get", "get_clipboard"):
-            return input_driver.get_clipboard()
-
-        if action in ("paste", "clipboard_paste"):
-            paste_txt = params.get("text") if params.get("text") is not None else (params.get("value") or "")
-            return input_driver.set_clipboard(str(paste_txt))
-
-        # Screenshot Action
-        if action in ("screenshot", "take_screenshot", "capture_screen"):
-            return _screenshot(params.get("path"))
-
-        # Visual / UIA Element Search Action
-        if action in ("screen_find", "find_element", "find_on_screen"):
-            desc = params.get("description") or params.get("text") or params.get("target") or ""
-            target = _find_target_element_escalated(desc)
-            if target:
-                return f"{target[0]},{target[1]} [Source: {target[2]}]"
-            return "NOT_FOUND"
-
-        if action == "wait":
-            secs = float(params.get("seconds", 1.0))
-            secs = min(secs, 30.0)
-            time.sleep(secs)
-            return f"Waited {secs}s"
-
-        # L0 OS State + L1 UIA Telemetry Action
-        if action in ("get_active_window_info", "active_window_info", "window_info", "os_state"):
-            from actions.screen_processor import get_active_window_context, get_display_metrics
-            ctx = get_active_window_context()
-            metrics = get_display_metrics()
-            r = ctx.get("rect", {})
-            hwnd = ctx.get("hwnd", 0)
-
-            # Extract UIA interactive elements preview
-            uia_elements = []
-            if hwnd:
-                try:
-                    uia_elements = windows_uia.dump_interactive_elements(hwnd, depth=2, max_elements=5)
-                except Exception:
-                    pass
-
-            uia_preview = ""
-            if uia_elements:
-                elements_str = ", ".join(f"{el['control_type']}('{el['name']}')" for el in uia_elements if el['name'])
-                if elements_str:
-                    uia_preview = f"\nUIA Interactive Elements: {elements_str}"
-
-            return (
-                f"Active Window: '{ctx.get('foreground_title')}' (Process: {ctx.get('foreground_process')}, HWND: {hwnd})\n"
-                f"Bounds: x={r.get('x')}, y={r.get('y')}, w={r.get('width')}, h={r.get('height')}\n"
-                f"Display: {metrics.get('width')}x{metrics.get('height')} (DPI Scale: {metrics.get('dpi_scale')}x)\n"
-                f"Visible Windows: {', '.join(ctx.get('visible_windows', []))}"
-                f"{uia_preview}"
-            )
-
-        # Mock / Long Term Data
-        if action == "random_data":
-            dt = params.get("type", "name")
-            result = _random_data(dt)
-            print(f"[ComputerControl] (random {dt}) -> {result}")
-            return result
-
-        if action == "user_data":
-            field = params.get("field", "name")
-            profile = _user_profile()
-            value = profile.get(field, "")
-            if not value:
-                value = _random_data(field)
-                print(f"[ComputerControl] (No '{field}' in memory, using random: {value})")
-        # Batch / Compound Macro Action
         if action in ("batch", "sequence", "macro"):
-            steps = params.get("sequence") or params.get("steps") or params.get("actions") or []
-            if not isinstance(steps, list) or not steps:
-                return "Error: 'batch' action requires a non-empty 'sequence' list of action steps."
+            return _handle_batch(params, computer_control, response=response, player=player, session_memory=session_memory)
 
-            executed = []
-            for idx, step in enumerate(steps):
-                if not isinstance(step, dict):
-                    continue
-                s_action = step.get("action", "")
-                if not s_action or s_action in ("batch", "sequence", "macro"):
-                    continue
-
-                step_res = computer_control(step, response=response, player=player, session_memory=session_memory)
-                step_str = str(step_res)
-                executed.append(f"Step {idx+1} ({s_action}): {step_str}")
-                if "failed" in step_str.lower() or "not_found" in step_str.lower():
-                    return f"Batch aborted at step {idx+1} ({s_action}): {step_str}. Executed so far: " + " -> ".join(executed[:-1])
-
-                delay = float(step.get("delay") or 0.08)
-                if delay > 0:
-                    time.sleep(delay)
-
-            return f"Executed {len(executed)} batch steps successfully: " + " -> ".join(executed)
+        handler = _ACTION_ROUTER.get(action)
+        if handler:
+            return handler(params=params, action=action, response=response, player=player, session_memory=session_memory)
 
         return f"Unknown action: '{action}'"
 
@@ -555,7 +588,7 @@ def computer_control(
         return f"computer_control '{action}' failed: {e}"
 
 
-# ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
+# Tool declaration (auto-discovered by core/action_loader.py)
 TOOL = {
     "name": "computer_control",
     "description": "Direct computer control: type, click, hotkeys, scroll, move mouse, screenshots, find elements on screen, inspect active window.",
@@ -659,14 +692,14 @@ TOOL = {
     "handler": computer_control,
 }
 
-# ── Backward compatibility aliases for Phase 4 modular driver refactor ────────
+# Compatibility aliases
 _focus_window = windows_native.focus_window
 focus_window = windows_native.focus_window
 _close_window = windows_native.close_window_by_title_or_active
 close_window = windows_native.close_window_by_title_or_active
 
+
 def _safe_close_tab(app_hint: str = "") -> str:
-    """Close active browser tab safely using Ctrl+W."""
     try:
         windows_native.focus_browser_or_app_window()
         input_driver.hotkey("ctrl", "w")
@@ -674,5 +707,26 @@ def _safe_close_tab(app_hint: str = "") -> str:
     except Exception as e:
         return f"Could not close tab: {e}"
 
+
 safe_close_tab = _safe_close_tab
 
+
+def _safe_close_window(title_or_name: str = "") -> str:
+    """Safely close a window strictly enforcing exact or specific title matching to prevent closing unrelated apps."""
+    if not title_or_name or not str(title_or_name).strip():
+        return "No window title provided to close."
+
+    target = str(title_or_name).strip().lower()
+
+    # Never close ZEZO / JARVIS main shell window
+    if target in ("zezo", "jarvis", "zezo os", "zezo_main", "tactical dashboard"):
+        return "Cannot close ZEZO main OS window."
+
+    try:
+        from core.computer import windows_native
+        return windows_native.close_window_by_title_or_active(target)
+    except Exception as e:
+        return f"Could not close window '{title_or_name}': {e}"
+
+
+safe_close_window = _safe_close_window

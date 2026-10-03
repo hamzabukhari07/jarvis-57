@@ -1,142 +1,32 @@
-# JARVIS — HUD and Avatar Architecture
+# ZEZO OS — Tactical HUD & Workspace Architecture
 
 ## Overview
 
-The HUD (Heads-Up Display) is built with **PyQt6** and features a holographic animated avatar rendered entirely in software using **QPainter**.
+The HUD (Heads-Up Display) is built with **PyQt6 QWebEngineView** hosting an ultra-responsive, GPU-accelerated tactical cockpit interface (`frontend/index.html`).
 
-**File**: `ui.py` (5438 lines), `core/avatar.py` (715 lines), `core/avatar_mesh.py` (351 lines)
+**Files**: `ui.py`, `frontend/index.html`, `frontend/style.css`, `frontend/js/ui.js`
 
-## PyQt6 Architecture
+## Tactical Cockpit Architecture
 
-### Main Window
+### Master 3-Column Workspace Layout
 
-```python
-class JarvisUI(QMainWindow):
-    # Left panel: Activity log
-    # Center: HUD content (avatar or reactor core)
-    # Right panel: Settings drawer
-    # Bottom: Content panel (scrollable web results, news, search)
-```
+| Column | Components | Purpose |
+|---|---|---|
+| **Left Column** | `01 · Hardware Telemetry`<br>`02 · Autonomous Task Queue` | Live CPU, RAM, GPU, and Network meters + Active agent task progress |
+| **Center Column** | `Fluid Vortex Core`<br>`Unified Command Dock`<br>`03 · Live Display Canvas` | Visual state indicator, Mic/State/Stop/Power controls, and Expandable Multi-View Inspector |
+| **Right Column** | `04 · Activity Log Stream`<br>`Context Actions` | Live conversational exchanges, system actions, and clipboard intelligence |
 
-### Layout
+---
 
-| Component | Size | Purpose |
-|-----------|------|---------|
-| Left panel | 148px | Activity log |
-| Center | Variable | Avatar/Reactor core |
-| Right panel | 340px | Settings drawer |
-| Window | 980x700 default | Main HUD |
-| Min size | 820x580 | Minimum window size |
+## Center Display & Fluid Vortex Core
 
-### Widgets
+The center panel features the Fluid Vortex core (`frontend/download.gif`) and the **Unified Command Dock**:
+1. **Mic Mute / Unmute**: Hardware-level mic toggle.
+2. **2x3 Phosphor Matrix State Badge**: Real-time standby, listening, thinking, speaking status indicator.
+3. **Emergency Stop Button**: Instant abort and task interruption.
+4. **Sleep & Power Mode**: Instant voice loop pause and sleep mode.
 
-- **QMainWindow** — top-level window
-- **QSplitter** — panel layout
-- **QTextEdit** — activity log
-- **QScrollArea** — content panel
-- **QProgressBar** — system metrics
-- **QComboBox** — voice, device selectors
-- **QPushButton** — various controls
-- **QLineEdit** — text input
-- **QLabel** — status indicators
-- **QStackedWidget** — settings pages
-- **QShortcut** — keyboard shortcuts
-
-## Avatar Rendering
-
-> **Web frontend note (`frontend/index.html`).** The Fluid Vortex avatar is an animated GIF (`frontend/download.gif`, 600×600, 90 frames) rendered at `.vortex-gif` inside `#avatar-frame .frame-inner`, which uses `backdrop-filter: blur(12px)` over a pure-black background. **Do not add `mix-blend-mode` to this animated element.** `screen` over black is a pixel-identical no-op (verified), but blending an animated layer inside a `backdrop-filter` ancestor forces a per-frame backdrop read and makes the QtWebEngine compositor flicker. Any per-frame animation inside a `backdrop-filter` subtree should likewise be avoided.
-
-### Face Model
-
-**File**: `core/face_model.obj` (25 KB)
-- **Source**: MediaPipe canonical face model
-- **License**: Apache 2.0
-- **Vertices**: 468
-- **Triangles**: 898
-- **Features**: Eyelids, nostrils, lips, cheekbones (measured anatomy)
-
-### Avatar Mesh
-
-**File**: `core/avatar_mesh.py`
-
-The mesh builds the head around the face model:
-- **Cranium**: Swept back over an ellipsoid (closed at occiput)
-- **Neck**: Tapering tube fading out
-- **Vertex normals**: For lighting
-- **Jaw rig**: Pivot between ears, max 0.115 radians drop
-- **Landmark rings**: Eye, brow, lip indices for animation
-
-### Renderer
-
-**File**: `core/avatar.py`
-
-```python
-# Everything rendered with QPainter
-# No OpenGL, no shaders, no GPU driver
-# 25 KB asset + formulas
-
-# Key animation systems:
-# - Eyes: Saccades between fixation points
-# - Brows: Track the phrase (not syllable)
-# - Mouth: Viseme-driven (see core/viseme.py)
-# - Jaw: Driven by audio openness
-# - Head: Nod on stressed syllables
-# - Blinking: Natural rhythm
-```
-
-### Animation Timing
-
-```python
-_TAU_OPEN = 0.022     # Jaw dropping toward vowel
-_TAU_SHUT = 0.012     # Lips closing on consonant
-_TAU_REST = 0.055     # Settling back to rest
-_TAU_SHAPE = 0.018    # Viseme openness following schedule
-
-# Frame-rate independent via _rate(dt, tau):
-#   return 1.0 - math.exp(-dt / tau)
-```
-
-### Brow and Eye Animation
-
-```python
-_BROW_LIFT = 0.14  # Derived from anatomy (brow-to-eye gap * 0.33 * 0.5 rig weight)
-# Brows ride the PHRASE, not the syllable
-# Slow asymmetry between left and right
-# Eyes make real saccades between fixation points
-# More saccades while speaking
-```
-
-## Lip-Sync System
-
-**Files**: `core/viseme.py`, `main.py:_pcm_visemes()`
-
-The mouth animation uses a **dual-source fusion**:
-1. **Audio formants** (20ms slices from FFT) → openness and width
-2. **Transcript** (VisemeStream) → which mouth shape
-
-```python
-# Blend ratio:
-o = 0.72 * t_open + 0.28 * a_open  # Text leads, audio corrects
-w = 0.78 * t_wide + 0.22 * a_wide
-```
-
-50 mouth shapes per second.
-
-## VisemeStream
-
-**File**: `core/viseme.py`
-
-```python
-class VisemeStream:
-    def feed_text(text: str):
-        # Parse text → list of (viseme, duration_weight) pairs
-        # Queue them for playback
-    
-    def frames(audio, hop: float):
-        # For each audio frame, advance through the queue
-        # Blend audio shape with transcript shape
-        # Return (level, openness, width) for avatar
-```
+---
 
 ## Multi-File Upload & Queue System
 
@@ -197,57 +87,37 @@ class VisemeStream:
 
 ## State Indicators
 
-| State | Avatar Behavior |
-|-------|-----------------|
-| **Listening** | Eyes meet yours, mouth ready |
-| **Thinking** | Looks away, brows down, blinking suppressed |
-| **Speaking** | Lip-sync active, eyes saccade, head nods |
-| **Sleeping** | Eyes closed (lids fall) |
-| **Content available** | Glances down at content panel |
+| State | Phosphor Matrix Badge |
+|---|---|
+| **STANDBY / READY** | Minimal pulse pattern |
+| **LISTENING** | Reactive waveform bars listening to user audio input |
+| **THINKING** | Animated scanning sweep |
+| **SPEAKING** | Active speech modulation indicator |
+| **SLEEPING** | Low-power dormant indicator |
 
-## Two HUD Styles
-
-1. **Face** (default): The animated holographic head
-2. **Core**: A reactor core — gauge ring, three arcs, spectrum driven by audio
-
-```python
-# Switch via config:
-get_hud_style() → "face" or "core"
-save_hud_style(style)
-```
-
-Both render in the same QPainter, same cost.
+---
 
 ## Theming
 
-```python
-# Accent color drives the entire palette:
-apply_ui_accent(accent_hex)  # hue shift, brightness/saturation preserved
-# Avatar retints with it
-# All HUD elements pick up new colors
+```javascript
+// Accent color drives the entire palette:
+applyAccentColor(accentHex) // Retints active borders, badges, progress bars, and glows
 ```
 
-## Rendering Loop
-
-```python
-# PyQt6 paintEvent → QPainter
-# Frame rate: 60 Hz normal, 30 Hz when idle, 20 Hz when minimized
-# Avatar animation steps independently of frame rate
-# Time constants (TAU_*) ensure same speed at any FPS
-```
+---
 
 ## Summary
 
 ```
-UI: PyQt6 QMainWindow, 980x700 default
-Rendering: QPainter only (no GPU)
-Face: MediaPipe canonical model (468 vertices, Apache 2.0)
-Animations: Eyes, brows, mouth, jaw, head, blink
-Lip-sync: 50 shapes/sec, dual-source fusion
+UI: PyQt6 QWebEngineView + HTML5/CSS/JS Tactical Workspace
+Rendering: Chromium GPU-accelerated compositing
+Centerpiece: Fluid Vortex Core + Unified Command Dock
 Upload: Multi-file drag-and-drop + UploadedFilesBar queue
-Activity Log: Copy Bar + Log Bus ring buffer + Redaction
+Activity Log: Copy Bar + Log Bus ring buffer + Secret Redaction
 Task Inspector: Live PID telemetry + Cancel action + ANSI stripping
-States: Listening, Thinking, Speaking, Sleeping
+States: Standby, Listening, Thinking, Speaking, Sleeping
+Theming: Hex / Preset accent color palette
+```
 HUD styles: Face or Reactor core
 Theming: Hue wheel accent color
 ```

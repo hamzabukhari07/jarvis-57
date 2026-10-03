@@ -47,6 +47,7 @@ TOOL = {
 | `code_helper` | `actions/code_helper.py` | Single function, inline snippet generator, or single-file code review | `task`, `file_path`, `code` |
 | `dev_agent` | `actions/dev_agent.py` | Read-only codebase exploration, architecture analysis, and bug hunting | `task`, `repo_path` |
 | `extract_design_system` | `actions/design_extractor.py` | On-demand design extractor for custom HTML files, URLs, and generating standalone `DESIGN.md` specs | `file_path`, `output_path`, `action`, `force` |
+| `fleet_control` | `actions/fleet_control.py` | Orchestrate named specialist agent fleet (dispatch, hire, fire, list_agents, get_status) | `action`, `agent_id`, `task`, `role`, `default_tool`, `model_id`, `specialty` |
 | `task_status` | `actions/task_status.py` | Query live progress, inspect logs, or cancel/terminate running background tasks | `action` ('status'/'cancel'), `task_id` |
 
 
@@ -73,7 +74,7 @@ TOOL = {
 | `clone_website` | `actions/website_cloner.py` | Autonomous AI Website Reverse Engineering pipeline (DOM extraction, token harvesting, AI synthesis of clean semantic HTML/CSS/JS, asset localization, and automatic local preview) | `url`, `output_format` ('static'/'clean_html'/'react'/'nextjs'/'redesign'), `include_subpages`, `max_pages`, `redesign_prompt`, `custom_folder` |
 | `browser_control` | `actions/browser_control.py` | Open URLs, navigate tabs, interact with browser | `url`, `action` |
 | `web_read_page` | `actions/web_reader.py` | Deep web scraping and markdown text extraction. Scrapling (Fetcher/StealthyFetcher) when installed, otherwise a built-in `requests` + BeautifulSoup fallback. | `url`, `stealth`, `max_chars` |
-| `web_search` | `actions/web_search.py` | Gemini grounded + DDG fallback, modes: news, research, price, compare | `query`, `mode` |
+| `web_search` | `actions/web_search.py` | Ultra-fast 3-tier search (Tavily AI &lt;500ms ➔ Gemini Grounded ➔ DDG) with Groq LPU synthesis, modes: search, news, research, price, compare | `query`, `mode`, `items`, `aspect` |
 | `agent_reach` | `actions/agent_reach.py` | Multi-platform intelligence, spoken audio Whisper transcription, video transcripts, social discussions & repo analysis (Instagram Reels, TikTok, YouTube, Reddit, GitHub, X, Stack Overflow, Hacker News, RSS) | `platform` ('auto'/'multi'/'instagram'/'tiktok'/'youtube'/'reddit'/'github'/'twitter'/'stackoverflow'/'hackernews'/'rss'), `target` |
 | `flight_finder` | `actions/flight_finder.py` | Live flight price and availability | `origin`, `destination`, `date` |
 | `youtube_video` | `actions/youtube_video.py` | Search, play, control YouTube | `query`, `action` |
@@ -83,8 +84,8 @@ TOOL = {
 | Tool | File | Purpose | Parameters |
 |------|------|---------|------------|
 | `computer_settings` | `actions/computer_settings.py` | Volume, brightness, WiFi, power, battery queries | `action`, `value` |
-| `computer_control` | `actions/computer_control.py` | Mouse clicks/drags, keyboard hotkeys, Unicode typing, compound batch macros, window control, and 3-tier escalated perception (L1 UIA ➔ L1.5 RapidOCR ROI ➔ L2 Vision) | `action` ('click'/'screen_click'/'double_click'/'type'/'hotkey'/'press'/'batch'/'get_active_window_info'/aliases), `x`, `y`, `description`, `text`, `keys`, `key`, `sequence` |
-| `open_app` | `actions/open_app.py` | Application launcher with post-launch focus guard and process terminator | `app_name`, `path`, `action` ('open'/'close') |
+| `computer_control` | `actions/computer_control.py` | Mouse clicks/drags, keyboard hotkeys, Unicode typing, compound batch macros, safe window closure with exact title matching (`_safe_close_window`), and 3-tier escalated perception (L1 UIA ➔ L1.5 RapidOCR ROI ➔ L2 Vision) | `action` ('click'/'screen_click'/'double_click'/'type'/'hotkey'/'press'/'batch'/'get_active_window_info'/'close_window'/aliases), `x`, `y`, `description`, `text`, `keys`, `key`, `sequence` |
+| `open_app` | `actions/open_app.py` | Application launcher with post-launch focus guard, non-destructive UI view switching (`office_view` vs `dashboard`), and process termination | `app_name`, `path`, `action` ('open'/'close') |
 | `weather_report` | `actions/weather_report.py` | Live weather forecast | `city`, `time` |
 | `game_updater` | `actions/game_updater.py` | Steam/Epic game updates and patch notes | `game_name`, `action` |
 | `reminder` | `actions/reminder.py` | Scheduled alarms, timers, reminders | `time_str`, `message` |

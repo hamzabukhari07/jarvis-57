@@ -2,8 +2,8 @@
 version: "3.0"
 name: "Dub"
 theme: "light"
-source: "C:/Users/Hamza Bukhari/Documents/antigravity/zezo latest/skills/hamza_taste/references/html/dub.html"
-extracted_at: "2026-10-01T12:03:37.264246+00:00"
+source: "D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/dub.html"
+extracted_at: "2026-10-03T15:00:14.563059+00:00"
 description: "Refined editorial light design system extracted deterministically from Dub. Features clean #ffffff cream canvas, high-contrast #171717 ink typography, and elegant Menlo headings."
 colors:
   primary: "#000000"
@@ -95,7 +95,7 @@ components:
 # Dub — Design Specification
 
 > **Aesthetic Profile:** Light Editorial / Cream Precision  
-> **Extracted Source:** C:/Users/Hamza Bukhari/Documents/antigravity/zezo latest/skills/hamza_taste/references/html/dub.html  
+> **Extracted Source:** D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/dub.html  
 > **Theme:** LIGHT  
 
 ---

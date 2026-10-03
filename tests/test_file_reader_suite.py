@@ -80,6 +80,7 @@ class TestFileReaderSuite:
         assert "config.json" in res.text
 
     def test_background_file_processor_summary_payload(self, tmp_path):
+        from unittest.mock import patch, MagicMock
         from actions.file_processor import file_processor
         from core.task_manager import get_task_manager
         import time
@@ -87,23 +88,27 @@ class TestFileReaderSuite:
         test_doc = tmp_path / "resume.txt"
         test_doc.write_text("Hamza Bukhari - Full Stack Developer & AI Engineer with React and FastAPI.", encoding="utf-8")
 
-        tm = get_task_manager()
-        msg = file_processor({"file_path": str(test_doc), "action": "summarize"})
-        assert "background" in msg.lower() and "task id" in msg.lower()
+        mock_resp = MagicMock()
+        mock_resp.text = "Hamza Bukhari is an AI Engineer and Full Stack Developer."
 
-        # Wait for background task to complete
-        start = time.time()
-        done_tasks = []
-        while time.time() - start < 10.0:
-            done_tasks = tm.get_categorized_tasks().get("done", [])
-            if done_tasks:
-                break
-            time.sleep(0.5)
+        with patch("core.gemini.call", return_value=mock_resp):
+            tm = get_task_manager()
+            msg = file_processor({"file_path": str(test_doc), "action": "summarize"})
+            assert "background" in msg.lower() and "task id" in msg.lower()
 
-        assert len(done_tasks) > 0
-        latest = done_tasks[0]
-        res = latest.get("result", {})
-        assert isinstance(res, dict)
-        assert "summary" in res
-        assert len(res["summary"]) > 0
+            # Wait for background task to complete
+            start = time.time()
+            done_tasks = []
+            while time.time() - start < 10.0:
+                done_tasks = tm.get_categorized_tasks().get("done", [])
+                if done_tasks:
+                    break
+                time.sleep(0.5)
+
+            assert len(done_tasks) > 0
+            latest = done_tasks[0]
+            res = latest.get("result", {})
+            assert isinstance(res, dict)
+            assert "summary" in res
+            assert len(res["summary"]) > 0
 

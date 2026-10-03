@@ -1,0 +1,449 @@
+from __future__ import annotations
+
+import json
+import logging
+import re
+import threading
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+from core.circuit_breaker import circuit_breaker
+from core.git_sandbox import git_sandbox
+
+logger = logging.getLogger(__name__)
+
+OFFICE_DESK_COORDINATES: list[tuple[int, int]] = [
+    (180, 160), (320, 160), (460, 160), (600, 160),
+    (180, 280), (320, 280), (460, 280), (600, 280),
+    (180, 400), (320, 400), (460, 400), (600, 400),
+]
+
+VALID_RISK_TIERS: set[str] = {"L0_READ_ONLY", "L1_MUTATION", "L2_DESTRUCTIVE"}
+VALID_TOOLS: set[str] = {
+    "opencode_run", "kilo_run", "dev_agent", "code_helper",
+    "antigravity_run", "extract_design_system", "agent_reach",
+    "web_reader", "web_search",
+}
+
+
+@dataclass
+class FleetAgent:
+    id: str
+    name: str
+    role: str
+    specialty: str
+    color: str
+    avatar_pixel: str
+    default_tool: str
+    risk_tier: str
+    prompt_prefix: str
+    status: str = "idle"
+    current_task_id: Optional[str] = None
+    current_task_title: Optional[str] = None
+    task_progress: int = 0
+    desk_x: int = 0
+    desk_y: int = 0
+    active_worktree: Optional[str] = None
+    completed_tasks: int = 0
+    recent_logs: List[str] = field(default_factory=list)
+
+
+class FleetManager:
+    """Orchestrates named specialist agent fleet, isolated worktrees, and live deck state."""
+
+    def __init__(self, config_path: Optional[Path] = None):
+        self._lock = threading.RLock()
+        self.config_path = config_path or (Path(__file__).parent.parent / "config" / "fleet_agents.json")
+        self.agents: Dict[str, FleetAgent] = {}
+        self._load_fleet()
+
+    def _allocate_desk(self, existing: Optional[FleetAgent], req_x: int, req_y: int) -> Tuple[int, int]:
+        """Allocate next available workstation desk on the office floor."""
+        if req_x > 0 and req_y > 0:
+            return req_x, req_y
+        if existing and existing.desk_x > 0 and existing.desk_y > 0:
+            return existing.desk_x, existing.desk_y
+
+        occupied = {(a.desk_x, a.desk_y) for a in self.agents.values() if a.desk_x > 0 and a.desk_y > 0}
+        for coord in OFFICE_DESK_COORDINATES:
+            if coord not in occupied:
+                return coord
+
+        idx = len(self.agents)
+        return (180 + (idx % 4) * 140, 480 + (idx // 4) * 100)
+
+    def _load_fleet(self) -> None:
+        if not self.config_path.exists():
+            return
+        try:
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            fleet_data = data.get("fleet", {})
+            with self._lock:
+                self.agents.clear()
+                for agent_id, info in fleet_data.items():
+                    uid = agent_id.upper().strip()
+                    self.agents[uid] = FleetAgent(
+                        id=uid,
+                        name=info.get("name", agent_id),
+                        role=info.get("role", ""),
+                        specialty=info.get("specialty", ""),
+                        color=info.get("color", "#3b82f6"),
+                        avatar_pixel=info.get("avatar_pixel", f"{uid.lower()}_pixel.png"),
+                        default_tool=info.get("default_tool", "dev_agent"),
+                        risk_tier=info.get("risk_tier", "L0_READ_ONLY"),
+                        prompt_prefix=info.get("prompt_prefix", ""),
+                        desk_x=info.get("desk_x", 0),
+                        desk_y=info.get("desk_y", 0),
+                    )
+        except Exception as e:
+            logger.error("[FleetManager] Failed to load fleet config: %s", e)
+
+    def _save_fleet(self) -> bool:
+        """Persist current fleet state back to fleet_agents.json."""
+        try:
+            self.config_path.parent.mkdir(parents=True, exist_ok=True)
+            export: Dict[str, Any] = {"fleet": {}}
+            with self._lock:
+                for a in self.agents.values():
+                    export["fleet"][a.id] = {
+                        "name": a.name,
+                        "role": a.role,
+                        "specialty": a.specialty,
+                        "color": a.color,
+                        "avatar_pixel": a.avatar_pixel,
+                        "default_tool": a.default_tool,
+                        "risk_tier": a.risk_tier,
+                        "prompt_prefix": a.prompt_prefix,
+                        "desk_x": a.desk_x,
+                        "desk_y": a.desk_y,
+                    }
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                json.dump(export, f, indent=2)
+            return True
+        except Exception as e:
+            logger.error("[FleetManager] Failed to save fleet config: %s", e)
+            return False
+
+    def get_agent(self, name_or_id: str) -> Optional[FleetAgent]:
+        key = name_or_id.upper().strip()
+        with self._lock:
+            if key in self.agents:
+                return self.agents[key]
+            for a in self.agents.values():
+                if key == a.name.upper() or a.name.upper().startswith(key):
+                    return a
+        return None
+
+    def save_agent_profile(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create or update an agent persona, tool, and desk coordinate with strict schema validation."""
+        raw_id = str(data.get("id") or data.get("name", "")).strip()
+        if not raw_id:
+            return {"success": False, "error": "Agent name or ID cannot be empty."}
+
+        clean_id = "".join(c for c in raw_id.upper() if c.isalnum() or c == "_")[:20]
+        if not clean_id:
+            return {"success": False, "error": "Agent identifier must contain alphanumeric characters."}
+
+        tool = str(data.get("default_tool") or "dev_agent").strip().lower()
+        if tool not in VALID_TOOLS and not tool.endswith("_run") and not tool.endswith("_agent"):
+            tool = "dev_agent"
+
+        risk_tier = str(data.get("risk_tier") or "").upper().strip()
+        if risk_tier not in VALID_RISK_TIERS:
+            risk_tier = "L1_MUTATION" if tool in ("kilo_run", "opencode_run", "antigravity_run") else "L0_READ_ONLY"
+
+        color_str = str(data.get("color") or "").strip()
+        if not re.match(r"^#[0-9a-fA-F]{6}$", color_str):
+            color_str = "#3b82f6"
+
+        name_str = str(data.get("name") or clean_id.title()).strip()[:40] or clean_id.title()
+        role_str = str(data.get("role") or "Autonomous Specialist").strip()[:80]
+        specialty_str = str(data.get("specialty") or role_str).strip()[:120]
+
+        with self._lock:
+            existing = self.agents.get(clean_id)
+            desk_x, desk_y = self._allocate_desk(
+                existing,
+                int(data.get("desk_x", 0)),
+                int(data.get("desk_y", 0))
+            )
+
+            prompt_prefix = str(
+                data.get("prompt_prefix")
+                or (existing.prompt_prefix if existing else f"You are {name_str}, an autonomous fleet specialist focusing on {specialty_str}.")
+            ).strip()
+
+            agent = FleetAgent(
+                id=clean_id,
+                name=name_str,
+                role=role_str,
+                specialty=specialty_str,
+                color=color_str,
+                avatar_pixel=str(data.get("avatar_pixel") or (existing.avatar_pixel if existing else f"{clean_id.lower()}_pixel.png")),
+                default_tool=tool,
+                risk_tier=risk_tier,
+                prompt_prefix=prompt_prefix,
+                desk_x=desk_x,
+                desk_y=desk_y,
+                status=existing.status if existing else "idle",
+                current_task_id=existing.current_task_id if existing else None,
+                active_worktree=existing.active_worktree if existing else None,
+            )
+            self.agents[clean_id] = agent
+            ok = self._save_fleet()
+
+        try:
+            from core.log_bus import emit_tool_micro_event
+            emit_tool_micro_event("fleet_updated", "fleet_manager", {"action": "hire", "agent": self._agent_to_dict(agent)})
+        except Exception:
+            pass
+
+        return {"success": ok, "agent": self._agent_to_dict(agent)}
+
+    def save_agent_soul(self, agent_id: str, soul_prompt: str) -> Dict[str, Any]:
+        """Update system prompt / soul.md for a specific agent."""
+        agent = self.get_agent(agent_id)
+        if not agent:
+            return {"success": False, "error": f"Agent '{agent_id}' not found."}
+
+        with self._lock:
+            agent.prompt_prefix = soul_prompt.strip()
+            ok = self._save_fleet()
+
+        try:
+            from core.log_bus import emit_tool_micro_event
+            emit_tool_micro_event("fleet_updated", "fleet_manager", {"action": "soul_update", "agent_id": agent.id})
+        except Exception:
+            pass
+
+        return {"success": ok, "agent_id": agent.id, "soul": agent.prompt_prefix}
+
+    def delete_agent(self, agent_id: str) -> Dict[str, Any]:
+        key = agent_id.upper().strip()
+        with self._lock:
+            if key not in self.agents:
+                return {"success": False, "error": f"Agent '{agent_id}' not found."}
+
+            agent = self.agents[key]
+            # Teardown any active worktree if present
+            if agent.active_worktree:
+                try:
+                    git_sandbox.safe_teardown(agent.current_task_id or agent.id.lower())
+                except Exception as ex:
+                    logger.warning("[FleetManager] Worktree teardown during delete_agent error: %s", ex)
+
+            del self.agents[key]
+            ok = self._save_fleet()
+
+        try:
+            from core.log_bus import emit_tool_micro_event
+            emit_tool_micro_event("fleet_updated", "fleet_manager", {"action": "fire", "deleted_id": key})
+        except Exception:
+            pass
+
+        return {"success": ok, "deleted_id": key}
+
+    def get_agent_full_profile(self, agent_id: str) -> Dict[str, Any]:
+        """Retrieve full details including soul.md, active worktree, and episodic memory."""
+        agent = self.get_agent(agent_id)
+        if not agent:
+            return {"success": False, "error": f"Agent '{agent_id}' not found."}
+
+        # Query episodic memories from SQLite for this agent persona
+        memories = []
+        try:
+            from memory.sqlite_memory import search_scroll_history
+            memories = search_scroll_history(agent.name, limit=6)
+        except Exception as e:
+            logger.debug("[FleetManager] Memory query error: %s", e)
+
+        # Query active task details from TaskManager if available
+        task_info = None
+        if agent.current_task_id:
+            try:
+                from core.task_manager import get_task_manager
+                st = get_task_manager().status(agent.current_task_id)
+                if st:
+                    task_info = {
+                        "id": st.get("id"),
+                        "title": st.get("group_title") or st.get("message") or "",
+                        "status": st.get("status"),
+                        "progress": st.get("progress", 0),
+                        "tool": st.get("tool"),
+                        "elapsed": f"{st.get('elapsed_sec', 0)}s",
+                        "recent_logs": (st.get("logs") or [])[-6:],
+                    }
+            except Exception as e:
+                logger.debug("[FleetManager] Task query error: %s", e)
+
+        return {
+            "success": True,
+            "agent": self._agent_to_dict(agent),
+            "soul_md": agent.prompt_prefix,
+            "task_info": task_info,
+            "memories": memories,
+        }
+
+    def dispatch_task(self, agent_id: str, prompt: str, path: Optional[str] = None) -> Dict[str, Any]:
+        """Launch an autonomous task executed by this agent's designated tool."""
+        agent = self.get_agent(agent_id)
+        if not agent:
+            return {"success": False, "error": f"Agent '{agent_id}' not found."}
+
+        # Capability check via Circuit Breaker
+        can_run, block_reason = circuit_breaker.can_execute(agent.default_tool)
+        if not can_run:
+            return {"success": False, "error": f"Circuit breaker tripped for {agent.default_tool}: {block_reason}"}
+
+        import uuid
+        task_id = uuid.uuid4().hex[:8]
+        worktree_path = None
+
+        # Worktree sandboxing for destructive actions
+        if agent.risk_tier == "L2_DESTRUCTIVE" or agent.default_tool in ("opencode_run", "kilo_run"):
+            wt = git_sandbox.create_worktree(f"{agent.id.lower()}_{task_id}")
+            if wt.success:
+                worktree_path = str(wt.worktree_path)
+
+        target_dir = worktree_path or path or str(Path.cwd())
+        enriched_prompt = f"[{agent.name} • {agent.role}]\n{agent.prompt_prefix}\n\nTask: {prompt}"
+
+        # Submit task to background TaskManager
+        from core.task_manager import get_task_manager
+        tm = get_task_manager()
+
+        def _worker_fn(worker_params: dict, task_ctx: Any) -> dict:
+            try:
+                from core.action_loader import discover_actions
+                reg = discover_actions(Path(__file__).parent.parent / "actions")
+                res = reg.run(agent.default_tool, {
+                    "task": enriched_prompt,
+                    "prompt": enriched_prompt,
+                    "project_path": target_dir,
+                    "repo_path": target_dir,
+                    "target_dir": target_dir,
+                    "path": target_dir,
+                })
+                task_ctx.report(100, "Completed successfully")
+                return {"status": "success", "result": str(res)}
+            except Exception as ex:
+                task_ctx.on_fail(str(ex))
+                raise
+
+        submitted_id = tm.submit(
+            tool_name=agent.default_tool,
+            fn=_worker_fn,
+            params={
+                "task": prompt,
+                "agent_id": agent.id,
+                "agent_name": agent.name,
+                "target_dir": target_dir,
+            },
+            group_title=f"[{agent.name}] {prompt[:40]}...",
+        )
+
+        with self._lock:
+            agent.status = "working"
+            agent.current_task_id = submitted_id
+            agent.current_task_title = prompt
+            agent.active_worktree = worktree_path
+
+        return {
+            "success": True,
+            "task_id": submitted_id,
+            "agent_id": agent.id,
+            "agent_name": agent.name,
+            "tool": agent.default_tool,
+            "worktree": worktree_path,
+        }
+
+    def complete_task(self, agent_id: str, task_id: str, merge_changes: bool = False) -> Dict[str, Any]:
+        """Mark agent task complete and teardown worktree."""
+        agent = self.get_agent(agent_id)
+        if not agent:
+            return {"success": False, "error": f"Agent '{agent_id}' not found."}
+
+        merge_msg = ""
+        if merge_changes and agent.active_worktree:
+            success, merge_msg = git_sandbox.merge_worktree(task_id)
+            if not success:
+                logger.warning(f"[FleetManager] Merge failed: {merge_msg}")
+
+        if agent.active_worktree:
+            teardown_msg = git_sandbox.safe_teardown(task_id)
+            logger.info(f"[FleetManager] {teardown_msg}")
+
+        with self._lock:
+            agent.status = "idle"
+            agent.current_task_id = None
+            agent.current_task_title = None
+            agent.active_worktree = None
+            agent.completed_tasks += 1
+
+        return {
+            "success": True,
+            "agent_name": agent.name,
+            "status": "idle",
+            "merge_result": merge_msg,
+        }
+
+    def get_fleet_deck_state(self) -> List[Dict[str, Any]]:
+        """Export full live state for the Scranton Pixel Office UI."""
+        from core.task_manager import get_task_manager
+        tm = get_task_manager()
+
+        with self._lock:
+            state = []
+            for a in self.agents.values():
+                # Sync real-time progress from task manager
+                task_progress = 0
+                if a.current_task_id:
+                    st = tm.status(a.current_task_id)
+                    if st:
+                        task_progress = st.get("progress", 0)
+                        if st.get("status") in ("done", "completed", "failed", "cancelled"):
+                            a.status = "idle"
+                            a.current_task_id = None
+
+                state.append({
+                    "id": a.id,
+                    "name": a.name,
+                    "role": a.role,
+                    "specialty": a.specialty,
+                    "color": a.color,
+                    "avatar_pixel": a.avatar_pixel,
+                    "default_tool": a.default_tool,
+                    "risk_tier": a.risk_tier,
+                    "status": a.status,
+                    "task_id": a.current_task_id,
+                    "task_title": a.current_task_title,
+                    "task_progress": task_progress,
+                    "worktree": a.active_worktree,
+                    "desk_x": a.desk_x,
+                    "desk_y": a.desk_y,
+                })
+            return state
+
+    def _agent_to_dict(self, a: FleetAgent) -> Dict[str, Any]:
+        return {
+            "id": a.id,
+            "name": a.name,
+            "role": a.role,
+            "specialty": a.specialty,
+            "color": a.color,
+            "avatar_pixel": a.avatar_pixel,
+            "default_tool": a.default_tool,
+            "risk_tier": a.risk_tier,
+            "prompt_prefix": a.prompt_prefix,
+            "status": a.status,
+            "current_task_id": a.current_task_id,
+            "active_worktree": a.active_worktree,
+            "desk_x": a.desk_x,
+            "desk_y": a.desk_y,
+        }
+
+
+fleet_manager = FleetManager()

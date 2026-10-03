@@ -1081,7 +1081,7 @@
     /* Spec Grid */
     .spec-grid {
       display: grid;
-      grid-template-columns: 100px 1fr;
+      grid-template-columns: 80px 1fr;
       gap: 4px 8px;
       background: #0d0d10;
       border: 1px solid var(--border-subtle);
@@ -1089,6 +1089,7 @@
       padding: 8px 10px;
       font-family: var(--font-mono);
       font-size: 10px;
+      width: 100%;
     }
 
     .spec-label {
@@ -1118,13 +1119,14 @@
 
     /* Staged files box */
     .file-preview-card {
-      margin-top: 8px;
+      margin-top: 0;
       background: #0a0a0c;
       border: 1px solid var(--border-subtle);
       border-radius: 4px;
       padding: 8px 10px;
       font-family: var(--font-mono);
       font-size: 10px;
+      width: 100%;
     }
 
     .file-pill-list {
@@ -1529,6 +1531,59 @@
       color: #ef4444;
     }
 
+    /* ── Inspector Tabs & Soul.md Editor ── */
+    .inspector-tabs {
+      display: flex;
+      gap: 2px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 8px;
+      padding-bottom: 2px;
+    }
+    .inspector-tab-content {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      padding: 4px 6px;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+    .tab-btn:hover {
+      color: var(--text-primary);
+    }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .soul-editor {
+      width: 100%;
+      height: 120px;
+      background: #050508;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      line-height: 1.4;
+      padding: 6px;
+      border-radius: 3px;
+      resize: vertical;
+      box-sizing: border-box;
+      outline: none;
+    }
+    .soul-editor:focus {
+      border-color: var(--accent);
+    }
+
     /* Interactive Office Props */
     .interactive-prop {
       cursor: pointer;
@@ -1617,44 +1672,6 @@
 
 <body>
 
-  <!-- Top Real-time Navigation & Telemetry -->
-  <header class="top-bar">
-    <div class="brand-section">
-      <div class="brand-title">ZEZO OS</div>
-      <span class="brand-badge">OFFICE</span>
-    </div>
-
-    <div class="telemetry-row">
-      <div class="telemetry-item">
-        <span>AGENTS:</span>
-        <span class="telemetry-value" id="hudFleet">12 ACTIVE</span>
-      </div>
-      <div class="telemetry-item">
-        <span>BRANCH:</span>
-        <span class="telemetry-value" id="hudBranch">main</span>
-      </div>
-      <div class="telemetry-item">
-        <span>STATUS:</span>
-        <span style="color: #22c55e; font-weight: 700;">ONLINE</span>
-      </div>
-    </div>
-
-    <div class="top-actions">
-      <button class="hud-tool-btn primary" style="background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.6); color: #ef4444;" onclick="triggerAllHandsMeeting()">
-        <iconify-icon icon="solar:users-group-two-rounded-bold" style="color: #ef4444;"></iconify-icon>
-        🚨 ALL HANDS
-      </button>
-      <button class="hud-tool-btn" id="soundToggleBtn" onclick="toggleSound()">
-        <iconify-icon icon="solar:volume-loud-bold" style="color: #38bdf8;"></iconify-icon>
-        Audio: ON
-      </button>
-      <button class="hud-tool-btn primary" style="background: var(--accent); border-color: #ff6b3d; color: #fff; font-weight: bold;" onclick="exitOfficeToHome()">
-        <iconify-icon icon="solar:home-2-bold" style="color: #fff;"></iconify-icon>
-        Home Screen
-      </button>
-    </div>
-  </header>
-
   <!-- Main Canvas & Inspector Layout -->
   <main class="deck-container">
 
@@ -1673,6 +1690,19 @@
         <div
           style="height: 28px; background: #0a0a0c; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-family: var(--font-mono); font-size: 10px;">
           <div class="section-label" style="margin-bottom:0; flex: 1;">01 · OFFICE FLOOR</div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button class="hud-tool-btn primary" onclick="openCreateAgentModal()" style="background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.5); color: #22c55e; padding: 2px 8px; font-size: 9.5px; height: 20px;">
+              <iconify-icon icon="solar:user-plus-bold" style="font-size: 11px;"></iconify-icon>
+              + HIRE AGENT
+            </button>
+            <button class="hud-tool-btn" id="soundToggleBtn" onclick="toggleSound()" style="padding: 2px 8px; font-size: 9.5px; height: 20px;">
+              <iconify-icon icon="solar:volume-loud-bold" style="color: #38bdf8; font-size: 11px;"></iconify-icon>
+              Audio: ON
+            </button>
+            <button class="hud-tool-btn primary" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.5); color: #ef4444; padding: 2px 8px; font-size: 9.5px; height: 20px;" onclick="triggerAllHandsMeeting()" title="Call All-Hands Meeting in Conference Room">
+              🚨 ALL HANDS
+            </button>
+          </div>
         </div>
 
         <div class="canvas-wrapper">
@@ -1772,7 +1802,7 @@
     <!-- Right Tactical Command Panel -->
     <aside class="tactical-sidebar">
 
-      <!-- 02 · AGENT INSPECTOR FRAME -->
+      <!-- 02 · AGENT INSPECTOR FRAME (Real Backend Sync) -->
       <div class="frame" style="flex: 0 0 auto;">
         <div class="corner corner-tl"></div>
         <div class="corner-v corner-v-tl"></div>
@@ -1783,54 +1813,103 @@
         <div class="corner corner-br"></div>
         <div class="corner-v corner-v-br"></div>
 
-        <div class="frame-inner">
-          <div class="section-label" style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="frame-inner" style="display: flex; flex-direction: column; max-height: 480px; overflow-y: auto;">
+          <div class="section-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
             <span>02 · INSPECTOR</span>
             <button class="hud-tool-btn" style="padding: 2px 6px; font-size: 9px; cursor: pointer;" onclick="closeAgentInspector()" title="Close Inspector View">✕ CLOSE</button>
           </div>
 
-          <div class="agent-dark-card">
-            <div class="agent-avatar-wrap">
-              <canvas id="activePortraitCanvas" width="44" height="56"></canvas>
-            </div>
-            <div class="agent-meta-group">
-              <div class="agent-title-row">
-                <span class="agent-name-txt" id="activeAgentName">MICHAEL</span>
-                <span class="badge badge-success mono" id="activeAgentStatusBadge">WORKING</span>
+          <!-- Inspector Tabs -->
+          <div class="inspector-tabs" id="inspectorTabs">
+            <button class="tab-btn active" id="tab-btn-overview" onclick="switchInspectorTab('overview')">OVERVIEW</button>
+            <button class="tab-btn" id="tab-btn-soul" onclick="switchInspectorTab('soul')">SOUL.MD</button>
+            <button class="tab-btn" id="tab-btn-memory" onclick="switchInspectorTab('memory')">MEMORY</button>
+            <button class="tab-btn" id="tab-btn-dispatch" onclick="switchInspectorTab('dispatch')">DISPATCH</button>
+          </div>
+
+          <!-- TAB 1: OVERVIEW -->
+          <div id="inspector-tab-overview" class="inspector-tab-content" style="display: flex; flex-direction: column; gap: 6px;">
+            <div class="agent-dark-card">
+              <div class="agent-avatar-wrap">
+                <canvas id="activePortraitCanvas" width="44" height="56"></canvas>
               </div>
-              <div class="agent-desc-txt" id="activeAgentRole">Regional Manager & Orchestrator</div>
+              <div class="agent-meta-group">
+                <div class="agent-title-row">
+                  <span class="agent-name-txt" id="activeAgentName">MICHAEL</span>
+                  <span class="badge badge-success mono" id="activeAgentStatusBadge">WORKING</span>
+                </div>
+                <div class="agent-desc-txt" id="activeAgentRole">Regional Manager & Orchestrator</div>
+                <div class="type-code text-muted" id="activeAgentSpecialty" style="font-size: 9px; margin-top: 2px;"></div>
+              </div>
+            </div>
+
+            <!-- Spec Grid with Openable OS Sandbox Folder Links -->
+            <div class="spec-grid">
+              <div class="spec-label">BRANCH</div>
+              <div class="spec-val" id="specWorktree">agent/fleet-orchestrator</div>
+
+              <div class="spec-label">PATH</div>
+              <div class="spec-val">
+                <span class="path-action-link" id="specPathLink" onclick="openActiveSandboxModal()"
+                  title="Click to inspect sandbox workspace files">
+                  <iconify-icon icon="solar:folder-open-bold" style="font-size: 12px;"></iconify-icon>
+                  <span id="specPath">.agent_worktrees/task-100/</span>
+                </span>
+              </div>
+
+              <div class="spec-label">ENGINE</div>
+              <div class="spec-val" id="specEngine">opencode_run</div>
+
+              <div class="spec-label">RISK TIER</div>
+              <div class="spec-val" id="specRiskTier" style="color: var(--green);">L0_READ_ONLY</div>
+            </div>
+
+            <!-- Staged Worktree Files Browser (Agent-Specific) -->
+            <div class="file-preview-card" style="margin-top: 6px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <span style="color: var(--text-muted); font-size: 9px;">FILES IN PROGRESS:</span>
+                <span style="color: var(--green); font-size: 9px;" id="activeFilesCount">0 ACTIVE</span>
+              </div>
+              <div class="file-pill-list" id="activeAgentFileList">
+                <!-- Dynamically populated per agent -->
+              </div>
             </div>
           </div>
 
-          <!-- Spec Grid with Openable OS Sandbox Folder Links -->
-          <div class="spec-grid">
-            <div class="spec-label">BRANCH</div>
-            <div class="spec-val" id="specWorktree">agent/fleet-orchestrator</div>
-
-            <div class="spec-label">PATH</div>
-            <div class="spec-val">
-              <span class="path-action-link" id="specPathLink" onclick="openActiveSandboxModal()"
-                title="Click to inspect sandbox workspace files">
-                <iconify-icon icon="solar:folder-open-bold" style="font-size: 12px;"></iconify-icon>
-                <span id="specPath">.agent_worktrees/task-100/</span>
-              </span>
+          <!-- TAB 2: SOUL.MD (SYSTEM PROMPT & PERSONA) -->
+          <div id="inspector-tab-soul" class="inspector-tab-content" style="display: none; flex-direction: column; gap: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span class="type-label" style="font-size: 9px; color: var(--accent);">SYSTEM PROMPT / SOUL.MD</span>
+              <span class="type-code text-muted" style="font-size: 8.5px;">Live in config/fleet_agents.json</span>
             </div>
-
-            <div class="spec-label">ENGINE</div>
-            <div class="spec-val">Tree-Sitter / py_compile</div>
-
-            <div class="spec-label">MODE</div>
-            <div class="spec-val" style="color: var(--green);">FULL AUTONOMY</div>
+            <textarea id="agentSoulEditor" class="soul-editor" placeholder="Enter agent persona and system instructions..."></textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 6px;">
+              <button class="hud-tool-btn primary" id="btnSaveSoul" onclick="saveActiveAgentSoul()" style="background: var(--accent); color: #fff; font-size: 9px; padding: 4px 10px;">
+                <iconify-icon icon="solar:diskette-bold"></iconify-icon> SAVE SOUL.MD
+              </button>
+            </div>
           </div>
 
-          <!-- Staged Worktree Files Browser (Agent-Specific) -->
-          <div class="file-preview-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-              <span style="color: var(--text-muted); font-size: 9px;">FILES IN PROGRESS:</span>
-              <span style="color: var(--green); font-size: 9px;" id="activeFilesCount">3 ACTIVE</span>
+          <!-- TAB 3: MEMORY PALACE (SQLITE FACTS & HISTORY) -->
+          <div id="inspector-tab-memory" class="inspector-tab-content" style="display: none; flex-direction: column; gap: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span class="type-label" style="font-size: 9px; color: var(--cyan);">SQLITE FTS5 EPISODIC MEMORIES</span>
+              <span class="badge badge-cyan mono" id="agentMemoryCountBadge" style="font-size: 8px;">0 ENTRIES</span>
             </div>
-            <div class="file-pill-list" id="activeAgentFileList">
-              <!-- Dynamically populated per agent -->
+            <div id="agentMemoryList" style="display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; padding-right: 2px;">
+              <div style="color: var(--text-muted); font-size: 9.5px; text-align: center; padding: 12px;">No historical memories recorded for this agent yet.</div>
+            </div>
+          </div>
+
+          <!-- TAB 4: DISPATCH TASK -->
+          <div id="inspector-tab-dispatch" class="inspector-tab-content" style="display: none; flex-direction: column; gap: 6px;">
+            <div class="type-label" style="font-size: 9px; color: var(--green);">DISPATCH AUTONOMOUS TASK</div>
+            <textarea id="agentTaskPromptInput" class="soul-editor" style="height: 65px;" placeholder="Describe task to execute in isolated worktree..."></textarea>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <input type="text" id="agentTaskPathInput" class="cmd-input" style="font-size: 9.5px; padding: 4px 6px; flex: 1;" placeholder="Target folder (optional)..." />
+              <button class="hud-tool-btn primary" onclick="dispatchTaskToActiveAgent()" style="background: var(--green); color: #000; font-weight: bold; font-size: 9.5px; padding: 4px 10px; white-space: nowrap;">
+                🚀 LAUNCH
+              </button>
             </div>
           </div>
 
@@ -1851,7 +1930,6 @@
         <div class="frame-inner">
           <div class="stream-header-strip">
             <div class="section-label" style="margin-bottom:0; flex: 1;">03 · ACTIVITY</div>
-            <span class="badge badge-cyan mono" style="font-size: 8px;">LIVE</span>
           </div>
 
           <div class="terminal-window" id="terminalLog">
@@ -1956,6 +2034,62 @@
         <div style="display: flex; justify-content: flex-end; gap: 8px;">
           <button class="modal-btn" onclick="openInVsCode()">🚀 Open in Editor / VS Code</button>
           <button class="modal-btn primary" onclick="closeModal('sandboxModal')">Done</button>
+  </div>
+
+  <!-- Modal: Create / Hire New Fleet Agent -->
+  <div class="modal-overlay" id="createAgentModal">
+    <div class="modal-panel" style="max-width: 480px;">
+      <div class="modal-head">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <iconify-icon icon="solar:user-plus-bold" style="font-size: 16px; color: var(--green);"></iconify-icon>
+          <span style="font-weight: 700;">HIRE & SPAWN FLEET AGENT</span>
+        </div>
+        <button class="hud-tool-btn" onclick="closeModal('createAgentModal')">✕</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <label class="spec-label" style="display:block; margin-bottom:3px;">AGENT ID / CODENAME</label>
+            <input type="text" id="newAgentId" class="cmd-input" placeholder="e.g. ANDY, DARRELL" style="width:100%; text-transform:uppercase;" />
+          </div>
+          <div>
+            <label class="spec-label" style="display:block; margin-bottom:3px;">FULL NAME</label>
+            <input type="text" id="newAgentName" class="cmd-input" placeholder="e.g. Andy Bernard" style="width:100%;" />
+          </div>
+        </div>
+
+        <div>
+          <label class="spec-label" style="display:block; margin-bottom:3px;">ROLE TITLE</label>
+          <input type="text" id="newAgentRole" class="cmd-input" placeholder="e.g. Senior Frontend Animator" style="width:100%;" />
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <label class="spec-label" style="display:block; margin-bottom:3px;">DEFAULT ENGINE</label>
+            <select id="newAgentTool" class="cmd-input" style="width:100%; background:#050508; color:#fff; border:1px solid var(--border-subtle); padding:4px;">
+              <option value="opencode_run">OpenCode (Full Feature Coder)</option>
+              <option value="kilo_run">Kilo (Fast Refactoring)</option>
+              <option value="antigravity_run">Antigravity (UI Synthesis)</option>
+              <option value="agent_reach">Agent Reach (Research & Web)</option>
+              <option value="dev_agent">Dev Agent (Read-only Explorer)</option>
+            </select>
+          </div>
+          <div>
+            <label class="spec-label" style="display:block; margin-bottom:3px;">THEME COLOR</label>
+            <input type="color" id="newAgentColor" value="#06b6d4" style="width:100%; height:26px; background:none; border:1px solid var(--border-subtle); cursor:pointer;" />
+          </div>
+        </div>
+
+        <div>
+          <label class="spec-label" style="display:block; margin-bottom:3px;">SYSTEM PROMPT / SOUL.MD</label>
+          <textarea id="newAgentSoul" class="soul-editor" style="height:85px;" placeholder="Define agent behavior, anti-slop rules, and specialization..."></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;">
+          <button class="modal-btn" onclick="closeModal('createAgentModal')">CANCEL</button>
+          <button class="modal-btn primary" onclick="saveNewAgentFromModal()" style="background:var(--green); color:#000; font-weight:bold;">
+            ✓ HIRE & SPAWN AGENT
+          </button>
         </div>
       </div>
     </div>
@@ -2330,39 +2464,97 @@
       });
     }
 
-    // Master Autonomous Fleet Scheduler (Runs continuously every 3.5s)
-    function runAutonomousFleetCycle() {
-      const available = agents.filter(ag => !ag.isBusy);
-      if (available.length < 1) return;
+    }
 
-      const rand = Math.random();
+    // ── Real Backend Event Handlers (Grounded WebSocket Architecture) ──
+    function handleAgentTaskStarted(data) {
+      if (!data) return;
+      const targetId = (data.agent_id || data.agent || '').toUpperCase();
+      const agent = agents.find(ag => ag.name.toUpperCase() === targetId);
 
-      if (rand < 0.40 && available.length >= 2) {
-        // Run dialogue banter between 2 agents
-        const script = BANTER_SCRIPTS[Math.floor(Math.random() * BANTER_SCRIPTS.length)];
-        const agentA = agents.find(ag => ag.name === script.a);
-        const agentB = agents.find(ag => ag.name === script.b);
-
-        if (agentA && agentB && !agentA.isBusy && !agentB.isBusy) {
-          startBanter(agentA, agentB, script);
+      if (agent) {
+        agent.isBusy = true;
+        setState(agent, 'working');
+        showBubble(agent, data.task ? (data.task.slice(0, 36) + '...') : 'Coding task started!', 4000);
+        appendLog(agent.name, `[TASK STARTED] ${data.task || 'Coding task initiated.'} (Tool: ${data.tool || agent.engine || 'kilo_run'})`, 'highlight');
+        if (selectedAgent && selectedAgent.name === agent.name) {
+          document.getElementById('activeAgentTask').innerText = data.task || 'Coding task in progress';
         }
-      } else if (rand < 0.65 && available.length >= 2) {
-        // Pair code review
-        const idxA = Math.floor(Math.random() * available.length);
-        const agentA = available[idxA];
-        const remaining = available.filter(ag => ag.name !== agentA.name);
-        if (remaining.length > 0) {
-          const agentB = remaining[Math.floor(Math.random() * remaining.length)];
-          startCodeReviewVisit(agentA, agentB);
-        }
-      } else if (rand < 0.85) {
-        // Water cooler break
-        const luckyAgent = available[Math.floor(Math.random() * available.length)];
-        startCoffeeBreak(luckyAgent);
       } else {
-        // Boardroom visit
-        const luckyAgent = available[Math.floor(Math.random() * available.length)];
-        startBoardroomCheck(luckyAgent);
+        appendLog('FLEET', `Task started on agent [${targetId}]: ${data.task || ''}`, 'highlight');
+      }
+    }
+
+    function handleTaskProgress(data) {
+      if (!data) return;
+      const targetId = (data.agent_id || '').toUpperCase();
+      const agent = targetId ? agents.find(ag => ag.name.toUpperCase() === targetId) : selectedAgent;
+      const msg = data.message || `Progress: ${data.progress || 0}%`;
+      appendLog(agent ? agent.name : 'TASK', msg, 'info');
+    }
+
+    function handleTaskDone(data) {
+      if (!data) return;
+      const targetId = (data.agent_id || '').toUpperCase();
+      const agent = targetId ? agents.find(ag => ag.name.toUpperCase() === targetId) : selectedAgent;
+
+      if (agent) {
+        agent.isBusy = false;
+        showBubble(agent, 'Task completed! ✓', 3500);
+        appendLog(agent.name, `[TASK COMPLETED] ${data.summary || 'Task finished successfully.'}`, 'success');
+        goToDesk(agent, () => {
+          setState(agent, 'idle');
+        });
+      } else {
+        appendLog('FLEET', `Task completed: ${data.summary || ''}`, 'success');
+      }
+    }
+
+    async function syncBackendFleetState() {
+      try {
+        const res = await fetch('/api/fleet/state');
+        if (!res.ok) return;
+        const json = await res.json();
+        const fleetMap = (json && json.fleet) || {};
+
+        Object.keys(fleetMap).forEach(k => {
+          const remote = fleetMap[k];
+          let local = agents.find(a => a.name.toUpperCase() === k.toUpperCase());
+          if (!local) {
+            local = {
+              name: remote.id || k,
+              role: remote.role || 'Agent Specialist',
+              worktree: `agent/${k.toLowerCase()}`,
+              sandbox: `.agent_worktrees/${k.toLowerCase()}/`,
+              files: ['main.py', 'core/prompt.txt'],
+              logs: [`[${k}] Attached to office floor.`],
+              x: (remote.desk_x || 4) + 3,
+              y: (remote.desk_y || 23) + 4,
+              shirt: remote.color || '#3b82f6',
+              hair: '#3b2a22',
+              skin: '#e9bd91',
+              tie: '#222222',
+              state: remote.status === 'busy' ? 'working' : 'idle',
+              deskX: remote.desk_x || 4,
+              deskY: remote.desk_y || 23,
+              engine: remote.executor_tool || 'kilo_run',
+              isBusy: remote.status === 'busy'
+            };
+            agents.push(local);
+            makeAgent(local);
+            goToDesk(local);
+          } else {
+            local.role = remote.role || local.role;
+            local.engine = remote.executor_tool || local.engine;
+            if (remote.status === 'busy') {
+              local.isBusy = true;
+              setState(local, 'working');
+            }
+          }
+        });
+        renderRoster();
+      } catch (err) {
+        console.debug('[Fleet] State sync error:', err);
       }
     }
 
@@ -2413,6 +2605,18 @@
       }
     }
 
+    // ── Inspector Tab Navigation ──
+    function switchInspectorTab(tab) {
+      playFoley('click');
+      const tabs = ['overview', 'soul', 'memory', 'dispatch'];
+      tabs.forEach(t => {
+        const btn = document.getElementById('tab-btn-' + t);
+        const panel = document.getElementById('inspector-tab-' + t);
+        if (btn) btn.classList.toggle('active', t === tab);
+        if (panel) panel.style.display = (t === tab) ? 'flex' : 'none';
+      });
+    }
+
     // Close Agent Inspector Drawer
     function closeAgentInspector() {
       playFoley('click');
@@ -2423,8 +2627,8 @@
       selectedAgent = null;
     }
 
-    // Select Agent Handler (Opens Inspector Specifically for Clicked Agent)
-    function selectAgent(name) {
+    // Select Agent Handler (Fetches real backend profile, soul.md, and memory palace)
+    async function selectAgent(name) {
       const ag = agents.find(a => a.name.toUpperCase() === name.toUpperCase()) || agents[0];
       selectedAgent = ag;
 
@@ -2440,14 +2644,15 @@
       const activeCard = document.getElementById('card-' + ag.name.toLowerCase());
       if (activeCard) activeCard.classList.add('active');
 
-      // 3. Update Meta & Spec
+      // 3. Update Meta & Spec Overview
       document.getElementById('activeAgentName').innerText = ag.name;
       document.getElementById('activeAgentRole').innerText = ag.role;
-      document.getElementById('specWorktree').innerText = ag.worktree;
-      document.getElementById('specPath').innerText = ag.sandbox;
+      document.getElementById('specWorktree').innerText = ag.worktree || `agent/${ag.name.toLowerCase()}`;
+      document.getElementById('specPath').innerText = ag.sandbox || `.agent_worktrees/${ag.name.toLowerCase()}/`;
+      document.getElementById('specEngine').innerText = ag.engine || 'opencode_run';
 
       const badge = document.getElementById('activeAgentStatusBadge');
-      badge.innerText = ag.state.toUpperCase();
+      badge.innerText = (ag.state || 'working').toUpperCase();
       badge.className = 'badge mono ' + (
         ag.state === 'working' ? 'badge-success' :
         ag.state === 'walking' ? 'badge-cyan' :
@@ -2455,7 +2660,7 @@
         ag.state === 'break' ? 'badge-amber' : 'badge-accent'
       );
 
-      // 4. Populate Agent-Specific Working Files
+      // 4. Working files
       const fileListEl = document.getElementById('activeAgentFileList');
       if (fileListEl && ag.files) {
         document.getElementById('activeFilesCount').innerText = ag.files.length + ' ACTIVE';
@@ -2467,24 +2672,197 @@
         `).join('');
       }
 
-      // 5. Populate Agent-Specific Activity Log Stream
-      const logContainer = document.getElementById('terminalLog');
-      if (logContainer) {
-        logContainer.innerHTML = '';
-        if (ag.logs && ag.logs.length) {
-          const now = new Date();
-          const timeStr = `[${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}]`;
-          ag.logs.forEach(l => {
-            const row = document.createElement('div');
-            row.className = 'log-line';
-            row.innerHTML = `<span class="log-ts">${timeStr}</span><span class="log-msg highlight">${l}</span>`;
-            logContainer.appendChild(row);
-          });
+      drawPixelPortrait(document.getElementById('activePortraitCanvas'), ag);
+
+      // 5. Fetch Real Backend Agent Data (Soul + Memory + Active Worktree)
+      try {
+        const res = await fetch(`/api/fleet/agent?id=${encodeURIComponent(ag.name)}`);
+        if (res.ok) {
+          const profile = await res.json();
+          // Populate Soul Editor
+          const soulEditor = document.getElementById('agentSoulEditor');
+          if (soulEditor) soulEditor.value = profile.soul_md || '';
+
+          // Populate Memory List
+          const memContainer = document.getElementById('agentMemoryList');
+          const badgeCount = document.getElementById('agentMemoryCountBadge');
+          if (memContainer) {
+            const memories = profile.memories || [];
+            if (badgeCount) badgeCount.innerText = `${memories.length} ENTRIES`;
+            if (memories.length > 0) {
+              memContainer.innerHTML = memories.map(m => `
+                <div style="background:var(--bg-elevated); padding:5px 8px; border-radius:3px; border-left:2px solid var(--cyan); font-size:9.5px;">
+                  <div style="color:var(--cyan); font-weight:bold; font-size:8px;">${m.category || 'EPISODIC'} · ${m.timestamp ? new Date(m.timestamp * 1000).toLocaleTimeString() : 'RECENT'}</div>
+                  <div style="color:var(--text-primary); margin-top:2px;">${m.content || m.summary || m}</div>
+                </div>
+              `).join('');
+            } else {
+              memContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 9.5px; text-align: center; padding: 12px;">No historical memories recorded in SQLite for this agent yet.</div>';
+            }
+          }
+
+          const agentData = profile.agent || profile;
+          if (agentData.worktree || agentData.active_worktree) document.getElementById('specWorktree').innerText = agentData.worktree || agentData.active_worktree;
+          if (agentData.sandbox_path || agentData.sandbox) document.getElementById('specPath').innerText = agentData.sandbox_path || agentData.sandbox;
+          if (agentData.default_tool) document.getElementById('specEngine').innerText = agentData.default_tool;
+          if (agentData.risk_tier) document.getElementById('specRiskTier').innerText = agentData.risk_tier;
         }
-        appendLog(ag.name, `Mounted worktree ${ag.sandbox} active.`, 'success');
+      } catch (err) {
+        // Fallback gracefully
+      }
+    }
+
+    // ── Save Live Soul.md to Backend ──
+    async function saveActiveAgentSoul() {
+      if (!selectedAgent) return;
+      playFoley('click');
+      const soulText = document.getElementById('agentSoulEditor').value;
+      const btn = document.getElementById('btnSaveSoul');
+      btn.innerText = 'SAVING...';
+      try {
+        const res = await fetch('/api/fleet/save_soul', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agent_id: selectedAgent.name, soul_md: soulText })
+        });
+        if (res.ok) {
+          showSoundToast(`Saved ${selectedAgent.name}'s soul.md!`);
+          appendLog(selectedAgent.name, `System instructions & soul.md updated and saved to config.`, 'success');
+        } else {
+          showSoundToast('Failed to save soul.md');
+        }
+      } catch (e) {
+        showSoundToast('Backend save error');
+      } finally {
+        btn.innerHTML = '<iconify-icon icon="solar:diskette-bold"></iconify-icon> SAVE SOUL.MD';
+      }
+    }
+
+    // ── Dispatch Task to Backend Agent ──
+    async function dispatchTaskToActiveAgent() {
+      if (!selectedAgent) return;
+      const prompt = document.getElementById('agentTaskPromptInput').value.trim();
+      const path = document.getElementById('agentTaskPathInput').value.trim();
+      if (!prompt) {
+        showSoundToast('Please enter a task prompt!');
+        return;
+      }
+      playFoley('click');
+      appendLog(selectedAgent.name, `Dispatching autonomous task: "${prompt}"`, 'highlight');
+      showBubble(selectedAgent, 'Task Dispatched! 🚀');
+      setState(selectedAgent, 'working');
+      goToDesk(selectedAgent);
+
+      try {
+        const res = await fetch('/api/fleet/dispatch_task', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agent_id: selectedAgent.name,
+            prompt: prompt,
+            path: path || ''
+          })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          showSoundToast(`Task dispatched to ${selectedAgent.name}!`);
+          appendLog(selectedAgent.name, `Task ID [${data.task_id}] running in worktree ${data.worktree}`, 'success');
+          document.getElementById('agentTaskPromptInput').value = '';
+          switchInspectorTab('overview');
+        } else {
+          showSoundToast(`Error: ${data.message || 'Dispatch failed'}`);
+        }
+      } catch (e) {
+        showSoundToast('Dispatch network error');
+      }
+    }
+
+    // ── Create & Spawn New Agent Modal ──
+    function openCreateAgentModal() {
+      playFoley('click');
+      document.getElementById('newAgentId').value = '';
+      document.getElementById('newAgentName').value = '';
+      document.getElementById('newAgentRole').value = '';
+      document.getElementById('newAgentSoul').value = '';
+      document.getElementById('createAgentModal').classList.add('open');
+    }
+
+    async function saveNewAgentFromModal() {
+      const id = document.getElementById('newAgentId').value.trim().toUpperCase();
+      const name = document.getElementById('newAgentName').value.trim() || id;
+      const role = document.getElementById('newAgentRole').value.trim() || 'General Agent Specialist';
+      const tool = document.getElementById('newAgentTool').value;
+      const color = document.getElementById('newAgentColor').value;
+      const soul = document.getElementById('newAgentSoul').value.trim();
+
+      if (!id) {
+        showSoundToast('Agent ID is required!');
+        return;
       }
 
-      drawPixelPortrait(document.getElementById('activePortraitCanvas'), ag);
+      playFoley('click');
+      try {
+        const res = await fetch('/api/fleet/save_agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: id,
+            name: name,
+            role: role,
+            default_tool: tool,
+            color: color,
+            soul_md: soul
+          })
+        });
+
+        if (res.ok) {
+          showSoundToast(`Agent ${name} hired & spawned! 🚀`);
+          closeModal('createAgentModal');
+
+          // Dynamically instantiate on the floor if not existing
+          let local = agents.find(a => a.name.toUpperCase() === id);
+          if (!local) {
+            // Find available desk coordinates
+            const deskSlots = [
+              { x: 78, y: 16, deskX: 78, deskY: 16 },
+              { x: 87, y: 16, deskX: 87, deskY: 16 },
+              { x: 2, y: 79, deskX: 2, deskY: 79 },
+              { x: 14, y: 79, deskX: 14, deskY: 79 },
+              { x: 26, y: 79, deskX: 26, deskY: 79 },
+              { x: 38, y: 79, deskX: 38, deskY: 79 },
+              { x: 50, y: 79, deskX: 50, deskY: 79 }
+            ];
+            const slot = deskSlots[agents.length % deskSlots.length];
+            local = {
+              name: id,
+              role: role,
+              worktree: `agent/${id.toLowerCase()}`,
+              sandbox: `.agent_worktrees/${id.toLowerCase()}/`,
+              files: ['main.py', 'core/prompt.txt'],
+              logs: [`[${id}] Joined the Scranton Office Fleet.`],
+              x: slot.x + 3,
+              y: slot.y + 4,
+              shirt: color,
+              hair: '#3b2a22',
+              skin: '#e9bd91',
+              tie: '#222222',
+              state: 'working',
+              deskX: slot.deskX,
+              deskY: slot.deskY,
+              engine: tool,
+              isBusy: false
+            };
+            agents.push(local);
+            makeAgent(local);
+            renderRoster();
+            goToDesk(local);
+          }
+          selectAgent(id);
+          appendLog('FLEET', `New agent [${name}] successfully spawned on the office floor.`, 'success');
+        }
+      } catch (err) {
+        showSoundToast('Error creating agent');
+      }
     }
 
     // Render Bottom Roster Strip
@@ -2494,7 +2872,7 @@
 
       agents.forEach(a => {
         const card = document.createElement('div');
-        card.className = 'roster-card' + (a.name === selectedAgent.name ? ' active' : '');
+        card.className = 'roster-card' + (selectedAgent && a.name === selectedAgent.name ? ' active' : '');
         card.id = 'card-' + a.name.toLowerCase();
         card.onclick = () => selectAgent(a.name);
 
@@ -2503,15 +2881,15 @@
           <div class="roster-info">
             <div class="roster-name-row">
               <span class="roster-name">${a.name}</span>
-              <span class="roster-status-pill status-${a.state}" id="pill-${a.name.toLowerCase()}">${a.state.toUpperCase()}</span>
+              <span class="roster-status-pill status-${a.state || 'working'}" id="pill-${a.name.toLowerCase()}">${(a.state || 'working').toUpperCase()}</span>
             </div>
             <span class="roster-role">${a.role}</span>
-            <span class="roster-task">${a.worktree.split('/')[1] || a.worktree}</span>
+            <span class="roster-task">${(a.worktree || a.name).split('/')[1] || a.worktree || a.name}</span>
             <div class="roster-pips">
               <div class="roster-pip filled"></div>
               <div class="roster-pip filled"></div>
-              <div class="roster-pip ${['MICHAEL', 'DWIGHT', 'JIM', 'PAM'].includes(a.name) ? 'filled' : ''}"></div>
-              <div class="roster-pip ${['MICHAEL', 'DWIGHT'].includes(a.name) ? 'filled' : ''}"></div>
+              <div class="roster-pip filled"></div>
+              <div class="roster-pip"></div>
               <div class="roster-pip"></div>
             </div>
           </div>
@@ -2526,6 +2904,7 @@
     // Terminal Logging
     function appendLog(agentName, text, type) {
       const logContainer = document.getElementById('terminalLog');
+      if (!logContainer) return;
       const row = document.createElement('div');
       row.className = 'log-line';
 
@@ -2551,8 +2930,10 @@
         input.value = '';
 
         setTimeout(() => {
-          appendLog(selectedAgent.name, `Executing command in worktree ${selectedAgent.sandbox}: "${cmd}"`, 'success');
-          showBubble(selectedAgent, 'Executing!');
+          if (selectedAgent) {
+            appendLog(selectedAgent.name, `Executing command in worktree ${selectedAgent.sandbox}: "${cmd}"`, 'success');
+            showBubble(selectedAgent, 'Executing!');
+          }
         }, 400);
       }
     }
@@ -2575,41 +2956,86 @@
     }
 
     function openInVsCode() {
-      alert(`Opening sandbox in VS Code at: ${selectedAgent.sandbox}`);
+      const path = (selectedAgent && selectedAgent.sandbox) ? selectedAgent.sandbox : '.agent_worktrees/';
+      showSoundToast(`Workspace link: ${path}`);
     }
 
-    // Startup Initialization
+    // Startup Initialization (Grounded: Zero Random Wandering, Pure WebSocket Event-Driven)
     agents.forEach(makeAgent);
     renderRoster();
-    // Initial state: full office canvas, drawer closed until agent selected
-    // selectAgent('MICHAEL');
 
-    // Seat all agents at their desks initially with glowing screens & typing animations
+    // Seat all agents at their desks initially in idle state
     agents.forEach(a => {
       const target = { x: a.deskX + 3.9 - 1.45, y: a.deskY + 5.1 };
       a.el.style.left = target.x + '%';
       a.el.style.top = target.y + '%';
-      setState(a, 'working');
+      setState(a, 'idle');
     });
 
-    // Start Autonomous Cycle (Every 3.5 seconds an agent transitions between working, walking, break & banter)
-    setInterval(runAutonomousFleetCycle, 3500);
+    // ── Real-Time Fleet WebSocket Integration ──
+    function connectFleetWebSocket() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = location.host || '127.0.0.1:8765';
+      const wsUrl = `${protocol}//${host}/ws`;
+      let ws;
 
-    // Initial warm-up action after 1.2 seconds: Jim visits Dwight!
-    setTimeout(() => {
-      const jim = agents.find(a => a.name === 'JIM');
-      const dwight = agents.find(a => a.name === 'DWIGHT');
-      if (jim && dwight) {
-        startBanter(jim, dwight, BANTER_SCRIPTS[0]);
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (e) {
+        console.debug('[Fleet-WS] Connect error, retrying in 3s:', e);
+        setTimeout(connectFleetWebSocket, 3000);
+        return;
       }
-    }, 1200);
 
-    // Secondary warm-up after 3.5 seconds: Kevin takes a water-cooler coffee break!
-    setTimeout(() => {
-      const kevin = agents.find(a => a.name === 'KEVIN');
-      if (kevin) startCoffeeBreak(kevin);
-    }, 3500);
+      ws.onopen = () => {
+        console.log('[Fleet-WS] Connected to ZEZO backend:', wsUrl);
+        appendLog('SYSTEM', 'Connected to ZEZO Agent OS real-time stream.', 'success');
+        syncBackendFleetState();
+      };
 
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          const type = msg.type || msg.event;
+          const data = msg.data || msg;
+
+          if (type === 'agent_task_started') {
+            handleAgentTaskStarted(data);
+          } else if (type === 'task_progress') {
+            handleTaskProgress(data);
+          } else if (type === 'task_done' || type === 'task_completed') {
+            handleTaskDone(data);
+          } else if (type === 'fleet_updated') {
+            syncBackendFleetState();
+          } else if (type === 'task_queued') {
+            appendLog('SYSTEM', `Task [${data.task_id}] queued (position #${data.position})`, 'warn');
+          } else if (type === 'backend_logs' && data.lines) {
+            data.lines.forEach(l => {
+              if (l.includes('[MICHAEL]') || l.includes('[DWIGHT]') || l.includes('[FLEET]') || l.includes('[kilo_agent]') || l.includes('[opencode_agent]')) {
+                appendLog('ENGINE', l, 'info');
+              }
+            });
+          }
+        } catch (err) {
+          console.debug('[Fleet-WS] Parse error:', err);
+        }
+      };
+
+      ws.onclose = () => {
+        console.debug('[Fleet-WS] Disconnected, retrying in 3s...');
+        setTimeout(connectFleetWebSocket, 3000);
+      };
+    }
+
+    // Initialize state & WebSocket connection on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      syncBackendFleetState();
+      connectFleetWebSocket();
+    });
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      syncBackendFleetState();
+      connectFleetWebSocket();
+    }
 
     // ── Audio Web Synthesizer (Retro Micro-Foley) ──
     let soundEnabled = true;
@@ -2702,9 +3128,8 @@
 
       if (type === 'assign') {
         playFoley('click');
-        appendLog(contextAgent.name, `Manual task assigned: Running AST code refactoring cycle.`, 'success');
-        showBubble(contextAgent, 'Task Assigned! ⚡');
-        goToDesk(contextAgent);
+        switchInspectorTab('dispatch');
+        showBubble(contextAgent, 'Dispatch ready!');
       } else if (type === 'break') {
         playFoley('coffee');
         startCoffeeBreak(contextAgent);
@@ -2820,17 +3245,74 @@
       appendLog('SYSTEM', 'Transitioning from Scranton Office view to ZEZO Primary Workspace.', 'highlight');
 
       setTimeout(() => {
-        // If loaded in iframe or child window
         if (window.parent && window.parent !== window) {
           window.parent.postMessage({ type: 'ZEZO_NAVIGATE', view: 'home' }, '*');
         } else if (document.referrer && document.referrer.includes('index.html')) {
           window.location.href = document.referrer;
         } else {
-          // Fallback redirect to primary frontend or close view
           window.location.href = '../frontend/index.html';
         }
       }, 400);
     }
+
+    // ── Live Backend Fleet Synchronization ──
+    async function syncBackendFleetState() {
+      try {
+        const res = await fetch('/api/fleet/state');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.fleet && Array.isArray(data.fleet)) {
+            data.fleet.forEach(f => {
+              const nameKey = (f.name || f.id || '').toUpperCase();
+              let local = agents.find(x => x.name.toUpperCase() === nameKey);
+              if (!local && f.id) {
+                // Dynamically spawn backend agent into local scene
+                const deskSlots = [
+                  { x: 78, y: 16, deskX: 78, deskY: 16 },
+                  { x: 87, y: 16, deskX: 87, deskY: 16 },
+                  { x: 2, y: 79, deskX: 2, deskY: 79 },
+                  { x: 14, y: 79, deskX: 14, deskY: 79 }
+                ];
+                const slot = deskSlots[agents.length % deskSlots.length];
+                local = {
+                  name: f.id,
+                  role: f.role || 'Fleet Specialist',
+                  worktree: f.worktree || `agent/${f.id.toLowerCase()}`,
+                  sandbox: f.sandbox_path || `.agent_worktrees/${f.id.toLowerCase()}/`,
+                  files: f.recent_files || ['main.py'],
+                  logs: [`[${f.id}] Synced from backend fleet.`],
+                  x: slot.x + 3,
+                  y: slot.y + 4,
+                  shirt: f.color || '#06b6d4',
+                  hair: '#3b2a22',
+                  skin: '#e9bd91',
+                  tie: '#222222',
+                  state: f.status || 'working',
+                  deskX: slot.deskX,
+                  deskY: slot.deskY,
+                  engine: f.default_tool || 'opencode_run',
+                  isBusy: false
+                };
+                agents.push(local);
+                makeAgent(local);
+                renderRoster();
+                goToDesk(local);
+              } else if (local) {
+                if (f.status && f.status !== 'idle' && !local.isBusy) {
+                  setState(local, 'working');
+                }
+                if (f.worktree) local.worktree = f.worktree;
+                if (f.sandbox_path) local.sandbox = f.sandbox_path;
+              }
+            });
+          }
+        }
+      } catch (e) {
+        // Fallback for standalone / static preview
+      }
+    }
+    setInterval(syncBackendFleetState, 3500);
+    setTimeout(syncBackendFleetState, 800);
 
   </script>
 </body>

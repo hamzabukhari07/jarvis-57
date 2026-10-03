@@ -55,41 +55,6 @@ def _check_python() -> None:
         sys.exit(1)
 
 
-def _check_assets() -> None:
-    """The avatar's face is a shipped file; a truncated clone should say so."""
-    face = HERE / "core" / "face_model.obj"
-    if not face.exists() or face.stat().st_size < 4096:
-        print(
-            "\nâš ï¸  core/face_model.obj is missing or truncated â€” the avatar will "
-            "fall back to the plain glowing core.\n"
-            "    Re-clone the repository, or fetch that one file again."
-        )
-
-
-def main() -> None:
-    print(f"âš™  JARVIS setup â€” detected OS: {OS or 'unknown'}, "
-          f"Python {sys.version_info[0]}.{sys.version_info[1]}")
-    _check_python()
-
-    # requirements.txt filters OS-specific extras by itself via pip markers.
-    _run("Installing Python dependencies (OS-specific extras auto-filtered)â€¦",
-         [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
-
-    # Chromium covers Chrome/Edge/Opera/Brave/Vivaldi; Firefox for Firefox.
-    # (Safari automation additionally needs: python -m playwright install webkit)
-    # Not fatal: these are a few hundred megabytes from a CDN that a corporate
-    # network or a flaky connection can refuse, and everything except browser
-    # automation works without them. Failing the whole install there would send
-    # a user away from a working app.
-    try:
-        _run("Installing Playwright browsers (chromium + firefox)â€¦",
-             [sys.executable, "-m", "playwright", "install", "chromium", "firefox"])
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"\nâš ï¸  Playwright browsers were not installed ({e}).")
-        print("    Everything except browser automation works. Retry later with:")
-        print(f'    {sys.executable} -m playwright install chromium firefox')
-
-    _check_assets()
 
     # â”€â”€ OS-specific post-install notes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if OS == "Windows":

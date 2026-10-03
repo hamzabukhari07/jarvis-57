@@ -72,9 +72,9 @@ py -3.12 -m venv .venv
 
 | Package | Version | Purpose | Used By |
 |---------|---------|---------|---------|
-| `PyQt6` | `>=6.6,<7` | HUD, avatar, all UI widgets | `ui.py`, `core/avatar.py` |
+| `PyQt6` | `>=6.6,<7` | Desktop window container, WebEngine host | `ui.py` |
 | `sounddevice` | `>=0.4,<1` | Audio I/O (PortAudio) | `main.py`, `core/audio_devices.py` |
-| `numpy` | `>=1.24,<3` | Audio processing, FFT, avatar math | `main.py`, `core/viseme.py`, `core/echo.py`, `core/avatar.py` |
+| `numpy` | `>=1.24,<3` | Audio processing, level & echo math | `main.py`, `core/echo.py` |
 | `google-genai` | `>=2.8.0,<3` | Gemini Live + REST API | `main.py`, `core/gemini.py` |
 | `aiohttp` | `>=3.9,<4` | Desktop WebSocket + static UI server | `core/ui_server.py` |
 
@@ -127,21 +127,14 @@ py -3.12 -m venv .venv
 | `pydub` | `>=0.25,<1` | Audio metadata/conversion | `actions/file_processor.py` |
 | `audioop-lts` | `>=0.2.1` (py≥3.13) | Restores stdlib `audioop` removed in Python 3.13 (PEP 594); required by pydub | `actions/file_processor.py` |
 | `py7zr` | `>=0.20,<2` | .7z archive extraction | `core/file_reader.py` |
-| `paho-mqtt` | (any) | MQTT printers | `plugins/` |
 | `pynvml` | (any) | NVIDIA GPU monitoring | `actions/system_monitor.py`, `ui.py` |
 
-### Voice: TTS, STT & Wake Word
+### Local Speech & Wake Word
 
 | Package | Version | Purpose | Used By |
 |---------|---------|---------|---------|
-| `edge-tts` | `>=6.1,<8` | Free online TTS engine | `core/tts.py` |
-| `kokoro` | `>=0.7,<1` | Local neural TTS (Python `<3.14`) | `core/tts.py` |
-| `miniaudio` | `>=1.61,<2` | Audio decoding | `core/tts.py` |
-| `faster-whisper` | `>=1.0,<2` | Local STT (primary) | `core/stt.py`, `actions/agent_reach.py` |
-| `openai-whisper` | (any) | Local STT (fallback) | `actions/agent_reach.py` |
-| `vosk` | `>=0.3.44,<0.4` | Lightweight offline STT fallback | `core/stt.py` |
+| `faster-whisper` | `>=1.0,<2` | Local video transcription (CTranslate2) | `actions/agent_reach.py` |
 | `openwakeword` | `>=0.6,<1` | "Hey Jarvis" wake-word detection | `core/wake_word.py` |
-| `torch` | `>=2.2,<3` | Neural model runtime (STT/TTS) | `core/stt.py`, `core/tts.py` |
 
 ### Remote Dashboard
 
@@ -152,14 +145,6 @@ py -3.12 -m venv .venv
 | `cryptography` | `>=42,<50` | AES-256-CBC encryption | `dashboard/server.py` |
 | `python-multipart` | `>=0.0.9,<1` | File uploads | `dashboard/server.py` |
 | `qrcode[pil]` | `>=7,<9` | QR code generation | `dashboard/server.py` |
-
-### Plugin Extras
-
-| Package | Purpose | Used By |
-|---------|---------|---------|
-| `google-api-python-client` | Gmail/Calendar OAuth | `plugins/_google_core.py` |
-| `google-auth-oauthlib` | OAuth flow | `plugins/_google_core.py` |
-| `tinytuya` | Tuya/Smart Life smart lights | `plugins/` |
 
 ### Windows-Only
 
@@ -177,21 +162,6 @@ py -3.12 -m venv .venv
 | Package | Version | Purpose | Used By |
 |---------|---------|---------|---------|
 | `pytest` | `>=8,<10` | Test suite runner | `tests/` |
-| `reportlab` | `>=4,<6` | Generates the sample PDF | `scripts/test_zezo.py` |
-
-## Everything Installs by Default
-
-Every package the project imports is declared as a **default** dependency —
-`pip install -r requirements.txt` performs one full-featured install. There is no
-commented-out/optional tier anymore.
-
-**One deliberate exception:** `kokoro` carries the marker
-`python_version < "3.14"`. Its English grapheme-to-phoneme chain is
-`kokoro -> misaki[en] -> spacy -> thinc -> blis`, and `blis` has no Python 3.14
-wheels yet (`Cython.Compiler.Errors.CompileError: blis\py.pyx`). On the supported
-Python 3.11–3.13 range it installs normally; on 3.14 it is skipped so the whole
-`pip install -r requirements.txt` never aborts. STT/TTS still work on 3.14 via
-`edge-tts`, `faster-whisper`, `vosk` and `torch`.
 
 ## Why Version Bounds
 
@@ -209,15 +179,10 @@ Web: requests, beautifulsoup4, playwright, scrapling[fetchers], ddgs, duckduckgo
 Automation: pyautogui, pyperclip, pygetwindow
 Vision: Pillow, opencv-python, mss
 Documents: youtube-transcript-api, yt-dlp, feedparser, python-pptx, openpyxl,
-           python-docx, PyPDF2, pdfplumber, markitdown, docling, pandas, pydub,
-           audioop-lts (py>=3.13), py7zr
-Voice: edge-tts, kokoro (<3.14), miniaudio, faster-whisper, openai-whisper,
-       vosk, openwakeword, torch
+           python-docx, PyPDF2, pdfplumber, markitdown, pandas, pydub,
+           audioop-lts (py>=3.13), py7zr, pynvml
+Voice: faster-whisper, openwakeword
 Dashboard: fastapi, uvicorn, cryptography, python-multipart, qrcode
-Plugins: google-api-python-client, google-auth-oauthlib, tinytuya, paho-mqtt, pynvml
 Windows-only: comtypes, pycaw, win10toast, pywinauto, pywin32, wmi
-Dev: pytest, reportlab
+Dev: pytest
 ```
-
-Everything above installs by default in one command:
-`pip install -r requirements.txt` (only `kokoro` is skipped on Python 3.14).

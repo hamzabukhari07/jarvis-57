@@ -292,14 +292,14 @@ def close_app(app_name: str = ""):
 
 def close_window():
     try:
-        from actions.computer_control import _safe_close_tab
-        return _safe_close_tab()
+        from actions.computer_control import _safe_close_window
+        return _safe_close_window()
     except Exception:
         if _OS == "Darwin":
-            pyautogui.hotkey("command", "w")
+            pyautogui.hotkey("command", "q")
         else:
-            pyautogui.hotkey("ctrl", "w")
-        return "Closed tab."
+            pyautogui.hotkey("alt", "f4")
+        return "Closed window."
 
 def full_screen():
     if _OS == "Darwin": pyautogui.hotkey("ctrl", "command", "f")

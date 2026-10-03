@@ -191,8 +191,8 @@ class OCREngine:
         t0 = time.perf_counter()
         if img is None:
             try:
-                import pyautogui
-                img = pyautogui.screenshot()
+                from core.computer.screen_capture import capture_screen_fast
+                img = capture_screen_fast()
             except Exception as e:
                 print(f"[OCREngine] Screenshot capture failed: {e}")
                 return None

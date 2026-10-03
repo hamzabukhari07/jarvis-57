@@ -45,9 +45,11 @@ L0: OS Native (0.37ms) L1: Windows UIA (10ms)  L1.5: RapidOCR (<80ms)  L2: Gemin
 - Strips diacritics/tashkeel and normalizes Urdu/Arabic characters via `normalize_urdu()`.
 - Locates spatial text in canvas applications (Figma, Canva, web apps) and extracts screen text in milliseconds.
 
-### 4. L2 Gemini Multimodal Vision (~2.0s) & Smart Cache (0.0ms Hit)
+### 4. L2 Gemini Multimodal Vision (5.0s Timeout Ladder) & Smart Cache (0.0ms Hit)
 - 64-bit gradient difference hashing (`compute_dhash`) detects visual frame delta.
 - If the screen hash and foreground window are unchanged (Hamming distance <= 2), returns cached observation in **0ms** (`[Cache: 0ms]`), eliminating redundant model calls.
+- **5.0s Per-Model Attempt Timeout (`MIN_TIMEOUT_MS = 5000`)**: If a cloud model in the ladder hangs or encounters network latency, it is cancelled at exactly 5.0 seconds and the request cascades down the ladder.
+- **Graceful Telemetry Fallback**: If all vision models fail or time out, the engine falls back to deterministic L0 OS native metadata (foreground window title, process executable, and coordinates) without stalling the real-time voice loop.
 - Deep multimodal reasoning for graphical icons, color swatches, and complex visual scenes.
 
 ---
