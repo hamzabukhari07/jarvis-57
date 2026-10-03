@@ -792,6 +792,8 @@
     .agent[data-name="STANLEY"] .hair { left: 13%; width: 74%; height: 8%; background: #27211e !important; }
     .agent[data-name="KEVIN"] .head { width: 78%; left: 11%; height: 27%; }
     .agent[data-name="KEVIN"] .body { left: 5%; width: 90%; height: 42%; border-radius: 3px 3px 0 0; }
+    .agent[data-name="ALI"] .hair { left: 8%; width: 84%; height: 12%; background: #27211e !important; clip-path: polygon(0 60%, 15% 0, 85% 0, 100% 60%, 88% 100%, 12% 100%); }
+    .agent[data-name="AHMAD"] .hair { left: 10%; width: 80%; height: 11%; background: #1a1715 !important; clip-path: polygon(0 0, 100% 0, 90% 100%, 10% 100%); }
     .agent[data-name="STANLEY"] .body { left: 5%; width: 90%; }
     .agent[data-name="ANGELA"] .body { left: 22%; width: 56%; }
     .agent[data-name="PAM"] .body { left: 18%; width: 64%; }
@@ -1843,7 +1845,10 @@
         <div class="frame-inner" style="display: flex; flex-direction: column; max-height: 480px; overflow-y: auto;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <div class="section-label" style="margin-bottom:0; flex: 1;">02 · INSPECTOR</div>
-            <button class="hud-tool-btn" style="padding: 2px 6px; font-size: 9px; cursor: pointer;" onclick="closeAgentInspector()" title="Close Inspector View">✕ CLOSE</button>
+            <div style="display: flex; gap: 4px; align-items: center;">
+              <button class="hud-tool-btn" id="btnFireAgent" style="padding: 2px 6px; font-size: 9px; cursor: pointer; color: var(--red); border-color: rgba(239, 68, 68, 0.4);" onclick="deleteActiveAgent()" title="Decommission & Fire this Agent">🗑️ FIRE AGENT</button>
+              <button class="hud-tool-btn" style="padding: 2px 6px; font-size: 9px; cursor: pointer;" onclick="closeAgentInspector()" title="Close Inspector View">✕ CLOSE</button>
+            </div>
           </div>
 
           <!-- Inspector Tabs -->
@@ -2126,17 +2131,16 @@
   <script>
     const office = document.getElementById('office');
 
-    // 9 Full Scranton Agents matching config/fleet_agents.json
+    // 8 Scranton Agents matching config/fleet_agents.json
     const agents = [
-      { name: 'MICHAEL', role: "Regional Manager & Master Orchestrator", specialty: "Task decomposition & delegation", worktree: 'agent/fleet-orchestrator', sandbox: '.agent_worktrees/task-100/', files: ['main.py', 'core/prompt.txt', 'AGENTS.md'], logs: ['[SYSTEM] Fleet Orchestrator attached to workspace.', '[MICHAEL] Sprint priorities aligned across agents.', '[MICHAEL] That is what she said!'], x: 6.5, y: 17, shirt: '#243b63', hair: '#33251e', skin: '#e9bd91', tie: '#b63e3b', state: 'working', deskX: 4, deskY: 23, isBusy: false, default_tool: 'dev_agent', risk_tier: 'L0_READ_ONLY', prompt_prefix: 'You are Michael Scott, Regional Manager of Dunder Mifflin Coding Fleet.' },
-      { name: 'DWIGHT', role: 'Safety & Security Auditor', specialty: "Governance policy enforcement", worktree: 'agent/task-api-refactor', sandbox: '.agent_worktrees/task-102/', files: ['actions/kilo_agent.py', 'core/governance.py', 'core/action_loader.py'], logs: ['[DWIGHT] Scanning AST nodes with Tree-Sitter.', '[DWIGHT] MICHAEL!! Jim put my stapler in Jell-O!', '[DWIGHT] Security policy applied: 0 unsafe shell commands permitted.'], x: 40, y: 30, shirt: '#c49b31', hair: '#32251c', skin: '#e6b98e', tie: '#604b25', state: 'working', deskX: 65, deskY: 27.5, isBusy: false, default_tool: 'dev_agent', risk_tier: 'L0_READ_ONLY', prompt_prefix: 'You are Dwight Schrute, Assistant to the Regional Manager.' },
-      { name: 'JIM', role: 'Senior Full-Stack Refactorer', specialty: "Clean code refactoring & TypeScript ergonomics", worktree: 'agent/pr-review-staging', sandbox: '.agent_worktrees/task-101/', files: ['actions/opencode_agent.py', 'core/task_manager.py'], logs: ['[JIM] Reviewing staged diff in opencode_agent.py.', '[JIM] Dwight, your stapler is in Jell-O again.', '[JIM] Staging PR assertions verified (12/12 passing).'], x: 37.5, y: 30, shirt: '#526f9a', hair: '#4b3023', skin: '#e8bd96', tie: '#d5d0c6', state: 'working', deskX: 56, deskY: 27.5, isBusy: false, default_tool: 'kilo_run', risk_tier: 'L1_LOW_RISK', prompt_prefix: 'You are Jim Halpert, Senior Refactoring Engineer.' },
-      { name: 'PAM', role: 'Design & Telemetry Specialist', specialty: "Design token extraction & HUD aesthetics", worktree: 'agent/design-tokens-v2', sandbox: '.agent_worktrees/task-103/', files: ['frontend/index.html', 'frontend/css/style.css', 'skills/hamza_taste/SKILL.md'], logs: ['[PAM] Extracted 42 new CSS color tokens from reference.', '[PAM] Fixed contrast ratios to AAA standard.', '[PAM] Rendered new procedural pixel avatars.'], x: 47, y: 68, shirt: '#ce789c', hair: '#80502f', skin: '#edc49f', tie: '#a84e76', state: 'working', deskX: 50, deskY: 55, isBusy: false, default_tool: 'extract_design_system', risk_tier: 'L0_READ_ONLY', prompt_prefix: 'You are Pam Beesly, Design System Architect.' },
-      { name: 'OSCAR', role: 'Code Metrics & Performance Accountant', specialty: "Cyclomatic complexity auditing (<15 score)", worktree: 'agent/ast-optimizer', sandbox: '.agent_worktrees/task-104/', files: ['core/llm_router.py', 'core/provider_health.py'], logs: ['[OSCAR] Actually, AST parser time complexity is O(N).', '[OSCAR] Groq token usage optimized: 184k tkns/sec.', '[OSCAR] Memory ring buffer allocated: 128 MB.'], x: 4, y: 57, shirt: '#537f73', hair: '#30261f', skin: '#b98461', tie: '#344d4a', state: 'working', deskX: 2, deskY: 55, isBusy: false, default_tool: 'dev_agent', risk_tier: 'L0_READ_ONLY', prompt_prefix: 'You are Oscar Martinez, Senior Code Accountant.' },
-      { name: 'STANLEY', role: 'Researcher', specialty: "Web and Market Intelligence", worktree: 'agent/telemetry-watchdog', sandbox: '.agent_worktrees/task-106/', files: ['actions/system_monitor.py', 'core/log_bus.py'], logs: ['[STANLEY] Telemetry watchdog active (0 faults).', '[STANLEY] Is it 5:00 PM yet?', '[STANLEY] CPU telemetry stream passing nominal thresholds.'], x: 65, y: 57, shirt: '#9d593f', hair: '#29231f', skin: '#8b5d43', tie: '#44352e', state: 'working', deskX: 14, deskY: 55, isBusy: false, default_tool: 'dev_agent', risk_tier: 'L0_READ_ONLY', prompt_prefix: 'You are Stanley Hudson. Keep code simple and minimal.' },
-      { name: 'RYAN', role: 'Rapid Autonomous Coding Lead', specialty: "Multi-file full-stack feature generation", worktree: 'agent/temp-subagent', sandbox: '.agent_worktrees/task-109/', files: ['core/voice_fallback.py', 'core/llm_client.py'], logs: ['[RYAN] Launching dynamic subagent thread.', '[RYAN] WebSockets live connection verified.', '[RYAN] Dispatching parallel tasks across cores.'], x: 78, y: 68, shirt: '#6d7e82', hair: '#3b2a22', skin: '#d9aa87', tie: '#3d4c51', state: 'working', deskX: 14, deskY: 79, isBusy: false, default_tool: 'opencode_run', risk_tier: 'L2_DESTRUCTIVE', prompt_prefix: 'You are Ryan Howard, Autonomous Coding Agent.' },
-      { name: 'KELLY', role: 'Social & Deep Web Researcher', specialty: "YouTube transcription & multi-source research", worktree: 'agent/social-research', sandbox: '.agent_worktrees/task-112/', files: ['actions/agent_reach.py', 'skills/social_research/SKILL.md'], logs: ['[KELLY] Transcribing YouTube audio stream.', '[KELLY] Multi-source research query synthesized.'], x: 31, y: 69, shirt: '#e11d48', hair: '#1e1b18', skin: '#c28558', tie: '#f43f5e', state: 'working', deskX: 26, deskY: 79, isBusy: false, default_tool: 'agent_reach', risk_tier: 'L1_LOW_RISK', prompt_prefix: 'You are Kelly Kapoor, Intelligence & Research Specialist.' },
-      { name: 'ANDY', role: 'AST QA Specialist', specialty: "General tasks and test runner", worktree: 'agent/qa-specialist', sandbox: '.agent_worktrees/task-113/', files: ['tests/test_fleet_control_suite.py'], logs: ['[ANDY] Running AST regression test suite.', '[ANDY] Cornell standards verified.'], x: 73, y: 68, shirt: '#2563eb', hair: '#78350f', skin: '#e8bd96', tie: '#f59e0b', state: 'working', deskX: 62, deskY: 79, isBusy: false, default_tool: 'kilo_run', risk_tier: 'L0_READ_ONLY', prompt_prefix: '# Andy Persona\nEnthusiastic tester and Cornell alumni.' }
+      { name: 'MICHAEL', role: "Regional Manager & Master Orchestrator", specialty: "Task decomposition & delegation", worktree: 'main', active_worktree: null, sandbox: '', files: [], logs: ['[SYSTEM] Fleet Orchestrator attached to workspace.'], x: 6.5, y: 17, shirt: '#243b63', hair: '#33251e', skin: '#e9bd91', tie: '#b63e3b', state: 'idle', deskX: 4, deskY: 23, isBusy: false, default_tool: 'dev_agent', risk_tier: 'L0_READ_ONLY', prompt_prefix: 'You are Michael Scott, Regional Manager of the Autonomous Coding Fleet.' },
+      { name: 'ALI', role: "Frontend & UI Design Specialist", specialty: "Responsive web apps, Tailwind/CSS layouts, and animations", worktree: 'main', active_worktree: null, sandbox: '', files: [], logs: ['[SYSTEM] Ali ready for Studio UI tasks.'], x: 40, y: 30, shirt: '#ec4899', hair: '#33251e', skin: '#e9bd91', tie: '#b63e3b', state: 'idle', deskX: 38, deskY: 55, isBusy: false, default_tool: 'antigravity_run', risk_tier: 'L1_MUTATION', prompt_prefix: 'You are Ali, Senior Frontend and UI Architecture Specialist.' },
+      { name: 'AHMAD', role: "Full-Stack & Backend Specialist", specialty: "FastAPI, PostgreSQL, microservices, and database models", worktree: 'main', active_worktree: null, sandbox: '', files: [], logs: ['[SYSTEM] Ahmad ready for Backend tasks.'], x: 78, y: 68, shirt: '#06b6d4', hair: '#3b2a22', skin: '#d9aa87', tie: '#3d4c51', state: 'idle', deskX: 62, deskY: 55, isBusy: false, default_tool: 'opencode_run', risk_tier: 'L2_DESTRUCTIVE', prompt_prefix: 'You are Ahmad, Senior Full-Stack and Backend Specialist.' },
+      { name: 'DWIGHT', role: 'Safety, Security & QA Auditor', specialty: "Governance policy enforcement and test suites", worktree: 'main', active_worktree: null, sandbox: '', files: [], logs: ['[SYSTEM] Dwight ready for security audits.'], x: 40, y: 30, shirt: '#c49b31', hair: '#32251c', skin: '#e6b98e', tie: '#604b25', state: 'idle', deskX: 65, deskY: 27.5, isBusy: false, default_tool: 'kilo_run', risk_tier: 'L1_MUTATION', prompt_prefix: 'You are Dwight Schrute, Assistant to the Regional Manager & Lead QA Auditor.' },
+      { name: 'JIM', role: 'Senior Refactoring & Ergonomics Lead', specialty: "Clean code refactoring & TypeScript ergonomics", worktree: 'main', active_worktree: null, sandbox: '', files: [], logs: ['[SYSTEM] Jim ready for code cleanup.'], x: 37.5, y: 30, shirt: '#526f9a', hair: '#4b3023', skin: '#e8bd96', tie: '#d5d0c6', state: 'idle', deskX: 56, deskY: 27.5, isBusy: false, default_tool: 'kilo_run', risk_tier: 'L1_MUTATION', prompt_prefix: 'You are Jim Halpert, Senior Refactoring Engineer.' },
+      { name: 'PAM', role: 'Design System & Token Architect', specialty: "Design token extraction & HUD aesthetics", worktree: 'main', active_worktree: null, sandbox: '', files: [], logs: ['[SYSTEM] Pam ready for design tokens.'], x: 47, y: 68, shirt: '#a855f7', hair: '#80502f', skin: '#edc49f', tie: '#a84e76', state: 'idle', deskX: 50, deskY: 55, isBusy: false, default_tool: 'extract_design_system', risk_tier: 'L0_READ_ONLY', prompt_prefix: 'You are Pam Beesly, Design System Architect.' },
+      { name: 'OSCAR', role: 'Code Metrics & Performance Auditor', specialty: "Cyclomatic complexity auditing (<15 score)", worktree: 'main', active_worktree: null, sandbox: '', files: [], logs: ['[SYSTEM] Oscar ready for complexity audits.'], x: 4, y: 57, shirt: '#537f73', hair: '#30261f', skin: '#b98461', tie: '#344d4a', state: 'idle', deskX: 2, deskY: 55, isBusy: false, default_tool: 'dev_agent', risk_tier: 'L0_READ_ONLY', prompt_prefix: 'You are Oscar Martinez, Senior Code Accountant.' },
+      { name: 'KELLY', role: 'Social & Deep Web Researcher', specialty: "YouTube transcription & multi-source research", worktree: 'main', active_worktree: null, sandbox: '', files: [], logs: ['[SYSTEM] Kelly ready for deep research.'], x: 31, y: 69, shirt: '#f43f5e', hair: '#1e1b18', skin: '#c28558', tie: '#f43f5e', state: 'idle', deskX: 26, deskY: 79, isBusy: false, default_tool: 'agent_reach', risk_tier: 'L1_MUTATION', prompt_prefix: 'You are Kelly Kapoor, Intelligence & Research Specialist.' }
     ];
 
     let selectedAgent = agents[0];
@@ -2586,10 +2590,11 @@
       if (specEl) specEl.innerText = ag.specialty || '';
 
       const wtEl = document.getElementById('specWorktree');
-      if (wtEl) wtEl.innerText = ag.worktree || `agent/${ag.name.toLowerCase()}-worktree`;
+      const activeWt = ag.active_worktree || ag.worktree;
+      if (wtEl) wtEl.innerText = activeWt ? activeWt.split(/[\\/]/).pop() : 'main';
 
       const pathEl = document.getElementById('specPath');
-      if (pathEl) pathEl.innerText = ag.sandbox || `.agent_worktrees/task-${ag.name.toLowerCase()}/`;
+      if (pathEl) pathEl.innerText = activeWt || 'Direct Workspace';
 
       const engineEl = document.getElementById('specEngine');
       if (engineEl) engineEl.innerText = ag.default_tool || 'dev_agent';
@@ -2615,14 +2620,18 @@
       const fileListEl = document.getElementById('activeAgentFileList');
       const filesCountEl = document.getElementById('activeFilesCount');
       if (fileListEl) {
-        const files = ag.files || ['main.py', 'core/prompt.txt'];
+        const files = (ag.files && ag.files.length) ? ag.files : [];
         if (filesCountEl) filesCountEl.innerText = files.length + ' ACTIVE';
-        fileListEl.innerHTML = files.map(f => `
-          <div class="file-pill" onclick="openActiveSandboxModal()" title="Click to inspect ${f}">
-            <iconify-icon icon="solar:document-bold"></iconify-icon>
-            <span>${f}</span>
-          </div>
-        `).join('');
+        if (files.length === 0) {
+          fileListEl.innerHTML = `<div style="color: var(--text-muted); font-size: 9px; padding: 4px;">No active file locks</div>`;
+        } else {
+          fileListEl.innerHTML = files.map(f => `
+            <div class="file-pill" onclick="openActiveSandboxModal()" title="Click to inspect ${f}">
+              <iconify-icon icon="solar:document-bold"></iconify-icon>
+              <span>${f}</span>
+            </div>
+          `).join('');
+        }
       }
 
       // 5. Pre-populate Soul.md tab with cached prompt
@@ -2649,10 +2658,25 @@
               ag.specialty = profile.agent.specialty || ag.specialty;
               ag.default_tool = profile.agent.default_tool || ag.default_tool;
               ag.risk_tier = profile.agent.risk_tier || ag.risk_tier;
+              ag.active_worktree = profile.agent.active_worktree;
               if (engineEl) engineEl.innerText = ag.default_tool;
               if (riskEl) {
                 riskEl.innerText = ag.risk_tier;
                 riskEl.style.color = ag.risk_tier === 'L2_DESTRUCTIVE' ? 'var(--red)' : (ag.risk_tier === 'L1_LOW_RISK' || ag.risk_tier === 'L1_MUTATION') ? 'var(--amber)' : 'var(--green)';
+              }
+              if (pathEl) pathEl.innerText = ag.active_worktree || 'Direct Workspace';
+              if (wtEl) wtEl.innerText = ag.active_worktree ? ag.active_worktree.split(/[\\/]/).pop() : 'main';
+            }
+            if (profile.task_info && fileListEl) {
+              const liveLogs = profile.task_info.recent_logs || [];
+              if (liveLogs.length && filesCountEl) {
+                filesCountEl.innerText = '1 RUNNING TASK';
+                fileListEl.innerHTML = `
+                  <div class="file-pill" style="border-color: var(--cyan); color: var(--cyan);">
+                    <iconify-icon icon="solar:play-circle-bold"></iconify-icon>
+                    <span>${profile.task_info.title || profile.task_info.id} (${profile.task_info.progress}%)</span>
+                  </div>
+                `;
               }
             }
             // Populate Memories list
@@ -2755,6 +2779,39 @@
         }
       } catch (e) {
         showSoundToast('Network error dispatching task');
+      }
+    }
+
+    // Delete & Decommission Active Agent
+    async function deleteActiveAgent() {
+      if (!selectedAgent) return;
+      const targetName = selectedAgent.name;
+      if (targetName === 'MICHAEL') {
+        alert('Cannot fire Michael Scott (Regional Manager & Master Orchestrator).');
+        return;
+      }
+      if (!confirm(`Are you sure you want to decommission and fire agent '${targetName}' from the active fleet?`)) {
+        return;
+      }
+
+      playFoley('click');
+      try {
+        const res = await fetch('/api/fleet/delete_agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agent_id: targetName })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showSoundToast(`Agent ${targetName} decommissioned.`);
+          appendLog('SYSTEM', `Agent ${targetName} fired from active fleet.`, 'warn');
+          closeAgentInspector();
+          await syncBackendState();
+        } else {
+          alert('Failed to delete agent: ' + (data.error || 'Server error'));
+        }
+      } catch (e) {
+        alert('Network error deleting agent: ' + e.message);
       }
     }
 
@@ -3261,6 +3318,20 @@
             { deskX: 26, deskY: 55 }, { deskX: 74, deskY: 79 }
           ];
 
+          const activeIds = new Set(fleetList.map(r => String(r.id || r.name).toUpperCase().trim()));
+
+          // 1. Prune deleted / unlisted agents from DOM and agents array
+          for (let i = agents.length - 1; i >= 0; i--) {
+            const ag = agents[i];
+            if (!activeIds.has(ag.name)) {
+              if (ag.el && ag.el.parentNode) {
+                ag.el.parentNode.removeChild(ag.el);
+              }
+              agents.splice(i, 1);
+            }
+          }
+
+          // 2. Synchronize remote agents
           fleetList.forEach((remote, idx) => {
             const rawId = remote.id || remote.name || `AGENT_${idx + 1}`;
             const upperId = String(rawId).toUpperCase().trim();
@@ -3273,8 +3344,9 @@
                 role: remote.role || 'Fleet Specialist',
                 specialty: remote.specialty || '',
                 worktree: remote.worktree || `agent/${upperId.toLowerCase()}-worktree`,
+                active_worktree: remote.worktree || null,
                 sandbox: `.agent_worktrees/task-${upperId.toLowerCase()}/`,
-                files: ['main.py', 'core/prompt.txt'],
+                files: [],
                 logs: [`[SYSTEM] ${upperId} connected to fleet workspace.`],
                 x: preset.deskX + 2,
                 y: preset.deskY + 4,
@@ -3298,6 +3370,7 @@
               ag.specialty = remote.specialty || ag.specialty;
               ag.default_tool = remote.default_tool || ag.default_tool;
               ag.risk_tier = remote.risk_tier || ag.risk_tier;
+              ag.active_worktree = remote.worktree || null;
               if (remote.status === 'working' || remote.status === 'busy') {
                 ag.state = 'working';
                 ag.isBusy = true;
@@ -3318,12 +3391,9 @@
 
           renderRoster();
           if (selectedAgent) {
-            const updated = agents.find(a => a.name === selectedAgent.name);
+            const updated = agents.find(a => a.name === selectedAgent.name) || agents[0];
             if (updated) {
-              const roleEl = document.getElementById('activeAgentRole');
-              if (roleEl) roleEl.innerText = updated.role;
-              const specEl = document.getElementById('activeAgentSpecialty');
-              if (specEl) specEl.innerText = updated.specialty;
+              selectAgent(updated.name);
             }
           }
         }
@@ -3332,8 +3402,42 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       initWebSocket();
-    });
 
+      // Enable horizontal mouse wheel scroll and drag swipe on Roster Strip
+      const strip = document.getElementById('rosterStrip');
+      if (strip) {
+        strip.addEventListener('wheel', (e) => {
+          if (e.deltaY !== 0) {
+            e.preventDefault();
+            strip.scrollLeft += e.deltaY;
+          }
+        }, { passive: false });
+
+        let isDown = false;
+        let startX = 0;
+        let scrollLeft = 0;
+
+        strip.addEventListener('mousedown', (e) => {
+          isDown = true;
+          strip.style.cursor = 'grabbing';
+          startX = e.pageX - strip.offsetLeft;
+          scrollLeft = strip.scrollLeft;
+        });
+
+        window.addEventListener('mouseup', () => {
+          isDown = false;
+          if (strip) strip.style.cursor = 'default';
+        });
+
+        strip.addEventListener('mousemove', (e) => {
+          if (!isDown) return;
+          e.preventDefault();
+          const x = e.pageX - strip.offsetLeft;
+          const walk = (x - startX) * 1.5;
+          strip.scrollLeft = scrollLeft - walk;
+        });
+      }
+    });
   </script>
 </body>
 

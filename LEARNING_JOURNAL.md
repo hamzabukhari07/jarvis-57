@@ -1,3 +1,22 @@
+## [2026-10-04] — Bugfix & UI Sync: Scranton Office Agent Deletion, Dynamic Swipe & Real Worktree Ingestion (`frontend/office.html`)
+
+### What was built / updated:
+1. **Interactive Agent Decommission & Deletion in UI (`frontend/office.html`):**
+   - Added `🗑️ FIRE AGENT` danger action button directly in the Agent Inspector header.
+   - Connected to `POST /api/fleet/delete_agent` with confirmation dialogs (protecting Michael as Orchestrator) and instant DOM/sprite removal.
+2. **Horizontal Mouse Wheel & Grab-Swipe Scrolling on Roster Strip:**
+   - Attached native wheel delta translation (`deltaY` to `scrollLeft`) and pointer drag-to-scroll swipe listeners to `#rosterStrip`. Users can now scroll/swipe smoothly across all agent cards.
+3. **Pruning Zombie / Unlisted Avatars (Reconciliation Sync):**
+   - `syncBackendState()` now reconciles local DOM sprites against active server fleet IDs, pruning unlisted agents and correcting the agent count badge to match real active agents (8 agents).
+4. **Real Live Worktree & Task File Rendering:**
+   - Replaced static placeholder sandbox paths (`.agent_worktrees/task-100/`) and fictitious file arrays with real `active_worktree` state and live running task summaries from the backend.
+5. **Strict 3-Layer Verification Passed 100%:**
+   - **Layer 1 (Static):** HTML syntax and script integrity verified.
+   - **Layer 2 (Unit Suite):** 16/16 tests passed across `test_fleet_control_suite.py`, `test_phase4_specialist_fleet_suite.py`, and `test_scranton_pixel_office_suite.py`.
+   - **Layer 3 (Full Regression):** 21/21 core regression tests passing.
+
+---
+
 ## [2026-10-03] — Feature & Architecture: Phase 4 — Autonomous Specialist Fleet, Dynamic Model Binding & White-Label ZEZO Coder (`core/fleet_manager.py`, `actions/fleet_control.py`, `config/fleet_agents.json`, `core/prompt.txt`, `tests/test_phase4_specialist_fleet_suite.py`)
 
 ### What was built / updated:
