@@ -1444,7 +1444,7 @@ class ZezoLive:
         except Exception as e:
             result = f"Tool '{name}' failed: {e}"
             traceback.print_exc()
-            self.speak_error(name, e)
+            self.ui.write_log(f"ERR: {name} — {str(e)[:120]}")
 
         if not self.ui.muted:
             self.ui.set_state("LISTENING")
