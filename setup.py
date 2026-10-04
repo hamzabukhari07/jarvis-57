@@ -1,4 +1,4 @@
-﻿"""
+"""
 JARVIS â€” one-time setup.
 
 Installs the Python dependencies for THIS operating system only: the OS-specific
@@ -56,7 +56,24 @@ def _check_python() -> None:
 
 
 
-    # â”€â”€ OS-specific post-install notes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+def main() -> None:
+    print(f"⚙  ZEZO setup — detected OS: {OS or 'unknown'}, "
+          f"Python {sys.version_info[0]}.{sys.version_info[1]}")
+    _check_python()
+
+    # requirements.txt filters OS-specific extras by itself via pip markers.
+    _run("Installing Python dependencies (OS-specific extras auto-filtered)…",
+         [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
+
+    try:
+        _run("Installing Playwright browsers (chromium + firefox)…",
+             [sys.executable, "-m", "playwright", "install", "chromium", "firefox"])
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"\n⚠️  Playwright browsers were not installed ({e}).")
+        print("    Everything except browser automation works. Retry later with:")
+        print(f'    {sys.executable} -m playwright install chromium firefox')
+
+    # ── OS-specific post-install notes ────────────────────────────────────────
     if OS == "Windows":
         try:
             import win32com.client  # noqa: F401
