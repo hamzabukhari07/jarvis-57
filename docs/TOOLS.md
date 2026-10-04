@@ -41,13 +41,13 @@ TOOL = {
 
 | Tool | File | Purpose | Parameters |
 |------|------|---------|------------|
-| `antigravity_run` | `actions/antigravity_agent.py` | Full multi-file web app & design synthesis agent via official Antigravity CLI (`agy`) with pure raw HTML reference blueprint injection, stack-fidelity routing (single-file HTML vs React/Next.js), and adaptive redesign directives | `task`, `project_path`, `model` |
+| `antigravity_run` | `actions/antigravity_agent.py` | Full multi-file web app & design synthesis agent via official Antigravity CLI (`agy`) with isolated directory allocation, raw HTML reference blueprint injection, stack-fidelity routing (single-file HTML vs React/Next.js), and in-place fleet execution | `task`, `project_path`, `model`, `run_in_place` |
 | `opencode_run` | `actions/opencode_agent.py` | Full autonomous implementation, multi-file code generation & test suite synthesis | `task`, `project_path`, `model` |
 | `kilo_run` | `actions/kilo_agent.py` | Fast refactoring & multi-file editing agent (free tier StepFun / Gemini) | `task`, `project_path`, `model` |
 | `code_helper` | `actions/code_helper.py` | Single function, inline snippet generator, or single-file code review | `task`, `file_path`, `code` |
 | `dev_agent` | `actions/dev_agent.py` | Read-only codebase exploration, architecture analysis, and bug hunting | `task`, `repo_path` |
 | `extract_design_system` | `actions/design_extractor.py` | On-demand design extractor for custom HTML files, URLs, and generating standalone `DESIGN.md` specs | `file_path`, `output_path`, `action`, `force` |
-| `fleet_control` | `actions/fleet_control.py` | Orchestrate named specialist agent fleet (dispatch, hire, fire, list_agents, get_status) | `action`, `agent_id`, `task`, `role`, `default_tool`, `model_id`, `specialty` |
+| `fleet_control` | `actions/fleet_control.py` | Orchestrate named specialist agent fleet (dispatch, hire, fire, list_agents, get_status) with automated capability routing, overflow load-balancing to Haider (max 3 concurrent tasks), and isolated workspaces | `action`, `agent_id`, `task`, `role`, `default_tool`, `model_id`, `specialty` |
 | `task_status` | `actions/task_status.py` | Query live progress, inspect logs, or cancel/terminate running background tasks | `action` ('status'/'cancel'), `task_id` |
 
 

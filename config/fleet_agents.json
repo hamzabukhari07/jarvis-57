@@ -64,6 +64,40 @@
         "animations"
       ]
     },
+    "HAIDER": {
+      "name": "Haider",
+      "role": "Frontend Specialist & Overflow Developer",
+      "specialty": "Modern web applications, component architecture, responsive styling, and fast UI synthesis",
+      "color": "#f43f5e",
+      "avatar_pixel": "jim_pixel.png",
+      "default_tool": "antigravity_run",
+      "risk_tier": "L1_MUTATION",
+      "prompt_prefix": "You are Haider, Frontend Specialist and UI Developer. You work closely with Ali to build clean, responsive, aesthetic user interfaces and handle frontend workloads with Antigravity.",
+      "model_id": "gemini-3.7-flash-medium",
+      "desk_x": 320,
+      "desk_y": 280,
+      "allowed_tools": [
+        "antigravity_run",
+        "extract_design_system",
+        "file_processor",
+        "file_controller",
+        "browser_control",
+        "fleet_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "hamza_taste",
+        "multi_agent_collaboration",
+        "make_plan"
+      ],
+      "capabilities": [
+        "web_design",
+        "frontend_coding",
+        "ui_refactor",
+        "animations",
+        "overflow_balancer"
+      ]
+    },
     "AHMAD": {
       "name": "Ahmad",
       "role": "Full-Stack & Backend Specialist",
@@ -99,38 +133,6 @@
         "auth_systems"
       ]
     },
-    "DWIGHT": {
-      "name": "Dwight Schrute",
-      "role": "Safety, Security & QA Auditor",
-      "specialty": "Governance policy enforcement, edge case testing, and strict code hygiene",
-      "color": "#eab308",
-      "avatar_pixel": "dwight_pixel.png",
-      "default_tool": "kilo_run",
-      "risk_tier": "L1_MUTATION",
-      "prompt_prefix": "You are Dwight Schrute, Assistant to the Regional Manager & Lead QA Auditor. You enforce absolute safety, zero regression, and verify all code changes against strict security and testing baselines.",
-      "model_id": "kilo/stepfun/step-3.7-flash:free",
-      "desk_x": 600,
-      "desk_y": 160,
-      "allowed_tools": [
-        "kilo_run",
-        "dev_agent",
-        "file_processor",
-        "file_controller",
-        "fleet_control",
-        "task_status"
-      ],
-      "allowed_skills": [
-        "system_diagnostics",
-        "multi_agent_collaboration",
-        "make_plan"
-      ],
-      "capabilities": [
-        "security_audit",
-        "qa_testing",
-        "edge_case_verification",
-        "governance_enforcement"
-      ]
-    },
     "PAM": {
       "name": "Pam Beesly",
       "role": "Design System & Token Architect",
@@ -158,35 +160,6 @@
         "design_token_extraction",
         "palette_generation",
         "brand_identity"
-      ]
-    },
-    "OSCAR": {
-      "name": "Oscar Martinez",
-      "role": "Code Metrics & Performance Auditor",
-      "specialty": "Cyclomatic complexity auditing (<15 score), token budgeting, and benchmark analysis",
-      "color": "#8b5cf6",
-      "avatar_pixel": "oscar_pixel.png",
-      "default_tool": "kilo_run",
-      "risk_tier": "L1_MUTATION",
-      "prompt_prefix": "You are Oscar Martinez, Senior Code Accountant. You mathematically audit function complexity, memory efficiency, and algorithmic performance.",
-      "model_id": "",
-      "desk_x": 460,
-      "desk_y": 280,
-      "allowed_tools": [
-        "kilo_run",
-        "dev_agent",
-        "file_processor",
-        "fleet_control",
-        "task_status"
-      ],
-      "allowed_skills": [
-        "antislop_code",
-        "multi_agent_collaboration"
-      ],
-      "capabilities": [
-        "complexity_audit",
-        "performance_profiling",
-        "anti_slop_hygiene"
       ]
     },
     "KELLY": {

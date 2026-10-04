@@ -68,6 +68,7 @@ class ApprovalGrant:
 
 # ── Inline Tools Risk Table (For tools hosted directly in main.py) ───────────
 INLINE_TOOL_RISKS: dict[str, ToolRisk] = {
+    "system_status":      ToolRisk.READ_ONLY,
     "screen_process":     ToolRisk.READ_ONLY,
     "close_camera":       ToolRisk.LOCAL_MUTATION,
     "manage_monitor":     ToolRisk.LOCAL_MUTATION,

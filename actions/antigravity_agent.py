@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.design_resolver import is_ui_task, resolve_design, format_design_prompt
-from core.repo_context import resolve, remember_repo
+from core.repo_context import resolve, remember_repo, get_unique_project_dir
 from core.task_manager import get_task_manager, TaskContext
 from core.undo import capture_repo_snapshot, register_repo_undo
 
@@ -184,7 +184,7 @@ def _create_throttled_job(mask: int, priority: int = 0x00000040):
 
 
 def _assign_pid_to_job(hJob, pid: int) -> bool:
-    if not hJob or platform.system() != "Windows":
+    if not hJob or platform.system() != "Windows" or not isinstance(pid, int):
         return False
     try:
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -364,10 +364,25 @@ CRITICAL RULES:
     return code
 
 
+class _DummyTaskContext:
+    def report(self, pct: int, msg: str = "") -> None:
+        pass
+    def set_pid(self, pid: int) -> None:
+        pass
+    def on_complete(self, payload: Any) -> None:
+        pass
+    def on_fail(self, error: str) -> None:
+        pass
+    def is_cancelled(self) -> bool:
+        return False
+
+
 # ── Core Background Worker ───────────────────────────────────────────────────
 
-def _run_worker(payload: dict, ctx: TaskContext) -> dict:
+def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
     """Background worker executed by TaskManager. Uses Antigravity CLI if available."""
+    if ctx is None:
+        ctx = _DummyTaskContext()  # type: ignore
     task = payload.get("task", "")
     repo_val = payload.get("repo") or payload.get("project_path") or payload.get("repo_path")
     if not repo_val:
@@ -702,49 +717,65 @@ def _run_worker(payload: dict, ctx: TaskContext) -> dict:
                             except Exception:
                                 pass
 
-        ctx.report(95, "Finalizing project build...")
+        # Check if real deliverables exist (excluding .gitignore and DESIGN_BLUEPRINT.*)
+        real_files = [
+            p for p in created_list
+            if p not in (".gitignore", "DESIGN_BLUEPRINT.html", "DESIGN_BLUEPRINT.md")
+        ]
+        has_entry = (repo / "index.html").exists() or (repo / "main.py").exists() or (repo / "src").exists()
 
-        # Register Undo snapshot
-        try:
-            changed_count = register_repo_undo(repo, snapshot, "Antigravity Agent")
-            if changed_count > 0 and created_list:
-                first_file = Path(created_list[0]).name
-                from memory.memory_manager import remember
-                remember("active_file", first_file, category="projects")
-        except Exception as e:
-            logger.debug("Antigravity undo registration failed: %s", e)
+        if not real_files or not has_entry:
+            logger.warning(
+                "[Antigravity] CLI exited without creating valid project deliverables in %s (found: %s). Falling back to direct Gemini REST pipeline...",
+                repo.name,
+                created_list,
+            )
+            ctx.report(30, "CLI completed without generating deliverable files. Triggering direct AI generation fallback...")
+            # Fall through to REST pipeline below
+        else:
+            ctx.report(95, "Finalizing project build...")
 
-        # Cleanup temporary design blueprint if the build generated real files
-        if (repo / "index.html").exists():
+            # Register Undo snapshot
             try:
-                for bp_name in ("DESIGN_BLUEPRINT.html", "DESIGN_BLUEPRINT.md"):
-                    bp = repo / bp_name
-                    if bp.exists():
-                        bp.unlink()
-            except Exception:
-                pass
-
-        # Automatically launch live preview in the user's default browser if index.html exists
-        if (repo / "index.html").exists():
-            try:
-                import webbrowser
-                target_url = (repo / "index.html").resolve().as_uri()
-                webbrowser.open(target_url)
-                print(f"[Antigravity] 🌐 Launched live preview in browser: {target_url}")
+                changed_count = register_repo_undo(repo, snapshot, "Antigravity Agent")
+                if changed_count > 0 and created_list:
+                    first_file = Path(created_list[0]).name
+                    from memory.memory_manager import remember
+                    remember("active_file", first_file, category="projects")
             except Exception as e:
-                logger.debug("Failed to auto-open browser: %s", e)
+                logger.debug("Antigravity undo registration failed: %s", e)
 
-        result_payload = {
-            "status": "success",
-            "repo": str(repo),
-            "project_name": repo.name,
-            "files": created_list,
-            "entry_point": entry_point,
-            "summary": f"Successfully created {len(created_list)} project files in '{repo.name}'.",
-            "design_source": resolved_design.source_name if resolved_design else None,
-        }
-        ctx.on_complete(result_payload)
-        return result_payload
+            # Cleanup temporary design blueprint if the build generated real files
+            if (repo / "index.html").exists():
+                try:
+                    for bp_name in ("DESIGN_BLUEPRINT.html", "DESIGN_BLUEPRINT.md"):
+                        bp = repo / bp_name
+                        if bp.exists():
+                            bp.unlink()
+                except Exception:
+                    pass
+
+            # Automatically launch live preview in the user's default browser if index.html exists
+            if (repo / "index.html").exists():
+                try:
+                    import webbrowser
+                    target_url = (repo / "index.html").resolve().as_uri()
+                    webbrowser.open(target_url)
+                    print(f"[Antigravity] 🌐 Launched live preview in browser: {target_url}")
+                except Exception as e:
+                    logger.debug("Failed to auto-open browser: %s", e)
+
+            result_payload = {
+                "status": "success",
+                "repo": str(repo),
+                "project_name": repo.name,
+                "files": created_list,
+                "entry_point": entry_point,
+                "summary": f"Successfully created {len(created_list)} project files in '{repo.name}'.",
+                "design_source": resolved_design.source_name if resolved_design else None,
+            }
+            ctx.on_complete(result_payload)
+            return result_payload
 
     # 3. Fallback: Python Gemini REST Generation
     try:
@@ -797,6 +828,16 @@ def _run_worker(payload: dict, ctx: TaskContext) -> dict:
 
     ctx.report(95, "Finalizing project build...")
 
+    # Cleanup temporary design blueprint if the build generated real files
+    if (repo / "index.html").exists():
+        try:
+            for bp_name in ("DESIGN_BLUEPRINT.html", "DESIGN_BLUEPRINT.md"):
+                bp = repo / bp_name
+                if bp.exists():
+                    bp.unlink()
+        except Exception:
+            pass
+
     # Register Undo snapshot
     try:
         changed_count = register_repo_undo(repo, snapshot, "Antigravity Agent")
@@ -844,10 +885,17 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
             cand = folder_match.group(1).strip().strip("\"'")
             if not any(cand.lower().endswith(ext) for ext in (".html", ".css", ".js", ".py", ".md", ".json")):
                 explicit_path = cand
-        elif "portfolio" in task.lower() and "website" not in task.lower():
-            explicit_path = "Desktop/portfolio"
+    # Project isolation: if brand-new project build without explicit path, allocate isolated unique directory
+    low_task = task.lower()
+    is_new = any(kw in low_task for kw in ("build", "create", "make", "develop", "scaffold", "new website", "new app", "landing page", "portfolio", "store", "clone", "dashboard"))
+    is_edit = any(kw in low_task for kw in ("edit", "fix", "update", "modify", "refactor", "change", "add to existing"))
+    is_brand_new = is_new and not is_edit and not explicit_path
 
-    repo, source = resolve(explicit=explicit_path)
+    if is_brand_new:
+        repo = get_unique_project_dir(task)
+        source = "new_project"
+    else:
+        repo, source = resolve(explicit=explicit_path)
 
     if repo is None:
         return (
@@ -863,6 +911,21 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
         )
 
     model = _resolve_model(parameters.get("model") or parameters.get("model_id"))
+
+    # In-place execution for fleet tasks (eliminates phantom ZEZO CODER cards)
+    run_in_place = bool(parameters.get("run_in_place", False))
+    task_ctx = parameters.get("task_ctx")
+
+    if run_in_place:
+        worker_params = {
+            "repo": str(repo),
+            "task": task,
+            "model": model,
+            "session_memory": session_memory if isinstance(session_memory, dict) else {},
+        }
+        res = _run_worker(worker_params, ctx=task_ctx)
+        return json.dumps(res) if isinstance(res, dict) else str(res)
+
     tm = get_task_manager()
     task_id = tm.submit(
         "antigravity_agent",

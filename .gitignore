@@ -24,4 +24,7 @@ build/
 memory/*.db
 memory/*.db-*
 memory/*.json
+memory/*.json.bak
 .agent_worktrees/
+# Local test scratch files
+/test_sample_resume_text.txt

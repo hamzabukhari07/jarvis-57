@@ -17,6 +17,11 @@ logger = logging.getLogger(__name__)
 
 def _broadcast_ui(event: str, data: Dict[str, Any]) -> None:
     try:
+        from core.ui_server import get_ui_server
+        get_ui_server().broadcast(event, data)
+    except Exception as e:
+        logger.debug("Failed broadcasting UI server event %s: %s", event, e)
+    try:
         from core.log_bus import emit_tool_micro_event
         emit_tool_micro_event(event, "fleet_control", data)
     except Exception as e:

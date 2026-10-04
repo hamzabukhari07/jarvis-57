@@ -1,3 +1,207 @@
+## [2026-10-04] — Fleet Inspector Activity Log Isolation, Kanban UI/UX Polish & Voice Reassignment Tool Sync
+
+- **What was built:**
+  - **Inspector Activity Feed Isolation (`frontend/office.html`):** Scoped activity logs strictly to each agent's internal log store (`ag.logs`). When selecting an agent in the Scranton Office UI Inspector, `03 • ACTIVITY` renders only that selected agent's logs rather than a global mixed stream.
+  - **Dynamic Workspace Button & Explorer Launcher (`frontend/office.html`):** Wired `[📁 Direct Workspace]` in the Inspector to show the real relative active project path (e.g. `Desktop/luxury-real-estate-landing`) and open the path directly in File Explorer via `/api/fleet/open_folder`.
+  - **Kanban Board UI/UX & Obsidian Scrollbars (`frontend/office.html`):** Added global obsidian dark custom scrollbars, eliminated native white horizontal scrollbar overflow, expanded Kanban modal width to `1040px`, and styled task cards with **Agent Badges** (`[ALI]`, `[HAIDER]`), human-readable task descriptions, clean target paths, and completion status.
+  - **ZEZO Task Manager Modal Cards (`frontend/index.html`):** Replaced generic `ZEZO CODER` badge with the assigned agent name (`ALI`, `HAIDER`, `AHMAD`) and formatted human task titles with target directories, removing raw unparsed JSON payload dumps.
+  - **Worktree Sandboxing & Auto-Teardown (`core/fleet_manager.py` & `.agent_worktrees/`):** Pruned and cleaned 29 stale git worktrees (~625 MB, 8,030 files) accumulated from past task runs. Added automatic `git_sandbox.safe_teardown(task_id)` invocation in `core/fleet_manager.py` upon task completion or failure so sandboxes are safely recycled without disk space accumulation.
+  - **Voice Reassignment & Delegation Guard (`core/prompt.txt`):** Added strict rule ensuring Gemini Live immediately dispatches `fleet_control(action='dispatch', agent_id=...)` whenever the user corrects or reassigns an agent in speech (e.g. "I said Haider"), preventing verbal hallucination without tool execution.
+- **Why this approach was chosen:**
+  - Addresses the 4 annotated UI/UX issues, the voice reassignment desync, and the disk bloat caused by untorn worktree sandboxes.
+- **Key files touched:**
+  - `frontend/office.html`
+  - `frontend/index.html`
+  - `core/prompt.txt`
+  - `core/fleet_manager.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Never allow terminal logs across multiple concurrent agents to concatenate into a single global DOM container without per-agent scoping.
+  - All modals with multi-column boards must have CSS `min-width: 0`, flex constraints, and custom dark scrollbars to prevent Windows native white scrollbars from appearing.
+  - Any subsystem creating dynamic Git worktrees (`git worktree add`) must guarantee an automated `safe_teardown` in a `finally` block or completion callback to prevent unbounded disk growth.
+
+---
+
+## [2026-10-04] — Scranton Office Fleet Live State Sync & Antigravity Fallback Assurance
+
+- **What was built:**
+  - Implemented event-driven WebSocket broadcasting (`_broadcast_event`) in `core/fleet_manager.py` sending `agent_task_started`, `task_progress`, `task_done`, and `fleet_updated` directly to `core/ui_server.py` and the Scranton Office UI (`frontend/office.html`).
+  - Wrapped `task_ctx.report` inside `_worker_fn` to continuously synchronize `agent.task_progress` and push timestamped activity logs to `agent.recent_logs` in real time.
+  - Connected `complete_task` in `_worker_fn` completion & error callbacks, automatically transitioning agents from `status: "working"` to `status: "idle"`, incrementing `completed_tasks`, and logging completion status into the Inspector feed.
+  - Upgraded `actions/fleet_control.py`'s `_broadcast_ui` to broadcast to `get_ui_server()` over WebSockets.
+  - Implemented fallback assurance in `actions/antigravity_agent.py`: if `agy` CLI exits without producing valid project deliverable files (e.g. only `.gitignore` or `DESIGN_BLUEPRINT.*`), Antigravity automatically falls back to the high-reasoning Gemini REST synthesizer to produce the final `index.html`.
+  - Added automatic cleanup of temporary `DESIGN_BLUEPRINT.html` and `DESIGN_BLUEPRINT.md` files upon build completion so the output directory contains only production assets.
+  - Added defensive integer type validation on `_assign_pid_to_job` in `actions/antigravity_agent.py` to prevent ctypes recursion under test mocks.
+  - Authored comprehensive test suite in `tests/test_fleet_live_sync_and_antigravity_assurance_suite.py` (3/3 passed, 211/211 full repo tests passing).
+- **Why this approach was chosen:**
+  - Solves the two user-reported bugs:
+    1. Agents dispatched via voice/UI remained labeled `IDLE` in the Scranton Office UI Inspector with empty activity logs.
+    2. Certain builds finished prematurely without creating `index.html`, leaving only the design blueprint.
+- **What alternatives were considered:**
+  - 3.5-second HTTP polling on `/api/fleet/state`: Rejected because event-driven WebSocket pushes provide sub-millisecond visual synchronization with zero network/CPU waste.
+- **Key files touched:**
+  - `core/fleet_manager.py`
+  - `actions/fleet_control.py`
+  - `actions/antigravity_agent.py`
+  - `tests/test_project_isolation_and_fleet_orchestrator_suite.py`
+  - `tests/test_fleet_live_sync_and_antigravity_assurance_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - `DESIGN_BLUEPRINT.html` is an intermediate specification artifact and must never be treated as the final project deliverable or opened in the browser as the finished product.
+  - When worker threads execute actions via `TaskManager`, always wire real-time progress callbacks to the active FleetAgent instance to keep UI inspector cards and roster badges in sync.
+
+---
+
+## [2026-10-04] — Vision 1.0: Project Workspace Isolation, In-Place Fleet Dispatch & Concurrency Load Balancing
+
+- **What was built:**
+  - Implemented semantic project folder extraction (`extract_project_slug`) and collision-safe directory allocation (`get_unique_project_dir`) in `core/repo_context.py` ensuring every new project receives a dedicated folder (`Desktop/<slug>`, `Desktop/<slug>_1`).
+  - Decoupled sticky `get_last_repo()` in `core/repo_context.py::resolve(is_new_project=True)` so new builds never clobber existing folders.
+  - Implemented in-place worker execution (`run_in_place=True`) in `actions/antigravity_agent.py` and `core/fleet_manager.py`, eliminating phantom secondary `ZEZO CODER` task cards.
+  - Registered `HAIDER` in `config/fleet_agents.json` as Frontend Developer (`antigravity_run`, desk coordinates: 320, 280).
+  - Implemented `get_agent_active_task_count(agent_id)` and concurrency overflow balancing in `core/fleet_manager.py` (max 3 active tasks per agent; overflows to Haider).
+  - Updated `renderTasks()` in `frontend/index.html` to render assigned agent badges (`ALI`, `HAIDER`, `AHMAD`), descriptive task titles, and clean relative target paths (`Desktop/...`).
+  - Aligned `core/prompt.txt` with the Vision 1.0 paradigm: *"ZEZO Manages the Work. Agents Execute the Work."* and added pre-flight clarification guard for broad open-ended prompts.
+  - Authored ADR-066 in `planning/decisions.md` and updated `docs/TOOLS.md`.
+  - Authored comprehensive test suite in `tests/test_project_isolation_and_fleet_orchestrator_suite.py` (6/6 passed, total 15/15 regression tests passed).
+- **Why this approach was chosen:**
+  - Solves the critical user-reported issues: (1) building a second project destroyed the first project, and (2) fleet tasks spawned duplicate phantom cards with broken progress reporting.
+- **What alternatives were considered:**
+  - Asking the user for a folder name on every build: Rejected because it breaks hands-free voice flow. Autonomous slug extraction and collision-safe disambiguation provides seamless zero-clobber workspaces automatically.
+- **Key files touched:**
+  - `core/repo_context.py`
+  - `actions/antigravity_agent.py`
+  - `core/fleet_manager.py`
+  - `config/fleet_agents.json`
+  - `frontend/index.html`
+  - `core/prompt.txt`
+  - `planning/decisions.md`
+  - `planning/PLAN_PROJECT_ISOLATION_AND_FLEET_QUEUE_FIX.md`
+  - `docs/TOOLS.md`
+  - `tests/test_project_isolation_and_fleet_orchestrator_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - When dispatching coding agents from higher-level workflows (like fleet managers or multi-agent pipelines), always pass `run_in_place=True` and `task_ctx` to avoid double-queuing in TaskManager.
+  - Always clean and format file paths in frontend templates (strip drive letters and absolute home directory roots) so the UI displays compact relative paths.
+
+---
+
+## [2026-10-04] — Voice Silence Diagnostics, Interruption Logging & Proactive Audio Telemetry (Item 4)
+
+- **What was built:**
+  - Implemented 5-second silence watchdog in `main.py` (`_arm_silence_watchdog`, `_silence_watchdog`, `_cancel_silence_watchdog`): arms on user speech transcription (`sc.input_transcription`), cancels on model audio (`response.data`) or transcription (`sc.output_transcription`), and emits a warning if 5s elapses with zero model output.
+  - Added logging for `server_content.interrupted` from Google Gemini Live server, alerting console and `log_bus` whenever a turn is cancelled server-side.
+  - Added proactivity telemetry to `main.py:_build_config`: logs `get_proactive_audio_enabled()` and the live connect config proactivity state to `log_bus` and console on every session startup.
+  - Added zero-output detection on `sc.turn_complete`: logs an explicit warning to `log_bus` (`audio.silence`) if a turn completes with user speech but no model audio or text.
+  - Added clean cancellation in `main.py:interrupt()` and `_receive_loop` finally block to avoid leaking background watchdog tasks.
+  - Authored comprehensive test suite in `tests/test_voice_silence_diagnostics_suite.py` (3/3 passed).
+  - Executed live comparative test against `gemini-3.1-flash-live-preview` with Hinglish prompt: verified that `proactive_audio: false` immediately returns 274,562 bytes of warm audio response in 0.72s, whereas `proactive_audio: true` causes the Google API to fail with `1007 Invalid JSON payload: Unknown name "proactivity" at 'setup'`.
+- **Why this approach was chosen:**
+  - Direct observability into the WebSocket pipeline isolates whether voice silence is caused by local mic drops, server-side turn interruption, Google API schema rejections, or speech classifier misclassification.
+- **What alternatives were considered:**
+  - Blindly modifying the echo-tail window without diagnostics: Rejected because without watchdog telemetry, the root cause between local echo suppression vs server-side rejection cannot be proven.
+- **Key files touched:**
+  - `main.py`
+  - `tests/test_voice_silence_diagnostics_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Google's `gemini-3.1-flash-live-preview` v1beta WebSocket endpoint does not support `proactivity` in setup configuration; keep `proactive_audio: false` in `config/api_keys.json`.
+  - Always cancel silence watchdogs on both `response.data` (audio) and `sc.output_transcription` (text) to prevent false-positive alarms during active responses.
+
+---
+
+## [2026-10-04] — Elimination of Out-of-Order Speech in Governance DENY Branch (Item 3)
+
+- **What was built:**
+  - Confirmed and finalized the complete removal of `self.speak()` from the governance DENY branch in `main.py:_execute_tool`.
+  - Routed tool execution exceptions to `self.ui.write_log` instead of `self.speak_error()`, ensuring all tool execution outcomes return strictly through `FunctionResponse`.
+  - Prevented WebSocket turn desynchronization in Google Gemini Live, which formerly crashed with `1008 Session closed: expected FunctionResponse but received client turn` when `self.speak()` injected client turns during tool evaluation.
+  - Authored test suite in `tests/test_governance_deny_branch_suite.py` verifying that governance denials return valid `FunctionResponse` without invoking `self.speak()` or `self.speak_error()`.
+- **Why this approach was chosen:**
+  - The Gemini Live protocol mandates that when a model issues a tool call (`FunctionCall`), the client MUST reply exclusively with `send_tool_response(function_responses=[...])`. Calling `send_client_content` mid-turn violates the WebSocket protocol.
+- **What alternatives were considered:**
+  - Delaying `self.speak()` until after tool response: Rejected because the model naturally communicates the denial message to the user once it receives the `FunctionResponse` containing `"Action blocked by security governance"`.
+- **Key files touched:**
+  - `main.py`
+  - `tests/test_governance_deny_branch_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Never call `self.speak()` inside any tool execution or dispatch path while Gemini Live is waiting for a `FunctionResponse`.
+
+---
+
+## [2026-10-04] — Long-Term Memory Restoration & Zero-Byte Immunity
+
+- **What was built:**
+  - Restored `memory/long_term.json` from `C:\Users\Hamza\zezo_backup_phase2\long_term.json` (size: 8,045 bytes, containing all 8 categories and 59 stored facts, preferences, wishes, and session summaries).
+  - Created a local safety replica at `memory/long_term.json.bak` (8,045 bytes).
+  - Root cause isolated: Git commit `4a93e689` untracked `memory/*.json` with `git rm`, leaving the local file unseeded, which resulted in a 0-byte file that crashed `load_memory()` with `Expecting value: line 1 column 1 (char 0)`.
+  - Added test environment isolation in `tests/conftest.py` via `ZEZO_MEMORY_PATH` pointing to an isolated temporary JSON file, preventing test executions from mutating or truncating the live memory file.
+  - Implemented auto-recovery in `memory/memory_manager.py`: if `memory/long_term.json` is missing or 0 bytes, `load_memory()` automatically restores from `long_term.json.bak`.
+  - Implemented atomic writes in `save_memory()`: writes to a `.tmp` file first, asserts `size > 0`, and atomically replaces `memory/long_term.json`, updating the `.bak` replica on every valid save.
+  - Authored regression test suite in `tests/test_memory_recovery_and_isolation_suite.py` (3/3 passed).
+- **Why this approach was chosen:**
+  - Guarantees crash immunity and zero data loss even if the primary JSON file is corrupted or truncated. Test isolation ensures `pytest` runs cannot contaminate user profile facts.
+- **What alternatives were considered:**
+  - Writing `{}` to the empty file: Rejected as strictly instructed by user; writing `{}` would erase historical facts, user preferences, and personal identity data permanently.
+- **Key files touched:**
+  - `memory/long_term.json`
+  - `memory/long_term.json.bak`
+  - `memory/memory_manager.py`
+  - `tests/conftest.py`
+  - `tests/test_memory_recovery_and_isolation_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Whenever untracking configuration or data files from Git, never delete the local working copy.
+  - Always isolate memory and file persistence paths in `tests/conftest.py` before running test suites.
+
+---
+
+## [2026-10-04] — Core Tool Name Collision Resolution & Discovery Cleanliness
+
+- **What was built:**
+  - Resolved tool rejection collisions on startup where `manage_monitor`, `screen_process`, and `system_status` were rejected with `"Name collides with a reserved core tool"`.
+  - Kept `screen_process` as an inline tool in `main.py` (tied directly to live session screen/camera capture and WebSocket vision injection), and removed the redundant `TOOL` dict from `actions/screen_processor.py`.
+  - Converted `system_status` and `manage_monitor` into real standalone actions: deleted their duplicate entries from `main.py:TOOL_DECLARATIONS`, removed their handlers from `_get_tool_handler`, and deleted their inline methods (`_handle_system_status`, `_handle_manage_monitor`). They now load cleanly from `actions/system_monitor.py` and `actions/background_monitor.py`.
+  - Ensured all inline tools remain registered in `core/governance.py:INLINE_TOOL_RISKS`.
+  - Built regression test suite in `tests/test_tool_collision_and_governance_suite.py` asserting zero action rejections on startup and confirming every declared tool passes `governance.evaluate()` without unknown-tool DENY.
+- **Why this approach was chosen:**
+  - Enforces the Single Source of Truth architecture rule: each tool must originate from exactly one location. State-dependent tools remain inline in `main.py`, while stateless system inspection and background monitoring tools reside cleanly in `actions/`.
+- **What alternatives were considered:**
+  - Keeping all three tools inline: Rejected because `system_status` and `manage_monitor` are completely stateless, and cluttering `main.py` violates the modular monolith design.
+  - Making `screen_process` a standalone action: Rejected because screen and camera capture requires live reference to `ZezoLive._pending_vision`, `ZezoLive._vision_busy`, and the active WebSocket session.
+- **Key files touched:**
+  - `actions/screen_processor.py`
+  - `main.py`
+  - `core/governance.py`
+  - `tests/test_tool_collision_and_governance_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Before adding a tool declaration to `TOOL_DECLARATIONS` in `main.py`, check if an action file in `actions/` already defines it to prevent action loader collision rejections.
+  - Action loader silently skips helper files that do not declare a module-level `TOOL` dict.
+
+---
+
+## [2026-10-04] — Audio Cutoff & Security Governance Desync Fix
+
+- **What was built:**
+  - Resolved the mid-speech audio cutoff ("bolte bolte chup ho jana") caused by premature echo tail cancellation in `main.py:_listen_audio` and playback queue underrun in `_play_audio`.
+  - Registered `system_status` as `ToolRisk.READ_ONLY` in `core/governance.py:INLINE_TOOL_RISKS` so it is never blocked by security policies.
+  - Eliminated out-of-order `self.speak()` injection inside `_execute_tool` on security policy blocks, preserving Gemini Live WebSocket turn state synchronization.
+  - Handled `server_content.interrupted` from Google Gemini Live server cleanly.
+  - Initialized `memory/long_term.json` with `{}` to prevent startup `JSONDecodeError`.
+- **Why this approach was chosen:**
+  - Allowing the spectral echo discriminator (`self._echo.is_user_speech`) to operate without a naive `_lvl > 0.08` bypass prevents speaker bleed from falsely triggering barge-in cancellations in Gemini Live. Increasing playback wait timeout from 0.2s to 0.45s absorbs network packet jitter between speech clauses.
+- **Key files touched:**
+  - `main.py`
+  - `core/governance.py`
+  - `memory/long_term.json`
+- **What to remember for future work:**
+  - Never call `self.speak()` (which sends `send_client_content`) inside `_execute_tool` while Gemini Live is awaiting a `FunctionResponse` (`send_tool_response`); always return the refusal within the function response dictionary.
+  - The echo tail must not be cancelled by raw volume alone, because the speaker playback easily exceeds mic volume thresholds.
+
+---
+
 ## [2026-10-04] — Phase 10: Multi-Scenario E2E Acceptance Suite & Release Verification
 
 - **What was built:**

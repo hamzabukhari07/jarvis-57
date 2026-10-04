@@ -36,9 +36,10 @@ youtube-transcript-api        # YouTube video transcript extraction
 yt-dlp>=2024.1.0              # Media metadata & audio extraction
 feedparser>=6.0.0             # RSS/news headline parsing
 python-pptx                   # PowerPoint ingestion
-openpyxl                      # Excel spreadsheet ingestion
-python-docx                   # Word document ingestion
-PyPDF2                        # PDF parser
+openpyxl                      # Excel spreadsheet ingestion & generation
+python-docx                   # Word document ingestion & generation
+reportlab>=4,<6               # Native PDF document compiler & generation
+pypdf>=5,<7                   # PDF parsing & extraction
 pdfplumber                    # Rich PDF text & table extractor
 markitdown                    # Fast markdown conversion
 pandas>=2,<4                  # Dataframe analysis

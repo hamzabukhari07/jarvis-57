@@ -207,7 +207,11 @@ class FleetManager:
         # 3. Domain Fallback Heuristics
         if any(w in low for w in ("token", "tokens", "palette", "design system", "extract design")):
             return self.get_agent("PAM")
-        if any(w in low for w in ("html", "css", "landing", "page", "react", "tailwind", "component", "studio", "ui", "frontend")):
+        if any(w in low for w in ("html", "css", "landing", "page", "react", "tailwind", "component", "studio", "ui", "frontend", "website", "portfolio", "web-project")):
+            if self.get_agent_active_task_count("ALI") >= 3:
+                haider = self.get_agent("HAIDER")
+                if haider and self.get_agent_active_task_count("HAIDER") < 3:
+                    return haider
             return self.get_agent("ALI")
         if any(w in low for w in ("fastapi", "postgres", "sql", "api", "endpoint", "schema", "microservice", "auth", "backend", "database")):
             return self.get_agent("AHMAD")
@@ -216,7 +220,30 @@ class FleetManager:
         if any(w in low for w in ("scrape", "transcribe", "summary", "web search", "market research", "research", "social")):
             return self.get_agent("KELLY")
 
-        return None
+        # 4. Default dispatch fallback: Ali for UI/frontend, Ahmad for general coding
+        if any(w in low for w in ("build", "create", "make", "design")):
+            if self.get_agent_active_task_count("ALI") >= 3:
+                haider = self.get_agent("HAIDER")
+                if haider and self.get_agent_active_task_count("HAIDER") < 3:
+                    return haider
+            return self.get_agent("ALI")
+        return self.get_agent("AHMAD") or self.get_agent("ALI") or list(self.agents.values())[0]
+
+    def get_agent_active_task_count(self, agent_id: str) -> int:
+        """Returns the number of currently active (running/queued) tasks assigned to an agent."""
+        uid = (agent_id or "").upper().strip()
+        if not uid:
+            return 0
+        from core.task_manager import get_task_manager
+        tm = get_task_manager()
+        active = tm.list_active()
+        count = 0
+        for t in active:
+            params = t.get("params") or {}
+            task_agent = str(params.get("agent_id") or "").upper().strip()
+            if task_agent == uid:
+                count += 1
+        return count
 
     def generate_peer_session_id(self, from_agent: str, to_agent: str) -> str:
         """Generates deterministic composite peer session ID for isolated P2P communication lineage."""
@@ -465,15 +492,37 @@ class FleetManager:
             "tasks": dispatched,
         }
 
+    def _broadcast_event(self, event_type: str, data: Dict[str, Any]) -> None:
+        """Thread-safe broadcast of fleet and task events to WebSocket UI and log bus."""
+        try:
+            from core.ui_server import get_ui_server
+            get_ui_server().broadcast(event_type, data)
+        except Exception as e:
+            logger.debug("[FleetManager] UI broadcast skipped: %s", e)
+        try:
+            from core.log_bus import emit_tool_micro_event
+            emit_tool_micro_event(event_type, "fleet_manager", data)
+        except Exception:
+            pass
+
     def dispatch_task(self, agent_id: str, prompt: str, path: Optional[str] = None, model_override: Optional[str] = None) -> Dict[str, Any]:
         """Launch an autonomous task executed by this agent's designated tool."""
         # Check if Michael orchestrator should auto-decompose multi-faceted full-stack tasks
         if agent_id.upper() in ("MICHAEL", "MANAGER") and any(w in prompt.lower() for w in ("full-stack", "fullstack", "entire app", "both frontend and backend")):
             return self.decompose_and_dispatch(prompt, path)
 
-        agent = self.get_agent(agent_id)
+        agent = self.get_agent(agent_id) or self.resolve_agent_by_mention_or_capability(agent_id)
+        if not agent:
+            agent = self.resolve_agent_by_mention_or_capability(prompt)
         if not agent:
             return {"success": False, "error": f"Agent '{agent_id}' not found."}
+
+        # Overflow Load Balancing: If Ali is at capacity (>= 3 active tasks), auto-route to Haider
+        if agent.id == "ALI" and self.get_agent_active_task_count("ALI") >= 3:
+            haider = self.get_agent("HAIDER")
+            if haider and self.get_agent_active_task_count("HAIDER") < 3:
+                logger.info("[FleetManager] Ali at max capacity (3 tasks). Auto-routing task to Haider.")
+                agent = haider
 
         # Capability check via Circuit Breaker
         can_run, block_reason = circuit_breaker.can_execute(agent.default_tool)
@@ -490,7 +539,11 @@ class FleetManager:
             if wt.success:
                 worktree_path = str(wt.worktree_path)
 
-        target_dir = worktree_path or path or str(Path.cwd())
+        target_dir = worktree_path or path
+        if not target_dir or target_dir == str(Path.cwd()):
+            from core.repo_context import get_unique_project_dir
+            target_dir = str(get_unique_project_dir(prompt))
+
         enriched_prompt = f"[{agent.name} • {agent.role}]\n{agent.prompt_prefix}\n\nTask: {prompt}"
         active_model = model_override or agent.model_id or None
 
@@ -500,6 +553,33 @@ class FleetManager:
 
         def _worker_fn(worker_params: dict, task_ctx: Any) -> dict:
             try:
+                # Wrap task_ctx.report to synchronize agent progress and activity logs
+                orig_report = getattr(task_ctx, "report", None)
+
+                def _reporting_wrapper(prog: int, msg: str = "") -> None:
+                    if orig_report:
+                        try:
+                            orig_report(prog, msg)
+                        except Exception:
+                            pass
+                    with self._lock:
+                        agent.task_progress = max(0, min(100, prog))
+                        if msg:
+                            clean_msg = f"[{prog}%] {msg}"
+                            if not agent.recent_logs or agent.recent_logs[-1] != clean_msg:
+                                agent.recent_logs.append(clean_msg)
+                                if len(agent.recent_logs) > 30:
+                                    agent.recent_logs = agent.recent_logs[-30:]
+                    self._broadcast_event("task_progress", {
+                        "task_id": submitted_id,
+                        "agent_id": agent.id,
+                        "agent": agent.name,
+                        "progress": prog,
+                        "message": msg,
+                    })
+
+                task_ctx.report = _reporting_wrapper
+
                 from core.action_loader import discover_actions
                 reg = discover_actions(Path(__file__).parent.parent / "actions")
                 call_params = {
@@ -509,16 +589,45 @@ class FleetManager:
                     "repo_path": target_dir,
                     "target_dir": target_dir,
                     "path": target_dir,
+                    "run_in_place": True,
+                    "task_ctx": task_ctx,
                 }
                 if active_model:
                     call_params["model"] = active_model
                     call_params["model_id"] = active_model
 
                 res = reg.run(agent.default_tool, call_params)
-                task_ctx.report(100, "Completed successfully")
+                _reporting_wrapper(100, "Completed successfully")
+                self.complete_task(agent.id, submitted_id)
+                self._broadcast_event("task_done", {
+                    "task_id": submitted_id,
+                    "agent_id": agent.id,
+                    "agent": agent.name,
+                    "summary": f"Completed: {prompt[:60]}",
+                })
+                self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
+                if worktree_path:
+                    try:
+                        git_sandbox.safe_teardown(f"{agent.id.lower()}_{task_id}")
+                    except Exception:
+                        pass
                 return {"status": "success", "result": str(res)}
             except Exception as ex:
-                task_ctx.on_fail(str(ex))
+                if hasattr(task_ctx, "on_fail"):
+                    task_ctx.on_fail(str(ex))
+                self.complete_task(agent.id, submitted_id)
+                self._broadcast_event("task_failed", {
+                    "task_id": submitted_id,
+                    "agent_id": agent.id,
+                    "agent": agent.name,
+                    "error": str(ex),
+                })
+                self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
+                if worktree_path:
+                    try:
+                        git_sandbox.safe_teardown(f"{agent.id.lower()}_{task_id}")
+                    except Exception:
+                        pass
                 raise
 
         submitted_id = tm.submit(
@@ -526,6 +635,7 @@ class FleetManager:
             fn=_worker_fn,
             params={
                 "task": prompt,
+                "taskTitle": prompt[:60],
                 "agent_id": agent.id,
                 "agent_name": agent.name,
                 "target_dir": target_dir,
@@ -538,7 +648,22 @@ class FleetManager:
             agent.status = "working"
             agent.current_task_id = submitted_id
             agent.current_task_title = prompt
+            agent.task_progress = 0
             agent.active_worktree = worktree_path
+            agent.recent_logs.append(f"[TASK STARTED] {prompt[:80]}")
+            if len(agent.recent_logs) > 30:
+                agent.recent_logs = agent.recent_logs[-30:]
+
+        self._broadcast_event("agent_task_started", {
+            "task_id": submitted_id,
+            "agent_id": agent.id,
+            "agent": agent.name,
+            "task": prompt,
+            "title": prompt[:60],
+            "tool": agent.default_tool,
+            "target_dir": target_dir,
+        })
+        self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
 
         return {
             "success": True,
@@ -570,8 +695,14 @@ class FleetManager:
             agent.status = "idle"
             agent.current_task_id = None
             agent.current_task_title = None
+            agent.task_progress = 0
             agent.active_worktree = None
             agent.completed_tasks += 1
+            agent.recent_logs.append(f"[COMPLETED] Task {task_id} finished")
+            if len(agent.recent_logs) > 30:
+                agent.recent_logs = agent.recent_logs[-30:]
+
+        self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
 
         return {
             "success": True,
@@ -661,7 +792,7 @@ def get_agent(name_or_id: str) -> Optional[Dict[str, Any]]:
 
 def list_agents() -> List[Dict[str, Any]]:
     """Helper to list all agents in the fleet as dicts."""
-    return fleet_manager.get_all_agents_state()
+    return fleet_manager.get_fleet_deck_state()
 
 
 
