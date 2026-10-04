@@ -1,3 +1,47 @@
+## [2026-10-04] — Voice Silence Diagnostics, Interruption Logging & Proactive Audio Telemetry (Item 4)
+
+- **What was built:**
+  - Implemented 5-second silence watchdog in `main.py` (`_arm_silence_watchdog`, `_silence_watchdog`, `_cancel_silence_watchdog`): arms on user speech transcription (`sc.input_transcription`), cancels on model audio (`response.data`) or transcription (`sc.output_transcription`), and emits a warning if 5s elapses with zero model output.
+  - Added logging for `server_content.interrupted` from Google Gemini Live server, alerting console and `log_bus` whenever a turn is cancelled server-side.
+  - Added proactivity telemetry to `main.py:_build_config`: logs `get_proactive_audio_enabled()` and the live connect config proactivity state to `log_bus` and console on every session startup.
+  - Added zero-output detection on `sc.turn_complete`: logs an explicit warning to `log_bus` (`audio.silence`) if a turn completes with user speech but no model audio or text.
+  - Added clean cancellation in `main.py:interrupt()` and `_receive_loop` finally block to avoid leaking background watchdog tasks.
+  - Authored comprehensive test suite in `tests/test_voice_silence_diagnostics_suite.py` (3/3 passed).
+  - Executed live comparative test against `gemini-3.1-flash-live-preview` with Hinglish prompt: verified that `proactive_audio: false` immediately returns 274,562 bytes of warm audio response in 0.72s, whereas `proactive_audio: true` causes the Google API to fail with `1007 Invalid JSON payload: Unknown name "proactivity" at 'setup'`.
+- **Why this approach was chosen:**
+  - Direct observability into the WebSocket pipeline isolates whether voice silence is caused by local mic drops, server-side turn interruption, Google API schema rejections, or speech classifier misclassification.
+- **What alternatives were considered:**
+  - Blindly modifying the echo-tail window without diagnostics: Rejected because without watchdog telemetry, the root cause between local echo suppression vs server-side rejection cannot be proven.
+- **Key files touched:**
+  - `main.py`
+  - `tests/test_voice_silence_diagnostics_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Google's `gemini-3.1-flash-live-preview` v1beta WebSocket endpoint does not support `proactivity` in setup configuration; keep `proactive_audio: false` in `config/api_keys.json`.
+  - Always cancel silence watchdogs on both `response.data` (audio) and `sc.output_transcription` (text) to prevent false-positive alarms during active responses.
+
+---
+
+## [2026-10-04] — Elimination of Out-of-Order Speech in Governance DENY Branch (Item 3)
+
+- **What was built:**
+  - Confirmed and finalized the complete removal of `self.speak()` from the governance DENY branch in `main.py:_execute_tool`.
+  - Routed tool execution exceptions to `self.ui.write_log` instead of `self.speak_error()`, ensuring all tool execution outcomes return strictly through `FunctionResponse`.
+  - Prevented WebSocket turn desynchronization in Google Gemini Live, which formerly crashed with `1008 Session closed: expected FunctionResponse but received client turn` when `self.speak()` injected client turns during tool evaluation.
+  - Authored test suite in `tests/test_governance_deny_branch_suite.py` verifying that governance denials return valid `FunctionResponse` without invoking `self.speak()` or `self.speak_error()`.
+- **Why this approach was chosen:**
+  - The Gemini Live protocol mandates that when a model issues a tool call (`FunctionCall`), the client MUST reply exclusively with `send_tool_response(function_responses=[...])`. Calling `send_client_content` mid-turn violates the WebSocket protocol.
+- **What alternatives were considered:**
+  - Delaying `self.speak()` until after tool response: Rejected because the model naturally communicates the denial message to the user once it receives the `FunctionResponse` containing `"Action blocked by security governance"`.
+- **Key files touched:**
+  - `main.py`
+  - `tests/test_governance_deny_branch_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Never call `self.speak()` inside any tool execution or dispatch path while Gemini Live is waiting for a `FunctionResponse`.
+
+---
+
 ## [2026-10-04] — Long-Term Memory Restoration & Zero-Byte Immunity
 
 - **What was built:**
