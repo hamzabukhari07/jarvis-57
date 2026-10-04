@@ -11,7 +11,25 @@
       "prompt_prefix": "You are Michael Scott, Regional Manager of the Autonomous Coding Fleet.",
       "model_id": "",
       "desk_x": 180,
-      "desk_y": 160
+      "desk_y": 160,
+      "allowed_tools": [
+        "opencode_run",
+        "fleet_control",
+        "task_status",
+        "file_processor",
+        "file_controller",
+        "dev_agent"
+      ],
+      "allowed_skills": [
+        "multi_agent_collaboration",
+        "make_plan",
+        "git_workflow"
+      ],
+      "capabilities": [
+        "task_decomposition",
+        "fleet_orchestration",
+        "multi_agent_delegation"
+      ]
     },
     "ALI": {
       "name": "Ali",
@@ -24,7 +42,27 @@
       "prompt_prefix": "You are Ali, Senior Frontend and UI Architecture Specialist. Build pixel-perfect, modern, accessible, and responsive user interfaces using Antigravity and studio design tokens.",
       "model_id": "gemini-3.7-flash-medium",
       "desk_x": 320,
-      "desk_y": 160
+      "desk_y": 160,
+      "allowed_tools": [
+        "antigravity_run",
+        "extract_design_system",
+        "file_processor",
+        "file_controller",
+        "browser_control",
+        "fleet_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "hamza_taste",
+        "multi_agent_collaboration",
+        "make_plan"
+      ],
+      "capabilities": [
+        "web_design",
+        "frontend_coding",
+        "ui_refactor",
+        "animations"
+      ]
     },
     "AHMAD": {
       "name": "Ahmad",
@@ -37,7 +75,29 @@
       "prompt_prefix": "You are Ahmad, Senior Python Backend Specialist. Build scalable backend architectures, clean REST/GraphQL APIs, and bulletproof database models with OpenCode.",
       "model_id": "opencode/mimo-v2.5-free",
       "desk_x": 460,
-      "desk_y": 160
+      "desk_y": 160,
+      "allowed_tools": [
+        "opencode_run",
+        "code_helper",
+        "file_processor",
+        "file_controller",
+        "dev_agent",
+        "fleet_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "opencode",
+        "multi_agent_collaboration",
+        "make_plan",
+        "git_workflow",
+        "test_fastapi_deploy"
+      ],
+      "capabilities": [
+        "backend_architecture",
+        "api_development",
+        "database_design",
+        "auth_systems"
+      ]
     },
     "DWIGHT": {
       "name": "Dwight Schrute",
@@ -50,7 +110,26 @@
       "prompt_prefix": "You are Dwight Schrute, Assistant to the Regional Manager & Lead QA Auditor. You enforce absolute safety, zero regression, and verify all code changes against strict security and testing baselines.",
       "model_id": "kilo/stepfun/step-3.7-flash:free",
       "desk_x": 600,
-      "desk_y": 160
+      "desk_y": 160,
+      "allowed_tools": [
+        "kilo_run",
+        "dev_agent",
+        "file_processor",
+        "file_controller",
+        "fleet_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "system_diagnostics",
+        "multi_agent_collaboration",
+        "make_plan"
+      ],
+      "capabilities": [
+        "security_audit",
+        "qa_testing",
+        "edge_case_verification",
+        "governance_enforcement"
+      ]
     },
     "PAM": {
       "name": "Pam Beesly",
@@ -58,12 +137,28 @@
       "specialty": "Design token extraction, visual branding, and HUD metrics rendering",
       "color": "#a855f7",
       "avatar_pixel": "pam_pixel.png",
-      "default_tool": "antigravity_run",
-      "risk_tier": "L1_MUTATION",
+      "default_tool": "extract_design_system",
+      "risk_tier": "L0_READ_ONLY",
       "prompt_prefix": "You are Pam Beesly, Design System Architect. Ensure UI components are pixel-perfect, modern, accessible, and aesthetically premium.",
       "model_id": "",
       "desk_x": 320,
-      "desk_y": 280
+      "desk_y": 280,
+      "allowed_tools": [
+        "extract_design_system",
+        "file_processor",
+        "file_controller",
+        "fleet_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "hamza_taste",
+        "multi_agent_collaboration"
+      ],
+      "capabilities": [
+        "design_token_extraction",
+        "palette_generation",
+        "brand_identity"
+      ]
     },
     "OSCAR": {
       "name": "Oscar Martinez",
@@ -76,7 +171,23 @@
       "prompt_prefix": "You are Oscar Martinez, Senior Code Accountant. You mathematically audit function complexity, memory efficiency, and algorithmic performance.",
       "model_id": "",
       "desk_x": 460,
-      "desk_y": 280
+      "desk_y": 280,
+      "allowed_tools": [
+        "kilo_run",
+        "dev_agent",
+        "file_processor",
+        "fleet_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "antislop_code",
+        "multi_agent_collaboration"
+      ],
+      "capabilities": [
+        "complexity_audit",
+        "performance_profiling",
+        "anti_slop_hygiene"
+      ]
     },
     "KELLY": {
       "name": "Kelly Kapoor",
@@ -84,12 +195,33 @@
       "specialty": "YouTube transcription, live web scraping, and multi-source research synthesis",
       "color": "#f43f5e",
       "avatar_pixel": "kelly_pixel.png",
-      "default_tool": "opencode_run",
+      "default_tool": "agent_reach",
       "risk_tier": "L1_MUTATION",
       "prompt_prefix": "You are Kelly Kapoor, Intelligence & Research Specialist. Find live answers, transcribe media, and summarize key insights rapidly.",
       "model_id": "",
       "desk_x": 600,
-      "desk_y": 280
+      "desk_y": 280,
+      "allowed_tools": [
+        "agent_reach",
+        "web_search",
+        "web_reader",
+        "file_processor",
+        "file_controller",
+        "fleet_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "social_research",
+        "web_scraper",
+        "web_research_pipeline",
+        "multi_agent_collaboration"
+      ],
+      "capabilities": [
+        "social_research",
+        "media_transcription",
+        "web_scraping",
+        "trend_synthesis"
+      ]
     }
   }
 }

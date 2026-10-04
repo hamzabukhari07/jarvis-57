@@ -395,19 +395,21 @@ To prevent regressions, the following critical repository invariants must be pre
 
 ### Phase 4: Dynamic Agent Capability Registry & Per-Agent Tool Permissions
 * **Objective:** Eliminate prompt bloat by filtering tool declarations dynamically based on active agent persona, mode, and explicit capabilities.
-* **Status:** ⏳ **Pending Execution**
+* **Status:** 🟢 **COMPLETED & VERIFIED (159/159 tests passed)**
 * **Files Touched:**
   - [core/action_loader.py](file:///d:/anitgravity/zezo%20work/jarvis-57/core/action_loader.py)
   - [config/fleet_agents.json](file:///d:/anitgravity/zezo%20work/jarvis-57/config/fleet_agents.json)
   - [core/fleet_manager.py](file:///d:/anitgravity/zezo%20work/jarvis-57/core/fleet_manager.py)
+  - [core/ui_server.py](file:///d:/anitgravity/zezo%20work/jarvis-57/core/ui_server.py)
   - [main.py](file:///d:/anitgravity/zezo%20work/jarvis-57/main.py)
+  - `tests/test_phase4_agent_capability_registry_suite.py`
 
 #### 📋 Todo List:
-- [ ] **Task 4.1:** Extend `FleetAgent` schema and `config/fleet_agents.json` with `allowed_tools`, `allowed_skills`, and `capabilities` arrays.
-- [ ] **Task 4.2:** Implement `get_tool_declarations(agent_id=None, mode=None)` with filter logic inspired by QwenPaw's `ToolRegistry.filter()`.
-- [ ] **Task 4.3:** Add `/api/tools?agent_id=...` inspection endpoint in `core/ui_server.py` with diagnostic reason logging for filtered tools.
-- [ ] **Task 4.4:** Dynamically scope tool declarations in `main.py:_build_config` when executing in specialized agent contexts.
-- [ ] **Task 4.5:** Verify ZEZO master orchestrator maintains access to all system tools while specialized sub-agents receive scoped payloads.
+- [x] **Task 4.1:** Extend `FleetAgent` schema and `config/fleet_agents.json` with `allowed_tools`, `allowed_skills`, and `capabilities` arrays.
+- [x] **Task 4.2:** Implement `get_tool_declarations(agent_id=None, mode=None)` with filter logic inspired by QwenPaw's `ToolRegistry.filter()`.
+- [x] **Task 4.3:** Add `/api/tools?agent_id=...` inspection endpoint in `core/ui_server.py` with diagnostic reason logging for filtered tools.
+- [x] **Task 4.4:** Dynamically scope tool declarations in `main.py:_build_config` when executing in specialized agent contexts.
+- [x] **Task 4.5:** Verify ZEZO master orchestrator maintains access to all system tools while specialized sub-agents receive scoped payloads.
 
 * **Acceptance Criteria:**
   - Dedicated coding agent payloads only include coding/file tools, reducing prompt declarations measurably.

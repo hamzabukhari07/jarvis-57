@@ -1,3 +1,29 @@
+## [2026-10-04] — Phase 4: Dynamic Agent Capability Registry & Per-Agent Tool Permissions
+
+- **What was built:**
+  - Extended `FleetAgent` schema and `config/fleet_agents.json` with `allowed_tools`, `allowed_skills`, and `capabilities` arrays.
+  - Implemented `get_tool_declarations(agent_id=None, mode=None)` in `core/action_loader.py` dynamically filtering tool function declarations.
+  - Implemented `filter_tools(agent_id=None, mode=None)` diagnostic inspection method with full reason attribution (`tool_disabled`, `not_in_agent_permissions`, `denied_by_mode`).
+  - Added `/api/tools?agent_id=...&mode=...` endpoint to `core/ui_server.py`.
+  - Updated `main.py:_build_config` to accept optional `agent_id` and `mode` scoping parameters.
+  - Created unit and integration test suite in `tests/test_phase4_agent_capability_registry_suite.py`.
+- **Why this approach was chosen:**
+  - Reduces Gemini token overhead and latency by eliminating irrelevant tool declarations in specialized agent contexts while keeping master orchestrator access universal.
+- **Key files touched:**
+  - `config/fleet_agents.json`
+  - `core/fleet_manager.py`
+  - `core/action_loader.py`
+  - `core/ui_server.py`
+  - `main.py`
+  - `tests/test_phase4_agent_capability_registry_suite.py`
+  - `planning/MASTER_IMPLEMENTATION_ROADMAP.md`
+- **Verification:**
+  - Layer 1 (static): `python -m py_compile main.py core/action_loader.py core/fleet_manager.py core/ui_server.py tests/test_phase4_agent_capability_registry_suite.py` (Exit 0).
+  - Layer 2 (runtime): `python -m pytest tests/test_phase4_agent_capability_registry_suite.py -v` (6 passed in 0.85s).
+  - Layer 3 (regression): Full test suite executed with 159 passed, 5 skipped, 0 failures (37.19s).
+
+---
+
 ## [2026-10-04] — Phase 3: Multi-Agent Peer Mesh, Named Routing & Workflow Decomposition
 
 - **What was built:**

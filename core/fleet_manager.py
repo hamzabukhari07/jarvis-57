@@ -49,6 +49,9 @@ class FleetAgent:
     active_worktree: Optional[str] = None
     completed_tasks: int = 0
     recent_logs: List[str] = field(default_factory=list)
+    allowed_tools: List[str] = field(default_factory=list)
+    allowed_skills: List[str] = field(default_factory=list)
+    capabilities: List[str] = field(default_factory=list)
 
 
 class FleetManager:
@@ -99,6 +102,9 @@ class FleetManager:
                         model_id=info.get("model_id", ""),
                         desk_x=info.get("desk_x", 0),
                         desk_y=info.get("desk_y", 0),
+                        allowed_tools=list(info.get("allowed_tools") or []),
+                        allowed_skills=list(info.get("allowed_skills") or []),
+                        capabilities=list(info.get("capabilities") or []),
                     )
         except Exception as e:
             logger.error("[FleetManager] Failed to load fleet config: %s", e)
@@ -122,6 +128,9 @@ class FleetManager:
                         "model_id": a.model_id,
                         "desk_x": a.desk_x,
                         "desk_y": a.desk_y,
+                        "allowed_tools": a.allowed_tools,
+                        "allowed_skills": a.allowed_skills,
+                        "capabilities": a.capabilities,
                     }
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(export, f, indent=2)
@@ -271,6 +280,9 @@ class FleetManager:
                 status=existing.status if existing else "idle",
                 current_task_id=existing.current_task_id if existing else None,
                 active_worktree=existing.active_worktree if existing else None,
+                allowed_tools=list(data.get("allowed_tools") or (existing.allowed_tools if existing else [])),
+                allowed_skills=list(data.get("allowed_skills") or (existing.allowed_skills if existing else [])),
+                capabilities=list(data.get("capabilities") or (existing.capabilities if existing else [])),
             )
             self.agents[clean_id] = agent
             ok = self._save_fleet()
@@ -603,6 +615,9 @@ class FleetManager:
                     "worktree": a.active_worktree,
                     "desk_x": a.desk_x,
                     "desk_y": a.desk_y,
+                    "allowed_tools": a.allowed_tools,
+                    "allowed_skills": a.allowed_skills,
+                    "capabilities": a.capabilities,
                 })
             return state
 
@@ -623,6 +638,9 @@ class FleetManager:
             "active_worktree": a.active_worktree,
             "desk_x": a.desk_x,
             "desk_y": a.desk_y,
+            "allowed_tools": a.allowed_tools,
+            "allowed_skills": a.allowed_skills,
+            "capabilities": a.capabilities,
         }
 
 

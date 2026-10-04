@@ -81,11 +81,37 @@ class ActionRegistry:
         self._logger = logger
         self._key_history: deque = deque(maxlen=20)
 
-    # -- called by main.py at LiveConnectConfig build time --
-    def get_tool_declarations(self) -> list[dict]:
+    # -- called by main.py at LiveConnectConfig build time & agent scoping --
+    def get_tool_declarations(self, agent_id: Optional[str] = None, mode: Optional[str] = None) -> list[dict]:
+        """
+        Returns Gemini function-declarations, optionally filtered by agent allowed_tools or execution mode.
+        If agent_id is provided, checks agent's allowed_tools from FleetManager.
+        """
+        allowed_set: Optional[set[str]] = None
+        if agent_id:
+            try:
+                from core.fleet_manager import fleet_manager
+                agent = fleet_manager.get_agent(agent_id)
+                if agent and agent.allowed_tools:
+                    allowed_set = set(agent.allowed_tools)
+            except Exception as e:
+                self._logger(f"[ActionRegistry] Failed resolving agent tool permissions for {agent_id}: {e}")
+
+        # Mode-based filtering heuristics (e.g. 'coding', 'research', 'safe')
+        mode_str = (mode or "").lower().strip()
+        mode_denied: set[str] = set()
+        if mode_str == "coding":
+            mode_denied = {"weather_report", "flight_finder", "youtube_video", "game_updater"}
+        elif mode_str == "safe" or mode_str == "readonly":
+            mode_denied = {rec.name for rec in self._actions.values() if rec.risk in ("external_mutation", "destructive", "privileged_os")}
+
         out = []
         for rec in self._actions.values():
             if not rec.enabled:
+                continue
+            if allowed_set is not None and rec.name not in allowed_set:
+                continue
+            if rec.name in mode_denied:
                 continue
             decl = {"name": rec.name, "description": rec.description,
                     "parameters": rec.parameters}
@@ -93,6 +119,53 @@ class ActionRegistry:
                 decl["behavior"] = rec.behavior
             out.append(decl)
         return out
+
+    def filter_tools(self, agent_id: Optional[str] = None, mode: Optional[str] = None) -> dict[str, Any]:
+        """Diagnostic inspection of allowed and filtered tools with reasons."""
+        allowed = []
+        filtered = []
+
+        allowed_set: Optional[set[str]] = None
+        agent_name = None
+        if agent_id:
+            try:
+                from core.fleet_manager import fleet_manager
+                agent = fleet_manager.get_agent(agent_id)
+                if agent:
+                    agent_name = agent.name
+                    if agent.allowed_tools:
+                        allowed_set = set(agent.allowed_tools)
+            except Exception as e:
+                self._logger(f"[ActionRegistry] Error fetching agent {agent_id}: {e}")
+
+        mode_str = (mode or "").lower().strip()
+        mode_denied: set[str] = set()
+        if mode_str == "coding":
+            mode_denied = {"weather_report", "flight_finder", "youtube_video", "game_updater"}
+        elif mode_str in ("safe", "readonly"):
+            mode_denied = {rec.name for rec in self._actions.values() if rec.risk in ("external_mutation", "destructive", "privileged_os")}
+
+        for rec in self._actions.values():
+            if not rec.enabled:
+                filtered.append({"tool": rec.name, "risk": rec.risk, "reason": "tool_disabled"})
+                continue
+            if allowed_set is not None and rec.name not in allowed_set:
+                filtered.append({"tool": rec.name, "risk": rec.risk, "reason": f"not_in_agent_permissions ({agent_name or agent_id})"})
+                continue
+            if rec.name in mode_denied:
+                filtered.append({"tool": rec.name, "risk": rec.risk, "reason": f"denied_by_mode ({mode_str})"})
+                continue
+            allowed.append({"tool": rec.name, "risk": rec.risk, "behavior": rec.behavior})
+
+        return {
+            "agent_id": agent_id,
+            "agent_name": agent_name,
+            "mode": mode,
+            "allowed_count": len(allowed),
+            "filtered_count": len(filtered),
+            "allowed_tools": allowed,
+            "filtered_tools": filtered,
+        }
 
     def has(self, name: str) -> bool:
         return name in self._actions

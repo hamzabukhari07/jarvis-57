@@ -115,6 +115,7 @@ class ZezoUIServer:
         app.router.add_get("/office", self._office_view_handler)
         app.router.add_get("/ws", self._ws_handler)
         app.router.add_get("/api/health", self._health_handler)
+        app.router.add_get("/api/tools", self._tools_inspection_handler)
         app.router.add_get("/api/fleet/state", self._fleet_state_handler)
         app.router.add_get("/api/fleet/agent", self._fleet_agent_profile_handler)
         app.router.add_post("/api/fleet/save_agent", self._fleet_save_agent_handler)
@@ -175,6 +176,19 @@ class ZezoUIServer:
 
     async def _health_handler(self, request: web.Request) -> web.Response:
         return web.json_response({"status": "ok", "app": "ZEZO", "port": self.port})
+
+    async def _tools_inspection_handler(self, request: web.Request) -> web.Response:
+        """Inspect allowed and filtered tools with reasons, optionally scoped by agent_id or mode."""
+        agent_id = request.query.get("agent_id") or request.query.get("agent")
+        mode = request.query.get("mode")
+        try:
+            from core.action_loader import get_action_registry
+            reg = get_action_registry()
+            res = reg.filter_tools(agent_id=agent_id, mode=mode)
+            return web.json_response({"status": "success", "data": res})
+        except Exception as e:
+            logger.exception("Error in /api/tools handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
 
     # ── Lazy attachment registry ──────────────────────────────────────────
     def register_attachment(self, info: dict[str, Any]) -> None:

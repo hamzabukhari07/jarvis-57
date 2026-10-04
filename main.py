@@ -55,6 +55,7 @@ import sys
 import traceback
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import sounddevice as sd
 import numpy as np
@@ -1045,7 +1046,7 @@ class ZezoLive:
         self.ui.write_log(f"ERR: {tool_name} — {short}")
         self.speak(f"Sir, {tool_name} encountered an error. {short}")
 
-    def _build_config(self) -> types.LiveConnectConfig:
+    def _build_config(self, agent_id: Optional[str] = None, mode: Optional[str] = None) -> types.LiveConnectConfig:
         from datetime import datetime
 
         # Load customization from config
@@ -1106,7 +1107,7 @@ class ZezoLive:
         # discovered. Rename the assistant, add a plugin or move to another OS
         # and this follows without anyone editing a prompt.
         _all_decls = (TOOL_DECLARATIONS
-                      + self._action_registry.get_tool_declarations()
+                      + self._action_registry.get_tool_declarations(agent_id=agent_id, mode=mode)
                       + self._plugin_registry.get_tool_declarations())
         _names = {(d.get("name") if isinstance(d, dict) else getattr(d, "name", ""))
                   for d in _all_decls}
