@@ -370,7 +370,8 @@ class SkillRegistry:
     def install_skill(self, source_path_or_zip: str | Path, target_domain: str = "") -> tuple[bool, str]:
         """
         Install a new skill from a local folder or .zip archive.
-        Safely unpacks, validates SKILL.md, and reloads registry.
+        Safely unpacks with Zip-Slip path containment, runs static security scan,
+        validates SKILL.md, and reloads registry.
         """
         with _lock:
             src = Path(source_path_or_zip).resolve()
@@ -388,7 +389,24 @@ class SkillRegistry:
                             return False, "Archive does not contain a valid SKILL.md file."
                         top_folder = Path(skill_entries[0]).parent
                         extract_name = top_folder.name if str(top_folder) != "." else src.stem
-                        dest_dir = dest_parent / extract_name
+                        dest_dir = (dest_parent / extract_name).resolve()
+
+                        # Zip-Slip & Path Containment Validation
+                        dest_dir_str = str(dest_dir)
+                        for member in z.infolist():
+                            # Reject oversized entries (e.g. decompression bomb / > 25MB single file)
+                            if member.file_size > 25 * 1024 * 1024:
+                                return False, f"Archive entry '{member.filename}' exceeds maximum allowed size (25MB)."
+                            
+                            target_path = (dest_dir / member.filename).resolve()
+                            try:
+                                # Ensure target_path is inside dest_dir
+                                common = os.path.commonpath([dest_dir_str, str(target_path)])
+                                if common != dest_dir_str:
+                                    return False, f"Security violation: Zip-Slip traversal attempt detected in '{member.filename}'."
+                            except ValueError:
+                                return False, f"Security violation: Archive member '{member.filename}' escapes target path."
+
                         dest_dir.mkdir(parents=True, exist_ok=True)
                         z.extractall(dest_dir)
                 elif src.is_dir():
@@ -400,6 +418,16 @@ class SkillRegistry:
                     shutil.copytree(src, dest_dir)
                 else:
                     return False, "Provided file is neither a directory nor a .zip skill archive."
+
+                # Run Static Security Scanner on extracted skill
+                from core.skill_scanner import scan_skill_directory
+                scan_report = scan_skill_directory(dest_dir)
+                if not scan_report.is_safe:
+                    # Remove malicious directory immediately
+                    if dest_dir.exists():
+                        shutil.rmtree(dest_dir, ignore_errors=True)
+                    reasons = "; ".join(v.message for v in scan_report.violations)
+                    return False, f"Skill installation rejected by Security Scanner: {reasons}"
 
                 self.reload()
                 return True, f"Skill successfully installed to {dest_dir.name}."
@@ -418,6 +446,7 @@ class SkillRegistry:
     ) -> tuple[bool, str]:
         """
         Autonomously synthesize or update a procedural skill package on disk with valid YAML frontmatter.
+        Sanitizes YAML frontmatter to prevent prompt injection or unauthorized pinning exploits.
         """
         with _lock:
             try:
@@ -425,23 +454,37 @@ class SkillRegistry:
                 if not clean_name:
                     return False, "Skill name cannot be empty."
 
-                skill_tags = tags or []
+                # Run static scan on instructions
+                from core.skill_scanner import scan_skill_text
+                scan_rep = scan_skill_text(instructions, filename=f"{clean_name}/SKILL.md")
+                if not scan_rep.is_safe:
+                    reasons = "; ".join(v.message for v in scan_rep.violations)
+                    return False, f"Skill synthesis rejected by Security Scanner: {reasons}"
+
+                # Sanitize description & author (strip newlines / yaml separators)
+                clean_desc = re.sub(r"[\r\n]+", " ", description.strip()).replace("---", "")
+                clean_author = re.sub(r"[\r\n]+", " ", author.strip()).replace("---", "")
+
+                skill_tags = [re.sub(r"[\r\n]+", "", t).strip() for t in (tags or []) if t.strip()]
                 inferred_domain = domain.lower() if domain else _infer_domain_from_name_and_tags(clean_name, skill_tags, Path(clean_name))
+                inferred_domain = re.sub(r"[^\w\-]", "", inferred_domain)
 
                 target_dir = self._dir / clean_name
                 target_dir.mkdir(parents=True, exist_ok=True)
                 skill_md = target_dir / "SKILL.md"
 
-                skill_trigs = triggers or _generate_default_triggers(clean_name, inferred_domain, skill_tags)
+                raw_trigs = triggers or _generate_default_triggers(clean_name, inferred_domain, skill_tags)
+                skill_trigs = [re.sub(r"[\r\n]+", "", t).strip() for t in raw_trigs if t.strip()]
 
                 trig_yaml = "\n".join(f"  - {t}" for t in skill_trigs)
                 tag_yaml = "\n".join(f"  - {t}" for t in skill_tags) if skill_tags else f"  - {inferred_domain}"
 
+                # Write sanitized frontmatter (strictly excluding arbitrary user key injections)
                 content = f"""---
 name: {clean_name}
-description: {description.strip()}
+description: {clean_desc}
 domain: {inferred_domain}
-author: {author}
+author: {clean_author}
 version: 1.0
 triggers:
 {trig_yaml}
@@ -449,7 +492,7 @@ tags:
 {tag_yaml}
 ---
 
-{instructions.strip()}
+{scan_rep.sanitized_content.strip()}
 """
                 skill_md.write_text(content, encoding="utf-8")
                 self.reload()

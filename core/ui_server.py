@@ -129,6 +129,11 @@ class ZezoUIServer:
         app.router.add_post("/api/settings/pipeline", self._save_pipeline_settings_handler)
         app.router.add_post("/api/settings/keys", self._save_keys_settings_handler)
         app.router.add_get("/api/preview_voice", self._preview_voice_handler)
+        app.router.add_get("/api/skills", self._skills_list_handler)
+        app.router.add_post("/api/skills/mode", self._skills_mode_handler)
+        app.router.add_post("/api/skills/install", self._skills_install_handler)
+        app.router.add_post("/api/skills/save", self._skills_save_handler)
+        app.router.add_post("/api/skills/delete", self._skills_delete_handler)
         app.router.add_get("/favicon.ico", self._favicon_handler)
 
         # Serve frontend static assets
@@ -693,6 +698,102 @@ class ZezoUIServer:
         except Exception as e:
             logger.warning("[UI Server] Failed to open folder in explorer: %s", e)
             return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _skills_list_handler(self, request: web.Request) -> web.Response:
+        """Return list of discovered declarative skills, optionally filtered by domain."""
+        domain = request.query.get("domain")
+        try:
+            from core.skill_loader import get_skill_registry
+            reg = get_skill_registry()
+            skills = reg.list_skills(domain=domain)
+            domains = reg.list_domains()
+            return web.json_response({"status": "success", "skills": skills, "domains": domains})
+        except Exception as e:
+            logger.exception("Error in /api/skills handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _skills_mode_handler(self, request: web.Request) -> web.Response:
+        """Update toggle mode (pinned, disabled, auto_activate) for a skill."""
+        try:
+            data = await request.json()
+            name = str(data.get("name") or "").strip()
+            pinned = bool(data.get("pinned", False))
+            disabled = bool(data.get("disabled", False))
+            auto_activate = bool(data.get("auto_activate", True))
+
+            from core.skill_loader import get_skill_registry
+            reg = get_skill_registry()
+            ok = reg.set_skill_mode(name, pinned=pinned, disabled=disabled, auto_activate=auto_activate)
+            if not ok:
+                return web.json_response({"status": "error", "message": f"Skill '{name}' not found"}, status=404)
+            return web.json_response({"status": "success", "name": name, "pinned": pinned, "disabled": disabled, "auto_activate": auto_activate})
+        except Exception as e:
+            logger.exception("Error in /api/skills/mode handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _skills_install_handler(self, request: web.Request) -> web.Response:
+        """Install a new skill from local file path or zip archive."""
+        try:
+            data = await request.json()
+            source = str(data.get("source") or data.get("path") or "").strip()
+            domain = str(data.get("domain") or "").strip()
+            if not source:
+                return web.json_response({"status": "error", "message": "Source path or zip required"}, status=400)
+
+            from core.skill_loader import get_skill_registry
+            reg = get_skill_registry()
+            ok, msg = reg.install_skill(source, target_domain=domain)
+            if not ok:
+                return web.json_response({"status": "error", "message": msg}, status=400)
+            return web.json_response({"status": "success", "message": msg, "skills": reg.list_skills()})
+        except Exception as e:
+            logger.exception("Error in /api/skills/install handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _skills_save_handler(self, request: web.Request) -> web.Response:
+        """Synthesize or update a declarative skill package."""
+        try:
+            data = await request.json()
+            name = str(data.get("name") or "").strip()
+            desc = str(data.get("description") or "").strip()
+            instructions = str(data.get("instructions") or "").strip()
+            domain = str(data.get("domain") or "").strip()
+            author = str(data.get("author") or "user").strip()
+            triggers = data.get("triggers") if isinstance(data.get("triggers"), list) else None
+            tags = data.get("tags") if isinstance(data.get("tags"), list) else None
+
+            from core.skill_loader import get_skill_registry
+            reg = get_skill_registry()
+            ok, msg = reg.save_learned_skill(
+                name=name,
+                description=desc,
+                instructions=instructions,
+                domain=domain,
+                author=author,
+                triggers=triggers,
+                tags=tags,
+            )
+            if not ok:
+                return web.json_response({"status": "error", "message": msg}, status=400)
+            return web.json_response({"status": "success", "message": msg, "skills": reg.list_skills()})
+        except Exception as e:
+            logger.exception("Error in /api/skills/save handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _skills_delete_handler(self, request: web.Request) -> web.Response:
+        """Delete a skill package from disk."""
+        try:
+            data = await request.json()
+            name = str(data.get("name") or "").strip()
+            from core.skill_loader import get_skill_registry
+            reg = get_skill_registry()
+            ok, msg = reg.delete_skill(name)
+            if not ok:
+                return web.json_response({"status": "error", "message": msg}, status=404)
+            return web.json_response({"status": "success", "message": msg, "skills": reg.list_skills()})
+        except Exception as e:
+            logger.exception("Error in /api/skills/delete handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
 
     async def _favicon_handler(self, request: web.Request) -> web.Response:
         fav = self.frontend_dir / "favicon.ico"

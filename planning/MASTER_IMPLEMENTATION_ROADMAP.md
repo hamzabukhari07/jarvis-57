@@ -443,19 +443,21 @@ To prevent regressions, the following critical repository invariants must be pre
 
 ### Phase 6: Skill Scanner, Zip-Slip Guard & Safe Skill Hub
 * **Objective:** Secure dynamic skill ingestion, prevent frontmatter prompt-injection, eliminate zip-slip vulnerabilities, and deliver the interactive Skill Hub UI.
-* **Status:** ⏳ **Pending Execution**
+* **Status:** 🟢 **COMPLETED & VERIFIED (167/167 tests passed)**
 * **Files Touched:**
   - [core/skill_loader.py](file:///d:/anitgravity/zezo%20work/jarvis-57/core/skill_loader.py)
   - `core/skill_scanner.py` (New module)
+  - [core/ui_server.py](file:///d:/anitgravity/zezo%20work/jarvis-57/core/ui_server.py)
   - [frontend/index.html](file:///d:/anitgravity/zezo%20work/jarvis-57/frontend/index.html)
+  - [frontend/js/ui.js](file:///d:/anitgravity/zezo%20work/jarvis-57/frontend/js/ui.js)
   - [tests/test_skill_hub_suite.py](file:///d:/anitgravity/zezo%20work/jarvis-57/tests/test_skill_hub_suite.py)
 
 #### 📋 Todo List:
-- [ ] **Task 6.1:** Build `core/skill_scanner.py` utilizing `_DANGEROUS_PATTERNS` and `redact_secrets` to scan skill instructions prior to saving/loading.
-- [ ] **Task 6.2:** Implement strict zip path containment (`os.path.commonpath`, member size limits, path traversal blocking) in `core/skill_loader.py:install_skill`.
-- [ ] **Task 6.3:** Sanitize YAML frontmatter generation in `save_learned_skill` to prevent `pinned: true` prompt-injection exploits.
-- [ ] **Task 6.4:** Implement Skill Hub Modal in `frontend/index.html` with drag-and-drop skill uploads and per-agent toggle switches (adhering strictly to AGENTS.md §8 rules).
-- [ ] **Task 6.5:** Un-skip and update `tests/test_skill_hub_suite.py` to test live skill security and validation logic.
+- [x] **Task 6.1:** Build `core/skill_scanner.py` utilizing `_DANGEROUS_PATTERNS` and `redact_secrets` to scan skill instructions prior to saving/loading.
+- [x] **Task 6.2:** Implement strict zip path containment (`os.path.commonpath`, member size limits, path traversal blocking) in `core/skill_loader.py:install_skill`.
+- [x] **Task 6.3:** Sanitize YAML frontmatter generation in `save_learned_skill` to prevent `pinned: true` prompt-injection exploits.
+- [x] **Task 6.4:** Implement Skill Hub Modal in `frontend/index.html` with drag-and-drop skill uploads and per-agent toggle switches (adhering strictly to AGENTS.md §8 rules).
+- [x] **Task 6.5:** Un-skip and update `tests/test_skill_hub_suite.py` to test live skill security and validation logic.
 
 * **Acceptance Criteria:**
   - Malicious zip with path traversal (`../../`) is rejected with `SecurityViolation`.

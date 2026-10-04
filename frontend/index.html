@@ -1122,40 +1122,50 @@
 
 <!-- Modal 8: Declarative Skills Hub Modal -->
 <div class="modal-overlay" id="skills-modal" onclick="if(event.target===this) closeModal('skills-modal')">
-  <div class="modal-panel frame" style="max-width: 680px;">
+  <div class="modal-panel frame" style="max-width: 720px; max-height: min(85vh, 760px); display: flex; flex-direction: column;">
     <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
     <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
     <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
     <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
 
-    <div class="frame-inner" style="padding: 18px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-        <span class="badge badge-accent mono">⚡ SKILL HUB · 10 DISCOVERED PACKAGES</span>
+    <div class="frame-inner" style="padding: 0; display: flex; flex-direction: column; overflow: hidden; height: 100%; max-height: inherit;">
+      <!-- Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; background: var(--bg-deep);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <iconify-icon icon="solar:bolt-bold" style="color: var(--accent); font-size: 16px;"></iconify-icon>
+          <span class="badge badge-accent mono" id="skills-count-badge">SKILL HUB</span>
+        </div>
         <button class="btn btn-ghost btn-sm" onclick="closeModal('skills-modal')">✕</button>
       </div>
 
-      <div style="display: flex; flex-direction: column; gap: 6px; max-height: 380px; overflow-y: auto;">
-        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <b>skills/hamza_taste</b>
-            <div class="type-code text-muted" style="font-size:10px;">Studio UI aesthetic, anti-slop design rules & color tokens</div>
-          </div>
-          <span class="badge badge-accent">DESIGN</span>
+      <!-- Main Body -->
+      <div style="padding: 14px 18px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; flex: 1; min-height: 0;">
+        <!-- Search & Domain Filter Bar -->
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input type="text" id="skill-search-input" class="input-field" placeholder="Search skills, triggers, or tags..." oninput="filterSkillsList()" style="flex: 1; font-size: 11px;">
+          <select id="skill-domain-filter" class="input-field" onchange="filterSkillsList()" style="width: 140px; font-size: 10.5px; background: var(--bg-deep);">
+            <option value="ALL">All Domains</option>
+          </select>
         </div>
-        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <b>skills/opencode</b>
-            <div class="type-code text-muted" style="font-size:10px;">Full autonomous multi-file coding workflow with feedback loop</div>
-          </div>
-          <span class="badge badge-accent">CODING</span>
+
+        <!-- Drag & Drop Skill Zip / Folder Importer Target -->
+        <div id="skill-drop-target" style="border: 1px dashed var(--border-subtle); border-radius: var(--radius-md); padding: 12px; text-align: center; background: rgba(255, 255, 255, 0.02); display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;" onclick="document.getElementById('skill-file-input').click()">
+          <input type="file" id="skill-file-input" style="display: none;" accept=".zip" onchange="handleSkillFileUpload(this.files)">
+          <iconify-icon icon="solar:cloud-upload-linear" style="font-size: 20px; color: var(--accent);"></iconify-icon>
+          <div style="font-size: 11px; font-weight: 600; color: #fff;">Drag & Drop Skill Package (.zip) or Click to Upload</div>
+          <div style="font-size: 9.5px; color: var(--text-muted);">Packages are verified with Zip-Slip path containment and static security scanner.</div>
         </div>
-        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <b>skills/social_research</b>
-            <div class="type-code text-muted" style="font-size:10px;">YouTube, Reddit & GitHub research pipeline</div>
-          </div>
-          <span class="badge">RESEARCH</span>
+
+        <!-- Dynamic Skills List Container -->
+        <div id="skills-catalog-list" style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="color: var(--text-muted); text-align: center; padding: 20px; font-size: 11px;">Loading installed declarative skills...</div>
         </div>
+      </div>
+
+      <!-- Footer Action -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 18px; border-top: 1px solid var(--border-subtle); background: var(--bg-deep); flex-shrink: 0;">
+        <span style="font-size: 9.5px; color: var(--text-muted); font-family: var(--font-mono);">Skills hot-reload autonomously on save / install.</span>
+        <button class="btn btn-sm btn-outline" onclick="loadSkillsHub()">REFRESH</button>
       </div>
     </div>
   </div>
@@ -1473,6 +1483,9 @@
     }
     if (id === 'qr-modal' && typeof window.requestRemoteKey === 'function') {
       window.requestRemoteKey();
+    }
+    if (id === 'skills-modal' && typeof window.loadSkillsHub === 'function') {
+      window.loadSkillsHub();
     }
   }
   function closeModal(id) {

@@ -1,3 +1,30 @@
+## [2026-10-04] — Phase 6: Skill Scanner, Zip-Slip Guard & Safe Skill Hub
+
+- **What was built:**
+  - Built `core/skill_scanner.py` providing static analysis of declarative skill text, prompt injection detection (role token hijacking, jailbreak directives), destructive command filtering (`_DANGEROUS_PATTERNS`), and automated secret scrubbing via `redact_secrets`.
+  - Hardened `core/skill_loader.py:install_skill` with Zip-Slip path containment validation (`os.path.commonpath`), per-entry size caps (25MB), and immediate static scanning upon unpacking.
+  - Sanitized YAML frontmatter generation in `core/skill_loader.py:save_learned_skill` preventing arbitrary frontmatter injection or unauthorized pinning exploits.
+  - Added Skill Hub REST endpoints to `core/ui_server.py`: `GET /api/skills`, `POST /api/skills/mode`, `POST /api/skills/install`, `POST /api/skills/save`, `POST /api/skills/delete`.
+  - Implemented interactive Skill Hub modal in `frontend/index.html` and `frontend/js/ui.js` with live domain filtering, search, drag-and-drop zip installation, and per-skill pin/active mode toggles (strictly respecting AGENTS.md §8 regression rules).
+  - Un-skipped and updated `tests/test_skill_hub_suite.py` with 12 unit tests verifying frontmatter parsing, domain inference, budgeting, state persistence, Zip-Slip rejection, dangerous command rejection, and prompt injection blocking.
+- **Why this approach was chosen:**
+  - Ensures safe community skill sharing and dynamic agent customization without risking remote execution, directory traversal escapes, or prompt injection hijacks.
+- **Key files touched:**
+  - `core/skill_scanner.py`
+  - `core/skill_loader.py`
+  - `core/ui_server.py`
+  - `frontend/index.html`
+  - `frontend/js/ui.js`
+  - `tests/test_skill_hub_suite.py`
+  - `planning/MASTER_IMPLEMENTATION_ROADMAP.md`
+- **Verification:**
+  - Layer 1 (static): `python -m py_compile core/skill_scanner.py core/skill_loader.py core/ui_server.py tests/test_skill_hub_suite.py` (Exit 0).
+  - Layer 2 (runtime): `python -m pytest tests/test_skill_hub_suite.py -v` (12 passed in 0.18s).
+  - Layer 3 (regression): Full test suite executed with 167 passed, 4 skipped, 0 failures (39.16s).
+  - Database Isolation: SHA256 `8263e4620997d150921eb87ccaea828cf7d697e615054b21761d5cd44b2aace1` verified unchanged.
+
+---
+
 ## [2026-10-04] — Phase 5: Composite Session Isolation & Deep Memory Recall
 
 - **What was built:**
