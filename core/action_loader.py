@@ -216,19 +216,23 @@ def _validate(module, filename: str) -> ActionRecord:
         return ActionRecord(name=name, file=filename,
                             error="TOOL['handler'] missing or not callable.")
 
-    raw_risk = str(tool.get("risk", "local_mutation")).lower().strip()
-    # Normalize risk if prefixed or mismatched
-    if "read_only" in raw_risk or "l0" in raw_risk:
-        norm_risk = "read_only"
-    elif "privileged" in raw_risk or "shutdown" in raw_risk:
-        norm_risk = "privileged_os"
-    elif "external" in raw_risk:
-        norm_risk = "external_mutation"
-    elif "code" in raw_risk or "l2" in raw_risk:
-        norm_risk = "code_execution"
-    else:
-        norm_risk = "local_mutation"
+    if "risk" not in tool:
+        return ActionRecord(name=name, file=filename,
+                            error="TOOL['risk'] missing. Every action must declare a valid ToolRisk tier.")
 
+    raw_risk = str(tool.get("risk", "")).lower().strip()
+    valid_risks = {
+        "read_only": "read_only",
+        "local_mutation": "local_mutation",
+        "external_mutation": "external_mutation",
+        "code_execution": "code_execution",
+        "privileged_os": "privileged_os",
+    }
+    if raw_risk not in valid_risks:
+        return ActionRecord(name=name, file=filename,
+                            error=f"TOOL['risk'] '{raw_risk}' is invalid. Must be one of: {list(valid_risks.keys())}.")
+
+    norm_risk = valid_risks[raw_risk]
     enabled = bool(tool.get("enabled", True))
 
     return ActionRecord(name=name, description=description.strip(), parameters=parameters,

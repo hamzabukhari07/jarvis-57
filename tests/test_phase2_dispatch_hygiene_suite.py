@@ -164,3 +164,44 @@ async def test_governance_exception_fails_closed():
         live._run_tool_dispatch.assert_not_called()
 
 
+def test_action_loader_rejects_missing_or_invalid_risk():
+    from core.action_loader import _validate
+    from types import SimpleNamespace
+
+    # 1. Missing risk
+    mock_mod_no_risk = SimpleNamespace(TOOL={
+        "name": "sample_tool",
+        "description": "Sample desc",
+        "parameters": {"type": "OBJECT", "properties": {}},
+        "handler": lambda p: "ok",
+    })
+    rec1 = _validate(mock_mod_no_risk, "sample_tool.py")
+    assert rec1.valid is False
+    assert "TOOL['risk'] missing" in rec1.error
+
+    # 2. Invalid risk tier
+    mock_mod_bad_risk = SimpleNamespace(TOOL={
+        "name": "sample_tool_2",
+        "description": "Sample desc",
+        "parameters": {"type": "OBJECT", "properties": {}},
+        "handler": lambda p: "ok",
+        "risk": "super_admin_tier",
+    })
+    rec2 = _validate(mock_mod_bad_risk, "sample_tool_2.py")
+    assert rec2.valid is False
+    assert "is invalid" in rec2.error
+
+
+def test_governance_unknown_tool_fails_closed_deny():
+    from core.governance import evaluate, get_tool_risk, PolicyDecision
+
+    # get_tool_risk on unmapped tool returns None
+    assert get_tool_risk("completely_unknown_custom_tool_xyz") is None
+
+    # evaluate returns PolicyDecision.DENY
+    decision, reason = evaluate("completely_unknown_custom_tool_xyz", {"arg": "val"})
+    assert decision == PolicyDecision.DENY
+    assert "fail-closed" in reason
+
+
+

@@ -114,8 +114,8 @@ _DEFAULT_TOOL_RISKS: dict[str, ToolRisk] = {
 TOOL_RISK_MAP = _DEFAULT_TOOL_RISKS
 
 
-def get_tool_risk(tool_name: str, parameters: dict | None = None) -> ToolRisk:
-    """Return the assigned risk tier for any action name, accounting for fine-grained sub-actions and action definitions."""
+def get_tool_risk(tool_name: str, parameters: dict | None = None) -> Optional[ToolRisk]:
+    """Return the assigned risk tier for any action name, accounting for fine-grained sub-actions and action definitions. Returns None for unknown tools (fail closed)."""
     if tool_name == "send_message":
         act = str((parameters or {}).get("action", "")).lower().strip()
         if act in ("search", "search_contact", "find_chat", "find_contact", "read", "list", "get_status"):
@@ -133,7 +133,7 @@ def get_tool_risk(tool_name: str, parameters: dict | None = None) -> ToolRisk:
                 if tr.value == r:
                     return tr
 
-    return _DEFAULT_TOOL_RISKS.get(tool_name, ToolRisk.LOCAL_MUTATION)
+    return _DEFAULT_TOOL_RISKS.get(tool_name, None)
 
 
 # ── Critical System Paths (Forbidden to modify / delete) ──────────────────────
@@ -223,6 +223,10 @@ def evaluate(
     name = (tool_name or "").strip()
     params = args or {}
     risk = get_tool_risk(name, params)
+
+    # 0. Fail closed on unknown/unregistered tools (DENY)
+    if risk is None:
+        return PolicyDecision.DENY, f"Action '{name}' is unknown and unregistered in governance taxonomy (fail-closed)."
 
     # 1. Scan arguments for hard dangerous patterns (DENY)
     arg_str = " ".join(f"{k}={v}" for k, v in params.items() if v is not None)
