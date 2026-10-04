@@ -28,6 +28,12 @@ __pycache__/
 *.txt
 References/
 repos for inspirations/
+repos for inspirations/**
+"repos for inspirations/"
 prototypes/
+prototypes/**
 .agent_worktrees/
+.agent_worktrees/**
 planning/
+planning/**
+tests/

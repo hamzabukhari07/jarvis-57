@@ -70,6 +70,8 @@ class ActionRecord:
     error: str = ""
     behavior: Optional[str] = None     # None = the API's default (blocking)
     scheduling: Optional[str] = None   # None = the API's default (WHEN_IDLE)
+    risk: str = "local_mutation"       # Default fallback risk tier
+    enabled: bool = True
 
 
 class ActionRegistry:
@@ -83,6 +85,8 @@ class ActionRegistry:
     def get_tool_declarations(self) -> list[dict]:
         out = []
         for rec in self._actions.values():
+            if not rec.enabled:
+                continue
             decl = {"name": rec.name, "description": rec.description,
                     "parameters": rec.parameters}
             if rec.behavior:
@@ -92,6 +96,13 @@ class ActionRegistry:
 
     def has(self, name: str) -> bool:
         return name in self._actions
+
+    def get(self, name: str) -> Optional[ActionRecord]:
+        return self._actions.get(name)
+
+    def get_risk(self, name: str) -> Optional[str]:
+        rec = self._actions.get(name)
+        return rec.risk if rec else None
 
     def scheduling(self, name: str) -> Optional[str]:
         """How this action's result should re-enter the conversation, if it said."""
@@ -205,10 +216,26 @@ def _validate(module, filename: str) -> ActionRecord:
         return ActionRecord(name=name, file=filename,
                             error="TOOL['handler'] missing or not callable.")
 
+    raw_risk = str(tool.get("risk", "local_mutation")).lower().strip()
+    # Normalize risk if prefixed or mismatched
+    if "read_only" in raw_risk or "l0" in raw_risk:
+        norm_risk = "read_only"
+    elif "privileged" in raw_risk or "shutdown" in raw_risk:
+        norm_risk = "privileged_os"
+    elif "external" in raw_risk:
+        norm_risk = "external_mutation"
+    elif "code" in raw_risk or "l2" in raw_risk:
+        norm_risk = "code_execution"
+    else:
+        norm_risk = "local_mutation"
+
+    enabled = bool(tool.get("enabled", True))
+
     return ActionRecord(name=name, description=description.strip(), parameters=parameters,
                         handler=handler, file=filename, valid=True, error="",
                         behavior=_opt_upper(tool.get("behavior"), _BEHAVIORS),
-                        scheduling=_opt_upper(tool.get("scheduling"), _SCHEDULING))
+                        scheduling=_opt_upper(tool.get("scheduling"), _SCHEDULING),
+                        risk=norm_risk, enabled=enabled)
 
 
 def discover_actions(actions_dir: Path, reserved_names: set[str] | None = None,

@@ -483,6 +483,8 @@ def desktop_control(
 TOOL = {
     "name": "desktop_control",
     "description": "Controls the desktop: wallpaper, organize, clean, list, stats.",
+    "risk": "local_mutation",
+    "enabled": True,
     "parameters": {
         "type": "OBJECT",
         "properties": {

@@ -428,6 +428,8 @@ TOOL = {
         "Returns a task_id immediately. Ask the user for the project "
         "path if you do not have one."
     ),
+    "risk": "code_execution",
+    "enabled": True,
     "behavior": "NON_BLOCKING",
     "scheduling": "WHEN_IDLE",
     "parameters": {

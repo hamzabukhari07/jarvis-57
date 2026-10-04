@@ -1250,6 +1250,178 @@ class ZezoLive:
 
         return out
 
+    async def _dispatch_save_memory(self, fc, name: str, args: dict) -> types.FunctionResponse:
+        category = args.get("category", "notes")
+        key      = args.get("key", "")
+        value    = args.get("value", "")
+        if key and value:
+            update_memory({category: {key: {"value": value}}})
+            print(f"[Memory] 💾 save_memory: {category}/{key} = {value}")
+            if category == "identity" and str(key).lower() == "language":
+                try:
+                    from memory.config_manager import save_response_language
+                    save_response_language(str(value))
+                except Exception:
+                    pass
+        if not self.ui.muted:
+            self.ui.set_state("LISTENING")
+        return types.FunctionResponse(
+            id=fc.id, name=name,
+            response={"result": "ok", "silent": True}
+        )
+
+    async def _handle_recall_memory(self, args: dict) -> str:
+        return search_memory(args.get("query", ""), limit=8)
+
+    async def _handle_undo(self, args: dict) -> str:
+        if str(args.get("action", "")).lower().strip() == "list":
+            items = undo_stack.history()
+            return ("Things I can undo, most recent first:\n"
+                    + "\n".join(f"{i+1}. {t}" for i, t in enumerate(items))
+                    ) if items else "I have not changed anything I can undo yet."
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, undo_stack.undo_last)
+
+    async def _handle_screen_process(self, args: dict) -> str:
+        import time as _t_mod
+        _now = _t_mod.monotonic()
+        _cooldown = 1.5
+        if self._vision_busy or (_now - self._vision_last_time) < _cooldown:
+            _wait = max(0, _cooldown - (_now - self._vision_last_time))
+            print(f"[Vision] ⏳ Cooldown active ({_wait:.1f}s remaining) — ignoring duplicate call")
+            return "Vision is currently analyzing the previous visual frame."
+
+        self._vision_busy = True
+        self._vision_last_time = _now
+        angle = args.get("angle", "screen").lower()
+        user_text = args.get("text", "What is currently visible on the screen?")
+        _stall = "screen"
+        img_b, mime_t = None, "image/jpeg"
+        loop = asyncio.get_event_loop()
+        try:
+            if angle == "camera":
+                try:
+                    img_b, mime_t = await loop.run_in_executor(None, _capture_camera)
+                    if hasattr(self.ui, "start_camera_stream"):
+                        self.ui.start_camera_stream()
+                    self._vision_cam_active = True
+                    print(f"[Vision] 📷 Camera: {len(img_b):,} bytes")
+                    _stall = "camera"
+                except Exception as cam_err:
+                    print(f"[Vision] ⚠️ Camera unavailable ({cam_err}) — falling back to screen capture")
+                    img_b, mime_t = await loop.run_in_executor(None, _capture_screen)
+                    _stall = "screen"
+            else:
+                img_b, mime_t = await loop.run_in_executor(None, _capture_screen)
+                print(f"[Vision] 🖥️  Screen: {len(img_b):,} bytes")
+                _stall = "screen"
+
+            v_obs = await loop.run_in_executor(
+                None, analyze_visual, img_b, mime_t, user_text, _stall
+            )
+            print(f"[Vision] 👁️  Observed: {v_obs[:100]}...")
+            return f"[Visual observation from {_stall}]: {v_obs}"
+        except Exception as e:
+            print(f"[Vision] ❌ Vision capture/analysis error: {e}")
+            return f"I could not inspect the screen right now: {e}"
+        finally:
+            self._vision_busy = False
+            self._pending_vision = None
+
+    async def _handle_close_camera(self, args: dict) -> str:
+        self.ui.stop_camera_stream()
+        return "Camera closed."
+
+    async def _handle_system_status(self, args: dict) -> str:
+        loop = asyncio.get_event_loop()
+        r = await loop.run_in_executor(None, get_system_status)
+        return str(r)
+
+    async def _handle_manage_monitor(self, args: dict) -> str:
+        action = args.get("action", "").lower().strip()
+        topic = args.get("topic", "").strip()
+        if action == "add" and topic:
+            return await asyncio.to_thread(add_monitor, topic)
+        if action == "remove" and topic:
+            return await asyncio.to_thread(remove_monitor, topic)
+        if action == "list":
+            topics = await asyncio.to_thread(list_monitors)
+            return ("Monitoring: " + ", ".join(topics)) if topics else "No topics are being monitored."
+        return "Specify action (add/remove/list) and a topic."
+
+    async def _handle_read_skill(self, args: dict) -> str:
+        s_name = args.get("skill_name", "")
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, lambda: self._skill_registry.read_skill(s_name))
+
+    async def _handle_list_skills(self, args: dict) -> str:
+        loop = asyncio.get_event_loop()
+        s_list = await loop.run_in_executor(None, self._skill_registry.list_skills)
+        if s_list:
+            return "Available Skills:\n" + "\n".join(
+                f"• {s['name']}: {s['description']} (v{s['version']} by {s['author']})"
+                for s in s_list
+            )
+        return "No skills installed in skills/ directory."
+
+    async def _handle_save_learned_skill(self, args: dict) -> str:
+        s_name = args.get("name", "")
+        s_desc = args.get("description", "")
+        s_inst = args.get("instructions", "")
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self._skill_registry.save_learned_skill(s_name, s_desc, s_inst, author="auto_learned")
+        )
+
+    async def _handle_shutdown_zezo(self, args: dict) -> str:
+        self.ui.write_log("SYS: Shutdown requested.")
+        async def _do_shutdown():
+            await self._save_session_summary()
+            if self.session:
+                try:
+                    await self.session.send_client_content(
+                        turns=[{"role": "user", "parts": [{"text": "Say a brief natural goodbye to the user."}]}],
+                        turn_complete=True,
+                    )
+                except Exception:
+                    pass
+            await asyncio.sleep(1.5)
+            import os as _os
+            _os._exit(0)
+        asyncio.create_task(_do_shutdown())
+        return "Shutting down..."
+
+    def _get_tool_handler(self, name: str):
+        handlers = {
+            "recall_memory": self._handle_recall_memory,
+            "undo": self._handle_undo,
+            "screen_process": self._handle_screen_process,
+            "close_camera": self._handle_close_camera,
+            "system_status": self._handle_system_status,
+            "manage_monitor": self._handle_manage_monitor,
+            "read_skill": self._handle_read_skill,
+            "list_skills": self._handle_list_skills,
+            "save_learned_skill": self._handle_save_learned_skill,
+            "shutdown_zezo": self._handle_shutdown_zezo,
+        }
+        return handlers.get(name)
+
+    async def _dispatch_action_registry(self, name: str, args: dict, loop) -> str:
+        if name == "file_processor" and not args.get("file_path") and self.ui.current_file:
+            args["file_path"] = self.ui.current_file
+        _ctx = {"player": self.ui, "speak": self.speak, "response": None, "session_memory": None}
+        r = await loop.run_in_executor(None, lambda: self._action_registry.run(name, args, _ctx))
+        result = r or "Done."
+        if (name == "web_search" and r
+                and not r.startswith("No results")
+                and not r.startswith("Search failed")):
+            _mode  = args.get("mode", "search")
+            _query = args.get("query") or ", ".join(args.get("items", []))
+            _label = f"{_mode.upper()} — {_query[:38]}" if _query else _mode.upper()
+            self.ui.show_content(_label, r)
+        return result
+
     async def _execute_tool(self, fc) -> types.FunctionResponse:
         name = fc.name
         args = dict(fc.args or {})
@@ -1257,26 +1429,6 @@ class ZezoLive:
         print(f"[Zezo] 🔧 {name}  {args}")
         self.ui.set_state("THINKING")
 
-
-        if name == "save_memory":
-            category = args.get("category", "notes")
-            key      = args.get("key", "")
-            value    = args.get("value", "")
-            if key and value:
-                update_memory({category: {key: {"value": value}}})
-                print(f"[Memory] 💾 save_memory: {category}/{key} = {value}")
-                if category == "identity" and str(key).lower() == "language":
-                    try:
-                        from memory.config_manager import save_response_language
-                        save_response_language(str(value))
-                    except Exception:
-                        pass
-            if not self.ui.muted:
-                self.ui.set_state("LISTENING")
-            return types.FunctionResponse(
-                id=fc.id, name=name,
-                response={"result": "ok", "silent": True}
-            )
 
         loop   = asyncio.get_event_loop()
         result = "Done."
@@ -1295,159 +1447,32 @@ class ZezoLive:
                     response={"result": f"SECURITY POLICY VIOLATION: Action '{name}' was blocked by safety governance. Reason: {reason}"}
                 )
         except Exception as _gov_err:
-            print(f"[Security] ⚠️ Governance evaluation warning: {_gov_err}")
+            print(f"[Security] 🛑 Governance evaluation error: {_gov_err}")
+            self.ui.write_log(f"ERR: Governance Error — {name} ({_gov_err})")
+            if not self.ui.muted:
+                self.ui.set_state("LISTENING")
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"result": f"SECURITY POLICY ERROR: Action '{name}' could not be evaluated by safety governance."}
+            )
+
+        if name == "save_memory":
+            return await self._dispatch_save_memory(fc, name, args)
 
         try:
-            if name == "recall_memory":
-                # Local file search: no network, no second model. Kept out of
-                # the executor deliberately — it is a dictionary scan over a few
-                # hundred short strings, and a thread hop would cost more than
-                # the work itself.
-                result = search_memory(args.get("query", ""), limit=8)
-
-            elif name == "undo":
-                if str(args.get("action", "")).lower().strip() == "list":
-                    items = undo_stack.history()
-                    result = ("Things I can undo, most recent first:\n"
-                              + "\n".join(f"{i+1}. {t}" for i, t in enumerate(items))
-                              ) if items else "I have not changed anything I can undo yet."
-                else:
-                    result = await loop.run_in_executor(None, undo_stack.undo_last)
-
-            elif name == "screen_process":
-                import time as _t_mod
-                _now = _t_mod.monotonic()
-                _cooldown = 1.5  # seconds — fast and responsive cooldown
-                if self._vision_busy or (_now - self._vision_last_time) < _cooldown:
-                    _wait = max(0, _cooldown - (_now - self._vision_last_time))
-                    print(f"[Vision] ⏳ Cooldown active ({_wait:.1f}s remaining) — ignoring duplicate call")
-                    result = "Vision is currently analyzing the previous visual frame."
-                else:
-                    self._vision_busy      = True
-                    self._vision_last_time = _now
-                    angle     = args.get("angle", "screen").lower()
-                    user_text = args.get("text", "What is currently visible on the screen?")
-                    _stall    = "screen"
-                    img_b, mime_t = None, "image/jpeg"
-                    try:
-                        if angle == "camera":
-                            try:
-                                img_b, mime_t = await loop.run_in_executor(None, _capture_camera)
-                                if hasattr(self.ui, "start_camera_stream"):
-                                    self.ui.start_camera_stream()
-                                self._vision_cam_active = True
-                                print(f"[Vision] 📷 Camera: {len(img_b):,} bytes")
-                                _stall = "camera"
-                            except Exception as cam_err:
-                                print(f"[Vision] ⚠️ Camera unavailable ({cam_err}) — falling back to screen capture")
-                                img_b, mime_t = await loop.run_in_executor(None, _capture_screen)
-                                _stall = "screen"
-                        else:
-                            img_b, mime_t = await loop.run_in_executor(None, _capture_screen)
-                            print(f"[Vision] 🖥️  Screen: {len(img_b):,} bytes")
-                            _stall = "screen"
-
-                        # Perform out-of-band one-shot vision analysis via fast REST model
-                        # to keep the live audio session rock-solid without WebSocket 1011 crashes.
-                        v_obs = await loop.run_in_executor(
-                            None, analyze_visual, img_b, mime_t, user_text, _stall
-                        )
-                        print(f"[Vision] 👁️  Observed: {v_obs[:100]}...")
-                        result = f"[Visual observation from {_stall}]: {v_obs}"
-                    except Exception as e:
-                        print(f"[Vision] ❌ Vision capture/analysis error: {e}")
-                        result = f"I could not inspect the screen right now: {e}"
-                    finally:
-                        self._vision_busy = False
-                        self._pending_vision = None
-
-            elif name == "close_camera":
-                self.ui.stop_camera_stream()
-                result = "Camera closed."
-
-            elif name == "system_status":
-                r = await loop.run_in_executor(None, get_system_status)
-                result = str(r)
-
-            elif name == "manage_monitor":
-                action = args.get("action", "").lower().strip()
-                topic  = args.get("topic", "").strip()
-                if action == "add" and topic:
-                    result = await asyncio.to_thread(add_monitor, topic)
-                elif action == "remove" and topic:
-                    result = await asyncio.to_thread(remove_monitor, topic)
-                elif action == "list":
-                    topics = await asyncio.to_thread(list_monitors)
-                    result = ("Monitoring: " + ", ".join(topics)) if topics else "No topics are being monitored."
-                else:
-                    result = "Specify action (add/remove/list) and a topic."
-
-            elif name == "read_skill":
-                s_name = args.get("skill_name", "")
-                result = await loop.run_in_executor(None, lambda: self._skill_registry.read_skill(s_name))
-
-            elif name == "list_skills":
-                s_list = await loop.run_in_executor(None, self._skill_registry.list_skills)
-                if s_list:
-                    result = "Available Skills:\n" + "\n".join(
-                        f"• {s['name']}: {s['description']} (v{s['version']} by {s['author']})"
-                        for s in s_list
-                    )
-                else:
-                    result = "No skills installed in skills/ directory."
-
-            elif name == "save_learned_skill":
-                s_name = args.get("name", "")
-                s_desc = args.get("description", "")
-                s_inst = args.get("instructions", "")
-                result = await loop.run_in_executor(
-                    None,
-                    lambda: self._skill_registry.save_learned_skill(s_name, s_desc, s_inst, author="auto_learned")
-                )
-
-            elif name == "shutdown_zezo":
-                self.ui.write_log("SYS: Shutdown requested.")
-                async def _do_shutdown():
-                    await self._save_session_summary()
-                    if self.session:
-                        try:
-                            await self.session.send_client_content(
-                                turns=[{"role": "user", "parts": [{"text": "Say a brief natural goodbye to the user."}]}],
-                                turn_complete=True,
-                            )
-                        except Exception:
-                            pass
-                    await asyncio.sleep(1.5)
-                    import os as _os
-                    _os._exit(0)
-                asyncio.create_task(_do_shutdown())
-
+            handler = self._get_tool_handler(name)
+            if handler:
+                result = await handler(args)
             elif self._action_registry.has(name):
-                # file_processor: fall back to the currently-uploaded file when none is given
-                if name == "file_processor" and not args.get("file_path") and self.ui.current_file:
-                    args["file_path"] = self.ui.current_file
-                _ctx = {"player": self.ui, "speak": self.speak,
-                        "response": None, "session_memory": None}
-                r = await loop.run_in_executor(None, lambda: self._action_registry.run(name, args, _ctx))
+                result = await self._dispatch_action_registry(name, args, loop)
+            elif self._plugin_registry.has(name):
+                r = await loop.run_in_executor(
+                    None,
+                    lambda: self._plugin_registry.run(name, args, player=self.ui, session_memory=None)
+                )
                 result = r or "Done."
-                # web_search: mirror results to the on-screen content panel
-                if (name == "web_search" and r
-                        and not r.startswith("No results")
-                        and not r.startswith("Search failed")):
-                    _mode  = args.get("mode", "search")
-                    _query = args.get("query") or ", ".join(args.get("items", []))
-                    _label = f"{_mode.upper()} — {_query[:38]}" if _query else _mode.upper()
-                    self.ui.show_content(_label, r)
-
             else:
-                if self._plugin_registry.has(name):
-                    r = await loop.run_in_executor(
-                        None,
-                        lambda: self._plugin_registry.run(name, args, player=self.ui, session_memory=None)
-                    )
-                    result = r or "Done."
-                else:
-                    result = f"Unknown tool: {name}"
+                result = f"Unknown tool: {name}"
 
         except Exception as e:
             result = f"Tool '{name}' failed: {e}"

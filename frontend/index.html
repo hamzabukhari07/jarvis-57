@@ -2111,7 +2111,8 @@
           const isFailed = t.status === 'failed';
           const badgeClass = isRunning ? 'badge-accent' : (isDone ? 'badge-success' : (isFailed ? 'badge-danger' : 'badge'));
           const prog = isDone ? 100 : (t.progress || (isRunning ? 50 : 0));
-          const toolLabel = getFriendlyToolBadge(t.tool);
+          const assignedAgent = t.params && (t.params.agent_name || t.params.agent_id);
+          const toolLabel = assignedAgent ? String(assignedAgent).toUpperCase() : getFriendlyToolBadge(t.tool);
           const target = (t.params && (t.params.repo || t.params.file_path || t.params.path || t.params.project_path || t.params.target || t.params.query || t.params.url || t.params.link)) || '';
           const isSelected = t.id === _selectedTaskId;
           const borderStyle = isSelected ? 'var(--accent)' : (isRunning ? 'var(--accent)' : (isDone ? '#22c55e' : (isFailed ? '#ef4444' : 'var(--border-default)')));

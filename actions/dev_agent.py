@@ -14,7 +14,7 @@ def get_base_dir():
 
 BASE_DIR         = get_base_dir()
 API_CONFIG_PATH  = BASE_DIR / "config" / "api_keys.json"
-PROJECTS_DIR     = Path.home() / "Desktop" / "JarvisProjects"
+PROJECTS_DIR     = Path.home() / "Desktop" / "ZezoProjects"
 MAX_FIX_ATTEMPTS = 5
 # Model choice, timeout and fallback ladder all live in core/gemini.py.
 from core.llm_router import generate_text, SMART
@@ -660,6 +660,8 @@ def dev_agent(
 TOOL = {
     "name": "dev_agent",
     "description": "Builds complete multi-file projects from scratch in the background: plans, writes files, installs deps, opens VSCode, runs and fixes errors. Returns a task_id immediately.",
+    "risk": "code_execution",
+    "enabled": True,
     "behavior": "NON_BLOCKING",
     "scheduling": "WHEN_IDLE",
     "parameters": {

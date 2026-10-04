@@ -930,6 +930,8 @@ TOOL = {
         "and a React/Next.js project ONLY when the user explicitly asks for React/Next.js. "
         "Always copy the user's exact stack instructions into the task string."
     ),
+    "risk": "code_execution",
+    "enabled": True,
     "behavior": "NON_BLOCKING",
     "scheduling": "WHEN_IDLE",
     "parameters": {

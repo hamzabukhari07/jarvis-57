@@ -161,6 +161,8 @@ TOOL = {
         "Use this whenever the user asks a specific agent to do something ('Michael ko bolo...', 'Dwight assign this task', "
         "'Pam check UI', 'Hire new QA agent Stanley') or asks for fleet status ('fleet status kya hai', 'kaun kaun se agents hain')."
     ),
+    "risk": "local_mutation",
+    "enabled": True,
     "behavior": "BLOCKING",
     "parameters": {
         "type": "OBJECT",

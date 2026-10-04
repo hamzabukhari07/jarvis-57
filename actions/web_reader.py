@@ -207,6 +207,8 @@ TOOL = {
         "Uses Scrapling to bypass anti-bot and Cloudflare protections when available, "
         "with a built-in requests + BeautifulSoup fallback."
     ),
+    "risk": "read_only",
+    "enabled": True,
     "behavior": "NON_BLOCKING",
     "scheduling": "WHEN_IDLE",
     "parameters": {

@@ -451,6 +451,8 @@ TOOL = {
         "result in the same turn. Ask the user for the project path "
         "if you do not have one — do not guess."
     ),
+    "risk": "code_execution",
+    "enabled": True,
     "behavior": "NON_BLOCKING",
     "scheduling": "WHEN_IDLE",
     "parameters": {

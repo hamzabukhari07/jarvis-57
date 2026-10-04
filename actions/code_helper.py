@@ -723,6 +723,8 @@ def code_helper(
 TOOL = {
     "name": "code_helper",
     "description": "Writes, edits, explains, runs code files or executes terminal/CLI commands silently in background (e.g. venv creation, git init, pip install).",
+    "risk": "code_execution",
+    "enabled": True,
     "parameters": {
         "type": "OBJECT",
         "properties": {

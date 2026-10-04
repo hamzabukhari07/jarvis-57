@@ -176,3 +176,48 @@ def check_all() -> list[str]:
         _save(monitors)
 
     return alerts
+
+
+def manage_monitor_action(parameters: dict, **kwargs) -> str:
+    """Action handler for background monitoring topic management."""
+    action = str(parameters.get("action", "")).lower().strip()
+    topic = str(parameters.get("topic", "")).strip()
+    if action == "add" and topic:
+        return add_monitor(topic)
+    elif action == "remove" and topic:
+        return remove_monitor(topic)
+    elif action == "list":
+        topics = list_monitors()
+        return ("Monitoring: " + ", ".join(topics)) if topics else "No topics are being monitored."
+    return "Specify action (add/remove/list) and a topic."
+
+
+# ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
+TOOL = {
+    "name": "manage_monitor",
+    "description": (
+        "Add, remove, or list background monitoring topics. "
+        "Zezo checks these topics once a day and alerts the user when there is a new development. "
+        "Use 'add' when the user says 'monitor X', 'track X', 'follow X'. "
+        "Use 'remove' when the user says 'stop monitoring X'. "
+        "Use 'list' when the user asks what is being monitored. "
+        "Do NOT add crypto, financial, or trading topics."
+    ),
+    "risk": "local_mutation",
+    "enabled": True,
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "action": {
+                "type": "STRING",
+                "description": "add | remove | list",
+            },
+            "topic": {
+                "type": "STRING",
+                "description": "Topic to monitor or stop monitoring (e.g. 'space exploration', 'AI news')",
+            },
+        },
+        "required": ["action"],
+    },
+    "handler": manage_monitor_action,
+}

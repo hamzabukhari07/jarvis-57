@@ -807,6 +807,8 @@ def file_controller(
 TOOL = {
     "name": "file_controller",
     "description": "Manages files and folders: list, create, delete, move, copy, rename, read, write, find (files and folders), disk usage. ALWAYS use to find or check files/folders on desktop or in filesystem instead of vision screen captures.",
+    "risk": "local_mutation",
+    "enabled": True,
     "parameters": {
         "type": "OBJECT",
         "properties": {

@@ -388,6 +388,8 @@ def reminder(
 TOOL = {
     "name": "reminder",
     "description": "Sets or dismisses timed notification reminders. Supports relative minutes (e.g. in 2 minutes), specific date and time, or dismissing/closing active reminder popups (action='dismiss').",
+    "risk": "local_mutation",
+    "enabled": True,
     "parameters": {
         "type": "OBJECT",
         "properties": {

@@ -55,6 +55,8 @@ def _log(message: str, player=None) -> None:
 TOOL = {
     "name": "weather_report",
     "description": "Gives the weather report to user",
+    "risk": "read_only",
+    "enabled": True,
     "parameters": {
         "type": "OBJECT",
         "properties": {

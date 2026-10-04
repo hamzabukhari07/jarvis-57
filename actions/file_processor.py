@@ -944,6 +944,8 @@ TOOL = {
         "Heavy operations (summarize, transcribe, analyze, convert) run asynchronously in the background and return a task_id immediately so conversation is never blocked. "
         "Fast metadata operations (info, word_count) return immediately."
     ),
+    "risk": "read_only",
+    "enabled": True,
     "behavior": "NON_BLOCKING",
     "scheduling": "WHEN_IDLE",
     "parameters": {

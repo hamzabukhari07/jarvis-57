@@ -562,6 +562,8 @@ def open_app(
 TOOL = {
     "name": "open_app",
     "description": "Opens or closes any application or opens specific files/folders with an app (e.g. open folder 'in' in VS Code). Always call this tool.",
+    "risk": "local_mutation",
+    "enabled": True,
     "parameters": {
         "type": "OBJECT",
         "properties": {

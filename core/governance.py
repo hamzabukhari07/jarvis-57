@@ -67,8 +67,8 @@ class ApprovalGrant:
 
 
 # ── Action to Risk Classification Mapping ─────────────────────────────────────
-TOOL_RISK_MAP: dict[str, ToolRisk] = {
-    # 1. READ_ONLY (Immediate frictionless execution)
+# Default / Fallback Risk Taxonomy for Core & Inline Actions
+_DEFAULT_TOOL_RISKS: dict[str, ToolRisk] = {
     "screen_process":         ToolRisk.READ_ONLY,
     "web_search":             ToolRisk.READ_ONLY,
     "web_read_page":          ToolRisk.READ_ONLY,
@@ -79,8 +79,10 @@ TOOL_RISK_MAP: dict[str, ToolRisk] = {
     "game_updater":           ToolRisk.READ_ONLY,
     "extract_design_system":  ToolRisk.READ_ONLY,
     "file_processor":         ToolRisk.READ_ONLY,
+    "read_skill":             ToolRisk.READ_ONLY,
+    "list_skills":            ToolRisk.READ_ONLY,
+    "recall_memory":          ToolRisk.READ_ONLY,
 
-    # 2. LOCAL_MUTATION (Allowed with confidence >= 0.70)
     "computer_control":       ToolRisk.LOCAL_MUTATION,
     "open_app":               ToolRisk.LOCAL_MUTATION,
     "desktop_control":        ToolRisk.LOCAL_MUTATION,
@@ -88,34 +90,50 @@ TOOL_RISK_MAP: dict[str, ToolRisk] = {
     "computer_settings":      ToolRisk.LOCAL_MUTATION,
     "youtube_video":          ToolRisk.LOCAL_MUTATION,
     "reminder":               ToolRisk.LOCAL_MUTATION,
+    "manage_monitor":         ToolRisk.LOCAL_MUTATION,
+    "browser_control":        ToolRisk.LOCAL_MUTATION,
+    "save_learned_skill":     ToolRisk.LOCAL_MUTATION,
+    "save_memory":            ToolRisk.LOCAL_MUTATION,
+    "undo":                   ToolRisk.LOCAL_MUTATION,
+    "close_camera":           ToolRisk.LOCAL_MUTATION,
 
-    # 3. EXTERNAL_MUTATION (Outbound communication / publishing)
     "send_message":           ToolRisk.EXTERNAL_MUTATION,
     "agent_reach":            ToolRisk.EXTERNAL_MUTATION,
 
-    # 4. CODE_EXECUTION (Autonomous synthesis & multi-file agents)
     "opencode_run":           ToolRisk.CODE_EXECUTION,
     "kilo_run":               ToolRisk.CODE_EXECUTION,
     "antigravity_run":        ToolRisk.CODE_EXECUTION,
     "code_helper":            ToolRisk.CODE_EXECUTION,
     "dev_agent":              ToolRisk.CODE_EXECUTION,
     "clone_website":          ToolRisk.CODE_EXECUTION,
+    "fleet_control":          ToolRisk.LOCAL_MUTATION,
 
-    # 5. PRIVILEGED_OS (Irreversible actions / system shutdown)
-    "shutdown_jarvis":        ToolRisk.PRIVILEGED_OS,
-    "modify_system_setting":  ToolRisk.PRIVILEGED_OS,
+    "shutdown_zezo":          ToolRisk.PRIVILEGED_OS,
 }
+
+TOOL_RISK_MAP = _DEFAULT_TOOL_RISKS
 
 
 def get_tool_risk(tool_name: str, parameters: dict | None = None) -> ToolRisk:
-    """Return the assigned risk tier for any action name, accounting for fine-grained sub-actions."""
+    """Return the assigned risk tier for any action name, accounting for fine-grained sub-actions and action definitions."""
     if tool_name == "send_message":
         act = str((parameters or {}).get("action", "")).lower().strip()
         if act in ("search", "search_contact", "find_chat", "find_contact", "read", "list", "get_status"):
             return ToolRisk.READ_ONLY
         return ToolRisk.EXTERNAL_MUTATION
 
-    return TOOL_RISK_MAP.get(tool_name, ToolRisk.LOCAL_MUTATION)
+    # Check dynamically discovered action risk if loaded in sys.modules
+    mod_name = f"actions.{tool_name}"
+    if mod_name in sys.modules:
+        mod = sys.modules[mod_name]
+        tool_decl = getattr(mod, "TOOL", None)
+        if isinstance(tool_decl, dict) and "risk" in tool_decl:
+            r = str(tool_decl["risk"]).lower().strip()
+            for tr in ToolRisk:
+                if tr.value == r:
+                    return tr
+
+    return _DEFAULT_TOOL_RISKS.get(tool_name, ToolRisk.LOCAL_MUTATION)
 
 
 # ── Critical System Paths (Forbidden to modify / delete) ──────────────────────
@@ -168,9 +186,7 @@ _DANGEROUS_PATTERNS = [
 
 # ── Sensitive Actions requiring Confirmation (ASK) ───────────────────────────
 _SENSITIVE_ACTIONS = {
-    "shutdown_jarvis": "Shutting down the assistant",
-    "modify_system_setting": "Modifying critical system configuration",
-    "kill_process": "Terminating a system process",
+    "shutdown_zezo": "Shutting down the assistant",
 }
 
 

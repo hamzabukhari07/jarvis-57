@@ -2309,6 +2309,8 @@ TOOL = {
         "Use mode='full_site' only if user explicitly asks for full mirror. "
         "Use output_format='react' or 'nextjs' if user asks for React/Next.js components."
     ),
+    "risk": "code_execution",
+    "enabled": True,
     "behavior": "NON_BLOCKING",
     "scheduling": "WHEN_IDLE",
     "parameters": {

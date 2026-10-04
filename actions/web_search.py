@@ -526,6 +526,8 @@ def web_search(
 TOOL = {
     "name": "web_search",
     "description": "Searches the web. Use for ANY question about current facts, events, prices, or topics — always prefer this over guessing. Never rely on your own memory for current/recent information; your training knowledge is outdated. Search the EXACT product/model/version name the user said — never substitute or 'correct' it with an older name you remember. Modes: 'search' (default), 'news' (latest headlines on a topic), 'research' (deep comprehensive answer), 'price' (product cost lookup), 'compare' (side-by-side comparison of items).",
+    "risk": "read_only",
+    "enabled": True,
     "parameters": {
         "type": "OBJECT",
         "properties": {

@@ -309,6 +309,8 @@ TOOL = {
         "Sends a text message or searches contacts via WhatsApp, Telegram, Discord, Instagram, etc. "
         "Use action='send' to send a message or action='search' to look up a contact."
     ),
+    "risk": "external_mutation",
+    "enabled": True,
     "parameters": {
         "type": "OBJECT",
         "properties": {

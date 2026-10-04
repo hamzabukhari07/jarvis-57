@@ -19,36 +19,18 @@ class BreakerState(str, Enum):
     OPEN = "OPEN"
 
 
-TOOL_RISK_MAP: Dict[str, RiskTier] = {
-    "dev_agent": RiskTier.L0_READ_ONLY,
-    "task_status": RiskTier.L0_READ_ONLY,
-    "system_status": RiskTier.L0_READ_ONLY,
-    "web_search": RiskTier.L0_READ_ONLY,
-    "web_read_page": RiskTier.L0_READ_ONLY,
-    "screen_process": RiskTier.L0_READ_ONLY,
-    "weather_report": RiskTier.L0_READ_ONLY,
-    "flight_finder": RiskTier.L0_READ_ONLY,
-    "game_updater": RiskTier.L0_READ_ONLY,
-    "youtube_video": RiskTier.L0_READ_ONLY,
-    "extract_design_system": RiskTier.L0_READ_ONLY,
+def _map_risk_tier(tool_name: str) -> RiskTier:
+    from core.governance import ToolRisk, get_tool_risk
+    tr = get_tool_risk(tool_name)
+    if tr == ToolRisk.READ_ONLY:
+        return RiskTier.L0_READ_ONLY
+    elif tr in (ToolRisk.CODE_EXECUTION, ToolRisk.PRIVILEGED_OS):
+        return RiskTier.L2_DESTRUCTIVE
+    return RiskTier.L1_LOW_RISK
 
-    "code_helper": RiskTier.L1_LOW_RISK,
-    "file_processor": RiskTier.L1_LOW_RISK,
-    "send_message": RiskTier.L1_LOW_RISK,
-    "reminder": RiskTier.L1_LOW_RISK,
-    "browser_control": RiskTier.L1_LOW_RISK,
-    "open_app": RiskTier.L1_LOW_RISK,
-    "computer_settings": RiskTier.L1_LOW_RISK,
-    "computer_control": RiskTier.L1_LOW_RISK,
-    "agent_reach": RiskTier.L1_LOW_RISK,
 
-    "opencode_run": RiskTier.L2_DESTRUCTIVE,
-    "kilo_run": RiskTier.L2_DESTRUCTIVE,
-    "antigravity_run": RiskTier.L2_DESTRUCTIVE,
-    "file_controller": RiskTier.L2_DESTRUCTIVE,
-    "desktop_control": RiskTier.L2_DESTRUCTIVE,
-    "clone_website": RiskTier.L2_DESTRUCTIVE,
-}
+def get_tool_tier(tool_name: str) -> RiskTier:
+    return _map_risk_tier(tool_name)
 
 
 @dataclass
@@ -58,10 +40,9 @@ class TierMetrics:
     failure_count: int = 0
     consecutive_successes: int = 0
     last_failure_time: float = 0.0
-    last_state_change: float = field(default_factory=time.time)
-    error_timestamps: List[float] = field(default_factory=list)
-    human_override_required: bool = False
     tripped_reason: str = ""
+    human_override_required: bool = False
+    error_timestamps: List[float] = field(default_factory=list)
 
 
 class RiskAwareCircuitBreaker:
@@ -78,7 +59,7 @@ class RiskAwareCircuitBreaker:
         }
 
     def get_tool_tier(self, tool_name: str) -> RiskTier:
-        return TOOL_RISK_MAP.get(tool_name, RiskTier.L1_LOW_RISK)
+        return _map_risk_tier(tool_name)
 
     def can_execute(self, tool_name: str) -> Tuple[bool, Optional[str]]:
         tier = self.get_tool_tier(tool_name)

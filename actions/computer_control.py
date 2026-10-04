@@ -663,6 +663,8 @@ def computer_control(
 TOOL = {
     "name": "computer_control",
     "description": "Direct computer control: type, click, hotkeys, scroll, move mouse, screenshots, find elements on screen, inspect active window.",
+    "risk": "local_mutation",
+    "enabled": True,
     "parameters": {
         "type": "OBJECT",
         "properties": {

@@ -1417,6 +1417,8 @@ def _log(player, text: str):
 TOOL = {
     "name": "browser_control",
     "description": "Controls any web browser on the desktop. Use ONLY when the user explicitly asks to open a website on screen, preview a webpage, click elements, fill forms, scroll, or interact with a desktop browser window (e.g. 'open this in Chrome', 'go to example.com', 'click the login button'). NEVER use for answering general factual questions or silent background web searches — use web_search instead so searches run quietly in the background without opening the user's browser window. Always pass the 'browser' parameter when the user specifies a browser (e.g. 'open in Edge', 'use Firefox'). Call each action exactly once per turn.",
+    "risk": "local_mutation",
+    "enabled": True,
     "parameters": {
         "type": "OBJECT",
         "properties": {

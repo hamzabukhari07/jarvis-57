@@ -1325,6 +1325,8 @@ TOOL = {
         "Supports YouTube (transcripts & channels), Instagram (Reels, posts & captions), TikTok (videos & captions), Reddit (posts & top comments), GitHub (README & search), Twitter/X threads, Stack Overflow (questions & answers), Hacker News, RSS feeds, and multi-platform research aggregator ('multi'). "
         "IMPORTANT: 'multi' does NOT just list search snippets — it FULLY FETCHES the body of every discovered source (web/blog article text, Reddit post+comments, Hacker News thread, YouTube transcript, GitHub README), analyses each one, synthesises an executive summary + key findings, and saves the report to an output file. Use it whenever the user asks for a research report, a deep summary, or to 'extract all the posts and analyze them'."
     ),
+    "risk": "external_mutation",
+    "enabled": True,
     "behavior": "NON_BLOCKING",
     "scheduling": "WHEN_IDLE",
     "parameters": {

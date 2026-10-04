@@ -319,3 +319,26 @@ class SystemMonitor:
             self._record("gpu")
 
         return " ".join(alerts) if alerts else None
+
+
+def system_status_action(parameters: dict, **kwargs) -> str:
+    """Action handler for real-time system metrics."""
+    return str(get_system_status())
+
+
+# ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
+TOOL = {
+    "name": "system_status",
+    "description": (
+        "Returns real-time system metrics: CPU usage, RAM, GPU load, CPU temperature, "
+        "uptime, and process count. Use when the user asks about computer performance, "
+        "temperature, memory, or resource usage."
+    ),
+    "risk": "read_only",
+    "enabled": True,
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+    },
+    "handler": system_status_action,
+}

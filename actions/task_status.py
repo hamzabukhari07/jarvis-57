@@ -97,6 +97,8 @@ TOOL = {
         "'kya ban gaya', or asks to cancel/stop a task ('cancel task', 'kilo band karo', 'stop opencode', 'task roko'). "
         "To cancel a running task, set action='cancel'. If task_id is omitted, it operates on the active task."
     ),
+    "risk": "read_only",
+    "enabled": True,
     "behavior": "BLOCKING",
     "parameters": {
         "type": "OBJECT",

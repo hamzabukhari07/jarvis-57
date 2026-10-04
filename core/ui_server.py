@@ -121,6 +121,7 @@ class ZezoUIServer:
         app.router.add_post("/api/fleet/save_soul", self._fleet_save_soul_handler)
         app.router.add_post("/api/fleet/dispatch_task", self._fleet_dispatch_task_handler)
         app.router.add_post("/api/fleet/delete_agent", self._fleet_delete_agent_handler)
+        app.router.add_post("/api/fleet/open_folder", self._fleet_open_folder_handler)
         app.router.add_post("/api/upload", self._upload_handler)
         app.router.add_post("/api/settings/assistant", self._save_assistant_settings_handler)
         app.router.add_post("/api/settings/agents", self._save_agents_settings_handler)
@@ -649,6 +650,36 @@ class ZezoUIServer:
         except Exception as e:
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
+    async def _fleet_open_folder_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            raw_path = str(data.get("path") or "").strip()
+            if not raw_path or raw_path.lower() in ("direct workspace", "main"):
+                target_path = BASE_DIR
+            else:
+                p = Path(raw_path)
+                if not p.is_absolute():
+                    p = BASE_DIR / p
+                target_path = p
+
+            if not target_path.exists():
+                target_path.mkdir(parents=True, exist_ok=True)
+
+            # Open folder in native OS file explorer (Windows / macOS / Linux)
+            import platform
+            system = platform.system()
+            if system == "Windows":
+                os.startfile(str(target_path))
+            elif system == "Darwin":
+                subprocess.Popen(["open", str(target_path)])
+            else:
+                subprocess.Popen(["xdg-open", str(target_path)])
+
+            return web.json_response({"success": True, "path": str(target_path)})
+        except Exception as e:
+            logger.warning("[UI Server] Failed to open folder in explorer: %s", e)
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
     async def _favicon_handler(self, request: web.Request) -> web.Response:
         fav = self.frontend_dir / "favicon.ico"
         if fav.exists():
@@ -700,6 +731,14 @@ class ZezoUIServer:
             muted = bool(payload.get("muted", False))
             if self.on_mute_toggle:
                 self.on_mute_toggle(muted)
+
+        elif msg_type == "confirm_response":
+            accepted = bool(payload.get("accepted", False))
+            try:
+                from core import confirm
+                confirm.resolve(accepted)
+            except Exception as e:
+                logger.warning("Failed resolving confirmation: %s", e)
 
         elif msg_type == "sleep_toggle":
             sleeping = bool(payload.get("sleeping", False))

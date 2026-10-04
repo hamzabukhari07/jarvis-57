@@ -628,3 +628,62 @@ def get_structured_perception(
         "details": obs_text or (f"Active window: {ctx.get('foreground_title', '')}" if ctx.get("foreground_title") else "Desktop"),
         "visible_windows": ctx.get("visible_windows", []),
     }
+
+
+def screen_processor_handler(parameters: dict, player: Any = None, **kwargs) -> str:
+    """Action handler for screen and webcam observation."""
+    angle = str(parameters.get("angle", "screen")).lower().strip()
+    user_text = str(parameters.get("text", "What is currently visible on the screen?")).strip()
+    
+    stall = "screen"
+    img_b, mime_t = None, "image/jpeg"
+    
+    if angle == "camera":
+        try:
+            img_b, mime_t = _capture_camera()
+            stall = "camera"
+            if player and hasattr(player, "start_camera_stream"):
+                player.start_camera_stream()
+        except Exception as cam_err:
+            print(f"[Vision] ⚠️ Camera unavailable ({cam_err}) — falling back to screen capture")
+            img_b, mime_t = _capture_screen()
+            stall = "screen"
+    else:
+        img_b, mime_t = _capture_screen()
+        stall = "screen"
+
+    try:
+        v_obs = analyze_visual(img_b, mime_t, user_text, stall)
+        if player and hasattr(player, "show_content"):
+            player.show_content(f"VISION ({stall.upper()})", v_obs)
+        return f"[Visual observation from {stall}]: {v_obs}"
+    except Exception as e:
+        return f"I could not inspect the screen right now: {e}"
+
+
+# ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
+TOOL = {
+    "name": "screen_process",
+    "description": (
+        "Captures the screen or webcam image and analyzes it to return a factual, detailed visual observation. "
+        "MUST be called when user asks what is on screen, what you see, look at camera, inspect active window, check search results or contacts on screen, etc. "
+        "Returns a precise description of the active application, window title, visible text, contacts/chats, code, buttons, or error messages."
+    ),
+    "risk": "read_only",
+    "enabled": True,
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "angle": {
+                "type": "STRING",
+                "description": "'screen' to capture display, 'camera' for webcam. Default: 'screen'"
+            },
+            "text": {
+                "type": "STRING",
+                "description": "The specific question or instruction about the screen/camera state (e.g. 'Is WhatsApp open and is Inferno in the search results?')."
+            }
+        },
+        "required": ["text"]
+    },
+    "handler": screen_processor_handler,
+}

@@ -360,6 +360,8 @@ TOOL = {
         "Features smart 0ms caching: uses existing DESIGN.md from References/UI/design md/ if fresh, "
         "or extracts live from URL/HTML if new or modified. Set action='list' to view all available designs."
     ),
+    "risk": "read_only",
+    "enabled": True,
     "behavior": "BLOCKING",
     "parameters": {
         "type": "OBJECT",

@@ -388,6 +388,8 @@ def youtube_video(
 TOOL = {
     "name": "youtube_video",
     "description": "Controls YouTube playback and videos. Actions: play (open a YouTube URL directly, or the top result for a search term, in the default browser), stop / pause (stop video playback), close (close YouTube tab), summarize, get_info, trending.",
+    "risk": "local_mutation",
+    "enabled": True,
     "parameters": {
         "type": "OBJECT",
         "properties": {

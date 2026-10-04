@@ -360,6 +360,8 @@ def flight_finder(parameters: dict, player=None, speak=None) -> str:
 TOOL = {
     "name": "flight_finder",
     "description": "Searches Google Flights and speaks the best options.",
+    "risk": "read_only",
+    "enabled": True,
     "parameters": {
         "type": "OBJECT",
         "properties": {
