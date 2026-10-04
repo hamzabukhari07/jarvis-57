@@ -136,9 +136,84 @@ class FleetManager:
             if key in self.agents:
                 return self.agents[key]
             for a in self.agents.values():
-                if key == a.name.upper() or a.name.upper().startswith(key):
+                if key == a.name.upper() or a.name.upper().startswith(key) or key in a.name.upper().split():
                     return a
         return None
+
+    def resolve_agent_by_mention_or_capability(self, query: str) -> Optional[FleetAgent]:
+        """
+        Intelligently resolves an agent by explicit name mention, role alias, or capability keyword fallback.
+        Examples:
+          - "Ali build landing page" -> ALI
+          - "Tell Dwight to verify" -> DWIGHT
+          - "Research AI frameworks" -> KELLY (Social & Deep Web Researcher)
+          - "Build PostgreSQL models" -> AHMAD (Full-Stack & Backend Specialist)
+        """
+        if not query or not query.strip():
+            return None
+
+        q = query.strip()
+        words = re.findall(r"\b[A-Za-z0-9_]+\b", q)
+
+        # 1. Direct Name / ID match in words (e.g. 'Ali', 'Ahmad', 'Dwight', 'Pam', 'Oscar', 'Kelly', 'Michael')
+        with self._lock:
+            for w in words:
+                w_up = w.upper()
+                for agent_id, agent in self.agents.items():
+                    if w_up == agent_id.upper() or w.lower() == agent.name.lower():
+                        return agent
+
+        low = q.lower()
+
+        # 2. Known Role / Alias Mapping
+        role_map = {
+            "manager": "MICHAEL",
+            "orchestrator": "MICHAEL",
+            "frontend": "ALI",
+            "ui": "ALI",
+            "designer": "ALI",
+            "backend": "AHMAD",
+            "database": "AHMAD",
+            "fullstack": "AHMAD",
+            "full-stack": "AHMAD",
+            "qa": "DWIGHT",
+            "tester": "DWIGHT",
+            "auditor": "DWIGHT",
+            "security": "DWIGHT",
+            "tokens": "PAM",
+            "metrics": "OSCAR",
+            "accountant": "OSCAR",
+            "complexity": "OSCAR",
+            "researcher": "KELLY",
+            "research": "KELLY",
+            "scraper": "KELLY",
+            "youtube": "KELLY",
+        }
+        for alias, agent_id in role_map.items():
+            if re.search(rf"\b{re.escape(alias)}\b", low):
+                agent = self.get_agent(agent_id)
+                if agent:
+                    return agent
+
+        # 3. Domain Fallback Heuristics
+        if any(w in low for w in ("token", "tokens", "palette", "design system", "extract design")):
+            return self.get_agent("PAM")
+        if any(w in low for w in ("html", "css", "landing", "page", "react", "tailwind", "component", "studio", "ui", "frontend")):
+            return self.get_agent("ALI")
+        if any(w in low for w in ("fastapi", "postgres", "sql", "api", "endpoint", "schema", "microservice", "auth", "backend", "database")):
+            return self.get_agent("AHMAD")
+        if any(w in low for w in ("test", "verify", "audit", "regression", "pytest", "edge case", "security")):
+            return self.get_agent("DWIGHT")
+        if any(w in low for w in ("scrape", "transcribe", "summary", "web search", "market research", "research", "social")):
+            return self.get_agent("KELLY")
+
+        return None
+
+    def generate_peer_session_id(self, from_agent: str, to_agent: str) -> str:
+        """Generates deterministic composite peer session ID for isolated P2P communication lineage."""
+        src = from_agent.upper().strip()
+        dst = to_agent.upper().strip()
+        return f"peer:{src}->{dst}:{int(time.time())}"
 
     def save_agent_profile(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create or update an agent persona, tool, and desk coordinate with strict schema validation."""
@@ -292,24 +367,82 @@ class FleetManager:
             "memories": memories,
         }
 
+    def delegate_peer_task(
+        self,
+        from_agent_id: str,
+        to_agent_id: str,
+        task: str,
+        upstream_deliverables: Optional[str] = None,
+        path: Optional[str] = None,
+        call_chain: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Executes a peer-to-peer delegation from one specialist agent to another with circular loop detection.
+        Injects upstream deliverables into the recipient's task payload.
+        """
+        src = (from_agent_id or "ZEZO").upper().strip()
+        chain = list(call_chain or [src])
+
+        # Resolve recipient
+        target = self.resolve_agent_by_mention_or_capability(to_agent_id) or self.get_agent(to_agent_id)
+        if not target:
+            return {"success": False, "error": f"Target peer agent '{to_agent_id}' could not be resolved."}
+
+        dst = target.id
+
+        # 1. Circular Loop & Max Depth Detection Guards
+        if dst in chain:
+            cycle_str = " -> ".join(chain + [dst])
+            logger.warning("[FleetManager] Circular delegation loop blocked: %s", cycle_str)
+            return {
+                "success": False,
+                "error": f"Circular peer delegation loop detected ({cycle_str}). Delegation blocked.",
+            }
+
+        if len(chain) >= 4:
+            return {
+                "success": False,
+                "error": f"Maximum peer delegation depth (3) exceeded: {' -> '.join(chain)}.",
+            }
+
+        new_chain = chain + [dst]
+        session_id = self.generate_peer_session_id(src, dst)
+
+        # 2. Inject Upstream Deliverables Handoff
+        handoff_header = f"[Peer Request from {src} to {target.name}]\n[Peer Session: {session_id}]\n"
+        if upstream_deliverables:
+            handoff_header += f"\n--- UPSTREAM DELIVERABLE HANDOFF FROM {src} ---\n{upstream_deliverables.strip()}\n------------------------------------------------\n\n"
+
+        full_task_prompt = f"{handoff_header}Directive: {task}"
+
+        logger.info("[FleetManager] P2P Delegation: %s -> %s (Chain: %s)", src, dst, " -> ".join(new_chain))
+        res = self.dispatch_task(agent_id=dst, prompt=full_task_prompt, path=path)
+        res["peer_session_id"] = session_id
+        res["call_chain"] = new_chain
+        res["from_agent"] = src
+        res["to_agent"] = dst
+        return res
+
     def decompose_and_dispatch(self, prompt: str, path: Optional[str] = None) -> Dict[str, Any]:
-        """High-level Michael task decomposition into specialized subtasks."""
+        """High-level Michael task decomposition into specialized subtasks with deliverable piping."""
         subtasks = []
         low = prompt.lower()
+        if any(w in low for w in ("research", "scrape", "youtube", "investigate", "find")):
+            subtasks.append(("KELLY", "Perform deep research and gather key technical requirements: " + prompt))
         if any(w in low for w in ("ui", "frontend", "landing", "page", "css", "html", "react", "view")):
-            subtasks.append(("ali", "Design and build responsive frontend user interface and components: " + prompt))
+            subtasks.append(("ALI", "Design and build responsive frontend user interface and components: " + prompt))
         if any(w in low for w in ("api", "backend", "database", "crud", "endpoint", "server", "model", "auth")):
-            subtasks.append(("ahmad", "Implement robust backend APIs, database schemas, and service logic: " + prompt))
+            subtasks.append(("AHMAD", "Implement robust backend APIs, database schemas, and service logic: " + prompt))
         if any(w in low for w in ("test", "qa", "verify", "audit", "security", "bug", "check")):
-            subtasks.append(("dwight", "Conduct end-to-end test verification, security review, and edge case audit: " + prompt))
+            subtasks.append(("DWIGHT", "Conduct end-to-end test verification, security review, and edge case audit: " + prompt))
 
         # Default fallback if no specific keywords matched
         if not subtasks:
-            subtasks = [("ahmad", prompt)]
+            subtasks = [("AHMAD", prompt)]
 
         dispatched = []
         for target_id, sub_prompt in subtasks:
-            target_agent = self.get_agent(target_id) or self.get_agent("ahmad") or list(self.agents.values())[0]
+            target_agent = self.get_agent(target_id) or self.resolve_agent_by_mention_or_capability(target_id) or list(self.agents.values())[0]
             res = self.dispatch_task(target_agent.id, sub_prompt, path=path)
             dispatched.append(res)
 
@@ -494,4 +627,51 @@ class FleetManager:
 
 
 fleet_manager = FleetManager()
+
+
+def resolve_agent_by_mention_or_capability(query: str) -> Optional[str]:
+    """Helper to resolve agent ID by query string."""
+    agent = fleet_manager.resolve_agent_by_mention_or_capability(query)
+    return agent.id if agent else None
+
+
+def generate_peer_session_id(from_agent: str, to_agent: str) -> str:
+    """Helper to generate peer session ID."""
+    return fleet_manager.generate_peer_session_id(from_agent, to_agent)
+
+
+def delegate_peer_task(
+    from_agent: str,
+    to_agent: str,
+    task: str,
+    upstream_deliverables: Optional[str] = None,
+    path: Optional[str] = None,
+    call_chain: Optional[List[str]] = None,
+    parent_task_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Helper to delegate peer task through fleet_manager singleton."""
+    res = fleet_manager.delegate_peer_task(
+        from_agent_id=from_agent,
+        to_agent_id=to_agent,
+        task=task,
+        upstream_deliverables=upstream_deliverables,
+        path=path,
+        call_chain=call_chain,
+    )
+    # Normalize return dict for tests and handlers
+    if res.get("success"):
+        return {
+            "status": "success",
+            "task_id": res.get("task_id"),
+            "target_agent": res.get("to_agent"),
+            "from_agent": res.get("from_agent"),
+            "peer_session_id": res.get("peer_session_id"),
+            "call_chain": res.get("call_chain"),
+            "message": f"Delegated task to {res.get('to_agent')}",
+        }
+    return {
+        "status": "error",
+        "error": res.get("error", "Delegation failed"),
+    }
+
 

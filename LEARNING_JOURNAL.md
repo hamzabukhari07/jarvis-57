@@ -1,3 +1,32 @@
+## [2026-10-04] — Phase 3: Multi-Agent Peer Mesh, Named Routing & Workflow Decomposition
+
+- **What was built:**
+  - Added declarative skills in `skills/`: `multi_agent_collaboration`, `make_plan`, `office_suite`.
+  - Implemented `resolve_agent_by_mention_or_capability` in `core/fleet_manager.py` supporting natural alias matching (Ali, Ahmad, Dwight, Pam, Oscar, Kelly, Michael) and capability fallback heuristics.
+  - Implemented `generate_peer_session_id(from_agent, to_agent)` creating isolated lineage tokens (`peer:<src>-><dst>:<ts>`).
+  - Added peer recursion and loop detection guards (`delegate_peer_task`) preventing circular delegation chains (Agent A $\to$ Agent B $\to$ Agent A) and enforcing max recursion depth $\le 3$.
+  - Implemented `peer_chat` (`delegate`) and `decompose_workflow` (`decompose`) action handlers in `actions/fleet_control.py`.
+  - Implemented upstream deliverable handoff piping (`--- UPSTREAM DELIVERABLE HANDOFF FROM <SRC> ---`) injected into recipient task contexts.
+  - Updated `core/prompt.txt` under `[AUTONOMOUS MULTI-AGENT FLEET DELEGATION]` with peer mesh directives.
+  - Created unit and integration test suite in `tests/test_phase3_multi_agent_mesh_suite.py`.
+- **Why this approach was chosen:**
+  - Enables true multi-agent collaborative workflows while strictly preventing stack overflow loops, preserving prompt isolation through composite session IDs, and adhering to Anti-Slop complexity limits ($< 15$).
+- **Key files touched:**
+  - `skills/multi_agent_collaboration/SKILL.md`
+  - `skills/make_plan/SKILL.md`
+  - `skills/office_suite/SKILL.md`
+  - `core/fleet_manager.py`
+  - `actions/fleet_control.py`
+  - `core/prompt.txt`
+  - `tests/test_phase3_multi_agent_mesh_suite.py`
+  - `planning/MASTER_IMPLEMENTATION_ROADMAP.md`
+- **Verification:**
+  - Layer 1 (static): `python -m py_compile core/fleet_manager.py actions/fleet_control.py tests/test_phase3_multi_agent_mesh_suite.py` (Exit 0).
+  - Layer 2 (runtime): `python -m pytest tests/test_phase3_multi_agent_mesh_suite.py -v` (8 passed in 0.16s).
+  - Layer 3 (regression): Full test suite executed with 153 passed, 5 skipped, 0 failures (37.56s).
+
+---
+
 ## [2026-10-04] — Phase 2: Unified Tool Risk Taxonomy & Dispatch Hygiene
 
 - **What was built:**

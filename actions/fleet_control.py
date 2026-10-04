@@ -132,6 +132,65 @@ def _handle_status(params: Dict[str, Any]) -> str:
     return f"Agent {agent.get('name')} ({agent.get('role')}) is currently {status.upper()} and ready for assignments."
 
 
+def _handle_peer_chat(params: Dict[str, Any]) -> str:
+    from_agent = str(params.get("from_agent") or "ZEZO").strip()
+    to_agent = str(params.get("to_agent") or params.get("agent_id") or "").strip()
+    message = str(params.get("message") or params.get("task") or "").strip()
+    upstream = str(params.get("upstream_deliverables") or params.get("context") or "").strip() or None
+    path = params.get("path")
+
+    if not to_agent:
+        return "Error: to_agent or agent_id is required for peer delegation."
+    if not message:
+        return "Error: message / task instruction is required for peer delegation."
+
+    res = fleet_manager.delegate_peer_task(
+        from_agent_id=from_agent,
+        to_agent_id=to_agent,
+        task=message,
+        upstream_deliverables=upstream,
+        path=path,
+    )
+    if not res.get("success"):
+        return f"Peer delegation failed: {res.get('error', 'Unknown error')}"
+
+    task_id = res.get("task_id")
+    target_name = res.get("agent_name", to_agent)
+    tool = res.get("tool", "agent")
+    sess_id = res.get("peer_session_id")
+
+    _broadcast_ui("peer_delegation_started", {
+        "task_id": task_id,
+        "peer_session_id": sess_id,
+        "from_agent": from_agent.upper(),
+        "to_agent": res.get("to_agent"),
+        "task": message,
+        "tool": tool,
+    })
+
+    return f"Peer delegation active: {from_agent.upper()} -> {target_name} ({tool}). Task ID: {task_id}."
+
+
+def _handle_decompose(params: Dict[str, Any]) -> str:
+    prompt = str(params.get("task") or params.get("prompt") or "").strip()
+    path = params.get("path")
+    if not prompt:
+        return "Error: task prompt is required for workflow decomposition."
+
+    res = fleet_manager.decompose_and_dispatch(prompt, path=path)
+    count = res.get("decomposed_count", 0)
+    tasks = res.get("tasks", [])
+    task_summaries = [f"• {t.get('agent_name', t.get('agent_id'))} ({t.get('tool')}) [ID: {t.get('task_id')}]" for t in tasks if t.get("success")]
+    
+    _broadcast_ui("workflow_decomposed", {
+        "task": prompt,
+        "count": count,
+        "tasks": tasks,
+    })
+
+    return f"Michael Scott decomposed and dispatched {count} specialist tasks:\n" + "\n".join(task_summaries)
+
+
 _ACTION_DISPATCH: Dict[str, Callable[[Dict[str, Any]], str]] = {
     "dispatch": _handle_dispatch,
     "hire": _handle_hire,
@@ -140,11 +199,15 @@ _ACTION_DISPATCH: Dict[str, Callable[[Dict[str, Any]], str]] = {
     "list": _handle_list,
     "get_status": _handle_status,
     "status": _handle_status,
+    "peer_chat": _handle_peer_chat,
+    "delegate": _handle_peer_chat,
+    "decompose_workflow": _handle_decompose,
+    "decompose": _handle_decompose,
 }
 
 
 def fleet_control(parameters: Dict[str, Any], **kwargs: Any) -> str:
-    """Main entrypoint for autonomous fleet control and delegation."""
+    """Main entrypoint for autonomous fleet control, delegation, and P2P peer routing."""
     action = str(parameters.get("action") or "list_agents").strip().lower()
     handler_fn = _ACTION_DISPATCH.get(action)
     if not handler_fn:
@@ -155,11 +218,11 @@ def fleet_control(parameters: Dict[str, Any], **kwargs: Any) -> str:
 TOOL = {
     "name": "fleet_control",
     "description": (
-        "Orchestrate autonomous multi-agent fleet. Dispatch coding tasks to named specialist workers "
-        "(Michael, Dwight, Jim, Pam, or custom agents), hire new specialist agents, query agent status "
-        "and active tasks, or manage agent personas. "
-        "Use this whenever the user asks a specific agent to do something ('Michael ko bolo...', 'Dwight assign this task', "
-        "'Pam check UI', 'Hire new QA agent Stanley') or asks for fleet status ('fleet status kya hai', 'kaun kaun se agents hain')."
+        "Orchestrate autonomous multi-agent fleet. Dispatch coding/research tasks to named specialist workers "
+        "(Ali, Ahmad, Dwight, Pam, Oscar, Kelly, Michael), trigger P2P peer handoffs with upstream deliverables, "
+        "decompose multi-stage workflows, hire/fire agents, or query agent status. "
+        "Use this whenever the user addresses a specific agent ('Tell Ali to build a landing page', 'Kelly transcribe and summarize this video', "
+        "'Ahmad build the auth API', 'Michael decompose this project') or for peer handoffs between agents."
     ),
     "risk": "local_mutation",
     "enabled": True,
@@ -169,16 +232,28 @@ TOOL = {
         "properties": {
             "action": {
                 "type": "STRING",
-                "enum": ["dispatch", "hire", "fire", "list_agents", "get_status"],
+                "enum": ["dispatch", "hire", "fire", "list_agents", "get_status", "peer_chat", "decompose_workflow"],
                 "description": "The fleet management action to execute.",
             },
             "agent_id": {
                 "type": "STRING",
-                "description": "Target agent codename or ID (e.g. 'MICHAEL', 'DWIGHT', 'JIM', 'PAM', or custom name).",
+                "description": "Target agent name or ID (e.g. 'ALI', 'AHMAD', 'DWIGHT', 'PAM', 'OSCAR', 'KELLY', 'MICHAEL').",
+            },
+            "from_agent": {
+                "type": "STRING",
+                "description": "Originating agent ID for P2P delegation (e.g. 'KELLY', 'MICHAEL', 'ZEZO').",
+            },
+            "to_agent": {
+                "type": "STRING",
+                "description": "Destination agent ID for P2P delegation (e.g. 'ALI', 'AHMAD', 'DWIGHT').",
             },
             "task": {
                 "type": "STRING",
-                "description": "The precise coding objective, bug fix, or analysis instruction to assign.",
+                "description": "The precise coding, research, or analysis objective to assign.",
+            },
+            "upstream_deliverables": {
+                "type": "STRING",
+                "description": "Extracted deliverables, analysis findings, or code from an upstream agent to inject into the recipient agent's context.",
             },
             "role": {
                 "type": "STRING",
@@ -186,12 +261,12 @@ TOOL = {
             },
             "default_tool": {
                 "type": "STRING",
-                "enum": ["opencode_run", "kilo_run", "dev_agent", "code_helper", "antigravity_run"],
+                "enum": ["opencode_run", "kilo_run", "dev_agent", "code_helper", "antigravity_run", "extract_design_system", "agent_reach", "web_search"],
                 "description": "Underlying execution engine assigned to this agent.",
             },
             "model_id": {
                 "type": "STRING",
-                "description": "Specific LLM model identifier (e.g. 'kilo/stepfun/step-3.7-flash:free').",
+                "description": "Specific LLM model identifier (e.g. 'gemini-3.7-flash-medium', 'kilo/stepfun/step-3.7-flash:free').",
             },
             "specialty": {
                 "type": "STRING",

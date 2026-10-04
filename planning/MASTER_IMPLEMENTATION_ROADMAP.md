@@ -366,7 +366,7 @@ To prevent regressions, the following critical repository invariants must be pre
 
 ### Phase 3: Multi-Agent Peer Mesh, Named Routing & Workflow Decomposition
 * **Objective:** Enable ZEZO to route explicit agent commands (Ali, Sara, etc.), auto-select agents by capability, decompose multi-stage pipelines, and support bidirectional P2P delegation.
-* **Status:** ⏳ **Pending Execution**
+* **Status:** 🟢 **COMPLETED & VERIFIED (153/153 tests passed)**
 * **Files Touched:**
   - [actions/fleet_control.py](file:///d:/anitgravity/zezo%20work/jarvis-57/actions/fleet_control.py)
   - [core/fleet_manager.py](file:///d:/anitgravity/zezo%20work/jarvis-57/core/fleet_manager.py)
@@ -374,20 +374,21 @@ To prevent regressions, the following critical repository invariants must be pre
   - `skills/multi_agent_collaboration/SKILL.md`
   - `skills/make_plan/SKILL.md`
   - `skills/office_suite/SKILL.md`
+  - `tests/test_phase3_multi_agent_mesh_suite.py`
 
 #### 📋 Todo List:
-- [ ] **Task 3.1:** Ingest QwenPaw declarative skills (`multi_agent_collaboration`, `make_plan`, `docx`/`xlsx`/`pdf` suite) into `skills/`.
-- [ ] **Task 3.2:** Implement `resolve_agent_by_mention_or_capability(query)` in `core/fleet_manager.py` to support natural alias matching and domain fallback.
-- [ ] **Task 3.3:** Implement `generate_peer_session_id(from_agent, to_agent)` and identity message formatting (`[Agent <from> requesting]`).
-- [ ] **Task 3.4:** Add peer recursion and loop detection guards to prevent circular delegation chains (Agent A $\to$ Agent B $\to$ Agent A).
-- [ ] **Task 3.5:** Implement `peer_chat` and `decompose_workflow` action handlers inside `actions/fleet_control.py`.
-- [ ] **Task 3.6:** Implement upstream deliverable handoff piping (e.g. Sara's research output injected into Ali's prompt).
-- [ ] **Task 3.7:** Update `core/prompt.txt` with multi-agent delegation guidelines and conversational response framing.
+- [x] **Task 3.1:** Ingest QwenPaw declarative skills (`multi_agent_collaboration`, `make_plan`, `docx`/`xlsx`/`pdf` suite) into `skills/`.
+- [x] **Task 3.2:** Implement `resolve_agent_by_mention_or_capability(query)` in `core/fleet_manager.py` to support natural alias matching and domain fallback.
+- [x] **Task 3.3:** Implement `generate_peer_session_id(from_agent, to_agent)` and identity message formatting (`[Agent <from> requesting]`).
+- [x] **Task 3.4:** Add peer recursion and loop detection guards to prevent circular delegation chains (Agent A $\to$ Agent B $\to$ Agent A).
+- [x] **Task 3.5:** Implement `peer_chat` and `decompose_workflow` action handlers inside `actions/fleet_control.py`.
+- [x] **Task 3.6:** Implement upstream deliverable handoff piping (e.g. Sara's research output injected into Ali's prompt).
+- [x] **Task 3.7:** Update `core/prompt.txt` with multi-agent delegation guidelines and conversational response framing.
 
 * **Acceptance Criteria:**
   - *"Tell Ali to build a landing page"* dispatches to Ali.
-  - *"Research AI website builders"* automatically selects Sara.
-  - *"Research X then build landing page"* decomposes into Sara $\to$ Ali sequence.
+  - *"Research AI website builders"* automatically selects Sara/Kelly.
+  - *"Research X then build landing page"* decomposes into Kelly/Sara $\to$ Ali sequence.
 * **Unlocks:** True multi-agent autonomous workflow execution.
 
 ---

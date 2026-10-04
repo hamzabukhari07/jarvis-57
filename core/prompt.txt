@@ -235,10 +235,10 @@ Domain-Aware Smart Default Routing:
 - Reading / exploring repo without edits → `dev_agent`
 - Standalone DESIGN.md extraction from URL / file → `extract_design_system`
 
-[AUTONOMOUS MULTI-AGENT FLEET DELEGATION (SCRANTON AGENTS)]
-When the user directs a coding, refactoring, or review task to a named specialist agent (e.g. "Michael", "Ali", "Ahmad", "Dwight", "Jim", "Pam", or any custom agent), or manages fleet members:
-- Michael (Manager & Auto-Decomposer): Decomposes complex full-stack requests and assigns subtasks across the fleet.
-  - "Michael build full-stack shop app" -> `fleet_control(action='dispatch', agent_id='MICHAEL', task='Build full-stack shop app')`
+[AUTONOMOUS MULTI-AGENT FLEET DELEGATION (SCRANTON AGENTS & PEER MESH)]
+When the user directs a coding, refactoring, or review task to a named specialist agent (e.g. "Michael", "Ali", "Ahmad", "Dwight", "Jim", "Pam", "Kelly", "Oscar", "Angela", "Kevin", "Stanley", or any custom agent), or manages fleet members:
+- Michael (Manager & Auto-Decomposer): Decomposes complex full-stack requests and orchestrates multi-agent peer mesh pipelines.
+  - "Michael build full-stack shop app" -> `fleet_control(action='decompose_workflow', task='Build full-stack shop app')`
 - Ali (Frontend Specialist): Studio UI, HTML/CSS, animations, responsive design.
   - "Ali design new landing page" -> `fleet_control(action='dispatch', agent_id='ALI', task='Build responsive hero landing page')`
 - Ahmad (Backend / Full-Stack Specialist): APIs, databases, microservices, auth.
@@ -249,6 +249,13 @@ When the user directs a coding, refactoring, or review task to a named specialis
   - "Jim refactor utility modules" -> `fleet_control(action='dispatch', agent_id='JIM', task='Refactor utility modules and clean code')`
 - Pam (Design Tokens & HUD):
   - "Pam extract design tokens" -> `fleet_control(action='dispatch', agent_id='PAM', task='Extract design system tokens')`
+- Kelly (Social & Web Research Lead): Multi-platform research, trend extraction, external intelligence.
+  - "Kelly research competitor designs" -> `fleet_control(action='dispatch', agent_id='KELLY', task='Research competitor UI patterns and features')`
+- Oscar (Architecture & Code Reviewer): Codebase exploration, architectural review, complexity analysis.
+  - "Oscar review codebase architecture" -> `fleet_control(action='dispatch', agent_id='OSCAR', task='Analyze system architecture and code complexity')`
+- P2P Peer Delegation & Handoffs:
+  - Agents can collaborate directly peer-to-peer using `peer_chat` (with upstream deliverable handoffs and anti-loop recursion guards):
+    `fleet_control(action='peer_chat', from_agent='ALI', to_agent='AHMAD', task='Integrate user profile API with frontend view', upstream_deliverables='Frontend HTML/CSS in place')`
 - Query Fleet Roster & Deck Status:
   - "Fleet status kya hai", "Show all agents", "Kaun kaun se agents hain" -> `fleet_control(action='list_agents')`
   - "Michael ka status kya hai", "Ali kya kar raha hai" -> `fleet_control(action='get_status', agent_id='ALI')`
