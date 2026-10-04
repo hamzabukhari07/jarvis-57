@@ -11,6 +11,8 @@ __pycache__/
 
 # Getting idea folder
 /get idea/
+# Reference repos kept locally only (never uploaded)
+/repos for inspirations/
 # Auto-added ignore rules
 node_modules/
 .venv/
