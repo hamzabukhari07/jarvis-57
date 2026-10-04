@@ -1422,13 +1422,27 @@ class ZezoLive:
             self.ui.show_content(_label, r)
         return result
 
+    async def _run_tool_dispatch(self, name: str, args: dict, loop) -> str:
+        """Unified dispatch path for both immediate and confirmed tool execution."""
+        handler = self._get_tool_handler(name)
+        if handler:
+            return await handler(args)
+        elif self._action_registry.has(name):
+            return await self._dispatch_action_registry(name, args, loop)
+        elif self._plugin_registry.has(name):
+            r = await loop.run_in_executor(
+                None,
+                lambda: self._plugin_registry.run(name, args, player=self.ui, session_memory=None)
+            )
+            return r or "Done."
+        return f"Unknown tool: {name}"
+
     async def _execute_tool(self, fc) -> types.FunctionResponse:
         name = fc.name
         args = dict(fc.args or {})
 
         print(f"[Zezo] 🔧 {name}  {args}")
         self.ui.set_state("THINKING")
-
 
         loop   = asyncio.get_event_loop()
         result = "Done."
@@ -1446,6 +1460,28 @@ class ZezoLive:
                     id=fc.id, name=name,
                     response={"result": f"SECURITY POLICY VIOLATION: Action '{name}' was blocked by safety governance. Reason: {reason}"}
                 )
+            elif decision == governance.PolicyDecision.ASK:
+                print(f"[Security] 🛡️ Action '{name}' requires human confirmation: {reason}")
+
+                def _do_execute_confirmed():
+                    try:
+                        asyncio.run_coroutine_threadsafe(self._run_tool_dispatch(name, args, loop), loop)
+                        return f"Action '{name}' confirmed and executed."
+                    except Exception as _e:
+                        return f"Failed executing confirmed action '{name}': {_e}"
+
+                pending_msg = confirm_gate.request(
+                    key=f"{name}:{fc.id}",
+                    title=f"Authorize: {name}",
+                    detail=reason or f"Action '{name}' requires explicit approval.",
+                    run=_do_execute_confirmed,
+                )
+                if not self.ui.muted:
+                    self.ui.set_state("LISTENING")
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"result": pending_msg}
+                )
         except Exception as _gov_err:
             print(f"[Security] 🛑 Governance evaluation error: {_gov_err}")
             self.ui.write_log(f"ERR: Governance Error — {name} ({_gov_err})")
@@ -1460,20 +1496,7 @@ class ZezoLive:
             return await self._dispatch_save_memory(fc, name, args)
 
         try:
-            handler = self._get_tool_handler(name)
-            if handler:
-                result = await handler(args)
-            elif self._action_registry.has(name):
-                result = await self._dispatch_action_registry(name, args, loop)
-            elif self._plugin_registry.has(name):
-                r = await loop.run_in_executor(
-                    None,
-                    lambda: self._plugin_registry.run(name, args, player=self.ui, session_memory=None)
-                )
-                result = r or "Done."
-            else:
-                result = f"Unknown tool: {name}"
-
+            result = await self._run_tool_dispatch(name, args, loop)
         except Exception as e:
             result = f"Tool '{name}' failed: {e}"
             traceback.print_exc()
