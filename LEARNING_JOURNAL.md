@@ -1,3 +1,48 @@
+## [2026-10-04] — Core Tool Name Collision Resolution & Discovery Cleanliness
+
+- **What was built:**
+  - Resolved tool rejection collisions on startup where `manage_monitor`, `screen_process`, and `system_status` were rejected with `"Name collides with a reserved core tool"`.
+  - Kept `screen_process` as an inline tool in `main.py` (tied directly to live session screen/camera capture and WebSocket vision injection), and removed the redundant `TOOL` dict from `actions/screen_processor.py`.
+  - Converted `system_status` and `manage_monitor` into real standalone actions: deleted their duplicate entries from `main.py:TOOL_DECLARATIONS`, removed their handlers from `_get_tool_handler`, and deleted their inline methods (`_handle_system_status`, `_handle_manage_monitor`). They now load cleanly from `actions/system_monitor.py` and `actions/background_monitor.py`.
+  - Ensured all inline tools remain registered in `core/governance.py:INLINE_TOOL_RISKS`.
+  - Built regression test suite in `tests/test_tool_collision_and_governance_suite.py` asserting zero action rejections on startup and confirming every declared tool passes `governance.evaluate()` without unknown-tool DENY.
+- **Why this approach was chosen:**
+  - Enforces the Single Source of Truth architecture rule: each tool must originate from exactly one location. State-dependent tools remain inline in `main.py`, while stateless system inspection and background monitoring tools reside cleanly in `actions/`.
+- **What alternatives were considered:**
+  - Keeping all three tools inline: Rejected because `system_status` and `manage_monitor` are completely stateless, and cluttering `main.py` violates the modular monolith design.
+  - Making `screen_process` a standalone action: Rejected because screen and camera capture requires live reference to `ZezoLive._pending_vision`, `ZezoLive._vision_busy`, and the active WebSocket session.
+- **Key files touched:**
+  - `actions/screen_processor.py`
+  - `main.py`
+  - `core/governance.py`
+  - `tests/test_tool_collision_and_governance_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Before adding a tool declaration to `TOOL_DECLARATIONS` in `main.py`, check if an action file in `actions/` already defines it to prevent action loader collision rejections.
+  - Action loader silently skips helper files that do not declare a module-level `TOOL` dict.
+
+---
+
+## [2026-10-04] — Audio Cutoff & Security Governance Desync Fix
+
+- **What was built:**
+  - Resolved the mid-speech audio cutoff ("bolte bolte chup ho jana") caused by premature echo tail cancellation in `main.py:_listen_audio` and playback queue underrun in `_play_audio`.
+  - Registered `system_status` as `ToolRisk.READ_ONLY` in `core/governance.py:INLINE_TOOL_RISKS` so it is never blocked by security policies.
+  - Eliminated out-of-order `self.speak()` injection inside `_execute_tool` on security policy blocks, preserving Gemini Live WebSocket turn state synchronization.
+  - Handled `server_content.interrupted` from Google Gemini Live server cleanly.
+  - Initialized `memory/long_term.json` with `{}` to prevent startup `JSONDecodeError`.
+- **Why this approach was chosen:**
+  - Allowing the spectral echo discriminator (`self._echo.is_user_speech`) to operate without a naive `_lvl > 0.08` bypass prevents speaker bleed from falsely triggering barge-in cancellations in Gemini Live. Increasing playback wait timeout from 0.2s to 0.45s absorbs network packet jitter between speech clauses.
+- **Key files touched:**
+  - `main.py`
+  - `core/governance.py`
+  - `memory/long_term.json`
+- **What to remember for future work:**
+  - Never call `self.speak()` (which sends `send_client_content`) inside `_execute_tool` while Gemini Live is awaiting a `FunctionResponse` (`send_tool_response`); always return the refusal within the function response dictionary.
+  - The echo tail must not be cancelled by raw volume alone, because the speaker playback easily exceeds mic volume thresholds.
+
+---
+
 ## [2026-10-04] — Phase 10: Multi-Scenario E2E Acceptance Suite & Release Verification
 
 - **What was built:**
