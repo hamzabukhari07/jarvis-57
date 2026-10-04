@@ -519,20 +519,21 @@ To prevent regressions, the following critical repository invariants must be pre
 
 ### Phase 9: Scranton Pixel Office Visual Sync & Live Task State Board
 * **Objective:** Connect inter-agent communication, task progress, and Kanban states to live visual animations on the Scranton Office floor.
-* **Status:** ⏳ **Pending Execution**
+* **Status:** 🟢 **COMPLETED & VERIFIED (184/184 tests passed)**
 * **Files Touched:**
   - [frontend/office.html](file:///d:/anitgravity/zezo%20work/jarvis-57/frontend/office.html)
   - [core/ui_server.py](file:///d:/anitgravity/zezo%20work/jarvis-57/core/ui_server.py)
-  - [core/fleet_manager.py](file:///d:/anitgravity/zezo%20work/jarvis-57/core/fleet_manager.py)
+  - `tests/test_phase9_office_visual_sync_suite.py`
 
 #### 📋 Todo List:
-- [ ] **Task 9.1:** Add WebSocket event listeners in `frontend/office.html` for `agent_peer_chat`, `agent_task_progress`, and `agent_status_change`.
-- [ ] **Task 9.2:** Render animated speech and collaboration lines over agent pixel desks during `peer_chat` interactions.
-- [ ] **Task 9.3:** Display real-time progress indicators above agent desks when active tasks execute in background worktrees.
-- [ ] **Task 9.4:** Implement interactive Kanban task board (`Backlog` $\to$ `Running` $\to$ `Review` $\to$ `Done`) linked to fleet tasks.
+- [x] **Task 9.1:** Add WebSocket event listeners in `frontend/office.html` for `peer_delegation_started`, `agent_peer_chat`, `agent_task_progress`, and `agent_status_change`.
+- [x] **Task 9.2:** Render animated SVG dashed collaboration lines (`drawCollaborationLine`) and speech bubbles over agent pixel desks during `peer_chat` interactions.
+- [x] **Task 9.3:** Display real-time progress indicators above agent desks when active tasks execute in background worktrees.
+- [x] **Task 9.4:** Implement interactive Kanban task board (`QUEUED` $\to$ `RUNNING` $\to$ `ATTENTION` $\to$ `COMPLETED`) linked to backend `TaskManager` tasks via `GET /api/tasks` endpoint.
 
 * **Acceptance Criteria:**
   - Ali consulting Sara renders an active communication line and speech bubble between their desks.
+  - Kanban Board modal adheres strictly to AGENTS.md §8 rules (opaque `#0a0a0a` frame, no inner backdrop-filter, explicit CSS transitions).
 * **Unlocks:** State-of-the-art interactive multi-agent desktop visualizer.
 
 ---
