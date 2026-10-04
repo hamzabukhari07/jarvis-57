@@ -1,3 +1,31 @@
+## [2026-10-04] — Phase 5: Composite Session Isolation & Deep Memory Recall
+
+- **What was built:**
+  - Implemented `generate_composite_session_id(agent_id, session_uuid)` generating isolated composite tokens (`<agent_id>:<session_uuid>`).
+  - Added `expand_turns(lo, hi, session_id=None)` in `memory/sqlite_memory.py` allowing retrieval of contiguous turn sequences across range bounds.
+  - Updated `search_scroll_history` with optional `session_id` scoping for isolated agent memory recall.
+  - Fixed schema alignment in `memory/memory_condenser.py` and `memory/sqlite_memory.py` (`last_turn_id` $\to$ `last_condensed_turn_id`).
+  - Exported `update_memory_entry` helper in `memory/memory_manager.py`.
+  - Created new action module `actions/recall_history.py` supporting `op="search"` and `op="expand"`.
+  - Exposed `.usage_metadata` token telemetry in `core/gemini.py` logging prompt, candidates, and total tokens.
+  - Created unit and integration test suite in `tests/test_phase5_composite_session_and_memory_recall_suite.py`.
+- **Why this approach was chosen:**
+  - Enables long-horizon timeline expansion and memory recall without bloating the live active system prompt context.
+- **Key files touched:**
+  - `memory/sqlite_memory.py`
+  - `memory/memory_manager.py`
+  - `memory/memory_condenser.py`
+  - `actions/recall_history.py`
+  - `core/gemini.py`
+  - `tests/test_phase5_composite_session_and_memory_recall_suite.py`
+  - `planning/MASTER_IMPLEMENTATION_ROADMAP.md`
+- **Verification:**
+  - Layer 1 (static): `python -m py_compile memory/sqlite_memory.py memory/memory_condenser.py actions/recall_history.py core/gemini.py tests/test_phase5_composite_session_and_memory_recall_suite.py` (Exit 0).
+  - Layer 2 (runtime): `python -m pytest tests/test_phase5_composite_session_and_memory_recall_suite.py -v` (4 passed in 0.16s).
+  - Layer 3 (regression): Full test suite executed with 163 passed, 5 skipped, 0 failures (36.71s).
+
+---
+
 ## [2026-10-04] — Phase 4: Dynamic Agent Capability Registry & Per-Agent Tool Permissions
 
 - **What was built:**

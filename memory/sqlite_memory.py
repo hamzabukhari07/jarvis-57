@@ -41,6 +41,24 @@ DB_PATH = get_db_path()
 _db_lock = threading.Lock()
 _current_session_id = f"sess_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
+
+def generate_composite_session_id(agent_id: str, session_uuid: Optional[str] = None) -> str:
+    """Generate isolated composite session ID format: <agent_id>:<session_uuid>."""
+    aid = (agent_id or "ZEZO").upper().strip()
+    suuid = session_uuid or f"sess_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.urandom(3).hex()}"
+    return f"{aid}:{suuid}"
+
+
+def get_current_session_id() -> str:
+    """Return the active session ID."""
+    return _current_session_id
+
+
+def set_current_session_id(session_id: str) -> None:
+    """Set the active global session ID."""
+    global _current_session_id
+    _current_session_id = session_id.strip()
+
 # ── Secret Redaction Patterns ───────────────────────────────────────────────
 # Each entry is (compiled pattern, replacement). Most replacements are the
 # blanket token, but credential-bearing HEADERS keep their name so a scrubbed
@@ -293,7 +311,7 @@ def sync_facts_from_dict(memory_dict: dict) -> None:
             print(f"[SQLite Memory] ⚠️ sync_facts error: {e}")
 
 
-def search_scroll_history(query: str, limit: int = 5) -> list[dict]:
+def search_scroll_history(query: str, limit: int = 5, session_id: Optional[str] = None) -> list[dict]:
     """
     Search historical verbatim turns and tool executions via FTS5 BM25 ranking.
     Returns matching snippets, role, timestamp, and tool execution details.
@@ -316,19 +334,34 @@ def search_scroll_history(query: str, limit: int = 5) -> list[dict]:
     with _db_lock:
         try:
             conn = _get_connection()
-            cursor = conn.execute(
-                """
-                SELECT t.id, t.session_id, t.role, t.content, t.tool_name,
-                       t.tool_args, t.tool_result, t.timestamp,
-                       bm25(turns_fts) AS rank
-                FROM turns_fts f
-                JOIN turns t ON f.rowid = t.id
-                WHERE turns_fts MATCH ?
-                ORDER BY rank ASC, t.id DESC
-                LIMIT ?
-                """,
-                (fts_query, limit),
-            )
+            if session_id:
+                cursor = conn.execute(
+                    """
+                    SELECT t.id, t.session_id, t.role, t.content, t.tool_name,
+                           t.tool_args, t.tool_result, t.timestamp,
+                           bm25(turns_fts) AS rank
+                    FROM turns_fts f
+                    JOIN turns t ON f.rowid = t.id
+                    WHERE turns_fts MATCH ? AND t.session_id = ?
+                    ORDER BY rank ASC, t.id DESC
+                    LIMIT ?
+                    """,
+                    (fts_query, session_id, limit),
+                )
+            else:
+                cursor = conn.execute(
+                    """
+                    SELECT t.id, t.session_id, t.role, t.content, t.tool_name,
+                           t.tool_args, t.tool_result, t.timestamp,
+                           bm25(turns_fts) AS rank
+                    FROM turns_fts f
+                    JOIN turns t ON f.rowid = t.id
+                    WHERE turns_fts MATCH ?
+                    ORDER BY rank ASC, t.id DESC
+                    LIMIT ?
+                    """,
+                    (fts_query, limit),
+                )
             for row in cursor.fetchall():
                 results.append({
                     "id": row["id"],
@@ -347,21 +380,78 @@ def search_scroll_history(query: str, limit: int = 5) -> list[dict]:
             try:
                 conn = _get_connection()
                 like_term = f"%{clean_q}%"
-                cursor = conn.execute(
-                    """
-                    SELECT id, session_id, role, content, tool_name, tool_args, tool_result, timestamp, 0 as rank
-                    FROM turns
-                    WHERE content LIKE ? OR tool_result LIKE ? OR tool_name LIKE ?
-                    ORDER BY id DESC
-                    LIMIT ?
-                    """,
-                    (like_term, like_term, like_term, limit),
-                )
+                if session_id:
+                    cursor = conn.execute(
+                        """
+                        SELECT id, session_id, role, content, tool_name, tool_args, tool_result, timestamp, 0 as rank
+                        FROM turns
+                        WHERE (content LIKE ? OR tool_result LIKE ? OR tool_name LIKE ?) AND session_id = ?
+                        ORDER BY id DESC
+                        LIMIT ?
+                        """,
+                        (like_term, like_term, like_term, session_id, limit),
+                    )
+                else:
+                    cursor = conn.execute(
+                        """
+                        SELECT id, session_id, role, content, tool_name, tool_args, tool_result, timestamp, 0 as rank
+                        FROM turns
+                        WHERE content LIKE ? OR tool_result LIKE ? OR tool_name LIKE ?
+                        ORDER BY id DESC
+                        LIMIT ?
+                        """,
+                        (like_term, like_term, like_term, limit),
+                    )
                 for row in cursor.fetchall():
                     results.append(dict(row))
                 conn.close()
             except Exception as e2:
                 print(f"[SQLite Memory] ⚠️ search_scroll_history error: {e2}")
+
+    return results
+
+
+def expand_turns(lo: int, hi: int, session_id: Optional[str] = None) -> list[dict]:
+    """
+    Fetch contiguous turn sequences by ID range [lo, hi] inclusive.
+    Optionally scopes to a specific composite session ID.
+    """
+    if lo > hi:
+        lo, hi = hi, lo
+
+    # Cap range to 200 turns per call to protect memory
+    if (hi - lo) > 200:
+        hi = lo + 200
+
+    results = []
+    with _db_lock:
+        try:
+            conn = _get_connection()
+            if session_id:
+                cursor = conn.execute(
+                    """
+                    SELECT id, session_id, role, content, tool_name, tool_args, tool_result, timestamp
+                    FROM turns
+                    WHERE id >= ? AND id <= ? AND session_id = ?
+                    ORDER BY id ASC
+                    """,
+                    (lo, hi, session_id),
+                )
+            else:
+                cursor = conn.execute(
+                    """
+                    SELECT id, session_id, role, content, tool_name, tool_args, tool_result, timestamp
+                    FROM turns
+                    WHERE id >= ? AND id <= ?
+                    ORDER BY id ASC
+                    """,
+                    (lo, hi),
+                )
+            for row in cursor.fetchall():
+                results.append(dict(row))
+            conn.close()
+        except Exception as e:
+            print(f"[SQLite Memory] ⚠️ expand_turns error: {e}")
 
     return results
 
@@ -570,7 +660,7 @@ def record_condensation(session_id: str, last_turn_id: int, summary: str) -> Non
             with conn:
                 conn.execute(
                     """
-                    INSERT INTO session_condensations (session_id, last_turn_id, summary, condensed_at)
+                    INSERT INTO session_condensations (session_id, last_condensed_turn_id, summary, condensed_at)
                     VALUES (?, ?, ?, ?)
                     """,
                     (session_id, last_turn_id, redact_secrets(summary), ts),

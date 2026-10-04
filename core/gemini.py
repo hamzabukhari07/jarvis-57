@@ -421,7 +421,18 @@ def call(contents, tier: str = FAST, config=None,
             kwargs = {"model": model, "contents": contents}
             if config is not None:
                 kwargs["config"] = config
-            return cl.models.generate_content(**kwargs)
+            resp = cl.models.generate_content(**kwargs)
+            # Expose token usage telemetry
+            try:
+                usage = getattr(resp, "usage_metadata", None)
+                if usage:
+                    prompt_toks = getattr(usage, "prompt_token_count", 0)
+                    resp_toks = getattr(usage, "candidates_token_count", 0)
+                    total_toks = getattr(usage, "total_token_count", 0)
+                    print(f"[Gemini Telemetry] {model} tokens -> prompt: {prompt_toks}, candidates: {resp_toks}, total: {total_toks}")
+            except Exception:
+                pass
+            return resp
         except Exception as e:
             msg = str(e)
             if ("429" in msg or "RESOURCE_EXHAUSTED" in msg

@@ -419,19 +419,21 @@ To prevent regressions, the following critical repository invariants must be pre
 
 ### Phase 5: Composite Session Isolation & Deep Memory Recall
 * **Objective:** Prevent cross-agent memory contamination and implement verifiable deep memory recall (`expand lo..hi`).
-* **Status:** ⏳ **Pending Execution**
+* **Status:** 🟢 **COMPLETED & VERIFIED (163/163 tests passed)**
 * **Files Touched:**
   - [memory/sqlite_memory.py](file:///d:/anitgravity/zezo%20work/jarvis-57/memory/sqlite_memory.py)
   - [memory/memory_manager.py](file:///d:/anitgravity/zezo%20work/jarvis-57/memory/memory_manager.py)
   - [memory/memory_condenser.py](file:///d:/anitgravity/zezo%20work/jarvis-57/memory/memory_condenser.py)
-  - `actions/recall_history.py` (New action)
+  - [actions/recall_history.py](file:///d:/anitgravity/zezo%20work/jarvis-57/actions/recall_history.py)
+  - [core/gemini.py](file:///d:/anitgravity/zezo%20work/jarvis-57/core/gemini.py)
+  - `tests/test_phase5_composite_session_and_memory_recall_suite.py`
 
 #### 📋 Todo List:
-- [ ] **Task 5.1:** Fix schema and broken SQL queries in `memory/memory_condenser.py` (`last_turn_id` $\to$ `last_condensed_turn_id`) and fix missing imports.
-- [ ] **Task 5.2:** Implement composite session IDs (`agent_id:session_uuid`) to isolate agent conversational turns in `memory/sqlite_memory.py`.
-- [ ] **Task 5.3:** Implement `expand_turns(lo, hi, session_id=None)` in `memory/sqlite_memory.py` for fetching contiguous turn sequences by ID range.
-- [ ] **Task 5.4:** Create `actions/recall_history.py` tool supporting `op="search"` and `op="expand"` operations.
-- [ ] **Task 5.5:** Expose `.usage_metadata` token telemetry in logs from `core/gemini.py` to monitor context pressure.
+- [x] **Task 5.1:** Fix schema and broken SQL queries in `memory/memory_condenser.py` (`last_turn_id` $\to$ `last_condensed_turn_id`) and fix missing imports.
+- [x] **Task 5.2:** Implement composite session IDs (`agent_id:session_uuid`) to isolate agent conversational turns in `memory/sqlite_memory.py`.
+- [x] **Task 5.3:** Implement `expand_turns(lo, hi, session_id=None)` in `memory/sqlite_memory.py` for fetching contiguous turn sequences by ID range.
+- [x] **Task 5.4:** Create `actions/recall_history.py` tool supporting `op="search"` and `op="expand"` operations.
+- [x] **Task 5.5:** Expose `.usage_metadata` token telemetry in logs from `core/gemini.py` to monitor context pressure.
 
 * **Acceptance Criteria:**
   - Agent can search past history and retrieve full untruncated turns 400–450 by turn ID.

@@ -161,6 +161,13 @@ def _recursive_update(target: dict, updates: dict) -> bool:
     return changed
 
 
+def update_memory_entry(category: str, key: str, value: str) -> None:
+    """Helper to update or create a single memory fact entry by category and key."""
+    if not category or not key or value is None:
+        return
+    update_memory({category: {key: value}})
+
+
 def update_memory(memory_update: dict) -> dict:
     if not isinstance(memory_update, dict) or not memory_update:
         return load_memory()
