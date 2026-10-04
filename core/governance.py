@@ -66,74 +66,53 @@ class ApprovalGrant:
         )
 
 
-# ── Action to Risk Classification Mapping ─────────────────────────────────────
-# Default / Fallback Risk Taxonomy for Core & Inline Actions
-_DEFAULT_TOOL_RISKS: dict[str, ToolRisk] = {
-    "screen_process":         ToolRisk.READ_ONLY,
-    "web_search":             ToolRisk.READ_ONLY,
-    "web_read_page":          ToolRisk.READ_ONLY,
-    "system_status":          ToolRisk.READ_ONLY,
-    "task_status":            ToolRisk.READ_ONLY,
-    "weather_report":         ToolRisk.READ_ONLY,
-    "flight_finder":          ToolRisk.READ_ONLY,
-    "game_updater":           ToolRisk.READ_ONLY,
-    "extract_design_system":  ToolRisk.READ_ONLY,
-    "file_processor":         ToolRisk.READ_ONLY,
-    "read_skill":             ToolRisk.READ_ONLY,
-    "list_skills":            ToolRisk.READ_ONLY,
-    "recall_memory":          ToolRisk.READ_ONLY,
-
-    "computer_control":       ToolRisk.LOCAL_MUTATION,
-    "open_app":               ToolRisk.LOCAL_MUTATION,
-    "desktop_control":        ToolRisk.LOCAL_MUTATION,
-    "file_controller":        ToolRisk.LOCAL_MUTATION,
-    "computer_settings":      ToolRisk.LOCAL_MUTATION,
-    "youtube_video":          ToolRisk.LOCAL_MUTATION,
-    "reminder":               ToolRisk.LOCAL_MUTATION,
-    "manage_monitor":         ToolRisk.LOCAL_MUTATION,
-    "browser_control":        ToolRisk.LOCAL_MUTATION,
-    "save_learned_skill":     ToolRisk.LOCAL_MUTATION,
-    "save_memory":            ToolRisk.LOCAL_MUTATION,
-    "undo":                   ToolRisk.LOCAL_MUTATION,
-    "close_camera":           ToolRisk.LOCAL_MUTATION,
-
-    "send_message":           ToolRisk.EXTERNAL_MUTATION,
-    "agent_reach":            ToolRisk.EXTERNAL_MUTATION,
-
-    "opencode_run":           ToolRisk.CODE_EXECUTION,
-    "kilo_run":               ToolRisk.CODE_EXECUTION,
-    "antigravity_run":        ToolRisk.CODE_EXECUTION,
-    "code_helper":            ToolRisk.CODE_EXECUTION,
-    "dev_agent":              ToolRisk.CODE_EXECUTION,
-    "clone_website":          ToolRisk.CODE_EXECUTION,
-    "fleet_control":          ToolRisk.LOCAL_MUTATION,
-
-    "shutdown_zezo":          ToolRisk.PRIVILEGED_OS,
+# ── Inline Tools Risk Table (For tools hosted directly in main.py) ───────────
+INLINE_TOOL_RISKS: dict[str, ToolRisk] = {
+    "screen_process":     ToolRisk.READ_ONLY,
+    "close_camera":       ToolRisk.LOCAL_MUTATION,
+    "manage_monitor":     ToolRisk.LOCAL_MUTATION,
+    "shutdown_zezo":      ToolRisk.PRIVILEGED_OS,
+    "save_memory":        ToolRisk.LOCAL_MUTATION,
+    "recall_memory":      ToolRisk.READ_ONLY,
+    "undo":               ToolRisk.LOCAL_MUTATION,
+    "read_skill":         ToolRisk.READ_ONLY,
+    "list_skills":        ToolRisk.READ_ONLY,
+    "save_learned_skill": ToolRisk.LOCAL_MUTATION,
 }
-
-TOOL_RISK_MAP = _DEFAULT_TOOL_RISKS
 
 
 def get_tool_risk(tool_name: str, parameters: dict | None = None) -> Optional[ToolRisk]:
-    """Return the assigned risk tier for any action name, accounting for fine-grained sub-actions and action definitions. Returns None for unknown tools (fail closed)."""
+    """
+    Return the assigned risk tier for any action name.
+    1. Checks dynamic TOOL dict from ActionRegistry (actions/*.py).
+    2. Checks INLINE_TOOL_RISKS for main.py inline tools.
+    3. Handles sub-action nuances (e.g. send_message search actions).
+    4. Returns None if unknown (fail-closed).
+    """
     if tool_name == "send_message":
         act = str((parameters or {}).get("action", "")).lower().strip()
         if act in ("search", "search_contact", "find_chat", "find_contact", "read", "list", "get_status"):
             return ToolRisk.READ_ONLY
         return ToolRisk.EXTERNAL_MUTATION
 
-    # Check dynamically discovered action risk if loaded in sys.modules
-    mod_name = f"actions.{tool_name}"
-    if mod_name in sys.modules:
-        mod = sys.modules[mod_name]
-        tool_decl = getattr(mod, "TOOL", None)
-        if isinstance(tool_decl, dict) and "risk" in tool_decl:
-            r = str(tool_decl["risk"]).lower().strip()
+    # 1. Check dynamically discovered action registry
+    try:
+        from core.action_loader import get_action_registry
+        reg = get_action_registry()
+        rec = reg.get(tool_name)
+        if rec and rec.risk:
             for tr in ToolRisk:
-                if tr.value == r:
+                if tr.value == rec.risk:
                     return tr
+    except Exception:
+        pass
 
-    return _DEFAULT_TOOL_RISKS.get(tool_name, None)
+    # 2. Check inline tools table
+    if tool_name in INLINE_TOOL_RISKS:
+        return INLINE_TOOL_RISKS[tool_name]
+
+    # 3. Unknown tool -> Fail closed
+    return None
 
 
 # ── Critical System Paths (Forbidden to modify / delete) ──────────────────────

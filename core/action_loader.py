@@ -300,10 +300,23 @@ def discover_actions(actions_dir: Path, reserved_names: set[str] | None = None,
             valid[rec.name] = rec
             logger(f"Action loaded: {rec.name} ({path.name})")
         else:
-            # Only log a rejection if the file actually tried to be an action.
             logger(f"Action rejected: {path.name} — {rec.error}")
 
+    global _GLOBAL_REGISTRY
     registry = ActionRegistry(valid, logger)
     registry._all_records = all_records
+    _GLOBAL_REGISTRY = registry
     logger(f"Action discovery complete: {len(valid)} active.")
     return registry
+
+
+_GLOBAL_REGISTRY: Optional[ActionRegistry] = None
+
+
+def get_action_registry() -> ActionRegistry:
+    """Returns the globally discovered action registry, auto-discovering if not yet initialized."""
+    global _GLOBAL_REGISTRY
+    if _GLOBAL_REGISTRY is None:
+        actions_dir = Path(__file__).resolve().parent.parent / "actions"
+        _GLOBAL_REGISTRY = discover_actions(actions_dir, logger=lambda m: None)
+    return _GLOBAL_REGISTRY

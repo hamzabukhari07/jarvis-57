@@ -204,4 +204,34 @@ def test_governance_unknown_tool_fails_closed_deny():
     assert "fail-closed" in reason
 
 
+def test_every_tool_governance_evaluation_not_unknown():
+    from pathlib import Path
+    from core.action_loader import discover_actions
+    from core.governance import evaluate, get_tool_risk, INLINE_TOOL_RISKS, PolicyDecision
+
+    actions_dir = Path(__file__).parent.parent / "actions"
+    registry = discover_actions(actions_dir)
+    action_names = registry.names()
+    inline_names = set(INLINE_TOOL_RISKS.keys())
+
+    all_tools = sorted(action_names | inline_names)
+    assert len(all_tools) >= 30, f"Expected at least 30 tools, got {len(all_tools)}"
+
+    # Explicit check for fleet_control, browser_control, task_status
+    for explicit_name in ("fleet_control", "browser_control", "task_status"):
+        assert explicit_name in all_tools, f"Missing required explicit tool: {explicit_name}"
+
+    print("\n=== TOOL -> RISK -> POLICY EVALUATION ===")
+    for tool_name in all_tools:
+        safe_args = {}
+        risk = get_tool_risk(tool_name, safe_args)
+        assert risk is not None, f"Tool '{tool_name}' failed risk lookup (returned None)"
+
+        decision, reason = evaluate(tool_name, safe_args)
+        assert decision != PolicyDecision.DENY or "unknown" not in reason.lower(), (
+            f"Tool '{tool_name}' was blocked as unknown: {reason}"
+        )
+        print(f"{tool_name:25} -> {risk.value:18} -> {decision.value}")
+
+
 
