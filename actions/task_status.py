@@ -66,6 +66,55 @@ def task_status(parameters: dict, player=None, speak=None) -> str:
             return f"Failed to cancel active task {tid}."
         return "No active background tasks are currently running to cancel."
 
+    # Conversational Team / Fleet status queries
+    if action in ("team", "team_status", "fleet", "blocked", "completed_today"):
+        from core.fleet_manager import fleet_manager
+        deck = fleet_manager.get_fleet_deck_state()
+        all_tasks = tm.all_tasks()
+
+        if action == "blocked":
+            failed_tasks = [t for t in all_tasks if t.get("status") == "failed"]
+            if not failed_tasks:
+                return "No agents or tasks are currently blocked or failed. All active pipelines are running smoothly."
+            lines = ["Blocked / Failed Tasks:"]
+            for ft in failed_tasks:
+                lines.append(f"• {ft.get('tool')} ({ft.get('id')}): {ft.get('error') or ft.get('message')}")
+            return "\n".join(lines)
+
+        if action == "completed_today":
+            completed = [t for t in all_tasks if t.get("status") == "done"]
+            if not completed:
+                return "No background tasks have completed yet today."
+            lines = [f"Completed Tasks ({len(completed)}):"]
+            for ct in completed:
+                lines.append(f"• {ct.get('tool')} ({ct.get('id')}) finished in {ct.get('elapsed_sec')}s.")
+            return "\n".join(lines)
+
+        # General team status
+        active_agents = []
+        idle_agents = []
+        for a in deck:
+            if a.get("status") == "busy":
+                task_title = a.get("task_title") or "active task"
+                active_agents.append(f"• {a['name']} ({a['role']}): Working on '{task_title}'")
+            else:
+                idle_agents.append(f"• {a['name']} ({a['role']}): Idle, ready for assignment")
+
+        summary = []
+        if active_agents:
+            summary.append(f"Active Agents ({len(active_agents)}):")
+            summary.extend(active_agents)
+        if idle_agents:
+            summary.append(f"Available Agents ({len(idle_agents)}):")
+            summary.extend(idle_agents)
+
+        active_bg = tm.list_active()
+        if active_bg:
+            summary.append("\nActive Background Tasks:")
+            summary.extend([f"• {_fmt(s)}" for s in active_bg])
+
+        return "\n".join(summary) if summary else "No agents or background tasks currently active."
+
     if task_id:
         st = tm.status(task_id)
         if st:

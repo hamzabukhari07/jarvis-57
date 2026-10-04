@@ -468,24 +468,26 @@ To prevent regressions, the following critical repository invariants must be pre
 
 ### Phase 7: Task Lifecycle Watchdog, Conversational Status & Steering Gates
 * **Objective:** Introduce Doom-Loop detection, per-turn iteration caps, batch tool pipelining (`run_tool_batch`), deliverable verification, and natural language team progress reporting.
-* **Status:** ⏳ **Pending Execution**
+* **Status:** 🟢 **COMPLETED & VERIFIED (178/178 tests passed)**
 * **Files Touched:**
   - `core/loop_gates.py` (New module)
+  - `core/deliverable_verifier.py` (New module)
   - [actions/task_status.py](file:///d:/anitgravity/zezo%20work/jarvis-57/actions/task_status.py)
   - `actions/run_tool_batch.py` (New action)
   - `actions/ast_tool.py` (New action)
   - [core/action_loader.py](file:///d:/anitgravity/zezo%20work/jarvis-57/core/action_loader.py)
   - [core/circuit_breaker.py](file:///d:/anitgravity/zezo%20work/jarvis-57/core/circuit_breaker.py)
   - [core/task_manager.py](file:///d:/anitgravity/zezo%20work/jarvis-57/core/task_manager.py)
+  - `tests/test_phase7_loop_gates_and_watchdog_suite.py`
 
 #### 📋 Todo List:
-- [ ] **Task 7.1:** Implement `core/loop_gates.py` with 4 evaluation gates: `iteration_cap`, `doom_loop` (windowed argument similarity), `tool_budget`, and `watchdog_timeout`.
-- [ ] **Task 7.2:** Wire `loop_gates.check()` into `core/action_loader.py:run` before tool dispatch.
-- [ ] **Task 7.3:** Port `run_tool_batch` and `ast_tool` into `actions/` with input sanitization and execution limits.
-- [ ] **Task 7.4:** Implement `verify_deliverable(task_type, path)` to validate output code/HTML structure before completing tasks.
-- [ ] **Task 7.5:** Upgrade `actions/task_status.py` and `actions/fleet_control.py` to answer natural team status queries (*"What's my team working on?"*, *"Is any agent blocked?"*, *"What did the team complete today?"*).
-- [ ] **Task 7.6:** Support `INTERRUPT_AND_CONTINUE` steering feedback injected into tool return values when doom loops occur.
-- [ ] **Task 7.7:** Key `circuit_breaker` failure state per-tool rather than per-risk-tier.
+- [x] **Task 7.1:** Implement `core/loop_gates.py` with 4 evaluation gates: `iteration_cap`, `doom_loop` (windowed argument similarity), `tool_budget`, and `watchdog_timeout`.
+- [x] **Task 7.2:** Wire `loop_gates.evaluate()` into `core/action_loader.py:run` before tool dispatch.
+- [x] **Task 7.3:** Port `run_tool_batch` and `ast_tool` into `actions/` with input sanitization and execution limits.
+- [x] **Task 7.4:** Implement `verify_deliverable(task_type, path)` to validate output code/HTML structure before completing tasks.
+- [x] **Task 7.5:** Upgrade `actions/task_status.py` and `actions/fleet_control.py` to answer natural team status queries (*"What's my team working on?"*, *"Is any agent blocked?"*, *"What did the team complete today?"*).
+- [x] **Task 7.6:** Support `INTERRUPT_AND_CONTINUE` steering feedback injected into tool return values when doom loops occur.
+- [x] **Task 7.7:** Key `circuit_breaker` failure state per-tool rather than per-risk-tier.
 
 * **Acceptance Criteria:**
   - Repetitive failing tool calls trigger an interrupt with corrective instructions rather than an infinite loop.

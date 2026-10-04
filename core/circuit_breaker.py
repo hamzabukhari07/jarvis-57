@@ -34,7 +34,8 @@ def get_tool_tier(tool_name: str) -> RiskTier:
 
 
 @dataclass
-class TierMetrics:
+class ToolMetrics:
+    tool_name: str
     tier: RiskTier
     state: BreakerState = BreakerState.CLOSED
     failure_count: int = 0
@@ -46,26 +47,29 @@ class TierMetrics:
 
 
 class RiskAwareCircuitBreaker:
-    """Risk-tiered capability circuit breaker protecting system against cascade failures."""
+    """Per-tool risk-aware circuit breaker protecting system against cascade failures."""
 
     def __init__(self, velocity_window_sec: float = 15.0, velocity_threshold: int = 3):
         self._lock = threading.Lock()
         self.velocity_window_sec = velocity_window_sec
         self.velocity_threshold = velocity_threshold
-        self._tiers: Dict[RiskTier, TierMetrics] = {
-            RiskTier.L0_READ_ONLY: TierMetrics(tier=RiskTier.L0_READ_ONLY),
-            RiskTier.L1_LOW_RISK: TierMetrics(tier=RiskTier.L1_LOW_RISK),
-            RiskTier.L2_DESTRUCTIVE: TierMetrics(tier=RiskTier.L2_DESTRUCTIVE),
-        }
+        self._tools: Dict[str, ToolMetrics] = {}
+
+    def _get_or_create_metrics(self, tool_name: str) -> ToolMetrics:
+        tname = (tool_name or "unknown").strip().lower()
+        if tname not in self._tools:
+            tier = get_tool_tier(tname)
+            self._tools[tname] = ToolMetrics(tool_name=tname, tier=tier)
+        return self._tools[tname]
 
     def get_tool_tier(self, tool_name: str) -> RiskTier:
         return _map_risk_tier(tool_name)
 
     def can_execute(self, tool_name: str) -> Tuple[bool, Optional[str]]:
-        tier = self.get_tool_tier(tool_name)
         with self._lock:
-            metrics = self._tiers[tier]
+            metrics = self._get_or_create_metrics(tool_name)
             now = time.time()
+            tier = metrics.tier
 
             if metrics.state == BreakerState.CLOSED:
                 return True, None
@@ -75,21 +79,21 @@ class RiskAwareCircuitBreaker:
                     if (now - metrics.last_failure_time) >= 10.0:
                         metrics.state = BreakerState.HALF_OPEN
                         return True, None
-                    return False, f"CircuitBreaker: L0 read-only queries paused ({metrics.tripped_reason}). Retry in 10s."
+                    return False, f"CircuitBreaker: Tool '{tool_name}' paused ({metrics.tripped_reason}). Retry in 10s."
 
                 if tier == RiskTier.L1_LOW_RISK:
                     if (now - metrics.last_failure_time) >= 60.0:
                         metrics.state = BreakerState.HALF_OPEN
                         return True, None
-                    return False, f"CircuitBreaker: L1 mutation tools throttled ({metrics.tripped_reason}). Cooldown active."
+                    return False, f"CircuitBreaker: Tool '{tool_name}' throttled ({metrics.tripped_reason}). Cooldown active."
 
                 if tier == RiskTier.L2_DESTRUCTIVE:
                     if metrics.human_override_required:
-                        return False, f"CircuitBreaker: L2 destructive action blocked ({metrics.tripped_reason}). Human confirmation required to re-arm."
+                        return False, f"CircuitBreaker: Tool '{tool_name}' blocked ({metrics.tripped_reason}). Human confirmation required to re-arm."
                     if (now - metrics.last_failure_time) >= 120.0:
                         metrics.state = BreakerState.HALF_OPEN
                         return True, None
-                    return False, f"CircuitBreaker: L2 destructive tools tripped ({metrics.tripped_reason})."
+                    return False, f"CircuitBreaker: Tool '{tool_name}' tripped ({metrics.tripped_reason})."
 
             if metrics.state == BreakerState.HALF_OPEN:
                 return True, None
@@ -97,10 +101,10 @@ class RiskAwareCircuitBreaker:
         return True, None
 
     def record_success(self, tool_name: str) -> None:
-        tier = self.get_tool_tier(tool_name)
         with self._lock:
-            metrics = self._tiers[tier]
+            metrics = self._get_or_create_metrics(tool_name)
             metrics.consecutive_successes += 1
+            tier = metrics.tier
 
             if metrics.state == BreakerState.HALF_OPEN:
                 if tier == RiskTier.L0_READ_ONLY and metrics.consecutive_successes >= 1:
@@ -115,10 +119,10 @@ class RiskAwareCircuitBreaker:
                     metrics.human_override_required = False
 
     def record_failure(self, tool_name: str, error_message: str) -> str:
-        tier = self.get_tool_tier(tool_name)
         now = time.time()
         with self._lock:
-            metrics = self._tiers[tier]
+            metrics = self._get_or_create_metrics(tool_name)
+            tier = metrics.tier
             metrics.failure_count += 1
             metrics.consecutive_successes = 0
             metrics.last_failure_time = now
@@ -140,31 +144,32 @@ class RiskAwareCircuitBreaker:
                 metrics.state = BreakerState.OPEN
                 metrics.human_override_required = True
 
-            return f"CircuitBreaker [{tier.value}]: state={metrics.state.value} (failures={metrics.failure_count})"
+            return f"CircuitBreaker [{tool_name}]: state={metrics.state.value} (failures={metrics.failure_count})"
 
-    def human_rearm(self, tier: Optional[RiskTier] = None) -> str:
+    def human_rearm(self, tool_name: Optional[str] = None) -> str:
         with self._lock:
-            target_tiers = [tier] if tier else list(self._tiers.keys())
-            for t in target_tiers:
-                m = self._tiers[t]
+            target_tools = [self._get_or_create_metrics(tool_name)] if tool_name else list(self._tools.values())
+            for m in target_tools:
                 m.state = BreakerState.CLOSED
                 m.failure_count = 0
                 m.consecutive_successes = 0
                 m.human_override_required = False
                 m.error_timestamps.clear()
-            return f"CircuitBreaker manually re-armed for {', '.join(t.value for t in target_tiers)}."
+            names = [m.tool_name for m in target_tools] or ["all tools"]
+            return f"CircuitBreaker manually re-armed for {', '.join(names)}."
 
     def get_status_summary(self) -> Dict[str, dict]:
         with self._lock:
             return {
-                tier.value: {
+                tool: {
+                    "tier": m.tier.value,
                     "state": m.state.value,
                     "failures": m.failure_count,
                     "consecutive_successes": m.consecutive_successes,
                     "human_override_required": m.human_override_required,
                     "tripped_reason": m.tripped_reason,
                 }
-                for tier, m in self._tiers.items()
+                for tool, m in self._tools.items()
             }
 
 

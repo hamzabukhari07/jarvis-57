@@ -1,3 +1,35 @@
+## [2026-10-04] — Phase 7: Task Lifecycle Watchdog, Conversational Status & Steering Gates
+
+- **What was built:**
+  - Built `core/loop_gates.py` implementing 4 execution gates: `watchdog_timeout` (300s wall-clock limit), `tool_budget` (50 tool max), `iteration_cap` (25 turn max), and `doom_loop` (windowed parameter similarity detector with `INTERRUPT_AND_CONTINUE` coaching text).
+  - Wired `loop_gates.evaluate()` into `core/action_loader.py:run` before tool dispatch, injecting corrective feedback when doom loops are encountered or blocking when limits are exceeded.
+  - Refactored `core/circuit_breaker.py` (`RiskAwareCircuitBreaker`) to key metrics and failure velocity per individual tool name rather than shared across risk tiers, while keeping risk-tier threshold evaluation and manual re-arming.
+  - Created `actions/run_tool_batch.py` sequential pipeline runner with variable substitution (`${steps.0.result}`), recursion defense, and hard $\le 10$ step cap.
+  - Created `actions/ast_tool.py` structural Python code parser and AST analyzer for inspecting classes, functions, arguments, and cyclomatic complexity hotspots.
+  - Built `core/deliverable_verifier.py` validating output deliverable integrity for HTML/CSS, Python, JS, and documentation.
+  - Upgraded `actions/task_status.py` with natural conversational fleet and team queries (`action='team'`, `'blocked'`, `'completed_today'`) querying real active background tasks and fleet states without hallucinating ETAs.
+  - Created comprehensive unit and integration test suite in `tests/test_phase7_loop_gates_and_watchdog_suite.py` (11/11 tests passed).
+- **Why this approach was chosen:**
+  - Guarantees autonomous reliability and prevents runaway execution loops while providing actionable corrective feedback to steer LLM reasoning.
+- **Key files touched:**
+  - `core/loop_gates.py`
+  - `core/circuit_breaker.py`
+  - `core/deliverable_verifier.py`
+  - `core/action_loader.py`
+  - `actions/run_tool_batch.py`
+  - `actions/ast_tool.py`
+  - `actions/task_status.py`
+  - `tests/test_phase7_loop_gates_and_watchdog_suite.py`
+  - `planning/MASTER_IMPLEMENTATION_ROADMAP.md`
+- **Verification:**
+  - Layer 1 (static): `python -m py_compile core/loop_gates.py core/circuit_breaker.py core/deliverable_verifier.py core/action_loader.py actions/run_tool_batch.py actions/ast_tool.py actions/task_status.py tests/test_phase7_loop_gates_and_watchdog_suite.py` (Exit 0).
+  - Layer 2 (runtime): `python -m pytest tests/test_phase7_loop_gates_and_watchdog_suite.py -v` (11 passed in 0.84s).
+  - Action Discovery: 31/31 tools active including `run_tool_batch` and `ast_tool`.
+  - Layer 3 (regression): Full test suite executed with 178 passed, 4 skipped, 0 failures (31.47s).
+  - Database Isolation: SQLite DB isolation verified cleanly across temp directories.
+
+---
+
 ## [2026-10-04] — Phase 6: Skill Scanner, Zip-Slip Guard & Safe Skill Hub
 
 - **What was built:**

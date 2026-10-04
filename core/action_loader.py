@@ -220,6 +220,19 @@ class ActionRegistry:
             print(f"[CircuitBreaker] [WARN] {block_msg}")
             return str(block_msg)
 
+        # Loop Gates & Doom-Loop Steering Evaluation
+        from core.loop_gates import GateDecision, loop_gates
+        sess_id = (ctx or {}).get("session_id") or "global"
+        gate_res = loop_gates.evaluate(name, parameters, session_id=sess_id)
+        if gate_res.decision == GateDecision.BLOCK:
+            msg = f"LoopGate Blocked: {gate_res.reason}"
+            print(f"[LoopGates] 🛑 {msg}")
+            return msg
+        elif gate_res.decision == GateDecision.INTERRUPT:
+            print(f"[LoopGates] ⚠️ {gate_res.reason}")
+            # Steer the agent with corrective feedback instead of executing identical failed loop
+            return gate_res.coaching_feedback or gate_res.reason or "Loop interrupted."
+
         from core.task_manager import ToolExecutionContext
         from core.log_bus import emit_tool_micro_event
 
