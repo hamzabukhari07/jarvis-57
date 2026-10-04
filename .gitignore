@@ -18,5 +18,8 @@ venv/
 .next/
 dist/
 build/
-*.log
-/tools/uncage/
+# Memory database & personal state
+memory/*.db
+memory/*.db-*
+memory/*.json
+.agent_worktrees/

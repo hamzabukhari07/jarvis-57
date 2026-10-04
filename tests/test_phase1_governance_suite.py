@@ -6,7 +6,8 @@ from core import confirm, governance
 from core.governance import ToolRisk, PolicyDecision
 
 
-def test_confirm_resolve_lifecycle():
+@pytest.mark.asyncio
+async def test_confirm_resolve_lifecycle():
     resolved = []
     
     def sample_action():
@@ -27,13 +28,63 @@ def test_confirm_resolve_lifecycle():
     assert len(shown) == 1
     assert shown[0][0] == "Test Action"
 
-    # Resolve with accepted=True
-    confirm.resolve(accepted=True)
-    import time
-    time.sleep(0.1) # allow worker thread to complete
+    # Route accepted=True through ui_server._handle_client_message
+    from core.ui_server import ZezoUIServer
+    server = ZezoUIServer()
+    class DummyWS:
+        pass
+    dummy_ws = DummyWS()
+    await server._handle_client_message(dummy_ws, {"type": "confirm_response", "accepted": True})
+    
+    import asyncio
+    await asyncio.sleep(0.1) # allow worker thread to complete
 
     assert "executed" in resolved
     assert len(hidden) == 1
+
+
+@pytest.mark.asyncio
+async def test_confirm_response_reject_and_timeout():
+    resolved = []
+    
+    def sample_action():
+        resolved.append("executed")
+        return "ok"
+
+    shown = []
+    hidden = []
+    confirm.bind(
+        show=lambda title, detail: shown.append((title, detail)),
+        hide=lambda: hidden.append(True),
+        log=lambda msg: None
+    )
+
+    from core.ui_server import ZezoUIServer
+    server = ZezoUIServer()
+    class DummyWS:
+        pass
+    dummy_ws = DummyWS()
+
+    # 1. Test accepted=False via WebSocket message
+    msg = confirm.request("test_reject", "Reject Test", "Detail", sample_action)
+    assert "[CONFIRMATION_PENDING]" in msg
+    await server._handle_client_message(dummy_ws, {"type": "confirm_response", "accepted": False})
+    import asyncio, time
+    await asyncio.sleep(0.1)
+    assert "executed" not in resolved
+    assert len(hidden) == 1
+
+    # 2. Test timeout expiration via WebSocket message
+    msg2 = confirm.request("test_timeout", "Timeout Test", "Detail", sample_action)
+    assert "[CONFIRMATION_PENDING]" in msg2
+    # Simulate timeout by adjusting start time in pending record
+    with confirm._lock:
+        if confirm._pending:
+            confirm._pending.at = time.monotonic() - (confirm.TIMEOUT_SECONDS + 5)
+    
+    await server._handle_client_message(dummy_ws, {"type": "confirm_response", "accepted": True}) # Should fail because expired
+    await asyncio.sleep(0.1)
+    assert "executed" not in resolved
 
 
 def test_governance_risk_classification():

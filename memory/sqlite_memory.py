@@ -29,7 +29,14 @@ def get_base_dir() -> Path:
 
 
 BASE_DIR = get_base_dir()
-DB_PATH = BASE_DIR / "memory" / "zezo_brain.db"
+
+def get_db_path() -> Path:
+    env_path = os.environ.get("ZEZO_DB_PATH")
+    if env_path:
+        return Path(env_path)
+    return BASE_DIR / "memory" / "zezo_brain.db"
+
+DB_PATH = get_db_path()
 
 _db_lock = threading.Lock()
 _current_session_id = f"sess_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -79,8 +86,9 @@ def redact_secrets(text: str) -> str:
 
 def _get_connection() -> sqlite3.Connection:
     """Create a thread-safe connection configured for high-concurrency WAL mode."""
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH), timeout=10.0, check_same_thread=False)
+    target_db = get_db_path()
+    target_db.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(target_db), timeout=10.0, check_same_thread=False)
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA synchronous = NORMAL;")
     conn.execute("PRAGMA foreign_keys = ON;")
