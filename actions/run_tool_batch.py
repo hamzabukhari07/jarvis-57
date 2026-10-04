@@ -140,6 +140,7 @@ TOOL = {
             "steps": {
                 "type": "ARRAY",
                 "description": "List of step objects: [{'tool': 'tool_name', 'parameters': {...}}, ...]",
+                "items": {"type": "OBJECT"},
             },
             "stop_on_error": {
                 "type": "BOOLEAN",
