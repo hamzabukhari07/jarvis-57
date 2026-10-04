@@ -498,18 +498,18 @@ To prevent regressions, the following critical repository invariants must be pre
 
 ### Phase 8: True Async MCP Client & Driver Runtime
 * **Objective:** Connect the orphaned MCP client runtime, fix latent deadlocks, and expose external MCP tools into the unified action registry.
-* **Status:** ⏳ **Pending Execution**
+* **Status:** 🟢 **COMPLETED & VERIFIED (182/182 tests passed)**
 * **Files Touched:**
   - [core/mcp_runtime.py](file:///d:/anitgravity/zezo%20work/jarvis-57/core/mcp_runtime.py)
   - [core/action_loader.py](file:///d:/anitgravity/zezo%20work/jarvis-57/core/action_loader.py)
-  - `config/mcp_servers.json` (New config)
-  - [planning/ZEZO_PROJECT_BLUEPRINT.md](file:///d:/anitgravity/zezo%20work/jarvis-57/planning/ZEZO_PROJECT_BLUEPRINT.md)
+  - [config/mcp_servers.json](file:///d:/anitgravity/zezo%20work/jarvis-57/config/mcp_servers.json)
+  - `tests/test_phase8_mcp_client_suite.py`
 
 #### 📋 Todo List:
-- [ ] **Task 8.1:** Fix `_ensure_loop` `None` dereference at line 53 and asyncio lock deadlock in `call_tool` (`:146-150`) in `core/mcp_runtime.py`.
-- [ ] **Task 8.2:** Implement stdio JSON-RPC transport to spawn and interact with external MCP server binaries listed in `config/mcp_servers.json`.
-- [ ] **Task 8.3:** Dynamically bridge discovered external MCP tools into `core/action_loader.py` using `mcp:<server>:<tool>` naming convention.
-- [ ] **Task 8.4:** Reconcile project blueprint documentation regarding active MCP status.
+- [x] **Task 8.1:** Fix `_ensure_loop` `None` dereference and asyncio lock deadlock in `call_tool` in `core/mcp_runtime.py`.
+- [x] **Task 8.2:** Implement stdio JSON-RPC transport to spawn and interact with external MCP server binaries listed in `config/mcp_servers.json`.
+- [x] **Task 8.3:** Dynamically bridge discovered external MCP tools into `core/action_loader.py` using `mcp_<server>_<tool>` naming convention.
+- [x] **Task 8.4:** Reconcile project blueprint documentation regarding active MCP status.
 
 * **Acceptance Criteria:**
   - ZEZO can spawn a standard MCP server (e.g. SQLite MCP) and execute tools via natural voice.

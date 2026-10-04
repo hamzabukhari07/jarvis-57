@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "sqlite": {
+      "command": "python",
+      "args": ["-m", "core.mcp_sqlite_mock"],
+      "enabled": false,
+      "env": {}
+    }
+  }
+}

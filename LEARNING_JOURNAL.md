@@ -1,3 +1,26 @@
+## [2026-10-04] — Phase 8: True Async MCP Client & Driver Runtime
+
+- **What was built:**
+  - Hardened `core/mcp_runtime.py` background event loop runtime with deadlock-free concurrency, lock lifecycle isolation, and stdio JSON-RPC subprocess transport (`McpProcessTransport`).
+  - Added external MCP server configuration loader reading `config/mcp_servers.json`.
+  - Dynamically bridged external MCP tools into `core/action_loader.py` under the namespaced identifier pattern (`mcp_<server>_<tool>`), allowing natural voice and CLI tool dispatch.
+  - Implemented unit and integration test suite in `tests/test_phase8_mcp_client_suite.py` (4/4 tests passed).
+- **Why this approach was chosen:**
+  - Guarantees non-blocking MCP execution on dedicated daemon threads while exposing external MCP servers as first-class tools in the unified action registry.
+- **Key files touched:**
+  - `core/mcp_runtime.py`
+  - `core/action_loader.py`
+  - `config/mcp_servers.json`
+  - `tests/test_phase8_mcp_client_suite.py`
+  - `planning/MASTER_IMPLEMENTATION_ROADMAP.md`
+- **Verification:**
+  - Layer 1 (static): `python -m py_compile core/mcp_runtime.py core/action_loader.py tests/test_phase8_mcp_client_suite.py` (Exit 0).
+  - Layer 2 (runtime): `python -m pytest tests/test_phase8_mcp_client_suite.py -v` (4 passed in 0.29s).
+  - Layer 3 (regression): Full test suite executed with 182 passed, 4 skipped, 0 failures (32.69s).
+  - Database Isolation: Verified clean temp database separation.
+
+---
+
 ## [2026-10-04] — Phase 7: Task Lifecycle Watchdog, Conversational Status & Steering Gates
 
 - **What was built:**
