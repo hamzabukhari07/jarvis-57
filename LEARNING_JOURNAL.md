@@ -1,3 +1,37 @@
+## [2026-10-04] — Vision 1.0: Project Workspace Isolation, In-Place Fleet Dispatch & Concurrency Load Balancing
+
+- **What was built:**
+  - Implemented semantic project folder extraction (`extract_project_slug`) and collision-safe directory allocation (`get_unique_project_dir`) in `core/repo_context.py` ensuring every new project receives a dedicated folder (`Desktop/<slug>`, `Desktop/<slug>_1`).
+  - Decoupled sticky `get_last_repo()` in `core/repo_context.py::resolve(is_new_project=True)` so new builds never clobber existing folders.
+  - Implemented in-place worker execution (`run_in_place=True`) in `actions/antigravity_agent.py` and `core/fleet_manager.py`, eliminating phantom secondary `ZEZO CODER` task cards.
+  - Registered `HAIDER` in `config/fleet_agents.json` as Frontend Developer (`antigravity_run`, desk coordinates: 320, 280).
+  - Implemented `get_agent_active_task_count(agent_id)` and concurrency overflow balancing in `core/fleet_manager.py` (max 3 active tasks per agent; overflows to Haider).
+  - Updated `renderTasks()` in `frontend/index.html` to render assigned agent badges (`ALI`, `HAIDER`, `AHMAD`), descriptive task titles, and clean relative target paths (`Desktop/...`).
+  - Aligned `core/prompt.txt` with the Vision 1.0 paradigm: *"ZEZO Manages the Work. Agents Execute the Work."* and added pre-flight clarification guard for broad open-ended prompts.
+  - Authored ADR-066 in `planning/decisions.md` and updated `docs/TOOLS.md`.
+  - Authored comprehensive test suite in `tests/test_project_isolation_and_fleet_orchestrator_suite.py` (6/6 passed, total 15/15 regression tests passed).
+- **Why this approach was chosen:**
+  - Solves the critical user-reported issues: (1) building a second project destroyed the first project, and (2) fleet tasks spawned duplicate phantom cards with broken progress reporting.
+- **What alternatives were considered:**
+  - Asking the user for a folder name on every build: Rejected because it breaks hands-free voice flow. Autonomous slug extraction and collision-safe disambiguation provides seamless zero-clobber workspaces automatically.
+- **Key files touched:**
+  - `core/repo_context.py`
+  - `actions/antigravity_agent.py`
+  - `core/fleet_manager.py`
+  - `config/fleet_agents.json`
+  - `frontend/index.html`
+  - `core/prompt.txt`
+  - `planning/decisions.md`
+  - `planning/PLAN_PROJECT_ISOLATION_AND_FLEET_QUEUE_FIX.md`
+  - `docs/TOOLS.md`
+  - `tests/test_project_isolation_and_fleet_orchestrator_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - When dispatching coding agents from higher-level workflows (like fleet managers or multi-agent pipelines), always pass `run_in_place=True` and `task_ctx` to avoid double-queuing in TaskManager.
+  - Always clean and format file paths in frontend templates (strip drive letters and absolute home directory roots) so the UI displays compact relative paths.
+
+---
+
 ## [2026-10-04] — Voice Silence Diagnostics, Interruption Logging & Proactive Audio Telemetry (Item 4)
 
 - **What was built:**

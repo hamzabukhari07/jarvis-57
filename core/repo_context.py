@@ -178,11 +178,13 @@ def _expand(raw: str) -> Optional[Path]:
 def resolve(
     explicit: Optional[str] = None,
     require_git: bool = False,
+    is_new_project: bool = False,
+    task_hint: Optional[str] = None,
 ) -> Tuple[Optional[Path], str]:
     """
     Returns (path, source).
 
-    source ∈ {"explicit", "memory", "cwd", "default", "none"}
+    source ∈ {"explicit", "new_project", "memory", "cwd", "default", "none"}
     """
     # 1. explicit
     if explicit:
@@ -194,6 +196,12 @@ def resolve(
                 logger.info("repo_context: explicit %s is not a git repo", p)
             remember_repo(str(p))
             return p, "explicit"
+
+    # 1.5. Brand-new project isolation: do not stick to stale previous repo
+    if is_new_project:
+        fresh_dir = get_unique_project_dir(task_hint or "web-project")
+        remember_repo(str(fresh_dir))
+        return fresh_dir, "new_project"
 
     # 2. memory
     last = get_last_repo()
@@ -212,6 +220,71 @@ def resolve(
     fallback.mkdir(parents=True, exist_ok=True)
     remember_repo(str(fallback))
     return fallback, "default"
+
+
+def extract_project_slug(prompt: str) -> str:
+    """Extract a concise, semantic project folder slug from user prompt or topic."""
+    import re
+    if not prompt:
+        return "web-project"
+
+    text = prompt.strip().strip("\"'").lower()
+    text = re.sub(r"```[\s\S]*?```", "", text)
+    text = re.sub(r"https?://\S+", "", text)
+
+    stopwords = {
+        "build", "create", "make", "design", "develop", "code", "generate",
+        "setup", "start", "write", "please", "can", "you", "for", "me", "a", "an",
+        "the", "in", "to", "with", "using", "and", "of", "on", "website", "webapp",
+        "site", "app", "application", "project", "folder", "page", "dir", "directory",
+        "desktop", "scratch", "new", "simple", "modern", "responsive", "clean"
+    }
+
+    words = re.findall(r"[a-zA-Z0-9]+", text)
+    filtered = [w for w in words if w not in stopwords]
+
+    if not filtered:
+        filtered = [w for w in words if w not in {"please", "can", "you", "for", "me", "a", "an", "the"}]
+
+    if not filtered:
+        return "web-project"
+
+    slug = "-".join(filtered[:4])
+    slug = re.sub(r"-+", "-", slug).strip("-")
+    if len(slug) < 3:
+        return "web-project"
+    return slug[:35].rstrip("-")
+
+
+def get_unique_project_dir(topic_or_task: str, base_parent: Optional[Path] = None) -> Path:
+    """Generate an isolated, collision-safe project directory path under base_parent."""
+    slug = extract_project_slug(topic_or_task)
+    parent = (base_parent or (Path.home() / "Desktop")).resolve()
+    parent.mkdir(parents=True, exist_ok=True)
+
+    target = parent / slug
+    if not target.exists():
+        target.mkdir(parents=True, exist_ok=True)
+        return target.resolve()
+
+    try:
+        if not any(target.iterdir()):
+            return target.resolve()
+    except Exception:
+        pass
+
+    counter = 1
+    while True:
+        cand = parent / f"{slug}_{counter}"
+        if not cand.exists():
+            cand.mkdir(parents=True, exist_ok=True)
+            return cand.resolve()
+        try:
+            if not any(cand.iterdir()):
+                return cand.resolve()
+        except Exception:
+            pass
+        counter += 1
 
 
 def get_unique_clone_dir(domain_or_name: str) -> Path:

@@ -2126,7 +2126,11 @@
           const prog = isDone ? 100 : (t.progress || (isRunning ? 50 : 0));
           const assignedAgent = t.params && (t.params.agent_name || t.params.agent_id);
           const toolLabel = assignedAgent ? String(assignedAgent).toUpperCase() : getFriendlyToolBadge(t.tool);
-          const target = (t.params && (t.params.repo || t.params.file_path || t.params.path || t.params.project_path || t.params.target || t.params.query || t.params.url || t.params.link)) || '';
+          let target = (t.params && (t.params.target_dir || t.params.repo || t.params.file_path || t.params.path || t.params.project_path || t.params.target || t.params.query || t.params.url || t.params.link)) || '';
+          if (target && target.includes('Desktop')) {
+            target = target.substring(target.indexOf('Desktop')).replace(/\\/g, '/');
+          }
+          const taskHeading = (t.params && (t.params.taskTitle || (t.params.task ? t.params.task.slice(0, 60) : ''))) || t.message || t.tool || 'Task Execution';
           const isSelected = t.id === _selectedTaskId;
           const borderStyle = isSelected ? 'var(--accent)' : (isRunning ? 'var(--accent)' : (isDone ? '#22c55e' : (isFailed ? '#ef4444' : 'var(--border-default)')));
           const bgStyle = isSelected ? 'rgba(242, 78, 30, 0.12)' : 'var(--bg-elevated)';
@@ -2175,10 +2179,10 @@
                 <span class="badge ${badgeClass}">${toolLabel}</span>
                 <span class="mono text-muted" style="font-size: 9px; ${isDone ? 'color: #22c55e; font-weight: 600;' : ''}">${statusIcon}</span>
               </div>
-              <div style="font-weight: 600; font-size: 11px; color: #fff; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                ${t.message || t.tool || 'Task Execution'}
+              <div style="font-weight: 600; font-size: 11px; color: #fff; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${taskHeading}">
+                ${taskHeading}
               </div>
-              ${target ? `<div class="type-code text-muted" style="font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Target: ${target}</div>` : ''}
+              ${target ? `<div class="type-code text-muted" style="font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${target}">Target: ${target}</div>` : ''}
               <div class="progress-track" style="margin-top: 6px;">
                 <div class="progress-fill" style="width: ${prog}%; background: ${isDone ? '#22c55e' : (isFailed ? '#ef4444' : 'var(--accent)')};"></div>
               </div>

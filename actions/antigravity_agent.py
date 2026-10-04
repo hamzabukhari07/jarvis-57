@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.design_resolver import is_ui_task, resolve_design, format_design_prompt
-from core.repo_context import resolve, remember_repo
+from core.repo_context import resolve, remember_repo, get_unique_project_dir
 from core.task_manager import get_task_manager, TaskContext
 from core.undo import capture_repo_snapshot, register_repo_undo
 
@@ -364,10 +364,25 @@ CRITICAL RULES:
     return code
 
 
+class _DummyTaskContext:
+    def report(self, pct: int, msg: str = "") -> None:
+        pass
+    def set_pid(self, pid: int) -> None:
+        pass
+    def on_complete(self, payload: Any) -> None:
+        pass
+    def on_fail(self, error: str) -> None:
+        pass
+    def is_cancelled(self) -> bool:
+        return False
+
+
 # ── Core Background Worker ───────────────────────────────────────────────────
 
-def _run_worker(payload: dict, ctx: TaskContext) -> dict:
+def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
     """Background worker executed by TaskManager. Uses Antigravity CLI if available."""
+    if ctx is None:
+        ctx = _DummyTaskContext()  # type: ignore
     task = payload.get("task", "")
     repo_val = payload.get("repo") or payload.get("project_path") or payload.get("repo_path")
     if not repo_val:
@@ -844,10 +859,17 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
             cand = folder_match.group(1).strip().strip("\"'")
             if not any(cand.lower().endswith(ext) for ext in (".html", ".css", ".js", ".py", ".md", ".json")):
                 explicit_path = cand
-        elif "portfolio" in task.lower() and "website" not in task.lower():
-            explicit_path = "Desktop/portfolio"
+    # Project isolation: if brand-new project build without explicit path, allocate isolated unique directory
+    low_task = task.lower()
+    is_new = any(kw in low_task for kw in ("build", "create", "make", "develop", "scaffold", "new website", "new app", "landing page", "portfolio", "store", "clone", "dashboard"))
+    is_edit = any(kw in low_task for kw in ("edit", "fix", "update", "modify", "refactor", "change", "add to existing"))
+    is_brand_new = is_new and not is_edit and not explicit_path
 
-    repo, source = resolve(explicit=explicit_path)
+    if is_brand_new:
+        repo = get_unique_project_dir(task)
+        source = "new_project"
+    else:
+        repo, source = resolve(explicit=explicit_path)
 
     if repo is None:
         return (
@@ -863,6 +885,21 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
         )
 
     model = _resolve_model(parameters.get("model") or parameters.get("model_id"))
+
+    # In-place execution for fleet tasks (eliminates phantom ZEZO CODER cards)
+    run_in_place = bool(parameters.get("run_in_place", False))
+    task_ctx = parameters.get("task_ctx")
+
+    if run_in_place:
+        worker_params = {
+            "repo": str(repo),
+            "task": task,
+            "model": model,
+            "session_memory": session_memory if isinstance(session_memory, dict) else {},
+        }
+        res = _run_worker(worker_params, ctx=task_ctx)
+        return json.dumps(res) if isinstance(res, dict) else str(res)
+
     tm = get_task_manager()
     task_id = tm.submit(
         "antigravity_agent",

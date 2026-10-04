@@ -207,7 +207,11 @@ class FleetManager:
         # 3. Domain Fallback Heuristics
         if any(w in low for w in ("token", "tokens", "palette", "design system", "extract design")):
             return self.get_agent("PAM")
-        if any(w in low for w in ("html", "css", "landing", "page", "react", "tailwind", "component", "studio", "ui", "frontend")):
+        if any(w in low for w in ("html", "css", "landing", "page", "react", "tailwind", "component", "studio", "ui", "frontend", "website", "portfolio", "web-project")):
+            if self.get_agent_active_task_count("ALI") >= 3:
+                haider = self.get_agent("HAIDER")
+                if haider and self.get_agent_active_task_count("HAIDER") < 3:
+                    return haider
             return self.get_agent("ALI")
         if any(w in low for w in ("fastapi", "postgres", "sql", "api", "endpoint", "schema", "microservice", "auth", "backend", "database")):
             return self.get_agent("AHMAD")
@@ -216,7 +220,30 @@ class FleetManager:
         if any(w in low for w in ("scrape", "transcribe", "summary", "web search", "market research", "research", "social")):
             return self.get_agent("KELLY")
 
-        return None
+        # 4. Default dispatch fallback: Ali for UI/frontend, Ahmad for general coding
+        if any(w in low for w in ("build", "create", "make", "design")):
+            if self.get_agent_active_task_count("ALI") >= 3:
+                haider = self.get_agent("HAIDER")
+                if haider and self.get_agent_active_task_count("HAIDER") < 3:
+                    return haider
+            return self.get_agent("ALI")
+        return self.get_agent("AHMAD") or self.get_agent("ALI") or list(self.agents.values())[0]
+
+    def get_agent_active_task_count(self, agent_id: str) -> int:
+        """Returns the number of currently active (running/queued) tasks assigned to an agent."""
+        uid = (agent_id or "").upper().strip()
+        if not uid:
+            return 0
+        from core.task_manager import get_task_manager
+        tm = get_task_manager()
+        active = tm.list_active()
+        count = 0
+        for t in active:
+            params = t.get("params") or {}
+            task_agent = str(params.get("agent_id") or "").upper().strip()
+            if task_agent == uid:
+                count += 1
+        return count
 
     def generate_peer_session_id(self, from_agent: str, to_agent: str) -> str:
         """Generates deterministic composite peer session ID for isolated P2P communication lineage."""
@@ -471,9 +498,18 @@ class FleetManager:
         if agent_id.upper() in ("MICHAEL", "MANAGER") and any(w in prompt.lower() for w in ("full-stack", "fullstack", "entire app", "both frontend and backend")):
             return self.decompose_and_dispatch(prompt, path)
 
-        agent = self.get_agent(agent_id)
+        agent = self.get_agent(agent_id) or self.resolve_agent_by_mention_or_capability(agent_id)
+        if not agent:
+            agent = self.resolve_agent_by_mention_or_capability(prompt)
         if not agent:
             return {"success": False, "error": f"Agent '{agent_id}' not found."}
+
+        # Overflow Load Balancing: If Ali is at capacity (>= 3 active tasks), auto-route to Haider
+        if agent.id == "ALI" and self.get_agent_active_task_count("ALI") >= 3:
+            haider = self.get_agent("HAIDER")
+            if haider and self.get_agent_active_task_count("HAIDER") < 3:
+                logger.info("[FleetManager] Ali at max capacity (3 tasks). Auto-routing task to Haider.")
+                agent = haider
 
         # Capability check via Circuit Breaker
         can_run, block_reason = circuit_breaker.can_execute(agent.default_tool)
@@ -490,7 +526,11 @@ class FleetManager:
             if wt.success:
                 worktree_path = str(wt.worktree_path)
 
-        target_dir = worktree_path or path or str(Path.cwd())
+        target_dir = worktree_path or path
+        if not target_dir or target_dir == str(Path.cwd()):
+            from core.repo_context import get_unique_project_dir
+            target_dir = str(get_unique_project_dir(prompt))
+
         enriched_prompt = f"[{agent.name} • {agent.role}]\n{agent.prompt_prefix}\n\nTask: {prompt}"
         active_model = model_override or agent.model_id or None
 
@@ -509,6 +549,8 @@ class FleetManager:
                     "repo_path": target_dir,
                     "target_dir": target_dir,
                     "path": target_dir,
+                    "run_in_place": True,
+                    "task_ctx": task_ctx,
                 }
                 if active_model:
                     call_params["model"] = active_model
@@ -526,6 +568,7 @@ class FleetManager:
             fn=_worker_fn,
             params={
                 "task": prompt,
+                "taskTitle": prompt[:60],
                 "agent_id": agent.id,
                 "agent_name": agent.name,
                 "target_dir": target_dir,

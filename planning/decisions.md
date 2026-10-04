@@ -1085,4 +1085,23 @@
   3. Synchronized `readme.md`, `AGENTS.md`, `docs/HUD_AND_AVATAR.md`, `docs/CODEBASE_MAP.md`, `docs/ARCHITECTURE.md`, `docs/DEPENDENCIES.md`, `docs/DATA_FLOW.md`, `docs/STORAGE.md`, `planning/PROJECT_ARCHITECTURE.md`, and `planning/ZEZO_PROJECT_BLUEPRINT.md` to reflect the active tactical workspace architecture.
 * **Consequence:** Cleaned codebase of ~147 KB of dead assets, removed outdated references across all documentation, and retained 100% functionality and test stability across all active modules.
 
+---
+
+## ADR-066: Project Workspace Isolation, In-Place Fleet Dispatch & Concurrency Load Balancing (`core/repo_context.py`, `actions/antigravity_agent.py`, `core/fleet_manager.py`, `config/fleet_agents.json`, `frontend/index.html`, `core/prompt.txt`)
+
+* **Date:** 2026-10-04
+* **Lead Architect:** Hamza Bukhari
+* **Context (Vision 1.0):**
+  1. Successive project generation requests previously overwrote the prior active folder (`Desktop/website` or sticky `last_active_repo`), causing severe project clobbering (e.g. building a real-estate site clobbered a freshly built portfolio).
+  2. Fleet dispatch (`fleet_control(action='dispatch')`) submitted tasks to `TaskManager` whose internal worker invoked `antigravity_action`, which in turn invoked `tm.submit` a second time, resulting in two disconnected task cards: an immediately finished agent card and a persistent orphan `ZEZO CODER` card.
+  3. Single agent bottleneck: All frontend requests routed solely to Ali with no concurrency limits or overflow balancing.
+  4. Task cards in `frontend/index.html` displayed generic IDs without assigned agent branding or clean relative target paths.
+* **Decision:**
+  1. **Dynamic Workspace Isolation:** Implemented `extract_project_slug(prompt)` and `get_unique_project_dir(topic_or_task)` in `core/repo_context.py`. Allocates semantic, collision-safe directories (`Desktop/<slug>`, `Desktop/<slug>_1`). Decoupled sticky `get_last_repo()` when a brand-new project build is initiated.
+  2. **In-Place Worker Execution (`run_in_place=True`):** Updated `actions/antigravity_agent.py` to accept `run_in_place=True` and `task_ctx`. `fleet_manager` executes the build synchronously within the agent's task lifecycle, eliminating phantom secondary `ZEZO CODER` cards.
+  3. **Fleet Roster Expansion & Concurrency Balancing (Max 3 Tasks):** Registered `HAIDER` in `config/fleet_agents.json` as Frontend Developer adjacent to Ali. Implemented `get_agent_active_task_count(agent_id)` in `core/fleet_manager.py`. If Ali is at capacity ($\ge 3$ tasks), incoming frontend tasks automatically overflow to Haider.
+  4. **Task Card Informative Rendering:** Updated `renderTasks()` in `frontend/index.html` to display the assigned agent badge (`ALI`, `HAIDER`, `AHMAD`), descriptive task heading (`taskTitle`), and formatted clean relative path (`Desktop/...`).
+  5. **Orchestrator System Prompt Alignment:** Updated `core/prompt.txt` to enforce the Vision 1.0 paradigm: *"ZEZO Manages the Work. Agents Execute the Work."* and added the pre-flight clarification guard for broad open-ended prompts.
+* **Consequence:** 100% project workspace isolation, zero folder clobbering, zero ghost cards in TaskManager, transparent multi-agent load balancing, and clear UI queue ownership.
+
 
