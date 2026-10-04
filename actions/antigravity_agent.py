@@ -184,7 +184,7 @@ def _create_throttled_job(mask: int, priority: int = 0x00000040):
 
 
 def _assign_pid_to_job(hJob, pid: int) -> bool:
-    if not hJob or platform.system() != "Windows":
+    if not hJob or platform.system() != "Windows" or not isinstance(pid, int):
         return False
     try:
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -717,49 +717,65 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
                             except Exception:
                                 pass
 
-        ctx.report(95, "Finalizing project build...")
+        # Check if real deliverables exist (excluding .gitignore and DESIGN_BLUEPRINT.*)
+        real_files = [
+            p for p in created_list
+            if p not in (".gitignore", "DESIGN_BLUEPRINT.html", "DESIGN_BLUEPRINT.md")
+        ]
+        has_entry = (repo / "index.html").exists() or (repo / "main.py").exists() or (repo / "src").exists()
 
-        # Register Undo snapshot
-        try:
-            changed_count = register_repo_undo(repo, snapshot, "Antigravity Agent")
-            if changed_count > 0 and created_list:
-                first_file = Path(created_list[0]).name
-                from memory.memory_manager import remember
-                remember("active_file", first_file, category="projects")
-        except Exception as e:
-            logger.debug("Antigravity undo registration failed: %s", e)
+        if not real_files or not has_entry:
+            logger.warning(
+                "[Antigravity] CLI exited without creating valid project deliverables in %s (found: %s). Falling back to direct Gemini REST pipeline...",
+                repo.name,
+                created_list,
+            )
+            ctx.report(30, "CLI completed without generating deliverable files. Triggering direct AI generation fallback...")
+            # Fall through to REST pipeline below
+        else:
+            ctx.report(95, "Finalizing project build...")
 
-        # Cleanup temporary design blueprint if the build generated real files
-        if (repo / "index.html").exists():
+            # Register Undo snapshot
             try:
-                for bp_name in ("DESIGN_BLUEPRINT.html", "DESIGN_BLUEPRINT.md"):
-                    bp = repo / bp_name
-                    if bp.exists():
-                        bp.unlink()
-            except Exception:
-                pass
-
-        # Automatically launch live preview in the user's default browser if index.html exists
-        if (repo / "index.html").exists():
-            try:
-                import webbrowser
-                target_url = (repo / "index.html").resolve().as_uri()
-                webbrowser.open(target_url)
-                print(f"[Antigravity] 🌐 Launched live preview in browser: {target_url}")
+                changed_count = register_repo_undo(repo, snapshot, "Antigravity Agent")
+                if changed_count > 0 and created_list:
+                    first_file = Path(created_list[0]).name
+                    from memory.memory_manager import remember
+                    remember("active_file", first_file, category="projects")
             except Exception as e:
-                logger.debug("Failed to auto-open browser: %s", e)
+                logger.debug("Antigravity undo registration failed: %s", e)
 
-        result_payload = {
-            "status": "success",
-            "repo": str(repo),
-            "project_name": repo.name,
-            "files": created_list,
-            "entry_point": entry_point,
-            "summary": f"Successfully created {len(created_list)} project files in '{repo.name}'.",
-            "design_source": resolved_design.source_name if resolved_design else None,
-        }
-        ctx.on_complete(result_payload)
-        return result_payload
+            # Cleanup temporary design blueprint if the build generated real files
+            if (repo / "index.html").exists():
+                try:
+                    for bp_name in ("DESIGN_BLUEPRINT.html", "DESIGN_BLUEPRINT.md"):
+                        bp = repo / bp_name
+                        if bp.exists():
+                            bp.unlink()
+                except Exception:
+                    pass
+
+            # Automatically launch live preview in the user's default browser if index.html exists
+            if (repo / "index.html").exists():
+                try:
+                    import webbrowser
+                    target_url = (repo / "index.html").resolve().as_uri()
+                    webbrowser.open(target_url)
+                    print(f"[Antigravity] 🌐 Launched live preview in browser: {target_url}")
+                except Exception as e:
+                    logger.debug("Failed to auto-open browser: %s", e)
+
+            result_payload = {
+                "status": "success",
+                "repo": str(repo),
+                "project_name": repo.name,
+                "files": created_list,
+                "entry_point": entry_point,
+                "summary": f"Successfully created {len(created_list)} project files in '{repo.name}'.",
+                "design_source": resolved_design.source_name if resolved_design else None,
+            }
+            ctx.on_complete(result_payload)
+            return result_payload
 
     # 3. Fallback: Python Gemini REST Generation
     try:
@@ -811,6 +827,16 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
             pass
 
     ctx.report(95, "Finalizing project build...")
+
+    # Cleanup temporary design blueprint if the build generated real files
+    if (repo / "index.html").exists():
+        try:
+            for bp_name in ("DESIGN_BLUEPRINT.html", "DESIGN_BLUEPRINT.md"):
+                bp = repo / bp_name
+                if bp.exists():
+                    bp.unlink()
+        except Exception:
+            pass
 
     # Register Undo snapshot
     try:

@@ -492,6 +492,19 @@ class FleetManager:
             "tasks": dispatched,
         }
 
+    def _broadcast_event(self, event_type: str, data: Dict[str, Any]) -> None:
+        """Thread-safe broadcast of fleet and task events to WebSocket UI and log bus."""
+        try:
+            from core.ui_server import get_ui_server
+            get_ui_server().broadcast(event_type, data)
+        except Exception as e:
+            logger.debug("[FleetManager] UI broadcast skipped: %s", e)
+        try:
+            from core.log_bus import emit_tool_micro_event
+            emit_tool_micro_event(event_type, "fleet_manager", data)
+        except Exception:
+            pass
+
     def dispatch_task(self, agent_id: str, prompt: str, path: Optional[str] = None, model_override: Optional[str] = None) -> Dict[str, Any]:
         """Launch an autonomous task executed by this agent's designated tool."""
         # Check if Michael orchestrator should auto-decompose multi-faceted full-stack tasks
@@ -540,6 +553,33 @@ class FleetManager:
 
         def _worker_fn(worker_params: dict, task_ctx: Any) -> dict:
             try:
+                # Wrap task_ctx.report to synchronize agent progress and activity logs
+                orig_report = getattr(task_ctx, "report", None)
+
+                def _reporting_wrapper(prog: int, msg: str = "") -> None:
+                    if orig_report:
+                        try:
+                            orig_report(prog, msg)
+                        except Exception:
+                            pass
+                    with self._lock:
+                        agent.task_progress = max(0, min(100, prog))
+                        if msg:
+                            clean_msg = f"[{prog}%] {msg}"
+                            if not agent.recent_logs or agent.recent_logs[-1] != clean_msg:
+                                agent.recent_logs.append(clean_msg)
+                                if len(agent.recent_logs) > 30:
+                                    agent.recent_logs = agent.recent_logs[-30:]
+                    self._broadcast_event("task_progress", {
+                        "task_id": submitted_id,
+                        "agent_id": agent.id,
+                        "agent": agent.name,
+                        "progress": prog,
+                        "message": msg,
+                    })
+
+                task_ctx.report = _reporting_wrapper
+
                 from core.action_loader import discover_actions
                 reg = discover_actions(Path(__file__).parent.parent / "actions")
                 call_params = {
@@ -557,10 +597,27 @@ class FleetManager:
                     call_params["model_id"] = active_model
 
                 res = reg.run(agent.default_tool, call_params)
-                task_ctx.report(100, "Completed successfully")
+                _reporting_wrapper(100, "Completed successfully")
+                self.complete_task(agent.id, submitted_id)
+                self._broadcast_event("task_done", {
+                    "task_id": submitted_id,
+                    "agent_id": agent.id,
+                    "agent": agent.name,
+                    "summary": f"Completed: {prompt[:60]}",
+                })
+                self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
                 return {"status": "success", "result": str(res)}
             except Exception as ex:
-                task_ctx.on_fail(str(ex))
+                if hasattr(task_ctx, "on_fail"):
+                    task_ctx.on_fail(str(ex))
+                self.complete_task(agent.id, submitted_id)
+                self._broadcast_event("task_failed", {
+                    "task_id": submitted_id,
+                    "agent_id": agent.id,
+                    "agent": agent.name,
+                    "error": str(ex),
+                })
+                self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
                 raise
 
         submitted_id = tm.submit(
@@ -581,7 +638,22 @@ class FleetManager:
             agent.status = "working"
             agent.current_task_id = submitted_id
             agent.current_task_title = prompt
+            agent.task_progress = 0
             agent.active_worktree = worktree_path
+            agent.recent_logs.append(f"[TASK STARTED] {prompt[:80]}")
+            if len(agent.recent_logs) > 30:
+                agent.recent_logs = agent.recent_logs[-30:]
+
+        self._broadcast_event("agent_task_started", {
+            "task_id": submitted_id,
+            "agent_id": agent.id,
+            "agent": agent.name,
+            "task": prompt,
+            "title": prompt[:60],
+            "tool": agent.default_tool,
+            "target_dir": target_dir,
+        })
+        self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
 
         return {
             "success": True,
@@ -613,8 +685,14 @@ class FleetManager:
             agent.status = "idle"
             agent.current_task_id = None
             agent.current_task_title = None
+            agent.task_progress = 0
             agent.active_worktree = None
             agent.completed_tasks += 1
+            agent.recent_logs.append(f"[COMPLETED] Task {task_id} finished")
+            if len(agent.recent_logs) > 30:
+                agent.recent_logs = agent.recent_logs[-30:]
+
+        self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
 
         return {
             "success": True,
@@ -704,7 +782,7 @@ def get_agent(name_or_id: str) -> Optional[Dict[str, Any]]:
 
 def list_agents() -> List[Dict[str, Any]]:
     """Helper to list all agents in the fleet as dicts."""
-    return fleet_manager.get_all_agents_state()
+    return fleet_manager.get_fleet_deck_state()
 
 
 

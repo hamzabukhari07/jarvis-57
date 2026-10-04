@@ -85,14 +85,15 @@ def test_haider_registered_in_fleet():
 def test_fleet_auto_capability_routing_and_overflow_to_haider():
     fm = FleetManager()
 
-    # Normal routing
-    agent_fe = fm.resolve_agent_by_mention_or_capability("Design responsive hero landing page")
-    assert agent_fe is not None
-    assert agent_fe.id == "ALI"
+    # Normal routing (0 active tasks)
+    with patch.object(fm, "get_agent_active_task_count", return_value=0):
+        agent_fe = fm.resolve_agent_by_mention_or_capability("Design responsive hero landing page")
+        assert agent_fe is not None
+        assert agent_fe.id == "ALI"
 
-    agent_be = fm.resolve_agent_by_mention_or_capability("Build FastAPI backend API with Postgres models")
-    assert agent_be is not None
-    assert agent_be.id == "AHMAD"
+        agent_be = fm.resolve_agent_by_mention_or_capability("Build FastAPI backend API with Postgres models")
+        assert agent_be is not None
+        assert agent_be.id == "AHMAD"
 
     # Simulate Ali has >= 3 active tasks -> should auto-route to Haider
     with patch.object(fm, "get_agent_active_task_count", side_effect=lambda aid: 3 if aid == "ALI" else 0):

@@ -1,3 +1,33 @@
+## [2026-10-04] — Scranton Office Fleet Live State Sync & Antigravity Fallback Assurance
+
+- **What was built:**
+  - Implemented event-driven WebSocket broadcasting (`_broadcast_event`) in `core/fleet_manager.py` sending `agent_task_started`, `task_progress`, `task_done`, and `fleet_updated` directly to `core/ui_server.py` and the Scranton Office UI (`frontend/office.html`).
+  - Wrapped `task_ctx.report` inside `_worker_fn` to continuously synchronize `agent.task_progress` and push timestamped activity logs to `agent.recent_logs` in real time.
+  - Connected `complete_task` in `_worker_fn` completion & error callbacks, automatically transitioning agents from `status: "working"` to `status: "idle"`, incrementing `completed_tasks`, and logging completion status into the Inspector feed.
+  - Upgraded `actions/fleet_control.py`'s `_broadcast_ui` to broadcast to `get_ui_server()` over WebSockets.
+  - Implemented fallback assurance in `actions/antigravity_agent.py`: if `agy` CLI exits without producing valid project deliverable files (e.g. only `.gitignore` or `DESIGN_BLUEPRINT.*`), Antigravity automatically falls back to the high-reasoning Gemini REST synthesizer to produce the final `index.html`.
+  - Added automatic cleanup of temporary `DESIGN_BLUEPRINT.html` and `DESIGN_BLUEPRINT.md` files upon build completion so the output directory contains only production assets.
+  - Added defensive integer type validation on `_assign_pid_to_job` in `actions/antigravity_agent.py` to prevent ctypes recursion under test mocks.
+  - Authored comprehensive test suite in `tests/test_fleet_live_sync_and_antigravity_assurance_suite.py` (3/3 passed, 211/211 full repo tests passing).
+- **Why this approach was chosen:**
+  - Solves the two user-reported bugs:
+    1. Agents dispatched via voice/UI remained labeled `IDLE` in the Scranton Office UI Inspector with empty activity logs.
+    2. Certain builds finished prematurely without creating `index.html`, leaving only the design blueprint.
+- **What alternatives were considered:**
+  - 3.5-second HTTP polling on `/api/fleet/state`: Rejected because event-driven WebSocket pushes provide sub-millisecond visual synchronization with zero network/CPU waste.
+- **Key files touched:**
+  - `core/fleet_manager.py`
+  - `actions/fleet_control.py`
+  - `actions/antigravity_agent.py`
+  - `tests/test_project_isolation_and_fleet_orchestrator_suite.py`
+  - `tests/test_fleet_live_sync_and_antigravity_assurance_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - `DESIGN_BLUEPRINT.html` is an intermediate specification artifact and must never be treated as the final project deliverable or opened in the browser as the finished product.
+  - When worker threads execute actions via `TaskManager`, always wire real-time progress callbacks to the active FleetAgent instance to keep UI inspector cards and roster badges in sync.
+
+---
+
 ## [2026-10-04] — Vision 1.0: Project Workspace Isolation, In-Place Fleet Dispatch & Concurrency Load Balancing
 
 - **What was built:**
