@@ -604,6 +604,7 @@ class ZezoLive:
         self.ui.on_audio_device_change = self._on_audio_device_change
         self._reconnect_event: asyncio.Event | None = None
         self._reconnect_keep = True   # False → next rebuild drops the resumption handle
+        self._silence_watchdog_task: Optional[asyncio.Task] = None
 
         # ── Session resumption ─────────────────────────────────────────
         # The server issues a resumption handle every few seconds and reissues
@@ -973,6 +974,7 @@ class ZezoLive:
 
     def interrupt(self) -> None:
         """Stop ZEZO mid-speech: drain queued audio and open mic immediately."""
+        self._cancel_silence_watchdog()
         self._interrupted = True
         q = self.audio_in_queue
         if q:
@@ -992,6 +994,29 @@ class ZezoLive:
         if self._turn_done_event:
             self._turn_done_event.clear()
         self.ui.write_log("SYS: Interrupted — listening...")
+
+    def _cancel_silence_watchdog(self) -> None:
+        if self._silence_watchdog_task and not self._silence_watchdog_task.done():
+            self._silence_watchdog_task.cancel()
+        self._silence_watchdog_task = None
+
+    def _arm_silence_watchdog(self, user_text: str) -> None:
+        self._cancel_silence_watchdog()
+        loop = self._loop
+        if loop and loop.is_running():
+            self._silence_watchdog_task = asyncio.create_task(self._silence_watchdog(user_text))
+
+    async def _silence_watchdog(self, user_text: str) -> None:
+        try:
+            await asyncio.sleep(5.0)
+            msg = f"[Audio] ⏱️ Silence watchdog: 5s elapsed since user speech '{user_text[:60]}' with NO model output"
+            print(f"[Zezo] ⚠️ {msg}")
+            if log_bus is not None:
+                log_bus.emit("WARNING", "audio.silence", msg)
+            if hasattr(self, "ui") and self.ui:
+                self.ui.write_log(f"SYS: [Silence Watchdog] No reply within 5s for: '{user_text[:40]}'")
+        except asyncio.CancelledError:
+            pass
 
     def speak(self, text: str):
         if not self._loop or not self.session:
@@ -1134,15 +1159,22 @@ class ZezoLive:
                 )
             ),
         )
-        if self._enhanced_live:
+        proactive_enabled = get_proactive_audio_enabled()
+        print(f"[Zezo] 🎙️ Proactive Audio Config: enabled={proactive_enabled}, enhanced_live={self._enhanced_live}")
+        if log_bus is not None:
+            log_bus.emit("INFO", "audio.config", f"Proactive Audio Config: enabled={proactive_enabled}, enhanced_live={self._enhanced_live}")
+        if self._enhanced_live and proactive_enabled:
             # Proactive audio: ZEZO stays silent when speech isn't addressed
             # to it (background chatter, talking to someone else in the room).
             # (Affective dialog was dropped: gemini-3.1-flash-live does not
             #  support it, and it never reliably detected tone in practice.
             #  To restore it on a 2.5 native-audio model, add back:
             #  cfg["enable_affective_dialog"] = True )
-            if get_proactive_audio_enabled():
-                cfg["proactivity"] = types.ProactivityConfig(proactive_audio=True)
+            cfg["proactivity"] = types.ProactivityConfig(proactive_audio=True)
+
+        print(f"[Zezo] 🎙️ Live Connect Config Proactivity: {cfg.get('proactivity')}")
+        if log_bus is not None:
+            log_bus.emit("INFO", "audio.config", f"Live Connect Config Proactivity: {cfg.get('proactivity')}")
 
         if self._tuned_live:
             cfg.update(self._tuning_config())
@@ -1668,6 +1700,7 @@ class ZezoLive:
                             self._resume_handle = _sru.new_handle
 
                     if response.data:
+                        self._cancel_silence_watchdog()
                         if self._interrupted:
                             pass  # discard: interrupted
                         else:
@@ -1684,6 +1717,7 @@ class ZezoLive:
                         sc = response.server_content
 
                         if sc.output_transcription and sc.output_transcription.text:
+                            self._cancel_silence_watchdog()
                             txt = _clean_transcript(sc.output_transcription.text)
                             # Log user speech immediately as soon as model starts answering
                             if in_buf and not in_logged:
@@ -1720,13 +1754,18 @@ class ZezoLive:
                                 self._last_user_speech = time.monotonic()
                                 self.ui.stream_transcript("user", txt, done=False)
                                 in_logged = False
+                                self._arm_silence_watchdog(" ".join(in_buf))
 
                         if getattr(sc, "interrupted", False):
+                            msg = "[Audio] ⚠️ server_content.interrupted received from Gemini Live (turn interrupted by server)"
+                            print(f"[Zezo] {msg}")
                             if log_bus is not None:
-                                log_bus.emit("INFO", "audio.recv", "Gemini Live turn was interrupted by server")
+                                log_bus.emit("WARNING", "audio.recv", msg)
                             self._interrupted = True
+                            self._cancel_silence_watchdog()
 
                         if sc.turn_complete:
+                            self._cancel_silence_watchdog()
                             if self._turn_done_event:
                                 self._turn_done_event.set()
 
@@ -1792,6 +1831,11 @@ class ZezoLive:
                                     }))
                             else:
                                 self.ui.stream_transcript("zezo", "", done=True)
+                                if full_in:
+                                    msg = f"[Audio] ⚠️ turn_complete received with ZERO model output after user input: '{full_in}'"
+                                    print(f"[Zezo] {msg}")
+                                    if log_bus is not None:
+                                        log_bus.emit("WARNING", "audio.silence", msg)
                             out_buf = []
                             try:
                                 from core.loop_gates import loop_gates
@@ -1851,6 +1895,8 @@ class ZezoLive:
             print(f"[Zezo] ❌ Recv: {e}")
             traceback.print_exc()
             raise
+        finally:
+            self._cancel_silence_watchdog()
 
     async def _play_audio(self):
         print("[Zezo] 🔊 Play started")
