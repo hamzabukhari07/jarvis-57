@@ -217,8 +217,6 @@ def resolve(
 
     # 4. Clean user project default fallback (Desktop/website)
     fallback = (Path.home() / "Desktop" / "website").resolve()
-    fallback.mkdir(parents=True, exist_ok=True)
-    remember_repo(str(fallback))
     return fallback, "default"
 
 
@@ -258,6 +256,13 @@ def extract_project_slug(prompt: str) -> str:
 
 def get_unique_project_dir(topic_or_task: str, base_parent: Optional[Path] = None) -> Path:
     """Generate an isolated, collision-safe project directory path under base_parent."""
+    import os
+    import tempfile
+
+    # If running inside pytest / automated test suites, sandbox strictly to temp directory
+    if base_parent is None and (os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("ZEZO_TEST_MODE")):
+        base_parent = Path(tempfile.gettempdir()) / "zezo_test_workspaces"
+
     slug = extract_project_slug(topic_or_task)
     parent = (base_parent or (Path.home() / "Desktop")).resolve()
     parent.mkdir(parents=True, exist_ok=True)

@@ -78,9 +78,8 @@ class ToolExecutionContext:
 CODING_TOOLS = {
     "opencode_agent", "opencode_run",
     "kilo_agent", "kilo_run",
-    "dev_agent",
     "antigravity_agent", "antigravity_run",
-    "code_helper",
+    "quick_snippet", "code_helper",
 }
 MAX_CONCURRENT_CODING_TASKS = 2
 

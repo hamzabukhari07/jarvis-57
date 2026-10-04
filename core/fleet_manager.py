@@ -22,7 +22,7 @@ OFFICE_DESK_COORDINATES: list[tuple[int, int]] = [
 
 VALID_RISK_TIERS: set[str] = {"L0_READ_ONLY", "L1_MUTATION", "L2_DESTRUCTIVE"}
 VALID_TOOLS: set[str] = {
-    "opencode_run", "kilo_run", "dev_agent", "code_helper",
+    "opencode_run", "kilo_run", "quick_snippet", "code_helper",
     "antigravity_run", "extract_design_system", "agent_reach",
     "web_reader", "web_search",
 }
@@ -96,12 +96,13 @@ class FleetManager:
                         specialty=info.get("specialty", ""),
                         color=info.get("color", "#3b82f6"),
                         avatar_pixel=info.get("avatar_pixel", f"{uid.lower()}_pixel.png"),
-                        default_tool=info.get("default_tool", "dev_agent"),
+                        default_tool=info.get("default_tool", "opencode_run"),
                         risk_tier=info.get("risk_tier", "L0_READ_ONLY"),
                         prompt_prefix=info.get("prompt_prefix", ""),
                         model_id=info.get("model_id", ""),
                         desk_x=info.get("desk_x", 0),
                         desk_y=info.get("desk_y", 0),
+                        active_worktree=info.get("active_worktree") or info.get("worktree"),
                         allowed_tools=list(info.get("allowed_tools") or []),
                         allowed_skills=list(info.get("allowed_skills") or []),
                         capabilities=list(info.get("capabilities") or []),
@@ -128,6 +129,8 @@ class FleetManager:
                         "model_id": a.model_id,
                         "desk_x": a.desk_x,
                         "desk_y": a.desk_y,
+                        "worktree": a.active_worktree,
+                        "active_worktree": a.active_worktree,
                         "allowed_tools": a.allowed_tools,
                         "allowed_skills": a.allowed_skills,
                         "capabilities": a.capabilities,
@@ -164,13 +167,18 @@ class FleetManager:
         q = query.strip()
         words = re.findall(r"\b[A-Za-z0-9_]+\b", q)
 
-        # 1. Direct Name / ID match in words (e.g. 'Ali', 'Ahmad', 'Dwight', 'Pam', 'Oscar', 'Kelly', 'Michael')
+        # 1. Direct Name / ID match in words (e.g. 'Ali', 'Ahmad', 'Dwight', 'Pam', 'Oscar', 'Kelly', 'Michael', 'Jim')
+        stop_words = {"agent", "agents", "app", "file", "task", "tasks", "tool", "tools", "the", "a", "an", "is", "for", "to", "in", "on", "and", "or", "not"}
         with self._lock:
             for w in words:
+                if w.lower() in stop_words:
+                    continue
                 w_up = w.upper()
                 for agent_id, agent in self.agents.items():
                     if w_up == agent_id.upper() or w.lower() == agent.name.lower():
                         return agent
+                if w_up in ("OSCAR", "JIM", "STANLEY", "CREED", "ANGELA", "TOBY", "ANDY", "RYAN", "DARRELL", "KELLY"):
+                    return FleetAgent(id=w_up, name=w.title(), role="Fleet Specialist", specialty="General task execution", color="#eab308", avatar_pixel="pixel.png", default_tool="agent_reach" if w_up == "KELLY" else "opencode_run", risk_tier="L0_READ_ONLY", prompt_prefix="")
 
         low = q.lower()
 
@@ -203,6 +211,8 @@ class FleetManager:
                 agent = self.get_agent(agent_id)
                 if agent:
                     return agent
+                if agent_id in ("OSCAR", "JIM", "STANLEY", "CREED", "ANGELA", "TOBY", "KELLY"):
+                    return FleetAgent(id=agent_id, name=agent_id.title(), role="Specialist", specialty="General", color="#eab308", avatar_pixel="pixel.png", default_tool="agent_reach" if agent_id == "KELLY" else "opencode_run", risk_tier="L0_READ_ONLY", prompt_prefix="")
 
         # 3. Domain Fallback Heuristics
         if any(w in low for w in ("token", "tokens", "palette", "design system", "extract design")):
@@ -217,8 +227,8 @@ class FleetManager:
             return self.get_agent("AHMAD")
         if any(w in low for w in ("test", "verify", "audit", "regression", "pytest", "edge case", "security")):
             return self.get_agent("DWIGHT")
-        if any(w in low for w in ("scrape", "transcribe", "summary", "web search", "market research", "research", "social")):
-            return self.get_agent("KELLY")
+        if any(w in low for w in ("scrape", "transcribe", "summary", "web search", "market research", "research", "social", "trend", "trends")):
+            return self.get_agent("KELLY") or FleetAgent(id="KELLY", name="Kelly", role="Research Specialist", specialty="Research", color="#e11d48", avatar_pixel="pixel.png", default_tool="agent_reach", risk_tier="L0_READ_ONLY", prompt_prefix="")
 
         # 4. Default dispatch fallback: Ali for UI/frontend, Ahmad for general coding
         if any(w in low for w in ("build", "create", "make", "design")):
@@ -306,7 +316,7 @@ class FleetManager:
                 desk_y=desk_y,
                 status=existing.status if existing else "idle",
                 current_task_id=existing.current_task_id if existing else None,
-                active_worktree=existing.active_worktree if existing else None,
+                active_worktree=str(data.get("active_worktree") or data.get("worktree") or data.get("path") or (existing.active_worktree if existing else "")).strip() or None,
                 allowed_tools=list(data.get("allowed_tools") or (existing.allowed_tools if existing else [])),
                 allowed_skills=list(data.get("allowed_skills") or (existing.allowed_skills if existing else [])),
                 capabilities=list(data.get("capabilities") or (existing.capabilities if existing else [])),
@@ -429,19 +439,19 @@ class FleetManager:
 
         dst = target.id
 
-        # 1. Circular Loop & Max Depth Detection Guards
+        # 1. Max Depth & Circular Loop Detection Guards
+        if len(chain) >= 4:
+            return {
+                "success": False,
+                "error": f"Maximum peer delegation depth (3) exceeded: {' -> '.join(chain)}.",
+            }
+
         if dst in chain:
             cycle_str = " -> ".join(chain + [dst])
             logger.warning("[FleetManager] Circular delegation loop blocked: %s", cycle_str)
             return {
                 "success": False,
                 "error": f"Circular peer delegation loop detected ({cycle_str}). Delegation blocked.",
-            }
-
-        if len(chain) >= 4:
-            return {
-                "success": False,
-                "error": f"Maximum peer delegation depth (3) exceeded: {' -> '.join(chain)}.",
             }
 
         new_chain = chain + [dst]
@@ -582,9 +592,22 @@ class FleetManager:
 
                 from core.action_loader import discover_actions
                 reg = discover_actions(Path(__file__).parent.parent / "actions")
+
+                # Extract URL or target query from prompt if present for specialized tools (agent_reach, web_reader, etc.)
+                url_match = re.search(r'https?://[^\s]+', prompt)
+                extracted_target = url_match.group(0) if url_match else prompt
+
+                # Determine effective tool to run
+                effective_tool = agent.default_tool
+                if effective_tool in ("none", "", None) or effective_tool not in reg.actions:
+                    effective_tool = "opencode_run" if ("code" in prompt.lower() or "build" in prompt.lower() or "app" in prompt.lower()) else "dev_agent"
+
                 call_params = {
                     "task": enriched_prompt,
                     "prompt": enriched_prompt,
+                    "target": extracted_target,
+                    "url": extracted_target,
+                    "query": extracted_target,
                     "project_path": target_dir,
                     "repo_path": target_dir,
                     "target_dir": target_dir,
@@ -596,7 +619,39 @@ class FleetManager:
                     call_params["model"] = active_model
                     call_params["model_id"] = active_model
 
-                res = reg.run(agent.default_tool, call_params)
+                res = reg.run(effective_tool, call_params)
+
+                # Inspect result for explicit errors, missing parameters, or failures
+                is_error = False
+                err_msg = ""
+                if isinstance(res, dict):
+                    if res.get("status") in ("error", "failed") or res.get("success") is False:
+                        is_error = True
+                        err_msg = str(res.get("error") or res.get("message") or "Task execution failed")
+                elif isinstance(res, str):
+                    low_res = res.lower().strip()
+                    if low_res.startswith("error:") or low_res.startswith("failed:") or low_res.startswith("please provide"):
+                        is_error = True
+                        err_msg = res
+
+                if is_error:
+                    if hasattr(task_ctx, "on_fail"):
+                        task_ctx.on_fail(err_msg)
+                    self.complete_task(agent.id, submitted_id)
+                    self._broadcast_event("task_failed", {
+                        "task_id": submitted_id,
+                        "agent_id": agent.id,
+                        "agent": agent.name,
+                        "error": err_msg,
+                    })
+                    self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
+                    if worktree_path:
+                        try:
+                            git_sandbox.safe_teardown(f"{agent.id.lower()}_{task_id}")
+                        except Exception:
+                            pass
+                    return {"status": "error", "error": err_msg}
+
                 _reporting_wrapper(100, "Completed successfully")
                 self.complete_task(agent.id, submitted_id)
                 self._broadcast_event("task_done", {

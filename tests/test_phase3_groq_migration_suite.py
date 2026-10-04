@@ -22,7 +22,7 @@ import core.llm_router as llm_router
 import actions.youtube_video as youtube_video
 import actions.flight_finder as flight_finder
 import actions.file_processor as file_processor
-import actions.dev_agent as dev_agent
+import actions.quick_snippet as quick_snippet
 
 
 class TestPhase3GroqMigrationSuite(unittest.TestCase):
@@ -59,12 +59,11 @@ class TestPhase3GroqMigrationSuite(unittest.TestCase):
 
     @patch("core.llm_client.call_groq_text")
     @patch("memory.config_manager.get_groq_api_key", return_value="gsk_dummy_test_key")
-    def test_dev_agent_plan_routes_to_groq(self, mock_key, mock_groq):
-        mock_groq.return_value = '{"project_name": "test_app", "entry_point": "main.py", "files": [{"path": "main.py", "description": "Entry", "imports": []}], "run_command": "python main.py", "dependencies": []}'
+    def test_quick_snippet_generation_routes_to_groq(self, mock_key, mock_groq):
+        mock_groq.return_value = "def hello_world():\n    return 'hello'"
         
-        plan = dev_agent._plan_project("Create a test project", "python")
-        self.assertEqual(plan["project_name"], "test_app")
-        self.assertEqual(plan["entry_point"], "main.py")
+        code = quick_snippet._generate_text("Write a hello world function in python")
+        self.assertIn("hello_world", code)
         mock_groq.assert_called_once()
 
     @patch("core.llm_client.call_groq_text", side_effect=Exception("Groq rate limit exceeded"))

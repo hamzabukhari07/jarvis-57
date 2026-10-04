@@ -20,4 +20,9 @@ Verify the changes using the verification pipeline and report the results.
 
 
 
+ab mujy explain kro simple words ma k jo tum ny change kia os sy kia hoa kia fark para before and after zezo ma within 4 lines only 
+
+
+
+
 Treat the following architecture plan as the target design. Before modifying anything, deeply inspect the existing ZEZO codebase and map every task to the current implementation. Do not blindly implement the phases. Identify what already exists, what needs to change, what should be reused, and any conflicts or risks. Then propose the safest implementation order. Do not modify code until I explicitly approve the implementation plan

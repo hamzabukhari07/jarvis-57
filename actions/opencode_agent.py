@@ -478,3 +478,6 @@ TOOL = {
     },
     "handler": opencode_agent,
 }
+
+# Alias matching tool declaration name
+opencode_run = opencode_agent

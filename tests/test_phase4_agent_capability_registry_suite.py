@@ -68,7 +68,7 @@ def test_get_tool_declarations_scoped_by_agent(registry):
     ahmad_decls = registry.get_tool_declarations(agent_id="AHMAD")
     ahmad_names = {d["name"] for d in ahmad_decls}
     assert "opencode_run" in ahmad_names
-    assert "code_helper" in ahmad_names
+    assert "quick_snippet" in ahmad_names
     assert "weather_report" not in ahmad_names
 
 

@@ -266,7 +266,7 @@ TOOL = {
             },
             "default_tool": {
                 "type": "STRING",
-                "enum": ["opencode_run", "kilo_run", "dev_agent", "code_helper", "antigravity_run", "extract_design_system", "agent_reach", "web_search"],
+                "enum": ["opencode_run", "kilo_run", "quick_snippet", "antigravity_run", "extract_design_system", "agent_reach", "web_search"],
                 "description": "Underlying execution engine assigned to this agent.",
             },
             "model_id": {

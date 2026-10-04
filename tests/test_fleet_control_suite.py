@@ -40,7 +40,7 @@ class TestFleetControlSuite:
             "action": "hire",
             "agent_id": "TEST_BOT",
             "role": "Integration Test Specialist",
-            "default_tool": "dev_agent",
+            "default_tool": "opencode_run",
         })
         assert "Hired new fleet agent" in hire_res
         assert "Test_Bot" in hire_res or "TEST_BOT" in hire_res.upper()

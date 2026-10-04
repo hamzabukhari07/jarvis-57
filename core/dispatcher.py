@@ -120,7 +120,7 @@ def dispatch_quick_edit(
             return opencode_agent(params, player=player, speak=speak, **kwargs)
 
         else:  # "groq_helper" (default, sub-second LPU text/code completion)
-            from actions.code_helper import code_helper
+            from actions.quick_snippet import quick_snippet
             params = {
                 "action": action or ("edit" if file_path else "write"),
                 "description": desc,
@@ -131,21 +131,21 @@ def dispatch_quick_edit(
                 params["output_path"] = project_path
             if code:
                 params["code"] = code
-            return code_helper(params, player=player, speak=speak, **kwargs)
+            return quick_snippet(params, player=player, speak=speak, **kwargs)
 
     except Exception as e:
         logger.error("Error dispatching quick edit to %s: %s", engine, e, exc_info=True)
-        # Fallback to code_helper if kilo/opencode threw an error
+        # Fallback to quick_snippet if kilo/opencode threw an error
         if engine != "groq_helper":
             try:
-                from actions.code_helper import code_helper
+                from actions.quick_snippet import quick_snippet
                 params = {
                     "action": action or ("edit" if file_path else "write"),
                     "description": desc,
                 }
                 if file_path:
                     params["file_path"] = file_path
-                return code_helper(params, player=player, speak=speak, **kwargs)
+                return quick_snippet(params, player=player, speak=speak, **kwargs)
             except Exception as fb_err:
                 return f"Quick edit error on {engine} ({e}); fallback error: {fb_err}"
         return f"Quick edit error on {engine}: {e}"

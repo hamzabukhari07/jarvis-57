@@ -101,7 +101,7 @@ class TestConcurrencyGuardSuite:
 
         # Queue tasks 3 and 4
         t3 = tm.submit("antigravity_run", slow_worker, {})
-        t4 = tm.submit("dev_agent", slow_worker, {})
+        t4 = tm.submit("quick_snippet", slow_worker, {})
 
         assert tm.status(t3)["message"] == "queued (position #1)"
         assert tm.status(t4)["message"] == "queued (position #2)"

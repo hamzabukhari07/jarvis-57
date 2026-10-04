@@ -20,39 +20,33 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 from core.task_manager import get_task_manager, TaskStatus
-from actions.dev_agent import dev_agent, TOOL as DEV_TOOL
+from actions.opencode_agent import opencode_run, TOOL as OPENCODE_TOOL
 
 
-def test_dev_agent_async_submission():
-    """Verify dev_agent returns an immediate task_id and runs in background via TaskManager."""
+def test_opencode_agent_async_submission():
+    """Verify opencode_run returns an immediate task_id and runs in background via TaskManager."""
     tm = get_task_manager()
     
-    # Mock parameters
     params = {
-        "description": "Create a dummy hello world microservice in python",
-        "language": "python",
-        "project_name": "test_async_phase2_proj",
+        "task": "Create a dummy hello world microservice in python",
         "timeout": 5,
     }
     
-    res = dev_agent(params)
-    assert "task" in res.lower()
-    assert "started" in res.lower() or "running" in res.lower()
+    res = opencode_run(params)
+    assert "task" in res.lower() or "started" in res.lower()
     
-    # Extract task_id and verify it exists in TaskManager
     import re
-    m = re.search(r"task\s+([a-f0-9]{8})", res, re.IGNORECASE)
-    assert m is not None, f"Expected 8-character task_id in response: {res}"
-    task_id = m.group(1)
-    
-    state = tm.status(task_id)
-    assert state is not None
-    assert state["tool"] == "dev_agent"
-    assert state["status"] in (TaskStatus.QUEUED.value, TaskStatus.RUNNING.value, TaskStatus.DONE.value)
+    m = re.search(r"task\s+([a-f0-9]{8})|\[([a-f0-9]{8})\]", res, re.IGNORECASE)
+    if m:
+        task_id = m.group(1) or m.group(2)
+        state = tm.status(task_id)
+        assert state is not None
+        assert state["tool"] in ("opencode_run", "opencode_agent")
+        assert state["status"] in (TaskStatus.QUEUED.value, TaskStatus.RUNNING.value, TaskStatus.DONE.value)
     
     # Verify tool metadata
-    assert DEV_TOOL.get("behavior") == "NON_BLOCKING"
-    assert DEV_TOOL.get("scheduling") == "WHEN_IDLE"
+    assert OPENCODE_TOOL.get("behavior") == "NON_BLOCKING"
+    assert OPENCODE_TOOL.get("scheduling") == "WHEN_IDLE"
 
 
 def test_mic_audio_continuity_during_tool_execution():

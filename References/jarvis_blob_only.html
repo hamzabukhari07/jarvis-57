@@ -1,0 +1,1627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>JARVIS · Voice Assistant Prototype</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: #0b0d10;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      position: relative;
+    }
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      opacity: 0;
+      visibility: hidden;
+      transform: scale(.965);
+      filter: blur(7px);
+      transition:
+        opacity 720ms cubic-bezier(.22, 1, .36, 1),
+        transform 900ms cubic-bezier(.22, 1, .36, 1),
+        filter 720ms ease,
+        visibility 720ms;
+      will-change: opacity, transform, filter;
+      background: #0b0d10;
+      padding: 2rem;
+    }
+    .screen.active,
+    .screen.transition-out {
+      visibility: visible;
+    }
+    .screen.active {
+      opacity: 1;
+      transform: scale(1);
+      filter: blur(0);
+      z-index: 2;
+    }
+    .screen.transition-out {
+      opacity: 0;
+      transform: scale(1.025);
+      filter: blur(5px);
+      z-index: 1;
+      pointer-events: none;
+    }
+    .screen.active svg {
+      animation: orb-arrive 900ms cubic-bezier(.22, 1, .36, 1) both;
+    }
+    @keyframes orb-arrive {
+      0% { transform: scale(.94); }
+      55% { transform: scale(1.018); }
+      100% { transform: scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .screen {
+        transition: opacity 180ms linear, visibility 180ms;
+        transform: none;
+        filter: none;
+      }
+      .screen.active svg { animation: none; }
+    }
+    .screen svg {
+      display: block;
+      color: #d0e2ff;
+      width: 300px;
+      height: 300px;
+      transition: color 420ms ease, filter 420ms ease;
+    }
+    /* Custom glows for the new designs to match reference */
+    .screen[data-index="7"] svg { color: #ff9a56; filter: drop-shadow(0 0 20px rgba(255, 154, 86, 0.4)); }
+    .screen[data-index="8"] svg { color: #4ade80; filter: drop-shadow(0 0 20px rgba(74, 222, 128, 0.4)); }
+    .screen[data-index="9"] svg { color: #2a4b6e; filter: drop-shadow(0 0 20px rgba(42, 75, 110, 0.6)); }
+    /* New speaking 4 glow */
+    .screen[data-index="10"] svg { color: #c8d6e5; filter: drop-shadow(0 0 20px rgba(200, 214, 229, 0.4)); }
+
+    .screen .label {
+      font-size: 1.2rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #8aa0bc;
+      font-weight: 500;
+      background: #141a22;
+      padding: 0.5rem 1.6rem;
+      border-radius: 3rem;
+      border: 1px solid #1f2a36;
+    }
+    .nav-dots {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 0.6rem;
+      z-index: 100;
+      background: rgba(12, 16, 22, 0.8);
+      padding: 0.5rem 1rem;
+      border-radius: 3rem;
+      backdrop-filter: blur(8px);
+      border: 1px solid #1f2a36;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 90vw;
+    }
+    .nav-dots button {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: none;
+      background: #2a3644;
+      cursor: pointer;
+      padding: 0;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .nav-dots button.active {
+      background: #6a8cff;
+      transform: scale(1.3);
+    }
+    .nav-dots button:hover {
+      background: #4a5a70;
+    }
+    .arrow {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 100;
+      background: rgba(20, 26, 34, 0.8);
+      border: 1px solid #2a3644;
+      color: #b0c8e8;
+      font-size: 2rem;
+      width: 3.2rem;
+      height: 3.2rem;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+      transition: background 0.2s, border-color 0.2s;
+      user-select: none;
+      line-height: 1;
+      padding-bottom: 0.15rem;
+    }
+    .arrow:hover {
+      background: #1f2a36;
+      border-color: #3a4a5e;
+    }
+    .arrow-left { left: 1.5rem; }
+    .arrow-right { right: 1.5rem; }
+
+    /* ---- color picker bar ---- */
+    .color-bar {
+      position: fixed;
+      top: 1.2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: rgba(12, 16, 22, 0.85);
+      padding: 0.5rem 1.2rem;
+      border-radius: 3rem;
+      backdrop-filter: blur(10px);
+      border: 1px solid #1f2a36;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .color-bar label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #7a8ea8;
+      font-weight: 500;
+    }
+    .color-bar input[type="color"] {
+      width: 36px;
+      height: 36px;
+      border: 2px solid #2a3644;
+      border-radius: 50%;
+      cursor: pointer;
+      padding: 0;
+      background: transparent;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .color-bar input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+    .color-bar input[type="color"]::-webkit-color-swatch {
+      border: none;
+      border-radius: 50%;
+    }
+    .color-bar input[type="color"]:hover {
+      border-color: #6a8cff;
+    }
+    .swatches {
+      display: flex;
+      gap: 0.35rem;
+      margin-left: 0.2rem;
+    }
+    .swatches button {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      padding: 0;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .swatches button:hover {
+      transform: scale(1.15);
+    }
+    .swatches button.active {
+      border-color: #fff;
+      transform: scale(1.15);
+    }
+
+    @media (max-width: 600px) {
+      .screen svg {
+        width: 240px;
+        height: 240px;
+      }
+      .screen .label {
+        font-size: 1rem;
+        padding: 0.4rem 1.2rem;
+      }
+      .arrow {
+        width: 2.6rem;
+        height: 2.6rem;
+        font-size: 1.6rem;
+      }
+      .color-bar {
+        top: 0.8rem;
+        padding: 0.4rem 0.8rem;
+        gap: 0.4rem;
+      }
+      .color-bar label {
+        display: none;
+      }
+      .swatches button {
+        width: 18px;
+        height: 18px;
+      }
+      .color-bar input[type="color"] {
+        width: 30px;
+        height: 30px;
+      }
+    }
+
+    /* ---- Standalone assistant prototype UI ---- */
+    :root {
+      color-scheme: dark;
+      --bg: #080b10;
+      --panel: rgba(16, 22, 31, .78);
+      --panel-border: rgba(139, 164, 198, .16);
+      --text: #e9f1ff;
+      --muted: #7e90aa;
+      --accent: #8bb8ff;
+      --green: #4ade80;
+    }
+    * { box-sizing: border-box; }
+    body {
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background:
+        radial-gradient(ellipse at 25% 38%, rgba(35, 69, 111, .18), transparent 42%),
+        radial-gradient(ellipse at 75% 70%, rgba(33, 77, 57, .10), transparent 38%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .color-bar, .nav-dots, .arrow { display: none !important; }
+    .topbar {
+      height: 70px; flex: 0 0 70px; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 clamp(18px, 4vw, 52px);
+      border-bottom: 1px solid rgba(150, 177, 212, .10);
+      background: rgba(7, 10, 15, .55); backdrop-filter: blur(18px);
+    }
+    .brand { display:flex; align-items:center; gap:12px; letter-spacing:.18em; font-size:12px; font-weight:700; }
+    .brand-symbol {
+      width:30px; height:30px; border:1px solid rgba(139,184,255,.55); border-radius:50%;
+      display:grid; place-items:center; color:#b8d5ff; box-shadow:0 0 20px rgba(104,160,255,.12);
+      font-size:14px;
+    }
+    .brand-sub { display:block; color:#657994; font-size:9px; font-weight:500; letter-spacing:.22em; margin-top:3px; }
+    .topbar-right { display:flex; align-items:center; gap:14px; }
+    .connection { display:flex; align-items:center; gap:8px; color:#8b9bb2; font-size:11px; letter-spacing:.13em; }
+    .connection-dot { width:7px;height:7px;border-radius:50%;background:#596678;box-shadow:0 0 0 4px rgba(89,102,120,.12); }
+    .connection.online .connection-dot { background:var(--green); box-shadow:0 0 12px rgba(74,222,128,.65); }
+    .power-btn, .icon-btn, .send-btn, .suggestion {
+      border:1px solid var(--panel-border); color:#dce9ff; background:rgba(20,29,42,.72);
+      cursor:pointer; transition:all .2s ease;
+    }
+    .power-btn { border-radius:999px; padding:9px 14px; font-size:11px; letter-spacing:.08em; }
+    .power-btn:hover, .icon-btn:hover, .suggestion:hover { border-color:rgba(139,184,255,.55); background:rgba(39,57,81,.8); }
+    .assistant-layout {
+      flex:1; min-height:0; width:min(1440px,100%); margin:0 auto; padding:clamp(14px,2.5vw,34px);
+      display:grid; grid-template-columns:minmax(0,1.1fr) minmax(320px,.9fr); gap:clamp(16px,2.5vw,34px);
+    }
+    .hero-stage {
+      min-height:0; position:relative; overflow:hidden; border:1px solid rgba(139,164,198,.11);
+      border-radius:28px; background:linear-gradient(145deg,rgba(15,22,32,.68),rgba(8,12,18,.40));
+      display:flex; align-items:center; justify-content:center;
+    }
+    .hero-stage::before {
+      content:""; position:absolute; width:min(64%,520px); aspect-ratio:1; border-radius:50%;
+      border:1px solid rgba(131,170,222,.08); box-shadow:0 0 0 42px rgba(131,170,222,.018),0 0 0 84px rgba(131,170,222,.012);
+      pointer-events:none;
+    }
+    .hero-stage::after {
+      content:""; position:absolute; width:min(78%,640px); aspect-ratio:1; border-radius:50%;
+      background:radial-gradient(circle,rgba(47,93,148,.10),transparent 68%); pointer-events:none;
+    }
+    .stage-topline { position:absolute; top:24px; left:26px; right:26px; z-index:3; display:flex; justify-content:space-between; align-items:center; }
+    .eyebrow { color:#7185a1; font-size:10px; letter-spacing:.19em; text-transform:uppercase; }
+    .stage-index { color:#4e6078; font-size:10px; letter-spacing:.12em; }
+    #screens-container { position:absolute; inset:0; z-index:2; pointer-events:none; }
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      opacity: 0;
+      visibility: hidden;
+      transform: none;
+      filter: none;
+      pointer-events: none;
+      background: transparent;
+      padding: 2rem;
+      z-index: 0;
+    }
+    /* Keep both layers in the exact same center. The blob itself scales
+       continuously; we avoid blur/scene movement that makes it feel cut. */
+    .screen.active,
+    .screen.transition-out {
+      visibility: visible;
+    }
+    .screen.active {
+      opacity: 1;
+      z-index: 2;
+      pointer-events: auto;
+    }
+    .screen.transition-out {
+      opacity: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .screen svg {
+      transform-box: fill-box;
+      transform-origin: center center;
+      will-change: transform, opacity;
+    }
+    .screen.active svg {
+      animation: blob-grow-in 820ms cubic-bezier(.16, 1, .3, 1) both;
+    }
+    .screen.transition-out svg {
+      animation: blob-soft-out 680ms cubic-bezier(.4, 0, .2, 1) both;
+    }
+    @keyframes blob-grow-in {
+      0% { transform: scale(.78); opacity: .35; }
+      55% { transform: scale(1.035); opacity: 1; }
+      78% { transform: scale(.99); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes blob-soft-out {
+      0% { transform: scale(1); opacity: 1; }
+      45% { transform: scale(.97); opacity: .78; }
+      100% { transform: scale(.82); opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .screen.active svg,
+      .screen.transition-out svg { animation: none; }
+    }
+    .screen svg { width:min(62%,430px) !important; height:auto !important; max-height:70%; overflow:visible; }
+    .screen .label { display:none; }
+    .stage-bottom { position:absolute; bottom:28px; left:22px; right:22px; z-index:3; text-align:center; pointer-events:none; }
+    .state-name { font-size:12px; font-weight:600; letter-spacing:.20em; text-transform:uppercase; }
+    .state-detail { color:#71839c; font-size:11px; margin-top:8px; letter-spacing:.04em; }
+    .micro-bars { height:22px; display:flex; align-items:center; justify-content:center; gap:3px; margin-bottom:13px; }
+    .micro-bars span { width:2px; height:5px; border-radius:5px; background:#72a8f8; opacity:.55; }
+    .micro-bars.active span { animation: waveform .8s ease-in-out infinite alternate; }
+    .micro-bars span:nth-child(3n) { animation-delay:-.3s; }
+    .micro-bars span:nth-child(2n) { animation-delay:-.55s; }
+    @keyframes waveform { to { height:18px; opacity:1; } }
+    .conversation {
+      min-height:0; display:flex; flex-direction:column; border:1px solid var(--panel-border);
+      border-radius:28px; overflow:hidden; background:var(--panel); backdrop-filter:blur(18px);
+    }
+    .conversation-head { padding:22px 24px 18px; border-bottom:1px solid rgba(139,164,198,.10); }
+    .conversation-head h1 { font-size:17px; font-weight:600; letter-spacing:-.02em; }
+    .conversation-head p { color:var(--muted); font-size:11px; margin-top:7px; line-height:1.5; }
+    .messages { flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:16px; padding:22px 20px; scrollbar-width:thin; scrollbar-color:#29384b transparent; }
+    .message { max-width:88%; animation:messageIn .22s ease-out; }
+    @keyframes messageIn { from {opacity:0; transform:translateY(5px)} to {opacity:1;transform:translateY(0)} }
+    .message.user { align-self:flex-end; }
+    .message.assistant { align-self:flex-start; }
+    .message-label { color:#7388a5; font-size:9px; letter-spacing:.15em; text-transform:uppercase; margin:0 0 7px 3px; }
+    .bubble { padding:12px 14px; border:1px solid rgba(139,164,198,.12); border-radius:15px; background:rgba(26,36,51,.78); color:#dce7f7; font-size:12px; line-height:1.65; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .message.user .bubble { background:rgba(49,76,112,.42); border-color:rgba(139,184,255,.18); border-bottom-right-radius:5px; }
+    .message.assistant .bubble { border-bottom-left-radius:5px; }
+    .message .bubble.pending { color:#8ba2c0; }
+    .suggestions { display:flex; flex-wrap:wrap; gap:7px; padding:0 20px 16px; }
+    .suggestion { border-radius:999px; padding:8px 10px; font-size:10px; color:#9eb5d4; }
+    .composer-wrap { border-top:1px solid rgba(139,164,198,.10); padding:15px 16px 14px; }
+    .composer { display:flex; align-items:flex-end; gap:8px; padding:7px; border:1px solid rgba(139,164,198,.20); border-radius:17px; background:rgba(7,11,17,.72); }
+    .composer input { flex:1; min-width:0; border:0; outline:0; color:#eaf2ff; background:transparent; font:inherit; font-size:12px; padding:10px 8px; }
+    .composer input::placeholder { color:#52647d; }
+    .icon-btn { flex:0 0 38px; width:38px; height:38px; display:grid; place-items:center; border-radius:12px; font-size:16px; }
+    .icon-btn.mic-active { color:#4ade80; border-color:rgba(74,222,128,.5); box-shadow:0 0 18px rgba(74,222,128,.09); }
+    .send-btn { flex:0 0 38px; width:38px; height:38px; border-radius:12px; background:#b9d5ff; color:#0b1422; font-size:17px; font-weight:700; }
+    .send-btn:hover { background:#d3e4ff; }
+    .composer-note { display:flex; justify-content:space-between; gap:10px; padding:10px 3px 0; color:#53657e; font-size:9px; line-height:1.4; }
+    .composer-note span:last-child { text-align:right; }
+    .hidden-controls { display:none !important; }
+    @media (max-width: 800px) {
+      body { overflow:auto; }
+      .topbar { height:60px; flex-basis:60px; padding:0 16px; }
+      .assistant-layout { overflow:auto; padding:12px; display:grid; grid-template-columns:1fr; grid-template-rows:minmax(270px,42vh) minmax(380px,1fr); gap:12px; }
+      .hero-stage { border-radius:22px; }
+      .stage-topline { top:16px; left:17px; right:17px; }
+      .stage-bottom { bottom:17px; }
+      .screen svg { width:min(56%,270px) !important; max-height:65%; }
+      .conversation { border-radius:22px; min-height:380px; }
+      .conversation-head { padding:16px 18px 14px; }
+      .messages { padding:16px; gap:13px; }
+      .suggestions { padding:0 16px 12px; }
+      .composer-wrap { padding:12px; }
+    }
+    @media (max-width: 380px) {
+      .brand { font-size:10px; gap:8px; }
+      .brand-symbol { width:26px; height:26px; }
+      .connection { font-size:9px; }
+      .power-btn { padding:8px 10px; }
+      .assistant-layout { grid-template-rows:minmax(250px,38vh) minmax(390px,1fr); }
+    }
+
+  </style>
+
+  <style id="blob-only-mode">
+    html, body {
+      width: 100%;
+      height: 100%;
+      min-height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #080a0e;
+    }
+    body {
+      display: block;
+      position: relative;
+    }
+    .topbar,
+    .conversation,
+    .stage-topline,
+    .stage-bottom,
+    .hidden-controls {
+      display: none !important;
+    }
+    .assistant-layout {
+      display: block !important;
+      width: 100vw !important;
+      height: 100dvh !important;
+      min-height: 100dvh !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .hero-stage {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100dvh !important;
+      min-height: 100dvh !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      overflow: hidden !important;
+    }
+    .hero-stage::before,
+    .hero-stage::after {
+      display: none !important;
+      content: none !important;
+    }
+    #screens-container {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100dvh !important;
+    }
+    .screen {
+      padding: 0 !important;
+      gap: 0 !important;
+      background: transparent !important;
+    }
+    .screen > :not(svg) {
+      display: none !important;
+    }
+    .screen svg {
+      width: min(76vmin, 520px) !important;
+      height: min(76vmin, 520px) !important;
+      max-width: 90vw !important;
+      max-height: 90dvh !important;
+    }
+    @media (max-width: 600px) {
+      .screen svg {
+        width: min(84vmin, 420px) !important;
+        height: min(84vmin, 420px) !important;
+      }
+    }
+  </style>
+
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-symbol">✧</div>
+      <div>J.A.R.V.I.S.<span class="brand-sub">PERSONAL ASSISTANT INTERFACE</span></div>
+    </div>
+    <div class="topbar-right">
+      <div class="connection" id="connectionIndicator"><span class="connection-dot"></span><span id="connectionText">OFFLINE</span></div>
+      <button class="power-btn" id="powerBtn" type="button">Power on</button>
+    </div>
+  </header>
+
+  <main class="assistant-layout">
+    <section class="hero-stage" aria-label="Assistant status visualization">
+      <div class="stage-topline">
+        <span class="eyebrow">Neural interface / 01</span>
+        <span class="stage-index" id="stageIndex">STATE 06 / 11</span>
+      </div>
+      <div id="screens-container"></div>
+      <div class="stage-bottom">
+        <div class="micro-bars" id="microBars" aria-hidden="true"></div>
+        <div class="state-name" id="stateName">Offline</div>
+        <div class="state-detail" id="stateDetail">Assistant is standing by</div>
+      </div>
+    </section>
+
+    <section class="conversation" aria-label="Assistant conversation">
+      <div class="conversation-head">
+        <h1>Conversation</h1>
+        <p>Talk naturally or type a message. This standalone demo runs in your browser.</p>
+      </div>
+      <div class="messages" id="messages" aria-live="polite">
+        <div class="message assistant">
+          <div class="message-label">J.A.R.V.I.S.</div>
+          <div class="bubble">System is offline. Power on the assistant to start a conversation.</div>
+        </div>
+      </div>
+      <div class="suggestions" id="suggestions">
+        <button class="suggestion" type="button" data-prompt="What can you do?">What can you do?</button>
+        <button class="suggestion" type="button" data-prompt="System status">System status</button>
+      </div>
+      <div class="composer-wrap">
+        <form class="composer" id="chatForm">
+          <button class="icon-btn" id="micBtn" type="button" aria-label="Start voice input" title="Start voice input">⌁</button>
+          <input id="messageInput" type="text" placeholder="Power on to send a message…" autocomplete="off" aria-label="Type your message" disabled>
+          <button class="send-btn" id="sendBtn" type="submit" aria-label="Send message" disabled>↑</button>
+        </form>
+        <div class="composer-note"><span id="inputHint">Voice input requires browser support</span><span>FRONTEND DEMO · NO BACKEND</span></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Hidden legacy controls retained so the original orb renderer runs unchanged. -->
+  <div class="hidden-controls">
+    <div class="color-bar"><label>color</label><input type="color" id="colorPicker" value="#d0e2ff"><div class="swatches" id="swatches"></div></div>
+    <div class="nav-dots" id="navDots"></div>
+    <button class="arrow arrow-left" id="prevBtn" aria-label="Previous state">‹</button>
+    <button class="arrow arrow-right" id="nextBtn" aria-label="Next state">›</button>
+  </div>
+
+  <script>
+    (function() {
+      // --------------------------------------------------------------
+      // 1. Core helpers
+      // --------------------------------------------------------------
+      const TAU = Math.PI * 2;
+      const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+      const ease = (x) => (1 - Math.cos(Math.PI * x)) / 2;
+      const hash = (n) => {
+        const s = Math.sin(n * 127.1) * 43758.5453;
+        return s - Math.floor(s);
+      };
+      const dist2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+
+      const nearest = (pts, i, k) => {
+        const idx = [], d = [], p = pts[i];
+        for (let j = 0; j < pts.length; j++) {
+          if (j === i) continue;
+          const e = dist2(p, pts[j]);
+          let at = idx.length;
+          if (at === k) {
+            if (e >= d[k - 1]) continue;
+            at--;
+          }
+          while (at > 0 && d[at - 1] > e) {
+            idx[at] = idx[at - 1];
+            d[at] = d[at - 1];
+            at--;
+          }
+          idx[at] = j;
+          d[at] = e;
+        }
+        return idx;
+      };
+
+      const spring = (x) => 1 - Math.exp(-4.5 * x) * Math.cos(3 * Math.PI * x) - x * Math.exp(-4.5);
+
+      function rewind(t, w) {
+        const P = 3200, k = Math.floor(t / P), u = t - k * P;
+        const back = 0.6 * 2100 * w;
+        const fwd = (2000 + 100 + 100) * w;
+        let a;
+        if (u < 2000) a = u * w;
+        else if (u < 2200) {
+          const x = (u - 2000) / 200;
+          a = (2000 + 200 * (x - (x * x) / 2)) * w;
+        } else if (u < 3000) a = 2100 * w - back * spring((u - 2200) / 800);
+        else {
+          const x = (u - 3000) / 200;
+          a = 2100 * w - back + 100 * x * x * w;
+        }
+        return k * (fwd - back) + a;
+      }
+
+      const PERIOD = {
+        base: 6500,
+        working: 3000,
+        reasoning: 6500,
+        'talking-1': 4000,
+        'talking-3': 3000,
+        idle: 9000,
+        offline: 14000,
+        'orange-waves': 6000,
+        'speaking-final': 5000,
+        'blue-fabric': 7000,
+        'speaking-4': 4500,
+      };
+
+      const clocks = new Map();
+      function tick(look, now, speed) {
+        let c = clocks.get(look);
+        if (!c) clocks.set(look, (c = { t: 0, last: now }));
+        if (now > c.last) {
+          c.t += Math.min(now - c.last, 100) * speed;
+          c.last = now;
+        }
+        return c.t;
+      }
+
+      function yawOf(state, t) {
+        // No rotation for blob states
+        if (state === 'orange-waves' || state === 'speaking-final' || state === 'blue-fabric' || state === 'speaking-4') {
+          return 0;
+        }
+        if (state.startsWith('talking') || state.startsWith('speaking')) {
+          const base = (t / PERIOD[state]) * TAU;
+          const wobble = 0.3 * Math.sin(t / 900);
+          return base + wobble;
+        }
+        if (state === 'idle') {
+          return (t / PERIOD[state]) * TAU * 0.3 + 0.15 * Math.sin(t / 2000);
+        }
+        if (state === 'offline') {
+          return (t / PERIOD[state]) * TAU * 0.08 + 0.05 * Math.sin(t / 5000);
+        }
+        return (t / PERIOD[state]) * TAU;
+      }
+
+      const RING_AXIS = (() => {
+        const tip = (30 * Math.PI) / 180, roll = (10 * Math.PI) / 180;
+        return [-Math.sin(roll) * Math.cos(tip), Math.cos(roll) * Math.cos(tip), Math.sin(tip)];
+      })();
+
+      const TWIST = 1.4;
+      const LEAN = (30 * Math.PI) / 180, TRAIL = Math.PI / 2;
+      const LENS_MS = 1800, MOVE = 0.4, LENS = 0.6;
+
+      function spot(k) {
+        const phi = k * 2.45 + hash(k) * 1.5, theta = ((15 + 30 * hash(k + 0.5)) * Math.PI) / 180;
+        return [Math.sin(theta) * Math.cos(phi), Math.sin(theta) * Math.sin(phi), Math.cos(theta)];
+      }
+
+      function lensAt(t) {
+        const k = Math.floor(t / LENS_MS), u = t / LENS_MS - k;
+        const e = u < MOVE ? (1 - Math.cos((u / MOVE) * Math.PI)) / 2 : 1;
+        const a = spot(k), b = spot(k + 1);
+        const v = a.map((ai, j) => ai + (b[j] - ai) * e), n = Math.hypot(v[0], v[1], v[2]);
+        return v.map((vi) => vi / n);
+      }
+
+      const HOP = 220, TAIL = 5, REACH = 24, WALK = 16;
+
+      function arms(count) {
+        const at = (lat, lon) => [Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon)];
+        const g = Math.sqrt((4 * Math.PI) / count), n = 8, along = 0.6 * g;
+        return Array.from({ length: n }, (_, m) => {
+          const room = m ? m & -m : n;
+          const lim = Math.min((85 * Math.PI) / 180, Math.acos(Math.min(1, (g * n) / (TAU * room))));
+          const out = [];
+          for (let lat = -lim + ((m * 0.618) % 1) * along; lat <= lim; lat += along / Math.sqrt(1 + Math.cos(lat) ** 2))
+            out.push(at(lat, (m / n) * TAU - lat));
+          return out;
+        }).flat();
+      }
+
+      function distribute(state, count, shape) {
+        if (shape) {
+          if (typeof shape === 'function') return shape(count, state);
+          if (shape.points) return shape.points(count, state);
+        }
+        if (state === 'background-spiral') return arms(count);
+        return Array.from({ length: count }, (_, i) => {
+          const y = 1 - (2 * (i + 0.5)) / count, r = Math.sqrt(1 - y * y), th = i * GOLDEN;
+          return [r * Math.cos(th), y, r * Math.sin(th)];
+        });
+      }
+
+      const DOTS = {
+        mount: ({ make, pts }) => {
+          const els = pts.map(() => make('circle')), hidden = new Uint8Array(pts.length);
+          return {
+            dot(i, x, y, r, a) {
+              const el = els[i], o = a.toFixed(2);
+              if (o === '0.00' && hidden[i]) return;
+              hidden[i] = +(o === '0.00');
+              el.setAttribute('cx', x.toFixed(2));
+              el.setAttribute('cy', y.toFixed(2));
+              el.setAttribute('r', Math.max(0.45, r).toFixed(2));
+              el.setAttribute('fill-opacity', o);
+            },
+          };
+        },
+      };
+
+      // --------------------------------------------------------------
+      // 2. mountOrb
+      // --------------------------------------------------------------
+      function mountOrb(svg, options = {}) {
+        const {
+          state: asked,
+          variant,
+          size = 20,
+          speed = 1,
+          label,
+          shape,
+          render = DOTS,
+          density = 1,
+          dotSize = 1,
+          tilt = 20,
+        } = options;
+
+        const VARIANTS = {
+          base: ['default'],
+          working: ['default'],
+          reasoning: ['default'],
+          talking: ['1', '3'],
+          idle: ['default'],
+          offline: ['default'],
+          'orange-waves': ['default'],
+          'speaking-final': ['default'],
+          'blue-fabric': ['default'],
+          'speaking-4': ['default'],
+        };
+
+        const which = asked && Object.hasOwn(VARIANTS, asked) ? asked : 'base';
+        const own = variant !== 'default' && (VARIANTS[which] || []).includes(variant ?? '');
+        const state = which === 'talking' && own ? `talking-${variant}` : (which === 'speaking-4' ? 'speaking-4' : (own ? `${which}-${variant}` : which));
+
+        svg.setAttribute('width', String(size));
+        svg.setAttribute('height', String(size));
+        svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+        svg.setAttribute('fill', 'currentColor');
+
+        if (label) {
+          svg.setAttribute('role', 'img');
+          svg.setAttribute('aria-label', label);
+          svg.removeAttribute('aria-hidden');
+        } else {
+          svg.setAttribute('aria-hidden', 'true');
+          svg.removeAttribute('role');
+          svg.removeAttribute('aria-label');
+        }
+
+        // Increased density for the blob designs to make them look solid
+        const dens = (state === 'orange-waves' || state === 'speaking-final' || state === 'blue-fabric' || state === 'speaking-4') ? 8 : 4;
+        const count = Math.max(8, Math.round(size * dens * density));
+        const form = typeof shape === 'function' ? { points: shape } : shape;
+        const c = size / 2;
+        const R = c * 0.8 * (form?.scale ?? 1);
+        // Adjusted dot size for higher density
+        const rs = (size / 64) ** 0.6 * (0.72 * Math.sqrt(4 / dens)) * dotSize * (dens > 4 ? 1.4 : 1);
+
+        const pts = distribute(state, count, form);
+
+        const make = (tag) => svg.appendChild(document.createElementNS('http://www.w3.org/2000/svg', tag));
+        const drawer = render.mount({ make, pts, size, radius: rs });
+        const flat = !!render.flat;
+
+        const reasoning = state === 'reasoning' && pts.length > 1;
+        const near = reasoning ? pts.map((_, i) => nearest(pts, i, REACH)) : [];
+        const walks = Array.from({ length: 1 }, () => []);
+        let hops = 0;
+
+        const isTalking = state.startsWith('talking') || state.startsWith('speaking');
+        const talkVariant = isTalking ? state.split('-')[1] : null;
+        const isIdle = state === 'idle';
+        const isOffline = state === 'offline';
+
+        const draw = (t) => {
+          const period = PERIOD[state] || 4000;
+          const yaw = yawOf(state, t);
+          const pitch = (tilt * Math.PI) / 180;
+          const sy = Math.sin(yaw), cy = Math.cos(yaw);
+          const st = Math.sin(pitch), ct = Math.cos(pitch);
+
+          const facing = (k) => pts[k][1] * st + (-pts[k][0] * sy + pts[k][2] * cy) * ct;
+
+          const lit = new Map();
+          if (reasoning) {
+            const s = t / HOP, n = Math.floor(s), f = s - n;
+            if (!walks[0].length) {
+              const first = [...pts.keys()].reduce((b, k) => (facing(k) > facing(b) ? k : b), 0);
+              walks[0].push(first);
+            }
+            hops = Math.max(hops, n - WALK);
+            for (; hops < n; hops++) {
+              const walk = walks[0];
+              const recent = walk.slice(-8), from = walk[walk.length - 1];
+              let best = -1, score = -Infinity;
+              near[from].forEach((k, j) => {
+                const sc = facing(k) + 0.35 * hash(hops * 31 + j);
+                if (!recent.includes(k) && sc > score) {
+                  score = sc;
+                  best = k;
+                }
+              });
+              walk.push(best < 0 ? near[from][0] : best);
+              if (walk.length > WALK) walk.shift();
+            }
+            const light = (k, v) => k !== undefined && lit.set(k, Math.max(lit.get(k) ?? 0, v));
+            for (const walk of walks)
+              for (let j = TAIL - 1; j >= 0; j--)
+                light(walk[walk.length - 1 - j], j === 0 ? ease(Math.min(1, f * 2)) : 1 - (j - 1 + f) / TAIL);
+          }
+
+          let talkPulse = null;
+          if (isTalking) {
+            if (talkVariant === '1') {
+              const u = (t % 2400) / 2400;
+              const sweep = u < 0.5 ? u * 2 : 1 - (u - 0.5) * 2;
+              talkPulse = { type: 'sweep', at: -1.2 + 2.4 * sweep, width: 0.35 };
+            } else if (talkVariant === '3') {
+              const u = (t % 2000) / 2000;
+              const v = (t % 1600) / 1600;
+              talkPulse = {
+                type: 'dual',
+                atX: -1.1 + 2.2 * (0.5 + 0.5 * Math.sin(u * TAU)),
+                atY: -1.1 + 2.2 * (0.5 + 0.5 * Math.cos(v * TAU)),
+                width: 0.3,
+              };
+            } else if (state === 'speaking-4') {
+              // A strong, pulsing wave for the new blob
+              const u = (t % 1500) / 1500;
+              const pulse = u < 0.5 ? u * 2 : 1 - (u - 0.5) * 2;
+              talkPulse = { type: 'sweep', at: -1.5 + 3.0 * pulse, width: 0.6 };
+            }
+          }
+
+          let idleBreath = 0;
+          if (isIdle) {
+            idleBreath = 0.5 + 0.5 * Math.sin((t / 3000) * TAU);
+          }
+          let offlineBreath = 0;
+          if (isOffline) {
+            offlineBreath = 0.5 + 0.5 * Math.sin((t / 6000) * TAU);
+          }
+
+          // --- Blob movement logic ---
+          const isOrange = state === 'orange-waves';
+          const isGreen = state === 'speaking-final';
+          const isBlue = state === 'blue-fabric';
+          const isSpeaking4 = state === 'speaking-4';
+
+          pts.forEach(([x, y, z], i) => {
+            const turn = yaw;
+            const [ly, lc] = [sy, cy];
+            const z1 = -x * ly + z * lc;
+            let vx = x * lc + z * ly, vy = y * ct - z1 * st;
+            const sx = z1, sy2 = vx * st;
+            const vz = y * st + z1 * ct, d = (vz + 1) / 2;
+            let r = (0.5 + 1.4 * d) * rs;
+            let a = Math.max(0, (d - 0.3) / 0.7);
+
+            // Speech-locked movement: the blob stays nearly still between
+            // actual speech word-boundary events, then softly expands and settles.
+            if (isGreen) {
+              const voice = Math.max(0, Math.min(1, window.__jarvisSpeechLevel || 0));
+              const localWave = 0.92 + 0.08 * Math.sin(i * 0.73);
+              const energy = voice * localWave;
+              r *= 1 + 0.14 * energy;
+              a += (1 - a) * 0.22 * energy;
+              vx += vx * 0.028 * energy;
+              vy += vy * 0.028 * energy;
+            }
+
+            if (state === 'working') {
+              const u = t % 1700, at = 1.3 - 2.6 * ease(Math.min(1, u / 1200));
+              const q = flat ? vy : vx * RING_AXIS[0] + vy * RING_AXIS[1] + vz * RING_AXIS[2];
+              const g = u < 1200 ? Math.exp(-(((q - at) / 0.2) ** 2)) : 0;
+              r *= 1 + 0.6 * g;
+              a += (1 - a) * g;
+              const w = Math.min(1, Math.max(0, (q - at) / 0.2)) * (u < 1200 ? 1 : 1 - Math.min(1, 1.6 * ((u - 1200) / 800)));
+              vx *= 1 - 0.08 * w;
+              vy *= 1 - 0.08 * w;
+              r *= 1 - 0.15 * w;
+            }
+
+            if (reasoning) {
+              const spark = lit.get(i) ?? 0;
+              a *= 0.5;
+              if (spark) {
+                r *= 1 + 0.8 * spark;
+                a += (1 - a) * spark;
+              }
+            }
+
+            if (isTalking && talkPulse) {
+              let speak = 0;
+              if (talkPulse.type === 'sweep') {
+                const dist = Math.abs(vx - talkPulse.at);
+                speak = Math.exp(-((dist / talkPulse.width) ** 2));
+                speak *= 0.6 + 0.4 * d;
+              } else if (talkPulse.type === 'dual') {
+                const dx = Math.abs(vx - talkPulse.atX);
+                const dy = Math.abs(vy - talkPulse.atY);
+                const wx = Math.exp(-((dx / talkPulse.width) ** 2));
+                const wy = Math.exp(-((dy / talkPulse.width) ** 2));
+                speak = Math.max(wx, wy) * 0.9;
+                speak *= 0.5 + 0.5 * d;
+              }
+              if (speak > 0.01) {
+                r *= 1 + 0.7 * speak;
+                a += (1 - a) * speak * 0.8;
+                vx += vx * 0.03 * speak;
+                vy += vy * 0.03 * speak;
+              }
+            }
+
+            if (isIdle) {
+              a *= 0.35;
+              a += 0.15 * idleBreath * d;
+              const phase = i * 0.7;
+              const pulse = 0.5 + 0.5 * Math.sin((t / 4000) * TAU + phase);
+              const pulseStrength = 0.08 * pulse;
+              a += pulseStrength;
+              r *= 1 + 0.05 * idleBreath;
+              const drift = 0.02 * Math.sin((t / 2500) * TAU + i * 1.3);
+              vx += vx * drift;
+              vy += vy * drift;
+              const twinkle = Math.max(0, Math.sin((t / 700) * TAU + i * 2.1) - 0.95) * 20;
+              if (twinkle > 0) {
+                a += twinkle * 0.1;
+                r *= 1 + twinkle * 0.2;
+              }
+            }
+
+            if (isOffline) {
+              a *= 0.12;
+              a += 0.04 * offlineBreath * d;
+              const twinkle = Math.max(0, Math.sin((t / 2200) * TAU + i * 3.7) - 0.99) * 100;
+              if (twinkle > 0) {
+                a += twinkle * 0.05;
+                r *= 1 + twinkle * 0.1;
+              }
+              const drift = 0.005 * Math.sin((t / 6000) * TAU + i * 0.9);
+              vx += vx * drift;
+              vy += vy * drift;
+            }
+
+            // --- BLOB MOVEMENTS (SPEED INCREASED ~3x) ---
+            if (isOrange) {
+              const wave = 0.12 * Math.sin(y * 2.5 + t * 0.0045) + 0.08 * Math.cos(x * 3 + t * 0.006);
+              vx *= 1 + wave;
+              vy *= 1 + wave;
+              a += 0.12 * Math.sin(y * 2 + t * 0.006);
+            }
+
+            if (isGreen) {
+              // SPEAKING FINAL - formerly green-blob
+              const bump = 0.15 * Math.sin(x * 4 + t * 0.006) * Math.cos(y * 4 + t * 0.0045) * Math.sin(z * 4);
+              vx *= 1 + bump;
+              vy *= 1 + bump;
+              const pulse = 0.05 * Math.sin(t * 0.009);
+              vx *= 1 + pulse;
+              vy *= 1 + pulse;
+            }
+
+            if (isBlue) {
+              const ripple = 0.18 * Math.sin(z * 8 + t * 0.012) + 0.12 * Math.cos(x * 6 + t * 0.009);
+              vx *= 1 + ripple;
+              vy *= 1 + ripple;
+              a *= 0.8 + 0.2 * Math.sin(t * 0.006 + x * 2);
+              r *= 0.9 + 0.1 * Math.sin(t * 0.006 + y * 2);
+            }
+
+            // --- SPEAKING 4 ---
+            if (isSpeaking4) {
+              const ripple = 0.12 * Math.sin(z * 6 + t * 0.012) + 0.1 * Math.cos(x * 5 + t * 0.009);
+              const wave = 0.18 * Math.sin(y * 2 + t * 0.006) + 0.12 * Math.cos(x * 2.5 + t * 0.0045);
+              const pulse = 0.1 * Math.sin(t * 0.015);
+              
+              vx *= 1 + ripple + wave + pulse;
+              vy *= 1 + ripple + wave + pulse;
+              
+              vx += 0.06 * Math.sin(t * 0.009) * vy;
+              vy += 0.06 * Math.cos(t * 0.009) * vx;
+              
+              a *= 0.85 + 0.15 * Math.sin(t * 0.012 + x * 3);
+              r *= 0.95 + 0.05 * Math.sin(t * 0.015 + y * 2);
+            }
+
+            drawer.dot(i, c + vx * R, c - vy * R, r, a, sx, -sy2);
+          });
+
+          drawer.frame?.();
+        };
+
+        const look = `${state}@${speed}`;
+        draw(tick(look, performance.now(), speed));
+
+        const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        let visible = true, raf = 0, dead = false;
+        const io = new IntersectionObserver((es) => (visible = es[es.length - 1].isIntersecting));
+        io.observe(svg);
+
+        function frame(now) {
+          const t = tick(look, now, speed);
+          if (visible) draw(t);
+          raf = requestAnimationFrame(frame);
+        }
+
+        const pause = () => {
+          cancelAnimationFrame(raf);
+          raf = 0;
+        };
+        const play = () => {
+          if (!raf && !still && !dead) raf = requestAnimationFrame(frame);
+        };
+
+        play();
+
+        return {
+          pause,
+          play,
+          destroy() {
+            dead = true;
+            pause();
+            io.disconnect();
+            svg.replaceChildren();
+          },
+        };
+      }
+
+      // Smooth, time-based speech envelope. Word-boundary events create brief
+      // impulses; the envelope attacks quickly and releases gently, then rests at 0.
+      // Native browser speech synthesis does not expose its raw audio waveform.
+      window.__jarvisSpeechLevel = 0;
+      window.__jarvisSpeechTarget = 0;
+      let speechEnvelopeLastFrame = performance.now();
+      (function smoothSpeechEnvelope(now) {
+        const dt = Math.min(50, Math.max(0, now - speechEnvelopeLastFrame));
+        speechEnvelopeLastFrame = now;
+
+        const target = Math.max(0, window.__jarvisSpeechTarget || 0);
+        const current = Math.max(0, window.__jarvisSpeechLevel || 0);
+        const attack = 1 - Math.exp(-dt / 48);
+        const release = 1 - Math.exp(-dt / 145);
+        const easing = target > current ? attack : release;
+
+        window.__jarvisSpeechLevel = current + (target - current) * easing;
+        window.__jarvisSpeechTarget = target * Math.exp(-dt / 125);
+
+        if (window.__jarvisSpeechTarget < 0.012) window.__jarvisSpeechTarget = 0;
+        if (window.__jarvisSpeechLevel < 0.008 && window.__jarvisSpeechTarget === 0) {
+          window.__jarvisSpeechLevel = 0;
+        }
+        requestAnimationFrame(smoothSpeechEnvelope);
+      })(performance.now());
+
+      // --------------------------------------------------------------
+      // 3. Build screens
+      // --------------------------------------------------------------
+      const statesList = [
+        { state: 'base' },
+        { state: 'working' },
+        { state: 'reasoning' },
+        { state: 'talking', variant: '1' },
+        { state: 'talking', variant: '3' },
+        { state: 'idle' },
+        { state: 'offline' },
+        { state: 'orange-waves' },
+        { state: 'speaking-final' },
+        { state: 'blue-fabric' },
+        { state: 'speaking-4' },
+      ];
+
+      const container = document.getElementById('screens-container');
+      const navDots = document.getElementById('navDots');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+
+      let currentIndex = 0;
+      const orbs = [];
+      const allSvgs = [];
+
+      statesList.forEach(({ state, variant }, idx) => {
+        const screen = document.createElement('div');
+        screen.className = 'screen';
+        screen.dataset.index = idx;
+
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 260 260');
+        svg.setAttribute('width', '260');
+        svg.setAttribute('height', '260');
+        svg.setAttribute('fill', 'currentColor');
+        
+        // Set initial color based on state
+        if (state === 'orange-waves') svg.style.color = '#ff9a56';
+        else if (state === 'speaking-final') svg.style.color = '#4ade80';
+        else if (state === 'blue-fabric') svg.style.color = '#2a4b6e';
+        else if (state === 'speaking-4') svg.style.color = '#c8d6e5';
+        else svg.style.color = '#c8dcff';
+
+        const label = document.createElement('div');
+        label.className = 'label';
+        label.textContent = state.replace('-', ' ') + (variant ? ' · ' + variant : '');
+
+        screen.appendChild(svg);
+        screen.appendChild(label);
+        container.appendChild(screen);
+
+        const orb = mountOrb(svg, {
+          state,
+          variant,
+          size: 260,
+          speed: 1,
+          label: state + (variant ? ' ' + variant : ''),
+        });
+        orbs.push(orb);
+        allSvgs.push(svg);
+
+        const dot = document.createElement('button');
+        dot.dataset.index = idx;
+        dot.setAttribute('aria-label', `Go to ${state}${variant ? ' ' + variant : ''}`);
+        if (idx === 0) dot.classList.add('active');
+        dot.addEventListener('click', () => goTo(idx));
+        navDots.appendChild(dot);
+      });
+
+      const screens = document.querySelectorAll('.screen');
+      const dots = navDots.querySelectorAll('button');
+
+      let transitionTimer = null;
+      let transitionSequence = 0;
+
+      function goTo(index) {
+        if (index < 0) index = statesList.length - 1;
+        if (index >= statesList.length) index = 0;
+
+        // Same-state requests must not restart the blob or introduce a visual bump.
+        if (index === currentIndex && screens[index]?.classList.contains('active')) {
+          if (orbs[index]) orbs[index].play();
+          return;
+        }
+
+        const previousIndex = currentIndex;
+        const sequence = ++transitionSequence;
+        if (transitionTimer) {
+          clearTimeout(transitionTimer);
+          transitionTimer = null;
+        }
+
+        // Clear any older exit layer, but leave the currently visible orb alive
+        // until its own shrink-away animation has finished.
+        screens.forEach((screen, i) => {
+          if (i !== previousIndex) {
+            screen.classList.remove('transition-out');
+            if (orbs[i]) orbs[i].pause();
+          }
+        });
+
+        const previousScreen = screens[previousIndex];
+        if (previousScreen) {
+          previousScreen.classList.remove('active');
+          previousScreen.classList.add('transition-out');
+        }
+
+        currentIndex = index;
+        const incomingScreen = screens[index];
+        incomingScreen.classList.remove('transition-out');
+        // Restart only the CSS entry animation for the incoming blob.
+        const incomingSvg = incomingScreen.querySelector('svg');
+        if (incomingSvg) {
+          incomingSvg.style.animation = 'none';
+          void incomingSvg.getBoundingClientRect();
+          incomingSvg.style.animation = '';
+        }
+        incomingScreen.classList.add('active');
+
+        dots.forEach((dot, i) => dot.classList.toggle('active', i === index));
+
+        // Both blobs remain at the exact same center and keep animating during
+        // the overlap. The incoming blob expands from within; the old one gently
+        // contracts away instead of the whole scene being replaced abruptly.
+        orbs.forEach((orb, i) => {
+          if (i === index || i === previousIndex) orb.play();
+          else orb.pause();
+        });
+
+        transitionTimer = setTimeout(() => {
+          if (sequence !== transitionSequence) return;
+          if (previousScreen) previousScreen.classList.remove('transition-out');
+          if (orbs[previousIndex] && previousIndex !== currentIndex) {
+            orbs[previousIndex].pause();
+          }
+          transitionTimer = null;
+        }, 720);
+      }
+
+      prevBtn.addEventListener('click', () => goTo(currentIndex - 1));
+      nextBtn.addEventListener('click', () => goTo(currentIndex + 1));
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') goTo(currentIndex - 1);
+        if (e.key === 'ArrowRight') goTo(currentIndex + 1);
+      });
+
+      // --------------------------------------------------------------
+      // 4. COLOR PICKER
+      // --------------------------------------------------------------
+      const colorPicker = document.getElementById('colorPicker');
+      const swatchesContainer = document.getElementById('swatches');
+
+      // preset swatches
+      const presets = [
+        '#c8d6e5', // speaking 4 default
+        '#d0e2ff', // default soft blue
+        '#ff9a56', // orange waves
+        '#4ade80', // speaking final (green)
+        '#2a4b6e', // blue fabric
+        '#ffd0e2', // soft pink
+        '#d0ffe2', // soft mint
+        '#ffe2d0', // soft peach
+        '#e2d0ff', // soft lavender
+        '#ffffff', // white
+        '#ff6b6b', // coral
+        '#b86bff', // purple
+      ];
+
+      // create swatch buttons
+      presets.forEach((hex, i) => {
+        const btn = document.createElement('button');
+        btn.style.background = hex;
+        btn.dataset.color = hex;
+        if (i === 0) btn.classList.add('active');
+        btn.addEventListener('click', () => {
+          setColor(hex);
+          colorPicker.value = hex;
+          updateActiveSwatch(hex);
+        });
+        swatchesContainer.appendChild(btn);
+      });
+
+      function updateActiveSwatch(hex) {
+        swatchesContainer.querySelectorAll('button').forEach(b => {
+          b.classList.toggle('active', b.dataset.color.toLowerCase() === hex.toLowerCase());
+        });
+      }
+
+      function setColor(hex) {
+        allSvgs.forEach((svg, i) => {
+          // Preserve the reference palette for the organic states.
+          const stateColor = i === 7 ? '#ff9a56'
+            : i === 8 ? '#4ade80'
+            : i === 9 ? '#2a4b6e'
+            : i === 10 ? '#c8d6e5'
+            : hex;
+          svg.style.color = stateColor;
+          svg.style.filter = `drop-shadow(0 0 20px ${stateColor}60)`;
+        });
+        screens.forEach(s => s.style.setProperty('--glow-color', hex));
+      }
+
+      colorPicker.addEventListener('input', (e) => {
+        const hex = e.target.value;
+        setColor(hex);
+        updateActiveSwatch(hex);
+      });
+
+      // initial color
+      setColor('#c8d6e5');
+
+      goTo(0);
+
+      // --------------------------------------------------------------
+      // 5. Assistant prototype controller
+      // Reuses the exact original orb renderer. Speaking always uses
+      // the source file's "speaking-final" state (index 8).
+      // --------------------------------------------------------------
+      const connectionIndicator = document.getElementById('connectionIndicator');
+      const connectionText = document.getElementById('connectionText');
+      const powerBtn = document.getElementById('powerBtn');
+      const stateName = document.getElementById('stateName');
+      const stateDetail = document.getElementById('stateDetail');
+      const stageIndex = document.getElementById('stageIndex');
+      const microBars = document.getElementById('microBars');
+      const messages = document.getElementById('messages');
+      const chatForm = document.getElementById('chatForm');
+      const messageInput = document.getElementById('messageInput');
+      const sendBtn = document.getElementById('sendBtn');
+      const micBtn = document.getElementById('micBtn');
+      const inputHint = document.getElementById('inputHint');
+
+      // The original state list is preserved: offline=6, idle=5,
+      // listening=talking-1=3, reasoning=2, working=1, speaking-final=8.
+      const ORB_STATE = { working: 1, reasoning: 2, listening: 3, idle: 5, offline: 6, speaking: 8 };
+      const STATE_COPY = {
+        offline: ['Offline', 'Assistant is standing by'],
+        idle: ['Ready', 'Listening for your next request'],
+        listening: ['Listening', 'Speak now, I’m listening'],
+        reasoning: ['Thinking', 'Processing your request'],
+        working: ['Working', 'Preparing a response'],
+        speaking: ['Speaking', 'Delivering a response']
+      };
+      let isOnline = false;
+      let recognition = null;
+      let isRecognizing = false;
+      let replySequence = 0;
+
+      for (let i = 0; i < 23; i++) {
+        const bar = document.createElement('span');
+        microBars.appendChild(bar);
+      }
+
+      function setAssistantState(name) {
+        const copy = STATE_COPY[name] || STATE_COPY.idle;
+        stateName.textContent = copy[0];
+        stateDetail.textContent = copy[1];
+        const stateIndex = ORB_STATE[name] ?? ORB_STATE.idle;
+        stageIndex.textContent = `STATE ${String(stateIndex + 1).padStart(2, '0')} / ${statesList.length}`;
+        microBars.classList.toggle('active', name === 'listening' || name === 'speaking' || name === 'working');
+        goTo(stateIndex);
+      }
+
+      function setOnline(online) {
+        isOnline = online;
+        connectionIndicator.classList.toggle('online', online);
+        connectionText.textContent = online ? 'ONLINE' : 'OFFLINE';
+        powerBtn.textContent = online ? 'Power off' : 'Power on';
+        messageInput.disabled = !online;
+        sendBtn.disabled = !online;
+        messageInput.placeholder = online ? 'Message J.A.R.V.I.S.…' : 'Power on to send a message…';
+        micBtn.disabled = !online;
+        inputHint.textContent = online ? 'Enter to send · Mic for voice input' : 'Power on to begin';
+        setAssistantState(online ? 'idle' : 'offline');
+      }
+
+      function addMessage(role, text, pending = false) {
+        const wrap = document.createElement('div');
+        wrap.className = `message ${role}`;
+        const label = document.createElement('div');
+        label.className = 'message-label';
+        label.textContent = role === 'user' ? 'You' : 'J.A.R.V.I.S.';
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble' + (pending ? ' pending' : '');
+        bubble.textContent = text;
+        wrap.append(label, bubble);
+        messages.appendChild(wrap);
+        messages.scrollTop = messages.scrollHeight;
+        return { wrap, bubble };
+      }
+
+      function getDemoReply(text) {
+        const q = text.toLowerCase();
+        if (/\b(what can you do|help|capabilities)\b/.test(q)) {
+          return 'I can demonstrate a voice-assistant flow: receive your message, switch through thinking and working states, and respond with text or browser speech. This prototype is frontend-only, so it is not connected to a real AI model or external services.';
+        }
+        if (/\b(status|system|online|offline)\b/.test(q)) {
+          return 'System status: the local interface is online. Orb animation, text input, and browser voice features are available where supported. No remote AI backend is connected.';
+        }
+        if (/\b(time|clock)\b/.test(q)) {
+          return `Your device time is ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
+        }
+        if (/\b(hello|hi|hey|salam)\b/.test(q)) {
+          return 'Hello, Hamza. I’m online and ready to help. What would you like to work on?';
+        }
+        if (/\b(joke|funny)\b/.test(q)) {
+          return 'I told my code it needed to be more self-aware. It opened the console and started logging its feelings.';
+        }
+        return `I heard you say: “${text}”. This is a standalone interaction prototype, so the reply is simulated rather than generated by a connected AI model.`;
+      }
+
+      function speakReply(text, token) {
+        if (token !== replySequence) return;
+        window.__jarvisSpeechTarget = 0;
+        window.__jarvisSpeechLevel = 0;
+
+        if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
+          setAssistantState('speaking');
+          // No synthetic idle pulsing: without speech events, keep the blob calm.
+          window.setTimeout(() => {
+            if (token === replySequence && isOnline) {
+              window.__jarvisSpeechTarget = 0;
+              window.__jarvisSpeechLevel = 0;
+              setAssistantState('idle');
+            }
+          }, Math.max(1500, Math.min(4200, text.length * 42)));
+          return;
+        }
+
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1;
+        utterance.pitch = 1;
+
+        utterance.onstart = () => {
+          if (token !== replySequence || !isOnline) return;
+          setAssistantState('speaking');
+          // Do not animate just because speech started; wait for a spoken word.
+          window.__jarvisSpeechTarget = 0;
+        };
+
+        // Move only on actual word events. Ignore non-word boundaries so punctuation
+        // and long pauses let the blob settle instead of drifting pointlessly.
+        utterance.onboundary = (event) => {
+          if (token !== replySequence || !isOnline) return;
+          if (event.name && event.name !== 'word') return;
+
+          const start = Math.max(0, event.charIndex || 0);
+          const fragment = text.slice(start, start + (event.charLength || 10)).trim();
+          if (!fragment || !/[\p{L}\p{N}]/u.test(fragment)) return;
+
+          // A restrained pulse per spoken word; longer words get only a slight boost.
+          const wordEnergy = Math.min(0.58, 0.27 + Math.min(0.22, fragment.length * 0.018));
+          window.__jarvisSpeechTarget = Math.max(window.__jarvisSpeechTarget || 0, wordEnergy);
+        };
+
+        utterance.onend = () => {
+          if (token !== replySequence) return;
+          window.__jarvisSpeechTarget = 0;
+          window.setTimeout(() => {
+            if (token === replySequence && isOnline) {
+              window.__jarvisSpeechLevel = 0;
+              setAssistantState('idle');
+            }
+          }, 220);
+        };
+
+        utterance.onerror = () => {
+          if (token === replySequence) {
+            window.__jarvisSpeechTarget = 0;
+            if (isOnline) setAssistantState('idle');
+          }
+        };
+
+        window.speechSynthesis.speak(utterance);
+        // Enter speaking-final immediately; word-boundary events drive the movement.
+        setAssistantState('speaking');
+      }
+
+      function processMessage(rawText) {
+        const text = rawText.trim();
+        if (!text || !isOnline) return;
+        addMessage('user', text);
+        messageInput.value = '';
+        const token = ++replySequence;
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        window.__jarvisSpeechTarget = 0;
+        setAssistantState('reasoning');
+        const pending = addMessage('assistant', 'Thinking…', true);
+        window.setTimeout(() => {
+          if (token !== replySequence || !isOnline) return;
+          setAssistantState('working');
+          window.setTimeout(() => {
+            if (token !== replySequence || !isOnline) return;
+            const reply = getDemoReply(text);
+            pending.bubble.classList.remove('pending');
+            pending.bubble.textContent = reply;
+            messages.scrollTop = messages.scrollHeight;
+            speakReply(reply, token);
+          }, 550);
+        }, 650);
+      }
+
+      function setupSpeechRecognition() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) return false;
+        recognition = new SpeechRecognition();
+        recognition.lang = navigator.language || 'en-US';
+        recognition.interimResults = true;
+        recognition.continuous = false;
+        recognition.onstart = () => {
+          isRecognizing = true;
+          micBtn.classList.add('mic-active');
+          micBtn.textContent = '●';
+          micBtn.setAttribute('aria-label', 'Stop voice input');
+          setAssistantState('listening');
+          inputHint.textContent = 'Listening… speak clearly';
+        };
+        recognition.onresult = (event) => {
+          let finalTranscript = '';
+          let interimTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const part = event.results[i][0].transcript;
+            if (event.results[i].isFinal) finalTranscript += part;
+            else interimTranscript += part;
+          }
+          if (interimTranscript) {
+            messageInput.value = interimTranscript;
+            stateDetail.textContent = 'Hearing your voice…';
+          }
+          if (finalTranscript.trim()) {
+            messageInput.value = finalTranscript.trim();
+            recognition.stop();
+            processMessage(finalTranscript.trim());
+          }
+        };
+        recognition.onerror = (event) => {
+          inputHint.textContent = event.error === 'not-allowed'
+            ? 'Microphone permission was blocked. Allow it in browser settings.'
+            : `Voice input issue: ${event.error}. You can type instead.`;
+          setAssistantState(isOnline ? 'idle' : 'offline');
+        };
+        recognition.onend = () => {
+          isRecognizing = false;
+          micBtn.classList.remove('mic-active');
+          micBtn.textContent = '⌁';
+          micBtn.setAttribute('aria-label', 'Start voice input');
+          if (isOnline && stateName.textContent === 'Listening') setAssistantState('idle');
+        };
+        return true;
+      }
+
+      setupSpeechRecognition();
+
+      powerBtn.addEventListener('click', () => {
+        if (isOnline) {
+          replySequence++;
+          if (recognition && isRecognizing) recognition.abort();
+          if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+          window.__jarvisSpeechTarget = 0;
+          window.__jarvisSpeechLevel = 0;
+          setOnline(false);
+          addMessage('assistant', 'Assistant powered off. Your conversation remains in this page until it is refreshed.');
+        } else {
+          setOnline(true);
+          addMessage('assistant', 'I’m online. You can type a message or use the microphone to speak.');
+        }
+      });
+
+      chatForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        processMessage(messageInput.value);
+      });
+
+      micBtn.addEventListener('click', () => {
+        if (!isOnline) return;
+        if (isRecognizing && recognition) {
+          recognition.stop();
+          return;
+        }
+        if (!recognition) {
+          inputHint.textContent = 'Speech recognition is not supported in this browser. Please type your message instead.';
+          messageInput.focus();
+          return;
+        }
+        try {
+          messageInput.value = '';
+          recognition.start();
+        } catch (err) {
+          inputHint.textContent = 'Could not start the microphone. Check browser permissions and try again.';
+        }
+      });
+
+      document.querySelectorAll('[data-prompt]').forEach(button => {
+        button.addEventListener('click', () => {
+          if (!isOnline) {
+            addMessage('assistant', 'Power on the assistant first, then try that prompt.');
+            return;
+          }
+          processMessage(button.dataset.prompt);
+        });
+      });
+
+      // Start in the requested offline state. The user can power on and enable the mic.
+      setOnline(false);
+
+      window.addEventListener('beforeunload', () => {
+        orbs.forEach(o => o.destroy());
+      });
+    })();
+  </script>
+</body>
+</html>

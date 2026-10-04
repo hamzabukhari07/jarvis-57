@@ -130,6 +130,7 @@ class ZezoUIServer:
         app.router.add_post("/api/settings/pipeline", self._save_pipeline_settings_handler)
         app.router.add_post("/api/settings/keys", self._save_keys_settings_handler)
         app.router.add_get("/api/preview_voice", self._preview_voice_handler)
+        app.router.add_get("/api/models", self._models_list_handler)
         app.router.add_get("/api/skills", self._skills_list_handler)
         app.router.add_post("/api/skills/mode", self._skills_mode_handler)
         app.router.add_post("/api/skills/install", self._skills_install_handler)
@@ -722,6 +723,61 @@ class ZezoUIServer:
             return web.json_response({"status": "success", "skills": skills, "domains": domains})
         except Exception as e:
             logger.exception("Error in /api/skills handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _models_list_handler(self, request: web.Request) -> web.Response:
+        """Return dynamic, categorized model lists from core.models."""
+        try:
+            from core import models
+            engine = request.query.get("engine")
+
+            opencode_models = [
+                "opencode/mimo-v2.5-free",
+                "opencode/qwen2.5-coder:free",
+                "opencode/gemini-2.5-flash:free",
+            ]
+            kilo_models = [
+                "kilo/stepfun/step-3.7-flash:free",
+                "kilo/deepseek/deepseek-chat:free",
+                "kilo/qwen/qwen-2.5-coder-32b-instruct:free",
+                "kilo/minimax/minimax-01:free",
+            ]
+            antigravity_models = list(models.ANTIGRAVITY_CLI_MODELS)
+            groq_models = [
+                "groq/llama-3.3-70b-versatile",
+                "groq/deepseek-r1-distill-llama-70b",
+                "groq/qwen-2.5-coder-32b",
+            ]
+            gemini_models = list(dict.fromkeys(models.GEMINI_FAST_MODELS + models.GEMINI_SMART_MODELS))
+
+            categorized = {
+                "opencode_run": opencode_models,
+                "kilo_run": kilo_models,
+                "antigravity_run": antigravity_models,
+                "groq": groq_models,
+                "gemini": gemini_models,
+                "none": gemini_models + groq_models,
+            }
+
+            all_models = list(dict.fromkeys(
+                antigravity_models + opencode_models + kilo_models + groq_models + gemini_models
+            ))
+
+            if engine and engine in categorized:
+                return web.json_response({
+                    "status": "success",
+                    "engine": engine,
+                    "models": categorized[engine],
+                    "all_models": all_models,
+                })
+
+            return web.json_response({
+                "status": "success",
+                "default_engine_models": categorized,
+                "all_models": all_models,
+            })
+        except Exception as e:
+            logger.exception("Error in /api/models handler: %s", e)
             return web.json_response({"status": "error", "message": str(e)}, status=500)
 
     async def _skills_mode_handler(self, request: web.Request) -> web.Response:

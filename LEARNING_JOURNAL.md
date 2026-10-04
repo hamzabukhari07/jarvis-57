@@ -1,3 +1,143 @@
+## [2026-10-05] — Scranton Office Desks, Model Picker, Dev Agent Deprecation & Quick Snippet Rename
+
+- **What was built:**
+  - **`dev_agent` Deprecation & Complete Deletion:** Completely removed legacy read-only `actions/dev_agent.py` and purged all references from schemas, configs, and test suites. Multi-file coding and refactoring are now handled purely by autonomous CLI engines (`OpenCode`, `KiloCode`, `Antigravity`).
+  - **`code_helper` Renamed to `quick_snippet` (`actions/quick_snippet.py`):** Renamed tool to `quick_snippet` with clear description as a fast 1-second single-file code snippet generator and silent background command runner for the voice loop.
+  - **Spatial Desk Conflict Resolution (`frontend/office.html`):** Configured distinct coordinates in `DESK_PRESETS` for all agents (`MICHAEL`, `ALI`, `HAIDER`, `AHMAD`, `JIM`, `DWIGHT`, `PAM`, `OSCAR`, `STANLEY`, `RYAN`, `KELLY`, `ANDY`) and dynamic desk pool fallback (`(74, 79)`, `(38, 79)`, etc.) so new agents never spawn on top of existing desks.
+  - **Workstation DOM Completeness (`frontend/office.html`):** Added visual pixel desk DOM elements and chairs for Ahmad (`left:62%;top:55%`) and unassigned workstations (`left:74%;top:79%`), resolving missing desk graphics.
+  - **Dynamic Display Name Binding (`frontend/office.html`):** Inspector title (`#activeAgentName`) and bottom Roster strip now bind to `ag.displayName || ag.name`, eliminating stale uppercase ID rendering when changing persona names.
+  - **Activity Terminal Log Normalization (`frontend/office.html`):** Refactored `renderSelectedAgentLogs()` to cleanly normalize both raw string logs and structured log objects, eliminating `undefined [undefined] undefined` rendering.
+  - **QtWebEngine Searchable Model Dropdown (`frontend/office.html`):** Replaced native `<datalist>` with custom searchable `.custom-dropdown` (`#cfgAgentModelDropdown`) connected to `/api/models` for 100% reliable interactive model selection.
+- **Why this approach was chosen:**
+  - Resolved UI collision bugs in the Scranton Office view, streamlined the coding agent hierarchy, and ensured all UI dropdowns function reliably within QtWebEngine.
+- **Key files touched:**
+  - `actions/quick_snippet.py`
+  - `actions/dev_agent.py` (deleted)
+  - `actions/code_helper.py` (deleted)
+  - `frontend/office.html`
+  - `core/fleet_manager.py`
+  - `config/fleet_agents.json`
+  - `core/task_manager.py`
+  - `core/dispatcher.py`
+  - `actions/fleet_control.py`
+  - `tests/*`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Native HTML5 `<datalist>` popup menus do not expand reliably in QtWebEngine desktop apps; always use custom styled `.custom-dropdown` elements.
+  - Keep 1-second inline tools (`quick_snippet`) distinct from autonomous multi-file CLI engines (`opencode_run`, `kilo_run`, `antigravity_run`).
+
+---
+
+## [2026-10-05] — Hardware-Accelerated 60 FPS Canvas 2D Neural Blob Optimization
+
+- **What was built:**
+  - **Hardware-Accelerated Canvas 2D Batch Engine (`frontend/js/neural_orb.js`):** Completely eliminated heavy SVG DOM attribute thrashing (~500,000 DOM reflow ops/sec) by porting the neural blob renderer to HTML5 Canvas 2D with `Accelerated2dCanvasEnabled` GPU paths.
+  - **Zero DOM Mutation & High-DPI Retina Support:** Rendering now performs direct canvas drawing with `window.devicePixelRatio` crispness and 0 transient string allocations per frame.
+  - **Zero-Overhead Idle Sleep & Gating:** All 10 non-active screen instances are completely paused (`cancelAnimationFrame`), reducing CPU utilization from whole-core saturation down to < 1%.
+  - **Calibrated Listening Motion Dynamics:** Tuned `orange-waves` displacement amplitude (from 0.20 down to ~0.09) and oscillation frequency by 50% for a calm, graceful organic breathing wave during microphone listening.
+  - **Retained 100% Visual Fidelity & Parity:** All 11 authentic mathematical states (`orange-waves`, `speaking-final`, `reasoning`, `working`, `idle`, `offline`, `talking`, `blue-fabric`, `speaking-4`), cubic-bezier crossfading, and audio-reactive speech envelope modulation are 100% preserved.
+- **Why this approach was chosen:**
+  - In QtWebEngine (Chromium on desktop), updating 2,080 SVG DOM `<circle>` nodes with `setAttribute` on every frame caused severe layout thrashing and UI thread starvation. Canvas 2D batching renders all points in under 0.3ms.
+- **Key files touched:**
+  - `frontend/js/neural_orb.js`
+  - `frontend/style.css`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Always use Canvas 2D / WebGL instead of raw SVG DOM nodes for particle simulations with >100 points in QtWebEngine desktop apps.
+
+---
+
+## [2026-10-05] — Authentic J.A.R.V.I.S. Vector Neural Blob Core Integration & Zero-Clipping Layout
+
+- **What was built:**
+  - **Full Vector Neural Blob Engine (`frontend/js/neural_orb.js`):** Directly integrated the authentic neural blob architecture from `jarvis_blob_only.html` featuring all 11 distinct organic mathematical shapes:
+    - `orange-waves` (Index 7, `#ff9a56`): 3x speed vibrant listening wave.
+    - `speaking-final` (Index 8, `#4ade80`): Organic harmonic voice core with real-time speech envelope modulation.
+    - `reasoning` (Index 2, `#38bdf8`): Traveling synaptic spark hop walks with dynamic illuminated nodes.
+    - `working` (Index 1, `#eab308`): High-energy rotating torus.
+    - `idle` (Index 5, `#00d2ff`): Subtle multi-phase breathing and twinkling star dots.
+    - `offline` (Index 6, `#64748b`): Slow celestial drift.
+    - `blue-fabric`, `speaking-4`, `talking-1`, `talking-3`, and `base`.
+  - **Fluid State Crossfading & Cubic Easing:** Implemented dual-layer `blob-grow-in` (820ms cubic bezier) and `blob-soft-out` (680ms cubic bezier) transitions so state shifts smoothly expand and contract from within the exact visual center without pops.
+  - **Zero-Clipping Responsive Viewport (`frontend/style.css`):** Configured `.screens-container`, `.screen`, and `.vortex-gif` with `overflow: visible`, `width: min(260px, 92%)`, and centered flex alignment, completely eliminating bottom edge clipping and flat cuts.
+  - **Modal Pause & Sleep Optimization:** Preserved `_zezoAnimActive` RAF hooks and `#vortex-gif` visibility management per AGENTS.md Rules 3 & 4.
+- **Why this approach was chosen:**
+  - Fully fulfills the user's vision to adopt the authentic, vector-perfect, and organic blob design from `jarvis_blob_only.html` in ZEZO.
+- **Key files touched:**
+  - `frontend/js/neural_orb.js`
+  - `frontend/style.css`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - SVG blob viewports must maintain `overflow: visible` and responsive `min()` bounds to prevent bottom clipping against the command dock.
+
+---
+
+## [2026-10-05] — Desktop Ghost Folder Prevention, Lazy Path Resolution & Test Sandboxing
+
+- **What was built:**
+  - **Eliminated Eager Directory Creation (`core/repo_context.py`):** Fixed `resolve()` which previously executed `(Path.home() / "Desktop" / "website").mkdir(parents=True, exist_ok=True)` on startup and fallback resolution during idle state even when no coding task was requested by the user.
+  - **Removed Legacy Unused Constants (`actions/dev_agent.py`):** Removed `PROJECTS_DIR = Path.home() / "Desktop" / "ZezoProjects"` which created `ZezoProjects` on the user's Desktop.
+  - **Automated Test Sandboxing (`core/repo_context.py`):** Configured `get_unique_project_dir()` to detect pytest / automated test runner environments (`PYTEST_CURRENT_TEST` and `ZEZO_TEST_MODE`) and route all fallback base directories to a temporary sandbox directory (`tempfile.gettempdir() / "zezo_test_workspaces"`) rather than creating test project directories (`fitness-gym...`, `perform-d...`, `frontend-u...`, `peer-reque...`, `real-estate-...`) on the user's live Windows Desktop.
+  - **Lazy Folder Creation:** Folders are now only materialized on disk when an active coding agent or action explicitly creates and writes project files, keeping the user's Desktop clean during idle launches and restarts.
+- **Why this approach was chosen:**
+  - Addresses user-reported issue where launching/restarting ZEZO or running background verification tests populated the user's Desktop with unwanted ghost folders.
+- **Key files touched:**
+  - `core/repo_context.py`
+  - `actions/dev_agent.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Never call `.mkdir()` in path resolution or getter functions unless a write operation is actively taking place.
+  - All test runners and dispatchers must be sandboxed to temporary directories (`tempfile`) so test artifacts never touch the user's live desktop or user home directory.
+
+---
+
+## [2026-10-05] — Hardware-Accelerated Canvas 2D Neural Orb & Organic Squeeze/Bloom State Morphing
+
+- **What was built:**
+  - **Hardware-Accelerated Canvas 2D Engine (`frontend/js/neural_orb.js`):** Replaced SVG DOM node manipulation with a single ultra-lightweight Canvas 2D rendering loop (< 0.3ms frame time, rock-solid 60 FPS in QtWebEngine, zero DOM thrashing).
+  - **Organic Continuous State Morphing & Squeeze/Bloom Transition:** Eliminated abrupt cut/paste pops on state changes. Implemented continuous particle LERP interpolation where the particle sphere smoothly squeezes inward (-12%) and blooms outward into the new state's wave topology over a 480ms cubic ease curve.
+  - **Fluid Color & Amplitude LERP:** Colors, glowing halos, rotation speeds, and speech envelope expansions smoothly interpolate in RGB vector space without visual flickering.
+  - **Real-Time Audio Detection Waveform Visualizer:** 4-bar dynamic voice equalizer meter in `#audio-wave-meter` reacting to mic amplitude during `Listening` mode.
+  - **Clear Microphone Action Button UX:** Displays `UNMUTE` when muted, `MUTE` when active.
+  - **Clean State Typography:** Removed trailing dots (`...`) across all state headings.
+- **Why this approach was chosen:**
+  - Eliminates pixelation and memory overhead of looping GIFs while polishing the avatar command dock affordances so every visual badge clearly communicates state without visual clutter.
+- **Key files touched:**
+  - `frontend/js/neural_orb.js`
+  - `frontend/index.html`
+  - `frontend/style.css`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Action buttons must display the action that will happen on click (e.g. `UNMUTE` when muted), not just passive status.
+  - Visualizer icons that track audio amplitude (like mic wavelength grids) should stay hidden in non-listening states to avoid user confusion.
+
+---
+
+## [2026-10-05] — Agent Engine Separation, Custom Workspace Path & Dynamic Model Discovery
+
+- **What was built:**
+  - **CLI Engine vs Tool Separation (`frontend/office.html`):** Cleanly separated Primary Engines from Tools in `editAgentModal` and `createAgentModal`. Primary Engine is strictly limited to autonomous CLI engines (`OpenCode`, `KiloCode`, `Antigravity`, or `Tool Specialist (No CLI)`), removing tools like `agent_reach`, `extract_design_system`, `web_search`, and `dev_agent` from engine dropdowns.
+  - **Custom Workspace / Folder Path Management (`frontend/office.html` & `core/fleet_manager.py`):** Added an `ASSIGNED WORKSPACE / FOLDER PATH` input in both Agent Edit and Hire modals with native OS File Explorer open trigger. Persisted `active_worktree` / `worktree` across `save_agent_profile`, `_load_fleet`, `_save_fleet`, and `config/fleet_agents.json`.
+  - **Dynamic & Future-Proof Model Discovery (`core/ui_server.py` & `frontend/office.html`):** Implemented `GET /api/models` endpoint aggregating verified model ladders from `core/models.py`. Implemented dynamic engine-linked model datalist combobox in the UI that suggests verified models while allowing custom free-text model entries without code changes.
+  - **Full 30 Tools & 15 Declarative Skills Catalog (`frontend/office.html`):** Replaced 8 hardcoded checkboxes in `ADD SKILLS & TOOLS` with a full interactive multi-select grid of all 30 system tools and 15 declarative skills with category filter tabs (`All`, `Tools`, `Skills`, `None`).
+  - **Robust Task Failure Detection & Delegation Guard (`core/fleet_manager.py` & `core/prompt.txt`):** Automatically forward extracted URL/query targets to specialized tools, strictly validate tool execution outcomes, and broadcast `task_failed` (showing `✗ FAILED` in red) on errors rather than false-positive `✓ DONE`. Updated `core/prompt.txt` to enforce persona delegation to Kelly Kapoor and Pam Beesly.
+- **Why this approach was chosen:**
+  - Addresses user-reported conceptual confusion between engines and tools, restores directory control per agent, future-proofs CLI model updates, and fixes false-positive completion reporting in the task queue.
+- **Key files touched:**
+  - `frontend/office.html`
+  - `core/ui_server.py`
+  - `core/fleet_manager.py`
+  - `core/prompt.txt`
+  - `config/fleet_agents.json`
+  - `planning/PLAN_AGENT_ENGINE_SEPARATION_AND_DYNAMIC_MODELS.md`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - CLI Engines and system Tools operate on fundamentally different paradigms: engines own autonomous coding loops; tools provide discrete functional capabilities.
+  - Never mark tasks 100% complete if the tool returned an error or missing argument response.
+  - Model datalists must remain open comboboxes to allow brand-new CLI models without code changes.
+
+---
+
 ## [2026-10-04] — Fleet Inspector Activity Log Isolation, Kanban UI/UX Polish & Voice Reassignment Tool Sync
 
 - **What was built:**

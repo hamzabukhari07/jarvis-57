@@ -70,7 +70,7 @@ def test_dispatch_creation_routing():
 def test_dispatch_quick_edit_routing():
     """Verify dispatch_quick_edit correctly routes to the configured edit engine."""
     with patch("core.dispatcher.get_edit_engine", return_value="groq_helper"):
-        with patch("actions.code_helper.code_helper", return_value="Code edited via Groq LPU") as mock_helper:
+        with patch("actions.quick_snippet.quick_snippet", return_value="Code edited via Groq LPU") as mock_helper:
             res = dispatch_quick_edit(task="Fix typo in calculate()", file_path="calc.py")
             assert res == "Code edited via Groq LPU"
             mock_helper.assert_called_once()

@@ -78,7 +78,7 @@ class TestTaskQueueWidget(unittest.TestCase):
                 {"id": "e5f6g7h8", "tool": "kilo_agent", "message": "queued (position #1)", "status": "queued"}
             ],
             "done": [
-                {"id": "i9j0k1l2", "tool": "dev_agent", "status": "done", "elapsed_sec": 4.1}
+                {"id": "i9j0k1l2", "tool": "antigravity_agent", "status": "done", "elapsed_sec": 4.1}
             ]
         }
         self.widget.set_tasks(mock_data)

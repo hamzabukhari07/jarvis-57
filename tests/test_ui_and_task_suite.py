@@ -106,7 +106,7 @@ class TestTaskManagerAndCancellation(unittest.TestCase):
     def test_task_state_params_propagation(self):
         tm = TaskManager()
         params = {"task": "Build hero section", "repo": "Desktop/my_project", "model": "antigravity"}
-        tid = tm.submit("dev_agent", lambda p, ctx: {"status": "success"}, params)
+        tid = tm.submit("opencode_run", lambda p, ctx: {"status": "success"}, params)
         state = tm.status(tid)
         self.assertIsNotNone(state)
         self.assertEqual(state["params"]["task"], "Build hero section")
@@ -121,7 +121,7 @@ class TestTaskManagerAndCancellation(unittest.TestCase):
                 time.sleep(0.05)
             return {"status": "success"}
 
-        tid = tm.submit("dev_agent", slow_job, {"task": "slow test"})
+        tid = tm.submit("opencode_run", slow_job, {"task": "slow test"})
         res = task_status({"action": "cancel", "task_id": tid})
         self.assertIn("cancelled", res.lower())
         st = tm.status(tid)

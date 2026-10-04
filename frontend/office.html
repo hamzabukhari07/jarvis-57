@@ -2224,12 +2224,14 @@
             <div class="desk" style="left:26%;top:55%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
             <div class="desk" style="left:38%;top:55%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
             <div class="desk" style="left:50%;top:55%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:62%;top:55%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
             <div class="desk" style="left:2%;top:79%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
             <div class="desk" style="left:14%;top:79%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
             <div class="desk" style="left:26%;top:79%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
             <div class="desk" style="left:38%;top:79%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
             <div class="desk" style="left:50%;top:79%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
             <div class="desk" style="left:62%;top:79%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
+            <div class="desk" style="left:74%;top:79%"><div class="monitor"></div><div class="keyboard"></div><div class="mouse"></div><div class="mug"></div></div>
 
             <!-- Workstation Chairs -->
             <div class="desk-chair" style="left:6.6%;top:29.5%"></div>
@@ -2242,12 +2244,14 @@
             <div class="desk-chair" style="left:28.6%;top:61.5%"></div>
             <div class="desk-chair" style="left:40.6%;top:61.5%"></div>
             <div class="desk-chair" style="left:52.6%;top:61.5%"></div>
+            <div class="desk-chair" style="left:64.6%;top:61.5%"></div>
             <div class="desk-chair" style="left:4.6%;top:85.5%"></div>
             <div class="desk-chair" style="left:16.6%;top:85.5%"></div>
             <div class="desk-chair" style="left:28.6%;top:85.5%"></div>
             <div class="desk-chair" style="left:40.6%;top:85.5%"></div>
             <div class="desk-chair" style="left:52.6%;top:85.5%"></div>
             <div class="desk-chair" style="left:64.6%;top:85.5%"></div>
+            <div class="desk-chair" style="left:76.6%;top:85.5%"></div>
 
             <!-- Kitchen and water cooler -->
             <div class="cooler interactive-prop" onclick="openPropModal('cooler')" title="Water Cooler · Click to inspect Coffee & Token usage"></div>
@@ -2517,7 +2521,7 @@
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
           <div>
-            <label class="spec-label" style="display:block; margin-bottom:3px;">DEFAULT ENGINE</label>
+            <label class="spec-label" style="display:block; margin-bottom:3px;">DEFAULT ENGINE (CLI)</label>
             <input type="hidden" id="newAgentTool" value="opencode_run" />
             <div class="custom-dropdown" id="newAgentToolDropdown">
               <div class="custom-dropdown-trigger" onclick="toggleCustomDropdown('newAgentToolDropdown')">
@@ -2537,20 +2541,8 @@
                   <span>Antigravity</span>
                   <iconify-icon icon="solar:check-bold" style="font-size: 10px; display:none;"></iconify-icon>
                 </div>
-                <div class="custom-dropdown-item" data-val="extract_design_system" onclick="selectDropdownOption('newAgentTool', 'extract_design_system', 'Extract Design System')">
-                  <span>Extract Design System</span>
-                  <iconify-icon icon="solar:check-bold" style="font-size: 10px; display:none;"></iconify-icon>
-                </div>
-                <div class="custom-dropdown-item" data-val="agent_reach" onclick="selectDropdownOption('newAgentTool', 'agent_reach', 'Agent Reach (Social/Web)')">
-                  <span>Agent Reach (Social/Web)</span>
-                  <iconify-icon icon="solar:check-bold" style="font-size: 10px; display:none;"></iconify-icon>
-                </div>
-                <div class="custom-dropdown-item" data-val="web_search" onclick="selectDropdownOption('newAgentTool', 'web_search', 'Web Search')">
-                  <span>Web Search</span>
-                  <iconify-icon icon="solar:check-bold" style="font-size: 10px; display:none;"></iconify-icon>
-                </div>
-                <div class="custom-dropdown-item" data-val="dev_agent" onclick="selectDropdownOption('newAgentTool', 'dev_agent', 'Dev Agent')">
-                  <span>Dev Agent</span>
+                <div class="custom-dropdown-item" data-val="none" onclick="selectDropdownOption('newAgentTool', 'none', 'Tool Specialist (No CLI)')">
+                  <span>Tool Specialist (No CLI)</span>
                   <iconify-icon icon="solar:check-bold" style="font-size: 10px; display:none;"></iconify-icon>
                 </div>
               </div>
@@ -2572,6 +2564,11 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <div>
+          <label class="spec-label" style="display:block; margin-bottom:3px;">ASSIGNED WORKSPACE / FOLDER PATH</label>
+          <input type="text" id="newAgentWorktree" class="cmd-input" placeholder="e.g. D:/projects/my-app, Desktop/landing-page (Optional)" style="width:100%; font-family: var(--font-mono); font-size: 11px;" />
         </div>
 
         <div>
@@ -2685,7 +2682,7 @@
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div>
-            <label class="spec-label" style="display:block; margin-bottom:4px;">PRIMARY ENGINE</label>
+            <label class="spec-label" style="display:block; margin-bottom:4px;">PRIMARY ENGINE (CLI)</label>
             <input type="hidden" id="cfgAgentTool" value="opencode_run" />
             <div class="custom-dropdown" id="cfgAgentToolDropdown">
               <div class="custom-dropdown-trigger" onclick="toggleCustomDropdown('cfgAgentToolDropdown')">
@@ -2705,20 +2702,8 @@
                   <span>Antigravity</span>
                   <iconify-icon icon="solar:check-bold" style="font-size: 10px; display:none;"></iconify-icon>
                 </div>
-                <div class="custom-dropdown-item" data-val="extract_design_system" onclick="selectDropdownOption('cfgAgentTool', 'extract_design_system', 'Extract Design System')">
-                  <span>Extract Design System</span>
-                  <iconify-icon icon="solar:check-bold" style="font-size: 10px; display:none;"></iconify-icon>
-                </div>
-                <div class="custom-dropdown-item" data-val="agent_reach" onclick="selectDropdownOption('cfgAgentTool', 'agent_reach', 'Agent Reach (Social/Web)')">
-                  <span>Agent Reach (Social/Web)</span>
-                  <iconify-icon icon="solar:check-bold" style="font-size: 10px; display:none;"></iconify-icon>
-                </div>
-                <div class="custom-dropdown-item" data-val="web_search" onclick="selectDropdownOption('cfgAgentTool', 'web_search', 'Web Search')">
-                  <span>Web Search</span>
-                  <iconify-icon icon="solar:check-bold" style="font-size: 10px; display:none;"></iconify-icon>
-                </div>
-                <div class="custom-dropdown-item" data-val="dev_agent" onclick="selectDropdownOption('cfgAgentTool', 'dev_agent', 'Dev Agent')">
-                  <span>Dev Agent</span>
+                <div class="custom-dropdown-item" data-val="none" onclick="selectDropdownOption('cfgAgentTool', 'none', 'Tool Specialist (No CLI)')">
+                  <span>Tool Specialist (No CLI)</span>
                   <iconify-icon icon="solar:check-bold" style="font-size: 10px; display:none;"></iconify-icon>
                 </div>
               </div>
@@ -2727,18 +2712,18 @@
 
           <div>
             <label class="spec-label" style="display:block; margin-bottom:4px;">MODEL</label>
-            <input type="text" id="cfgAgentModelId" class="cmd-input" placeholder="Use global default" list="modelIdPresets" style="width:100%;" />
-            <datalist id="modelIdPresets">
-              <option value="Use global default">
-              <option value="gemini-3.7-flash-medium">
-              <option value="gemini-2.5-flash">
-              <option value="gemini-2.5-pro">
-              <option value="kilo/stepfun/step-3.7-flash:free">
-              <option value="kilo/deepseek/deepseek-chat:free">
-              <option value="kilo/qwen/qwen-2.5-coder-32b-instruct:free">
-              <option value="opencode/mimo-v2.5-free">
-              <option value="opencode/qwen2.5-coder:free">
-            </datalist>
+            <div class="custom-dropdown" id="cfgAgentModelDropdown">
+              <div class="custom-dropdown-trigger" onclick="toggleCustomDropdown('cfgAgentModelDropdown')">
+                <input type="text" id="cfgAgentModelId" class="cmd-input" placeholder="Use global default" style="width:100%; border:none; background:transparent; padding:0; height:auto; color:#fff;" onclick="event.stopPropagation(); toggleCustomDropdown('cfgAgentModelDropdown', true);" oninput="filterModelDropdown(this.value)" autocomplete="off" />
+                <iconify-icon icon="solar:alt-arrow-down-bold" style="font-size: 11px; color: var(--text-muted); flex-shrink:0;"></iconify-icon>
+              </div>
+              <div class="custom-dropdown-menu" id="cfgAgentModelMenu" style="max-height: 200px; overflow-y: auto;">
+                <div class="custom-dropdown-item active" data-val="" onclick="selectModelOption('')">
+                  <span>Use global default</span>
+                  <iconify-icon icon="solar:check-bold" style="font-size: 10px;"></iconify-icon>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2785,13 +2770,24 @@
           </div>
         </div>
 
+        <div>
+          <label class="spec-label" style="display:block; margin-bottom:4px;">ASSIGNED WORKSPACE / FOLDER PATH</label>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <input type="text" id="cfgAgentWorktree" class="cmd-input" placeholder="e.g. D:/projects/portfolio, Desktop/landing-page, or leave empty for Direct Workspace" style="width:100%; font-family: var(--font-mono); font-size: 11px;" />
+            <button type="button" class="hud-tool-btn" onclick="openAgentAssignedFolder()" title="Open Folder in OS File Explorer" style="padding: 6px 9px;">
+              <iconify-icon icon="solar:folder-with-files-bold" style="font-size: 14px; color: var(--cyan);"></iconify-icon>
+            </button>
+          </div>
+        </div>
+
         <!-- Add Skills Pill Grid (Spacious 3-Column Layout) -->
         <div>
           <div class="skills-filter-row" style="margin-top: 4px;">
             <label class="spec-label" style="margin-bottom:0;">ADD SKILLS & TOOLS</label>
             <div class="skills-filter-btn-group">
               <button type="button" class="skill-filter-btn" onclick="filterSkillsSelection('all')">All</button>
-              <button type="button" class="skill-filter-btn active" onclick="filterSkillsSelection('builtin')">Builtin</button>
+              <button type="button" class="skill-filter-btn active" onclick="filterSkillsSelection('builtin')">Tools</button>
+              <button type="button" class="skill-filter-btn" onclick="filterSkillsSelection('skill')">Skills</button>
               <button type="button" class="skill-filter-btn" onclick="filterSkillsSelection('none')">None</button>
             </div>
           </div>
@@ -3310,21 +3306,68 @@
       }
     }
 
-    // ── Predefined Available Skills & Capabilities ──
+    // ── Full System Tools & Declarative Skills Catalog ──
     const FLEET_SKILLS = [
-      { id: 'web_search', name: 'web_search', type: 'builtin' },
-      { id: 'web_reader', name: 'web_reader', type: 'builtin' },
-      { id: 'extract_design_system', name: 'design_system', type: 'builtin' },
-      { id: 'file_processor', name: 'file_reader', type: 'builtin' },
-      { id: 'file_controller', name: 'file_writer', type: 'builtin' },
-      { id: 'code_helper', name: 'code_helper', type: 'builtin' },
-      { id: 'computer_control', name: 'computer_control', type: 'optional' },
-      { id: 'agent_reach', name: 'agent_reach', type: 'optional' }
+      // Builtin System Tools
+      { id: 'web_search', name: 'Web Search', type: 'builtin' },
+      { id: 'web_reader', name: 'Web Reader', type: 'builtin' },
+      { id: 'agent_reach', name: 'Agent Reach (Deep Intel)', type: 'builtin' },
+      { id: 'extract_design_system', name: 'Design System Extractor', type: 'builtin' },
+      { id: 'file_processor', name: 'File Processor (Reader)', type: 'builtin' },
+      { id: 'file_controller', name: 'File Controller (Writer)', type: 'builtin' },
+      { id: 'code_helper', name: 'Code Helper', type: 'builtin' },
+      { id: 'dev_agent', name: 'Dev Agent (Explorer)', type: 'builtin' },
+      { id: 'computer_control', name: 'Computer Control', type: 'builtin' },
+      { id: 'computer_settings', name: 'Computer Settings', type: 'builtin' },
+      { id: 'browser_control', name: 'Browser Control', type: 'builtin' },
+      { id: 'open_app', name: 'Launch Desktop Apps', type: 'builtin' },
+      { id: 'system_monitor', name: 'System Telemetry', type: 'builtin' },
+      { id: 'website_cloner', name: 'Website Cloner', type: 'builtin' },
+      { id: 'youtube_video', name: 'YouTube Video', type: 'builtin' },
+      { id: 'reminder', name: 'Reminder / Scheduler', type: 'builtin' },
+      { id: 'send_message', name: 'Send Message (Chat)', type: 'builtin' },
+      { id: 'weather_report', name: 'Weather Report', type: 'builtin' },
+      { id: 'flight_finder', name: 'Flight Finder', type: 'builtin' },
+      { id: 'game_updater', name: 'Game Patch Notes', type: 'builtin' },
+      { id: 'desktop_control', name: 'Desktop Icons & Windows', type: 'builtin' },
+
+      // Declarative Skills
+      { id: 'hamza_taste', name: 'Hamza Taste (Studio UI)', type: 'skill' },
+      { id: 'social_research', name: 'Social Research Pipeline', type: 'skill' },
+      { id: 'web_scraper', name: 'Anti-Bot Scraper', type: 'skill' },
+      { id: 'web_research_pipeline', name: 'Deep Research Pipeline', type: 'skill' },
+      { id: 'multi_agent_collaboration', name: 'Multi-Agent Collab', type: 'skill' },
+      { id: 'make_plan', name: 'Make Plan & Architect', type: 'skill' },
+      { id: 'git_workflow', name: 'Git Workflow & Staging', type: 'skill' },
+      { id: 'test_fastapi_deploy', name: 'FastAPI Deploy Test', type: 'skill' },
+      { id: 'figma_helper', name: 'Figma Design Helper', type: 'skill' },
+      { id: 'office_suite', name: 'Office Suite Workflow', type: 'skill' },
+      { id: 'parallel_task_management', name: 'Parallel Task Manager', type: 'skill' }
     ];
 
     let currentSelectedSkills = new Set(['web_search', 'file_processor', 'extract_design_system', 'file_controller']);
     let currentSelectedCoreFile = 'SOUL.md';
     let agentFileToggles = { 'SOUL.md': true, 'AGENTS.md': true, 'PROFILE.md': true, 'MEMORY.md': true };
+
+    async function openAgentAssignedFolder() {
+      playFoley('click');
+      const pathVal = (document.getElementById('cfgAgentWorktree')?.value || (selectedAgent?.active_worktree || selectedAgent?.worktree || '')).trim();
+      try {
+        const res = await fetch('/api/fleet/open_folder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: pathVal })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showSoundToast(`Opened folder in Explorer: ${data.path}`);
+        } else {
+          showZezoModalAlert('Folder Error', data.error || 'Failed to open directory.');
+        }
+      } catch (err) {
+        showZezoModalAlert('Folder Error', 'Network error: ' + err.message);
+      }
+    }
 
     // ── Inspector Tab Navigation (3 Clean Tabs) ──
     function switchInspectorTab(tabName) {
@@ -3338,7 +3381,7 @@
       });
     }
 
-    // Filter Skills Pill Grid (All / Builtin / None)
+    // Filter Skills Pill Grid (All / Builtin / Skill / None)
     function filterSkillsSelection(mode) {
       playFoley('click');
       document.querySelectorAll('.skill-filter-btn').forEach(b => b.classList.remove('active'));
@@ -3350,6 +3393,8 @@
         currentSelectedSkills = new Set();
       } else if (mode === 'builtin') {
         currentSelectedSkills = new Set(FLEET_SKILLS.filter(s => s.type === 'builtin').map(s => s.id));
+      } else if (mode === 'skill') {
+        currentSelectedSkills = new Set(FLEET_SKILLS.filter(s => s.type === 'skill').map(s => s.id));
       }
       renderSkillsGrid();
     }
@@ -3493,26 +3538,99 @@
       }
     });
 
+    let cachedModelsData = null;
+
+    async function loadDynamicModelsList(engineName) {
+      const menu = document.getElementById('cfgAgentModelMenu');
+      if (!menu) return;
+      try {
+        if (!cachedModelsData) {
+          const res = await fetch('/api/models');
+          cachedModelsData = await res.json();
+        }
+        if (cachedModelsData && cachedModelsData.status === 'success') {
+          const eng = engineName || 'all';
+          let list = [];
+          if (eng && cachedModelsData.default_engine_models && cachedModelsData.default_engine_models[eng]) {
+            list = cachedModelsData.default_engine_models[eng];
+          } else {
+            list = cachedModelsData.all_models || [];
+          }
+          const currentVal = (document.getElementById('cfgAgentModelId')?.value || '').trim();
+          let html = `
+            <div class="custom-dropdown-item ${!currentVal ? 'active' : ''}" data-val="" onclick="selectModelOption('')">
+              <span>Use global default</span>
+              <iconify-icon icon="solar:check-bold" style="font-size: 10px; ${!currentVal ? '' : 'display:none;'}"></iconify-icon>
+            </div>
+          `;
+          list.forEach(m => {
+            const isSel = currentVal === m;
+            html += `
+              <div class="custom-dropdown-item ${isSel ? 'active' : ''}" data-val="${m}" onclick="selectModelOption('${m}')">
+                <span>${m}</span>
+                <iconify-icon icon="solar:check-bold" style="font-size: 10px; ${isSel ? '' : 'display:none;'}"></iconify-icon>
+              </div>
+            `;
+          });
+          menu.innerHTML = html;
+        }
+      } catch (err) {
+        console.debug('Failed to load dynamic models list:', err);
+      }
+    }
+
+    function selectModelOption(val) {
+      const input = document.getElementById('cfgAgentModelId');
+      if (input) input.value = val;
+      const dropdown = document.getElementById('cfgAgentModelDropdown');
+      if (dropdown) dropdown.classList.remove('open');
+      const menu = document.getElementById('cfgAgentModelMenu');
+      if (menu) {
+        menu.querySelectorAll('.custom-dropdown-item').forEach(item => {
+          const match = item.getAttribute('data-val') === val;
+          item.classList.toggle('active', match);
+          const icon = item.querySelector('iconify-icon');
+          if (icon) icon.style.display = match ? 'inline-block' : 'none';
+        });
+      }
+    }
+
+    function filterModelDropdown(query) {
+      const q = (query || '').toLowerCase().trim();
+      const menu = document.getElementById('cfgAgentModelMenu');
+      if (!menu) return;
+      const dropdown = document.getElementById('cfgAgentModelDropdown');
+      if (dropdown && !dropdown.classList.contains('open')) dropdown.classList.add('open');
+
+      menu.querySelectorAll('.custom-dropdown-item').forEach(item => {
+        const text = (item.textContent || '').toLowerCase();
+        item.style.display = (!q || text.includes(q)) ? 'flex' : 'none';
+      });
+    }
+
     // Engine change listener to auto-suggest model ID and risk tier
     function handleEngineChange(toolName) {
       const modelInput = document.getElementById('cfgAgentModelId');
+      loadDynamicModelsList(toolName);
       if (!modelInput) return;
 
       if (toolName === 'kilo_run') {
         if (!modelInput.value || modelInput.value.includes('opencode') || modelInput.value.includes('gemini')) {
-          modelInput.value = 'kilo/stepfun/step-3.7-flash:free';
+          selectModelOption('kilo/stepfun/step-3.7-flash:free');
         }
         setDropdownValue('cfgAgentRiskTier', 'L1_MUTATION', { 'L0_READ_ONLY': 'Safe (Read-Only)', 'L1_MUTATION': 'Standard (Edit Code)', 'L2_DESTRUCTIVE': 'Full Access (Build & Delete)' });
       } else if (toolName === 'opencode_run') {
         if (!modelInput.value || modelInput.value.includes('kilo')) {
-          modelInput.value = 'opencode/mimo-v2.5-free';
+          selectModelOption('opencode/mimo-v2.5-free');
         }
         setDropdownValue('cfgAgentRiskTier', 'L2_DESTRUCTIVE', { 'L0_READ_ONLY': 'Safe (Read-Only)', 'L1_MUTATION': 'Standard (Edit Code)', 'L2_DESTRUCTIVE': 'Full Access (Build & Delete)' });
       } else if (toolName === 'antigravity_run') {
         if (!modelInput.value || modelInput.value.includes('kilo') || modelInput.value.includes('opencode')) {
-          modelInput.value = 'gemini-3.7-flash-medium';
+          selectModelOption('gemini-3.7-flash-medium');
         }
         setDropdownValue('cfgAgentRiskTier', 'L1_MUTATION', { 'L0_READ_ONLY': 'Safe (Read-Only)', 'L1_MUTATION': 'Standard (Edit Code)', 'L2_DESTRUCTIVE': 'Full Access (Build & Delete)' });
+      } else if (toolName === 'none') {
+        setDropdownValue('cfgAgentRiskTier', 'L0_READ_ONLY', { 'L0_READ_ONLY': 'Safe (Read-Only)', 'L1_MUTATION': 'Standard (Edit Code)', 'L2_DESTRUCTIVE': 'Full Access (Build & Delete)' });
       }
     }
 
@@ -3545,7 +3663,7 @@
 
       // 3. Update Meta & Spec in Overview Tab
       const nameEl = document.getElementById('activeAgentName');
-      if (nameEl) nameEl.innerText = ag.name;
+      if (nameEl) nameEl.innerText = ag.displayName || ag.name;
 
       const roleEl = document.getElementById('activeAgentRole');
       if (roleEl) roleEl.innerText = ag.role || 'Fleet Specialist';
@@ -3559,7 +3677,8 @@
       const engineLabelMap = {
         'opencode_run': 'OpenCode',
         'kilo_run': 'KiloCode',
-        'antigravity_run': 'Antigravity'
+        'antigravity_run': 'Antigravity',
+        'none': 'Tool Specialist (No CLI)'
       };
       if (engineEl) engineEl.innerText = engineLabelMap[initialTool] || initialTool;
 
@@ -3600,11 +3719,7 @@
       const cfgSpec = document.getElementById('cfgAgentSpecialty');
       if (cfgSpec) cfgSpec.value = ag.specialty || ag.role || '';
 
-      setDropdownValue('cfgAgentTool', initialTool, {
-        'opencode_run': 'OpenCode',
-        'kilo_run': 'KiloCode',
-        'antigravity_run': 'Antigravity'
-      });
+      setDropdownValue('cfgAgentTool', initialTool, engineLabelMap);
 
       setDropdownValue('cfgAgentRiskTier', ag.risk_tier || 'L0_READ_ONLY', {
         'L0_READ_ONLY': 'Safe (Read-Only)',
@@ -3615,13 +3730,22 @@
       const cfgModel = document.getElementById('cfgAgentModelId');
       if (cfgModel) cfgModel.value = ag.model_id || '';
 
+      const cfgWorktree = document.getElementById('cfgAgentWorktree');
+      if (cfgWorktree) cfgWorktree.value = (activeWt && activeWt !== 'main') ? activeWt : '';
+
       setZezoSwatchValue('cfgAgentColorSwatches', 'cfgAgentColor', ag.shirt || '#06b6d4');
 
       const cfgColor = document.getElementById('cfgAgentColor');
       if (cfgColor) cfgColor.value = ag.shirt || '#06b6d4';
 
       // 4. Render Skills Grid
+      if (ag.allowed_tools && ag.allowed_tools.length) {
+        currentSelectedSkills = new Set(ag.allowed_tools.concat(ag.allowed_skills || []));
+      } else if (ag.skills && ag.skills.length) {
+        currentSelectedSkills = new Set(ag.skills);
+      }
       renderSkillsGrid();
+      loadDynamicModelsList(initialTool);
 
       // 5. Populate Active Task in Overview
       const fileListEl = document.getElementById('activeAgentFileList');
@@ -3726,7 +3850,8 @@
         setDropdownValue('cfgAgentTool', toolVal, {
           'opencode_run': 'OpenCode',
           'kilo_run': 'KiloCode',
-          'antigravity_run': 'Antigravity'
+          'antigravity_run': 'Antigravity',
+          'none': 'Tool Specialist (No CLI)'
         });
 
         const riskVal = selectedAgent.risk_tier || 'L0_READ_ONLY';
@@ -3739,10 +3864,20 @@
         const cfgModel = document.getElementById('cfgAgentModelId');
         if (cfgModel) cfgModel.value = selectedAgent.model_id || '';
 
+        const activeWt = selectedAgent.active_worktree || selectedAgent.worktree;
+        const cfgWorktree = document.getElementById('cfgAgentWorktree');
+        if (cfgWorktree) cfgWorktree.value = (activeWt && activeWt !== 'main') ? activeWt : '';
+
         const colorVal = selectedAgent.shirt || '#06b6d4';
         setZezoSwatchValue('cfgAgentColorSwatches', 'cfgAgentColor', colorVal);
 
+        if (selectedAgent.allowed_tools && selectedAgent.allowed_tools.length) {
+          currentSelectedSkills = new Set(selectedAgent.allowed_tools.concat(selectedAgent.allowed_skills || []));
+        } else if (selectedAgent.skills && selectedAgent.skills.length) {
+          currentSelectedSkills = new Set(selectedAgent.skills);
+        }
         renderSkillsGrid();
+        loadDynamicModelsList(toolVal);
       } catch (err) {
         console.warn('Error populating edit modal fields:', err);
       }
@@ -3775,16 +3910,18 @@
       const btn = document.getElementById('btnSaveConfig');
       const displayName = (document.getElementById('cfgAgentDisplayName').value || '').trim();
       const specialty = (document.getElementById('cfgAgentSpecialty').value || '').trim();
-      const tool = document.getElementById('cfgAgentTool').value || 'dev_agent';
+      const tool = document.getElementById('cfgAgentTool').value || 'opencode_run';
       const riskTier = document.getElementById('cfgAgentRiskTier').value || 'L0_READ_ONLY';
       const rawModel = (document.getElementById('cfgAgentModelId').value || '').trim();
       const modelId = rawModel === 'Use global default' ? '' : rawModel;
+      const worktree = (document.getElementById('cfgAgentWorktree')?.value || '').trim();
       const color = document.getElementById('cfgAgentColor').value || '#06b6d4';
 
       playFoley('click');
       if (btn) btn.innerHTML = '<iconify-icon icon="solar:refresh-bold" class="spinning"></iconify-icon> SAVING...';
 
       try {
+        const selectedSkillsArr = Array.from(currentSelectedSkills);
         const res = await fetch('/api/fleet/save_agent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -3796,8 +3933,12 @@
             default_tool: tool,
             risk_tier: riskTier,
             model_id: modelId,
+            active_worktree: worktree,
+            worktree: worktree,
             color: color,
-            skills: Array.from(currentSelectedSkills),
+            allowed_tools: selectedSkillsArr,
+            allowed_skills: selectedSkillsArr,
+            skills: selectedSkillsArr,
             prompt_prefix: selectedAgent.prompt_prefix
           })
         });
@@ -3808,7 +3949,11 @@
           selectedAgent.default_tool = tool;
           selectedAgent.risk_tier = riskTier;
           selectedAgent.model_id = modelId;
+          selectedAgent.active_worktree = worktree;
+          selectedAgent.worktree = worktree;
           selectedAgent.shirt = color;
+          selectedAgent.allowed_tools = selectedSkillsArr;
+          selectedAgent.allowed_skills = selectedSkillsArr;
           closeModal('editAgentModal');
           showSoundToast(`Profile saved for ${selectedAgent.name} ✓`);
           appendLog(selectedAgent.name, `Profile saved (${tool} / ${modelId || 'Global Default'}).`, 'success');
@@ -4005,15 +4150,18 @@
       document.getElementById('newAgentName').value = '';
       document.getElementById('newAgentRole').value = '';
       document.getElementById('newAgentSoul').value = '';
+      const wtInput = document.getElementById('newAgentWorktree');
+      if (wtInput) wtInput.value = '';
     }
 
     async function saveNewAgentFromModal() {
       const id = (document.getElementById('newAgentId').value || '').trim().toUpperCase();
       const name = (document.getElementById('newAgentName').value || '').trim() || id;
       const role = (document.getElementById('newAgentRole').value || '').trim() || 'Fleet Specialist';
-      const tool = document.getElementById('newAgentTool').value || 'dev_agent';
+      const tool = document.getElementById('newAgentTool').value || 'opencode_run';
       const color = document.getElementById('newAgentColor').value || '#06b6d4';
       const soul = (document.getElementById('newAgentSoul').value || '').trim();
+      const worktree = (document.getElementById('newAgentWorktree')?.value || '').trim();
 
       if (!id) {
         showZezoModalAlert('Validation Error', 'Please provide an Agent ID or Codename.');
@@ -4031,6 +4179,8 @@
             role: role,
             default_tool: tool,
             color: color,
+            active_worktree: worktree,
+            worktree: worktree,
             prompt_prefix: soul || `You are ${name}, specializing in ${role}.`
           })
         });
@@ -4092,7 +4242,7 @@
           <canvas class="roster-portrait-canvas" id="portrait-${a.name.toLowerCase()}" width="38" height="52"></canvas>
           <div class="roster-info">
             <div class="roster-name-row">
-              <span class="roster-name">${a.name}</span>
+              <span class="roster-name">${a.displayName || a.name}</span>
               <span class="roster-status-pill status-${a.state || 'idle'}" id="pill-${a.name.toLowerCase()}">${(a.state || 'idle').toUpperCase()}</span>
             </div>
             <span class="roster-role">${a.role || 'Specialist'}</span>
@@ -4129,20 +4279,35 @@
       strip.appendChild(hireCard);
     }
 
-    // Render Selected Agent's Isolated Logs in 03 · ACTIVITY Feed
+    // Render Selected Agent's Isolated Logs in 03 · ACTIVITY Feed (Robust Normalizer)
     function renderSelectedAgentLogs(ag) {
       const logContainer = document.getElementById('terminalLog');
       if (!logContainer) return;
       logContainer.innerHTML = '';
+      const fallbackName = ag ? (ag.displayName || ag.name) : 'SYSTEM';
       const list = (ag && ag.logs && ag.logs.length) ? ag.logs : [
-        { timeStr: `[${new Date().toLocaleTimeString('en-GB')}]`, agentName: ag ? ag.name : 'SYSTEM', text: `${ag ? (ag.displayName || ag.name) : 'Agent'} terminal ready.`, type: 'highlight' }
+        { timeStr: `[${new Date().toLocaleTimeString('en-GB')}]`, agentName: fallbackName, text: `${fallbackName} terminal ready.`, type: 'highlight' }
       ];
       list.forEach(l => {
+        let timeStr = `[${new Date().toLocaleTimeString('en-GB')}]`;
+        let agentName = fallbackName;
+        let text = '';
+        let typeClass = '';
+
+        if (typeof l === 'string') {
+          text = l;
+        } else if (l && typeof l === 'object') {
+          timeStr = l.timeStr || timeStr;
+          agentName = l.agentName || fallbackName;
+          text = l.text || '';
+          typeClass = l.type ? ` ${l.type.trim()}` : '';
+        }
+
         const row = document.createElement('div');
         row.className = 'log-line';
         row.innerHTML = `
-          <span class="log-ts">${l.timeStr}</span>
-          <span class="log-msg ${l.type || ''}">[${l.agentName}] ${l.text}</span>
+          <span class="log-ts">${timeStr}</span>
+          <span class="log-msg${typeClass}">[${agentName}] ${text}</span>
         `;
         logContainer.appendChild(row);
       });
@@ -4717,6 +4882,7 @@
           const DESK_PRESETS = {
             MICHAEL: { deskX: 4, deskY: 23, shirt: '#243b63', hair: '#33251e', skin: '#e9bd91', tie: '#b63e3b' },
             ALI:     { deskX: 38, deskY: 55, shirt: '#ec4899', hair: '#33251e', skin: '#e9bd91', tie: '#b63e3b' },
+            HAIDER:  { deskX: 26, deskY: 55, shirt: '#f43f5e', hair: '#3b2a22', skin: '#e8bd96', tie: '#f43f5e' },
             AHMAD:   { deskX: 62, deskY: 55, shirt: '#06b6d4', hair: '#3b2a22', skin: '#d9aa87', tie: '#3d4c51' },
             JIM:     { deskX: 56, deskY: 27.5, shirt: '#526f9a', hair: '#4b3023', skin: '#e8bd96', tie: '#d5d0c6' },
             DWIGHT:  { deskX: 65, deskY: 27.5, shirt: '#c49b31', hair: '#32251c', skin: '#e6b98e', tie: '#604b25' },
@@ -4726,11 +4892,16 @@
             RYAN:    { deskX: 14, deskY: 79, shirt: '#6d7e82', hair: '#3b2a22', skin: '#d9aa87', tie: '#3d4c51' },
             KELLY:   { deskX: 26, deskY: 79, shirt: '#e11d48', hair: '#1e1b18', skin: '#c28558', tie: '#f43f5e' },
             ANDY:    { deskX: 62, deskY: 79, shirt: '#2563eb', hair: '#78350f', skin: '#e8bd96', tie: '#f59e0b' },
+            AGENT:   { deskX: 74, deskY: 79, shirt: '#3b82f6', hair: '#222222', skin: '#e8bd96', tie: '#3b82f6' },
           };
 
           const SPAWN_DESKS = [
-            { deskX: 38, deskY: 55 }, { deskX: 62, deskY: 55 },
-            { deskX: 26, deskY: 55 }, { deskX: 74, deskY: 79 }
+            { deskX: 74, deskY: 79 },
+            { deskX: 38, deskY: 79 },
+            { deskX: 50, deskY: 79 },
+            { deskX: 2, deskY: 79 },
+            { deskX: 78, deskY: 16 },
+            { deskX: 87, deskY: 16 }
           ];
 
           const activeIds = new Set(fleetList.map(r => String(r.id || r.name).toUpperCase().trim()));
@@ -4760,13 +4931,14 @@
               const seatY = deskY + 5.1;
               ag = {
                 name: upperId,
+                displayName: remote.name || upperId,
                 role: remote.role || 'Fleet Specialist',
                 specialty: remote.specialty || '',
                 worktree: remote.worktree || `agent/${upperId.toLowerCase()}-worktree`,
                 active_worktree: remote.worktree || null,
                 sandbox: `.agent_worktrees/task-${upperId.toLowerCase()}/`,
                 files: [],
-                logs: [`[SYSTEM] ${upperId} connected to fleet workspace.`],
+                logs: [`[SYSTEM] ${remote.name || upperId} connected to fleet workspace.`],
                 x: seatX,
                 y: seatY,
                 shirt: remote.color || preset.shirt || '#2563eb',
@@ -4789,6 +4961,7 @@
               }
               setState(ag, ag.state);
             } else {
+              ag.displayName = remote.name || ag.displayName || ag.name;
               ag.role = remote.role || ag.role;
               ag.specialty = remote.specialty || ag.specialty;
               ag.default_tool = remote.default_tool || ag.default_tool;
