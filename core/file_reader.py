@@ -153,6 +153,12 @@ def fuzzy_find_in_dir(parent: Path, target_name: str) -> Path | None:
             matches.append(child)
 
     if matches:
+        if Path(target_name).suffix:
+            file_matches = [p for p in matches if p.is_file()]
+            if file_matches:
+                file_matches.sort(key=lambda p: len(p.name))
+                return file_matches[0]
+            return None
         matches.sort(key=lambda p: (not p.is_dir(), len(p.name)))
         return matches[0]
 

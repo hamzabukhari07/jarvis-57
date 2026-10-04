@@ -79,6 +79,21 @@ def test_loop_gates_watchdog_timeout():
     assert "Watchdog timeout exceeded" in res.reason
 
 
+def test_loop_gates_idle_reset():
+    engine = LoopGatesEngine(watchdog_timeout_sec=10.0, idle_reset_sec=20.0)
+    session = "test_sess_idle"
+    t0 = 1000.0
+
+    # Start session
+    res = engine.evaluate("file_controller", {"action": "list"}, session_id=session, now=t0)
+    assert res.decision == GateDecision.PROCEED
+
+    # Call after 30s of idle time (exceeds 20s idle threshold) -> auto resets session
+    res = engine.evaluate("file_controller", {"action": "read"}, session_id=session, now=t0 + 30.0)
+    assert res.decision == GateDecision.PROCEED
+    assert res.reason is None
+
+
 # ── 2. Per-Tool Circuit Breaker Tests ──────────────────────────────────────────
 
 def test_circuit_breaker_per_tool_isolation():

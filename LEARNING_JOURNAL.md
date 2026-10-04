@@ -71,6 +71,31 @@
   - Layer 3 (regression): Full test suite executed with 182 passed, 4 skipped, 0 failures (32.69s).
   - Database Isolation: Verified clean temp database separation.
 
+## [2026-10-04] — Fix: Interactive Voice LoopGates Watchdog & Native Document Generation (PDF/DOCX/XLSX)
+
+- **What was built:**
+  - Fixed `core/loop_gates.py` session lifecycle: added `idle_reset_sec` (60.0s) auto-reset so interactive voice sessions do not hit the 5-minute wall-clock watchdog across idle conversation turns.
+  - Wired explicit `loop_gates.reset_session("global")` calls into `main.py` on new user input exchanges and `turn_complete` events.
+  - Added native PDF document compilation (`ReportLab`), Word document compilation (`python-docx`), and Excel workbook compilation (`openpyxl`) to `actions/file_controller.py:write_file` and `create_file`.
+  - Added `to_pdf` and `convert_to_pdf` actions to `actions/file_processor.py`.
+  - Fixed `core/file_reader.py:fuzzy_find_in_dir` to prevent matching directories (e.g. `tests/`) when resolving filenames with file extensions.
+  - Updated `skills/office_suite/SKILL.md` and `file_controller` TOOL description with precise instructions for document creation.
+- **Why this approach was chosen:**
+  - Preserves autonomous agent doom loop and runaway watchdog protection during active continuous loops while preventing false-positive timeouts during human conversational pauses.
+  - Eliminates LLM excuses/hallucinations about missing PDF/Office generation tools by providing immediate native compilation.
+- **Key files touched:**
+  - `core/loop_gates.py`
+  - `main.py`
+  - `actions/file_controller.py`
+  - `actions/file_processor.py`
+  - `core/file_reader.py`
+  - `skills/office_suite/SKILL.md`
+  - `tests/test_phase7_loop_gates_and_watchdog_suite.py`
+- **Verification:**
+  - Layer 1 (static): `python -m py_compile core/loop_gates.py main.py actions/file_controller.py actions/file_processor.py core/file_reader.py tests/test_phase7_loop_gates_and_watchdog_suite.py` (Exit 0).
+  - Layer 2 (runtime): Real generation of `test_sample_resume.pdf` (1.8 KB), `test_sample_doc.docx` (35.8 KB), and `test_sample_sheet.xlsx` (4.8 KB); round-trip text extraction via `pdfplumber` confirmed valid content. ActionRegistry end-to-end tool run succeeded with zero LoopGate blocks.
+  - Layer 3 (regression): `tests/test_phase7_loop_gates_and_watchdog_suite.py` (12/12 passed) and `tests/test_phase10_e2e_acceptance_suite.py` (8/8 passed) total 20/20 passed.
+
 ---
 
 ## [2026-10-04] — Phase 7: Task Lifecycle Watchdog, Conversational Status & Steering Gates

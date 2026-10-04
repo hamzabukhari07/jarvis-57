@@ -60,6 +60,7 @@ class LoopGatesEngine:
         similarity_window: int = 4,
         similarity_threshold: int = 3,
         watchdog_timeout_sec: float = 300.0,
+        idle_reset_sec: float = 60.0,
     ):
         self._lock = threading.RLock()
         self.max_iterations = max_iterations
@@ -67,6 +68,7 @@ class LoopGatesEngine:
         self.similarity_window = similarity_window
         self.similarity_threshold = similarity_threshold
         self.watchdog_timeout_sec = watchdog_timeout_sec
+        self.idle_reset_sec = idle_reset_sec
 
         # Context-keyed history buffers
         self._history: Dict[str, collections.deque[ToolCallEntry]] = collections.defaultdict(
@@ -75,6 +77,7 @@ class LoopGatesEngine:
         self._iteration_counts: Dict[str, int] = collections.defaultdict(int)
         self._tool_counts: Dict[str, int] = collections.defaultdict(int)
         self._session_start_times: Dict[str, float] = {}
+        self._session_last_active_times: Dict[str, float] = {}
 
     def _compute_param_hash(self, tool_name: str, params: dict) -> str:
         """Create normalized structural hash of tool parameters."""
@@ -99,8 +102,15 @@ class LoopGatesEngine:
         current_time = time.time() if now is None else now
 
         with self._lock:
+            # Auto-reset session if idle time between tool invocations exceeds idle_reset_sec
+            last_active = self._session_last_active_times.get(session_id)
+            if last_active is not None and (current_time - last_active) > self.idle_reset_sec:
+                self.reset_session(session_id)
+
             if session_id not in self._session_start_times:
                 self._session_start_times[session_id] = current_time
+
+            self._session_last_active_times[session_id] = current_time
 
             # 1. Watchdog Timeout Gate
             elapsed = current_time - self._session_start_times[session_id]
@@ -159,17 +169,22 @@ class LoopGatesEngine:
 
             return GateResult(decision=GateDecision.PROCEED)
 
-    def reset_session(self, session_id: str = "global") -> None:
+    def reset_session(self, session_id: Optional[str] = "global") -> None:
         """Reset counters for a completed or new conversation turn/session."""
         with self._lock:
-            if session_id in self._history:
-                del self._history[session_id]
-            if session_id in self._iteration_counts:
-                del self._iteration_counts[session_id]
-            if session_id in self._tool_counts:
-                del self._tool_counts[session_id]
-            if session_id in self._session_start_times:
-                del self._session_start_times[session_id]
+            if session_id is None:
+                self._history.clear()
+                self._iteration_counts.clear()
+                self._tool_counts.clear()
+                self._session_start_times.clear()
+                self._session_last_active_times.clear()
+                return
+
+            self._history.pop(session_id, None)
+            self._iteration_counts.pop(session_id, None)
+            self._tool_counts.pop(session_id, None)
+            self._session_start_times.pop(session_id, None)
+            self._session_last_active_times.pop(session_id, None)
 
 
 # Global runtime instance
