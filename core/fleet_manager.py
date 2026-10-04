@@ -606,6 +606,11 @@ class FleetManager:
                     "summary": f"Completed: {prompt[:60]}",
                 })
                 self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
+                if worktree_path:
+                    try:
+                        git_sandbox.safe_teardown(f"{agent.id.lower()}_{task_id}")
+                    except Exception:
+                        pass
                 return {"status": "success", "result": str(res)}
             except Exception as ex:
                 if hasattr(task_ctx, "on_fail"):
@@ -618,6 +623,11 @@ class FleetManager:
                     "error": str(ex),
                 })
                 self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
+                if worktree_path:
+                    try:
+                        git_sandbox.safe_teardown(f"{agent.id.lower()}_{task_id}")
+                    except Exception:
+                        pass
                 raise
 
         submitted_id = tm.submit(

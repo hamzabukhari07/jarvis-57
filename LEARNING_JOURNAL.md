@@ -1,3 +1,27 @@
+## [2026-10-04] — Fleet Inspector Activity Log Isolation, Kanban UI/UX Polish & Voice Reassignment Tool Sync
+
+- **What was built:**
+  - **Inspector Activity Feed Isolation (`frontend/office.html`):** Scoped activity logs strictly to each agent's internal log store (`ag.logs`). When selecting an agent in the Scranton Office UI Inspector, `03 • ACTIVITY` renders only that selected agent's logs rather than a global mixed stream.
+  - **Dynamic Workspace Button & Explorer Launcher (`frontend/office.html`):** Wired `[📁 Direct Workspace]` in the Inspector to show the real relative active project path (e.g. `Desktop/luxury-real-estate-landing`) and open the path directly in File Explorer via `/api/fleet/open_folder`.
+  - **Kanban Board UI/UX & Obsidian Scrollbars (`frontend/office.html`):** Added global obsidian dark custom scrollbars, eliminated native white horizontal scrollbar overflow, expanded Kanban modal width to `1040px`, and styled task cards with **Agent Badges** (`[ALI]`, `[HAIDER]`), human-readable task descriptions, clean target paths, and completion status.
+  - **ZEZO Task Manager Modal Cards (`frontend/index.html`):** Replaced generic `ZEZO CODER` badge with the assigned agent name (`ALI`, `HAIDER`, `AHMAD`) and formatted human task titles with target directories, removing raw unparsed JSON payload dumps.
+  - **Worktree Sandboxing & Auto-Teardown (`core/fleet_manager.py` & `.agent_worktrees/`):** Pruned and cleaned 29 stale git worktrees (~625 MB, 8,030 files) accumulated from past task runs. Added automatic `git_sandbox.safe_teardown(task_id)` invocation in `core/fleet_manager.py` upon task completion or failure so sandboxes are safely recycled without disk space accumulation.
+  - **Voice Reassignment & Delegation Guard (`core/prompt.txt`):** Added strict rule ensuring Gemini Live immediately dispatches `fleet_control(action='dispatch', agent_id=...)` whenever the user corrects or reassigns an agent in speech (e.g. "I said Haider"), preventing verbal hallucination without tool execution.
+- **Why this approach was chosen:**
+  - Addresses the 4 annotated UI/UX issues, the voice reassignment desync, and the disk bloat caused by untorn worktree sandboxes.
+- **Key files touched:**
+  - `frontend/office.html`
+  - `frontend/index.html`
+  - `core/prompt.txt`
+  - `core/fleet_manager.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Never allow terminal logs across multiple concurrent agents to concatenate into a single global DOM container without per-agent scoping.
+  - All modals with multi-column boards must have CSS `min-width: 0`, flex constraints, and custom dark scrollbars to prevent Windows native white scrollbars from appearing.
+  - Any subsystem creating dynamic Git worktrees (`git worktree add`) must guarantee an automated `safe_teardown` in a `finally` block or completion callback to prevent unbounded disk growth.
+
+---
+
 ## [2026-10-04] — Scranton Office Fleet Live State Sync & Antigravity Fallback Assurance
 
 - **What was built:**

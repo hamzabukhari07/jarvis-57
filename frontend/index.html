@@ -2208,25 +2208,34 @@
           const isRunning = t.status === 'running';
           const isDone = t.status === 'done' || t.status === 'completed';
           const isFailed = t.status === 'failed';
-          const statusBadge = isRunning ? 'badge-accent' : (isDone ? 'badge-success' : (isFailed ? 'badge' : 'badge'));
+          const statusBadge = isRunning ? 'badge-accent' : (isDone ? 'badge-success' : (isFailed ? 'badge-danger' : 'badge'));
           const prog = isDone ? 100 : (t.progress || 0);
-          const toolLabel = getFriendlyToolBadge(t.tool);
+          const assignedAgent = t.params && (t.params.agent_name || t.params.agent_id);
+          const agentLabel = assignedAgent ? String(assignedAgent).toUpperCase() : getFriendlyToolBadge(t.tool);
+          const taskHeading = (t.params && (t.params.taskTitle || t.params.task || t.params.prompt)) || t.message || 'Task Execution';
+          let targetPath = (t.params && (t.params.target_dir || t.params.path || t.params.project_path)) || '';
+          if (targetPath && targetPath.includes('Desktop')) {
+            targetPath = targetPath.substring(targetPath.indexOf('Desktop')).replace(/\\/g, '/');
+          }
+          const modelId = t.params && (t.params.model_id || t.params.model);
+
           return `
             <div class="card card-interactive" onclick="selectAndShowTask('${t.id}', true)" style="background: var(--bg-elevated); cursor: pointer; transition: border-color 0.15s ease, background-color 0.15s ease;" title="Click for detailed inspection">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="badge ${isRunning ? 'badge-accent' : ''}">${toolLabel}</span>
+                  <span class="badge ${assignedAgent ? 'badge-accent' : ''}" style="font-weight: 700; letter-spacing: 0.5px;">${agentLabel}</span>
                   <span class="mono text-muted">#${t.id}</span>
+                  ${modelId ? `<span class="badge mono" style="font-size: 8px; opacity: 0.7;">${modelId}</span>` : ''}
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
                   <span class="badge ${statusBadge}">● ${t.status.toUpperCase()} (${prog}%)</span>
                   <span class="badge" style="font-size: 8px; padding: 2px 4px; color: var(--accent);">🔍 DETAILS</span>
                 </div>
               </div>
-              <div style="font-weight: 600; margin-bottom: 2px;">${t.message || 'Task Execution'}</div>
-              ${t.params ? `<div class="type-code text-muted">${JSON.stringify(t.params)}</div>` : ''}
+              <div style="font-weight: 600; font-size: 11px; color: #fff; margin-bottom: 3px;">${taskHeading}</div>
+              ${targetPath ? `<div class="type-code text-muted" style="font-size: 9.5px; margin-bottom: 2px;">📁 Target: ${targetPath}</div>` : ''}
               <div class="progress-track" style="margin-top: 6px;">
-                <div class="progress-fill" style="width: ${prog}%;"></div>
+                <div class="progress-fill" style="width: ${prog}%; background: ${isDone ? '#22c55e' : (isFailed ? '#ef4444' : 'var(--accent)')};"></div>
               </div>
             </div>
           `;

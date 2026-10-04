@@ -1033,24 +1033,28 @@
       font-weight: 600;
     }
 
-    /* Custom subtle dark scrollbars for inspector panels */
-    .inspector-scroll-pane {
+    /* Custom subtle dark obsidian scrollbars for all panels & modals */
+    * {
       scrollbar-width: thin;
       scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
     }
-    .inspector-scroll-pane::-webkit-scrollbar {
+    ::-webkit-scrollbar {
       width: 4px;
       height: 4px;
     }
-    .inspector-scroll-pane::-webkit-scrollbar-track {
-      background: transparent;
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.3);
     }
-    .inspector-scroll-pane::-webkit-scrollbar-thumb {
+    ::-webkit-scrollbar-thumb {
       background: rgba(255, 255, 255, 0.15);
       border-radius: 2px;
     }
-    .inspector-scroll-pane::-webkit-scrollbar-thumb:hover {
+    ::-webkit-scrollbar-thumb:hover {
       background: var(--accent);
+    }
+    .inspector-scroll-pane {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
     }
 
     /* ── Skills & Capabilities Grid ── */
@@ -2587,7 +2591,7 @@
 
   <!-- Modal: Kanban Fleet Task Board (Rule 1 & Rule 6 Compliant) -->
   <div class="modal-overlay" id="kanbanModal">
-    <div class="modal-panel" style="max-width: 820px; width: 820px;">
+    <div class="modal-panel" style="max-width: 1040px; width: 94vw; background: #0a0a0a;">
       <div class="modal-head">
         <div style="display: flex; align-items: center; gap: 8px;">
           <iconify-icon icon="solar:checklist-minimalistic-bold" style="font-size: 16px; color: var(--cyan);"></iconify-icon>
@@ -2596,50 +2600,50 @@
         </div>
         <button class="hud-tool-btn" onclick="closeModal('kanbanModal')">✕</button>
       </div>
-      <div class="modal-body" style="padding: 12px; gap: 8px;">
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; min-height: 280px; max-height: 380px; overflow-y: auto;">
+      <div class="modal-body" style="padding: 14px; gap: 10px;">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; min-height: 320px; max-height: 480px; overflow-y: auto;">
           
           <!-- Backlog / Queued Column -->
-          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
-              <span style="font-size: 10px; font-weight: 700; color: var(--text-muted);">QUEUED</span>
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
+              <span style="font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px;">QUEUED</span>
               <span class="badge mono" id="kanbanColQueuedCount" style="font-size: 8px;">0</span>
             </div>
-            <div id="kanbanColQueued" style="display: flex; flex-direction: column; gap: 6px; overflow-y: auto;">
-              <div style="font-size: 9.5px; color: var(--text-muted); text-align: center; padding: 20px 0;">No queued tasks</div>
+            <div id="kanbanColQueued" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1;">
+              <div style="font-size: 9.5px; color: var(--text-muted); text-align: center; padding: 24px 0;">No queued tasks</div>
             </div>
           </div>
 
           <!-- In Progress / Running Column -->
-          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
-              <span style="font-size: 10px; font-weight: 700; color: var(--cyan);">RUNNING</span>
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
+              <span style="font-size: 10px; font-weight: 700; color: var(--cyan); letter-spacing: 0.5px;">RUNNING</span>
               <span class="badge badge-cyan mono" id="kanbanColRunningCount" style="font-size: 8px;">0</span>
             </div>
-            <div id="kanbanColRunning" style="display: flex; flex-direction: column; gap: 6px; overflow-y: auto;">
-              <div style="font-size: 9.5px; color: var(--text-muted); text-align: center; padding: 20px 0;">No active tasks</div>
+            <div id="kanbanColRunning" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1;">
+              <div style="font-size: 9.5px; color: var(--text-muted); text-align: center; padding: 24px 0;">No active tasks</div>
             </div>
           </div>
 
           <!-- Review / Blocked Column -->
-          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
-              <span style="font-size: 10px; font-weight: 700; color: var(--accent);">ATTENTION</span>
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
+              <span style="font-size: 10px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px;">ATTENTION</span>
               <span class="badge mono" id="kanbanColReviewCount" style="font-size: 8px;">0</span>
             </div>
-            <div id="kanbanColReview" style="display: flex; flex-direction: column; gap: 6px; overflow-y: auto;">
-              <div style="font-size: 9.5px; color: var(--text-muted); text-align: center; padding: 20px 0;">No blocked items</div>
+            <div id="kanbanColReview" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1;">
+              <div style="font-size: 9.5px; color: var(--text-muted); text-align: center; padding: 24px 0;">No blocked items</div>
             </div>
           </div>
 
           <!-- Done / Completed Column -->
-          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
-              <span style="font-size: 10px; font-weight: 700; color: var(--green);">COMPLETED</span>
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
+              <span style="font-size: 10px; font-weight: 700; color: var(--green); letter-spacing: 0.5px;">COMPLETED</span>
               <span class="badge badge-success mono" id="kanbanColDoneCount" style="font-size: 8px;">0</span>
             </div>
-            <div id="kanbanColDone" style="display: flex; flex-direction: column; gap: 6px; overflow-y: auto;">
-              <div style="font-size: 9.5px; color: var(--text-muted); text-align: center; padding: 20px 0;">No completed tasks</div>
+            <div id="kanbanColDone" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1;">
+              <div style="font-size: 9.5px; color: var(--text-muted); text-align: center; padding: 24px 0;">No completed tasks</div>
             </div>
           </div>
 
@@ -3640,10 +3644,13 @@
       // 6. Draw Pixel Portrait
       drawPixelPortrait(document.getElementById('activePortraitCanvas'), ag);
 
-      // 7. Select Default Core File in FILES tab
+      // 7. Render Isolated Activity Logs (Only for this Selected Agent)
+      renderSelectedAgentLogs(ag);
+
+      // 8. Select Default Core File in FILES tab
       selectCoreFile(currentSelectedCoreFile || 'SOUL.md');
 
-      // 8. Fetch Live Server Data
+      // 9. Fetch Live Server Data
       try {
         const res = await fetch('/api/fleet/agent?id=' + encodeURIComponent(ag.name));
         if (res.ok) {
@@ -3672,11 +3679,12 @@
                 riskEl.style.color = ag.risk_tier === 'L2_DESTRUCTIVE' ? 'var(--red)' : (isSafe ? 'var(--green)' : 'var(--amber)');
               }
               if (pathEl) {
-                if (ag.active_worktree) {
-                  pathEl.innerText = ag.active_worktree;
-                } else {
-                  pathEl.innerText = ag.sandbox || 'Direct Workspace';
+                let displayPath = ag.active_worktree || ag.worktree || ag.sandbox || 'Direct Workspace';
+                if (displayPath.includes('Desktop')) {
+                  displayPath = displayPath.substring(displayPath.indexOf('Desktop')).replace(/\\/g, '/');
                 }
+                pathEl.innerText = displayPath;
+                pathEl.title = ag.active_worktree || ag.worktree || ag.sandbox || 'Direct Workspace';
               }
 
               if (cfgDisplayName) cfgDisplayName.value = profile.agent.name || ag.name;
@@ -4121,22 +4129,67 @@
       strip.appendChild(hireCard);
     }
 
-    // Terminal Logging
-    function appendLog(agentName, text, type) {
+    // Render Selected Agent's Isolated Logs in 03 · ACTIVITY Feed
+    function renderSelectedAgentLogs(ag) {
       const logContainer = document.getElementById('terminalLog');
-      const row = document.createElement('div');
-      row.className = 'log-line';
+      if (!logContainer) return;
+      logContainer.innerHTML = '';
+      const list = (ag && ag.logs && ag.logs.length) ? ag.logs : [
+        { timeStr: `[${new Date().toLocaleTimeString('en-GB')}]`, agentName: ag ? ag.name : 'SYSTEM', text: `${ag ? (ag.displayName || ag.name) : 'Agent'} terminal ready.`, type: 'highlight' }
+      ];
+      list.forEach(l => {
+        const row = document.createElement('div');
+        row.className = 'log-line';
+        row.innerHTML = `
+          <span class="log-ts">${l.timeStr}</span>
+          <span class="log-msg ${l.type || ''}">[${l.agentName}] ${l.text}</span>
+        `;
+        logContainer.appendChild(row);
+      });
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
 
+    // Terminal Logging (Scoped & Isolated per Agent)
+    function appendLog(agentName, text, type) {
       const now = new Date();
       const timeStr = `[${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}]`;
       const typeClass = type ? ` ${type}` : '';
+      const upperName = String(agentName || '').toUpperCase().trim();
+      const logItem = { agentName: upperName || 'SYSTEM', text, type: typeClass, timeStr };
 
-      row.innerHTML = `
-        <span class="log-ts">${timeStr}</span>
-        <span class="log-msg${typeClass}">[${agentName}] ${text}</span>
-      `;
-      logContainer.appendChild(row);
-      logContainer.scrollTop = logContainer.scrollHeight;
+      // Route to specific agent's internal log store
+      const targetAg = agents.find(a => a.name === upperName || (a.displayName && a.displayName.toUpperCase() === upperName));
+      if (targetAg) {
+        if (!targetAg.logs) targetAg.logs = [];
+        targetAg.logs.push(logItem);
+        if (targetAg.logs.length > 80) targetAg.logs = targetAg.logs.slice(-80);
+      } else if (selectedAgent) {
+        if (!selectedAgent.logs) selectedAgent.logs = [];
+        selectedAgent.logs.push(logItem);
+        if (selectedAgent.logs.length > 80) selectedAgent.logs = selectedAgent.logs.slice(-80);
+      }
+
+      // Only update the active DOM terminal if this log belongs to the selected agent
+      const isVisibleForActive = selectedAgent && (
+        (targetAg && targetAg.name === selectedAgent.name) ||
+        upperName === 'YOU' ||
+        (!targetAg && upperName !== 'PROGRESS') ||
+        (upperName === 'PROGRESS' && (!targetAg || targetAg.name === selectedAgent.name))
+      );
+
+      if (isVisibleForActive) {
+        const logContainer = document.getElementById('terminalLog');
+        if (logContainer) {
+          const row = document.createElement('div');
+          row.className = 'log-line';
+          row.innerHTML = `
+            <span class="log-ts">${timeStr}</span>
+            <span class="log-msg${typeClass}">[${upperName}] ${text}</span>
+          `;
+          logContainer.appendChild(row);
+          logContainer.scrollTop = logContainer.scrollHeight;
+        }
+      }
     }
 
     async function handleTerminalCommand(event) {
@@ -4188,6 +4241,11 @@
     }
 
     function openActiveSandboxModal() {
+      if (selectedAgent) {
+        const path = selectedAgent.active_worktree || selectedAgent.worktree || selectedAgent.sandbox || 'Direct Workspace';
+        const displayEl = document.getElementById('modalPathDisplay');
+        if (displayEl) displayEl.innerText = path;
+      }
       document.getElementById('sandboxModal').classList.add('open');
     }
 
@@ -4196,7 +4254,9 @@
     }
 
     function openInVsCode() {
-      alert(`Opening sandbox in VS Code at: ${selectedAgent.sandbox}`);
+      if (!selectedAgent) return;
+      const path = selectedAgent.active_worktree || selectedAgent.worktree || selectedAgent.sandbox || '';
+      openActiveWorktreeInExplorer();
     }
 
     // Startup Initialization
@@ -4399,17 +4459,34 @@
             return;
           }
           container.innerHTML = list.map(t => {
-            const tool = t.tool || 'task';
-            const prog = t.progress || 0;
-            const title = t.message || t.params?.task || t.group_title || tool;
+            const assignedAgent = (t.params && (t.params.agent_name || t.params.agent_id)) || t.assigned_agent || '';
+            const agentBadge = assignedAgent ? assignedAgent.toUpperCase() : (t.tool || 'TASK').replace(/_/g, ' ').toUpperCase();
+            const prog = t.progress || (t.status === 'done' || t.status === 'completed' ? 100 : 0);
+            const isDone = t.status === 'done' || t.status === 'completed';
+            const isRunning = t.status === 'running';
+            const isFailed = t.status === 'failed';
+            const badgeColor = isDone ? 'var(--green)' : (isRunning ? 'var(--cyan)' : (isFailed ? 'var(--red)' : 'var(--text-muted)'));
+            
+            const taskTitle = (t.params && (t.params.taskTitle || t.params.task || t.params.prompt)) || t.group_title || t.message || 'Task Execution';
+            let targetPath = (t.params && (t.params.target_dir || t.params.path || t.params.project_path)) || '';
+            if (targetPath && targetPath.includes('Desktop')) {
+              targetPath = targetPath.substring(targetPath.indexOf('Desktop')).replace(/\\/g, '/');
+            }
+
             return `
-              <div style="background: var(--bg-elevated); border: 1px solid var(--border-default); border-radius: 3px; padding: 6px 8px; font-size: 10px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                  <span style="font-weight: bold; color: #fff; font-size: 9px;">${tool}</span>
-                  <span style="color: var(--cyan); font-size: 8px;">${prog}%</span>
+              <div style="background: var(--bg-elevated); border: 1px solid var(--border-default); border-left: 3px solid ${badgeColor}; border-radius: 4px; padding: 7px 9px; font-size: 10px; display: flex; flex-direction: column; gap: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-weight: 700; color: #fff; font-family: var(--font-mono); font-size: 9.5px; background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px;">${agentBadge}</span>
+                  <span style="color: ${badgeColor}; font-size: 8.5px; font-weight: 600; font-family: var(--font-mono);">${isDone ? '✓ 100%' : (isRunning ? `⟳ ${prog}%` : `${prog}%`)}</span>
                 </div>
-                <div style="color: var(--text-secondary); font-size: 9px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${title}</div>
-                <div style="font-size: 8px; color: var(--text-muted); margin-top: 4px;">ID: ${t.id} · ${t.elapsed_sec || 0}s</div>
+                <div style="color: var(--text-primary); font-size: 10px; font-weight: 500; line-height: 1.35; max-height: 38px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${taskTitle}">
+                  ${taskTitle}
+                </div>
+                ${targetPath ? `<div style="font-size: 8.5px; color: var(--text-muted); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${targetPath}">📁 ${targetPath}</div>` : ''}
+                <div style="font-size: 8px; color: var(--text-muted); font-family: var(--font-mono); display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 3px; margin-top: 2px;">
+                  <span>#${t.id}</span>
+                  <span>${t.elapsed_sec || 0}s</span>
+                </div>
               </div>
             `;
           }).join('');

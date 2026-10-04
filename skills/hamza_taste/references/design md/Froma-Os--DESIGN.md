@@ -2,8 +2,8 @@
 version: "3.0"
 name: "Froma Os "
 theme: "dark"
-source: "C:/Users/Hamza Bukhari/Documents/antigravity/zezo latest/skills/hamza_taste/references/html/froma os .html"
-extracted_at: "2026-09-30T17:18:55.919652+00:00"
+source: "D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/froma os .html"
+extracted_at: "2026-10-04T17:17:36.835432+00:00"
 description: "High-precision studio design system extracted deterministically from Froma Os . Features deep #000000 void canvas, high-contrast #e4e0d8 typography, vibrant #e4e0d8 accents, and glassy elevation."
 colors:
   primary: "#e4e0d8"
@@ -95,7 +95,7 @@ components:
 # Froma Os  — Design Specification
 
 > **Aesthetic Profile:** Dark Studio / High-Precision Void  
-> **Extracted Source:** C:/Users/Hamza Bukhari/Documents/antigravity/zezo latest/skills/hamza_taste/references/html/froma os .html  
+> **Extracted Source:** D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/froma os .html  
 > **Theme:** DARK  
 
 ---
