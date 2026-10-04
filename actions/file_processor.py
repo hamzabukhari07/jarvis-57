@@ -272,6 +272,12 @@ def _process_text_doc(path: Path, file_type: str, action: str,
             out.write_text(content, encoding="utf-8")
         return content
 
+    if action in ("to_pdf", "convert_to_pdf"):
+        from actions.file_controller import _write_pdf_document
+        out = _output_path(path, "converted", ".pdf")
+        _write_pdf_document(out, content)
+        return f"Converted to PDF. Saved: {out.name}"
+
     instruction = params.get("instruction", "")
     prompt_map  = {
         "summarize":  f"Summarize this document concisely:\n\n{content[:40000]}",

@@ -116,6 +116,7 @@ class ZezoUIServer:
         app.router.add_get("/ws", self._ws_handler)
         app.router.add_get("/api/health", self._health_handler)
         app.router.add_get("/api/tools", self._tools_inspection_handler)
+        app.router.add_get("/api/tasks", self._tasks_list_handler)
         app.router.add_get("/api/fleet/state", self._fleet_state_handler)
         app.router.add_get("/api/fleet/agent", self._fleet_agent_profile_handler)
         app.router.add_post("/api/fleet/save_agent", self._fleet_save_agent_handler)
@@ -193,6 +194,17 @@ class ZezoUIServer:
             return web.json_response({"status": "success", "data": res})
         except Exception as e:
             logger.exception("Error in /api/tools handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _tasks_list_handler(self, request: web.Request) -> web.Response:
+        """Fetch all background tasks categorized for Kanban boards and monitoring."""
+        try:
+            from core.task_manager import get_task_manager
+            tm = get_task_manager()
+            tasks = tm.all_tasks()
+            return web.json_response({"status": "success", "tasks": tasks})
+        except Exception as e:
+            logger.exception("Error in /api/tasks handler: %s", e)
             return web.json_response({"status": "error", "message": str(e)}, status=500)
 
     # ── Lazy attachment registry ──────────────────────────────────────────

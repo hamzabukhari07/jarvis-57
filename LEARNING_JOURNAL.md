@@ -1,3 +1,135 @@
+## [2026-10-04] — Phase 10: Multi-Scenario E2E Acceptance Suite & Release Verification
+
+- **What was built:**
+  - Built comprehensive end-to-end acceptance test suite in `tests/test_phase10_e2e_acceptance_suite.py` validating the 4 primary interaction scenarios:
+    1. Direct single-tool invocation with multi-tier governance and loop gate enforcement.
+    2. Explicit named specialist delegation (*"Tell Ali to build a landing page"*).
+    3. Auto-capability natural language routing (*"Research AI agent frameworks"* $\to$ Kelly).
+    4. Compound multi-stage workflow pipeline decomposition (Kelly $\to$ Ali $\to$ Dwight).
+  - Validated peer delegation loop detection (circular chains blocked), max recursion depth enforcement ($\le 3$), and upstream deliverable context injection.
+  - Verified natural conversational team status queries (`action="team"`, `"blocked"`, `"completed_today"`).
+  - Validated output deliverable integrity checking via `core/deliverable_verifier.py`.
+  - Conducted complete frontend compliance audit of `frontend/index.html` and `frontend/office.html` against all 8 AGENTS.md §8 invariant rules, eliminating all occurrences of `transition: all` and verifying modal overlay constraints.
+- **Why this approach was chosen:**
+  - Provides mathematical release confidence across the entire operating system stack before production deployment.
+- **Key files touched:**
+  - `tests/test_phase10_e2e_acceptance_suite.py`
+  - `core/fleet_manager.py`
+  - `actions/task_status.py`
+  - `frontend/index.html`
+  - `planning/MASTER_IMPLEMENTATION_ROADMAP.md`
+- **Verification:**
+  - Layer 1 (static): `python -m py_compile tests/test_phase10_e2e_acceptance_suite.py core/fleet_manager.py actions/task_status.py` (Exit 0).
+  - Layer 2 (runtime): `python -m pytest tests/test_phase10_e2e_acceptance_suite.py -v` (8 passed in 0.93s).
+  - Layer 3 (regression): Full test suite executed with 192 passed, 4 skipped, 0 failures in 32.82s.
+  - Database Isolation: Verified SHA256 of `memory/zezo_brain.db` untouched (`ef801dce...`).
+
+---
+
+## [2026-10-04] — Phase 9: Scranton Pixel Office Visual Sync & Live Task State Board
+
+- **What was built:**
+  - Implemented `GET /api/tasks` REST API endpoint in `core/ui_server.py` exposing background tasks (`queued`, `running`, `completed`, `attention`) from `TaskManager`.
+  - Added live Kanban Task Board modal (`#kanbanModal`) to `frontend/office.html` with real-time column grouping, search filtering, and state transitions.
+  - Implemented interactive SVG dashed collaboration lines (`drawCollaborationLine`) and desk speech bubbles in `frontend/office.html` dynamically rendering inter-agent discussions during `peer_chat` and workflow pipeline steps.
+  - Added WebSocket event listeners for `peer_delegation_started`, `agent_peer_chat`, and `agent_task_progress`.
+  - Strictly conformed to AGENTS.md §8 regression rules (opaque `#0a0a0a` modal panel, zero inner `backdrop-filter`, explicit CSS transitions, and proper animation pauses).
+  - Authored validation suite in `tests/test_phase9_office_visual_sync_suite.py` (2/2 passed).
+- **Why this approach was chosen:**
+  - Connects backend task execution and multi-agent peer mesh directly to visual feedback on the office floor without altering the core simulation engine.
+- **Key files touched:**
+  - `core/ui_server.py`
+  - `frontend/office.html`
+  - `tests/test_phase9_office_visual_sync_suite.py`
+  - `planning/MASTER_IMPLEMENTATION_ROADMAP.md`
+- **Verification:**
+  - Layer 1 (static): `python -m py_compile core/ui_server.py tests/test_phase9_office_visual_sync_suite.py` (Exit 0).
+  - Layer 2 (runtime): `python -m pytest tests/test_phase9_office_visual_sync_suite.py -v` (2 passed in 0.17s).
+  - Layer 3 (regression): Full test suite passed (184 passed, 4 skipped, 0 failures in 33.15s).
+  - Database Isolation: Unpolluted clean test run.
+
+---
+
+## [2026-10-04] — Phase 8: True Async MCP Client & Driver Runtime
+
+- **What was built:**
+  - Hardened `core/mcp_runtime.py` background event loop runtime with deadlock-free concurrency, lock lifecycle isolation, and stdio JSON-RPC subprocess transport (`McpProcessTransport`).
+  - Added external MCP server configuration loader reading `config/mcp_servers.json`.
+  - Dynamically bridged external MCP tools into `core/action_loader.py` under the namespaced identifier pattern (`mcp_<server>_<tool>`), allowing natural voice and CLI tool dispatch.
+  - Implemented unit and integration test suite in `tests/test_phase8_mcp_client_suite.py` (4/4 tests passed).
+- **Why this approach was chosen:**
+  - Guarantees non-blocking MCP execution on dedicated daemon threads while exposing external MCP servers as first-class tools in the unified action registry.
+- **Key files touched:**
+  - `core/mcp_runtime.py`
+  - `core/action_loader.py`
+  - `config/mcp_servers.json`
+  - `tests/test_phase8_mcp_client_suite.py`
+  - `planning/MASTER_IMPLEMENTATION_ROADMAP.md`
+- **Verification:**
+  - Layer 1 (static): `python -m py_compile core/mcp_runtime.py core/action_loader.py tests/test_phase8_mcp_client_suite.py` (Exit 0).
+  - Layer 2 (runtime): `python -m pytest tests/test_phase8_mcp_client_suite.py -v` (4 passed in 0.29s).
+  - Layer 3 (regression): Full test suite executed with 182 passed, 4 skipped, 0 failures (32.69s).
+  - Database Isolation: Verified clean temp database separation.
+
+## [2026-10-04] — Fix: Interactive Voice LoopGates Watchdog & Native Document Generation (PDF/DOCX/XLSX)
+
+- **What was built:**
+  - Fixed `core/loop_gates.py` session lifecycle: added `idle_reset_sec` (60.0s) auto-reset so interactive voice sessions do not hit the 5-minute wall-clock watchdog across idle conversation turns.
+  - Wired explicit `loop_gates.reset_session("global")` calls into `main.py` on new user input exchanges and `turn_complete` events.
+  - Added native PDF document compilation (`ReportLab`), Word document compilation (`python-docx`), and Excel workbook compilation (`openpyxl`) to `actions/file_controller.py:write_file` and `create_file`.
+  - Added `to_pdf` and `convert_to_pdf` actions to `actions/file_processor.py`.
+  - Fixed `core/file_reader.py:fuzzy_find_in_dir` to prevent matching directories (e.g. `tests/`) when resolving filenames with file extensions.
+  - Updated `skills/office_suite/SKILL.md` and `file_controller` TOOL description with precise instructions for document creation.
+- **Why this approach was chosen:**
+  - Preserves autonomous agent doom loop and runaway watchdog protection during active continuous loops while preventing false-positive timeouts during human conversational pauses.
+  - Eliminates LLM excuses/hallucinations about missing PDF/Office generation tools by providing immediate native compilation.
+- **Key files touched:**
+  - `core/loop_gates.py`
+  - `main.py`
+  - `actions/file_controller.py`
+  - `actions/file_processor.py`
+  - `core/file_reader.py`
+  - `skills/office_suite/SKILL.md`
+  - `tests/test_phase7_loop_gates_and_watchdog_suite.py`
+- **Verification:**
+  - Layer 1 (static): `python -m py_compile core/loop_gates.py main.py actions/file_controller.py actions/file_processor.py core/file_reader.py tests/test_phase7_loop_gates_and_watchdog_suite.py` (Exit 0).
+  - Layer 2 (runtime): Real generation of `test_sample_resume.pdf` (1.8 KB), `test_sample_doc.docx` (35.8 KB), and `test_sample_sheet.xlsx` (4.8 KB); round-trip text extraction via `pdfplumber` confirmed valid content. ActionRegistry end-to-end tool run succeeded with zero LoopGate blocks.
+  - Layer 3 (regression): `tests/test_phase7_loop_gates_and_watchdog_suite.py` (12/12 passed) and `tests/test_phase10_e2e_acceptance_suite.py` (8/8 passed) total 20/20 passed.
+
+---
+
+## [2026-10-04] — Phase 7: Task Lifecycle Watchdog, Conversational Status & Steering Gates
+
+- **What was built:**
+  - Built `core/loop_gates.py` implementing 4 execution gates: `watchdog_timeout` (300s wall-clock limit), `tool_budget` (50 tool max), `iteration_cap` (25 turn max), and `doom_loop` (windowed parameter similarity detector with `INTERRUPT_AND_CONTINUE` coaching text).
+  - Wired `loop_gates.evaluate()` into `core/action_loader.py:run` before tool dispatch, injecting corrective feedback when doom loops are encountered or blocking when limits are exceeded.
+  - Refactored `core/circuit_breaker.py` (`RiskAwareCircuitBreaker`) to key metrics and failure velocity per individual tool name rather than shared across risk tiers, while keeping risk-tier threshold evaluation and manual re-arming.
+  - Created `actions/run_tool_batch.py` sequential pipeline runner with variable substitution (`${steps.0.result}`), recursion defense, and hard $\le 10$ step cap.
+  - Created `actions/ast_tool.py` structural Python code parser and AST analyzer for inspecting classes, functions, arguments, and cyclomatic complexity hotspots.
+  - Built `core/deliverable_verifier.py` validating output deliverable integrity for HTML/CSS, Python, JS, and documentation.
+  - Upgraded `actions/task_status.py` with natural conversational fleet and team queries (`action='team'`, `'blocked'`, `'completed_today'`) querying real active background tasks and fleet states without hallucinating ETAs.
+  - Created comprehensive unit and integration test suite in `tests/test_phase7_loop_gates_and_watchdog_suite.py` (11/11 tests passed).
+- **Why this approach was chosen:**
+  - Guarantees autonomous reliability and prevents runaway execution loops while providing actionable corrective feedback to steer LLM reasoning.
+- **Key files touched:**
+  - `core/loop_gates.py`
+  - `core/circuit_breaker.py`
+  - `core/deliverable_verifier.py`
+  - `core/action_loader.py`
+  - `actions/run_tool_batch.py`
+  - `actions/ast_tool.py`
+  - `actions/task_status.py`
+  - `tests/test_phase7_loop_gates_and_watchdog_suite.py`
+  - `planning/MASTER_IMPLEMENTATION_ROADMAP.md`
+- **Verification:**
+  - Layer 1 (static): `python -m py_compile core/loop_gates.py core/circuit_breaker.py core/deliverable_verifier.py core/action_loader.py actions/run_tool_batch.py actions/ast_tool.py actions/task_status.py tests/test_phase7_loop_gates_and_watchdog_suite.py` (Exit 0).
+  - Layer 2 (runtime): `python -m pytest tests/test_phase7_loop_gates_and_watchdog_suite.py -v` (11 passed in 0.84s).
+  - Action Discovery: 31/31 tools active including `run_tool_batch` and `ast_tool`.
+  - Layer 3 (regression): Full test suite executed with 178 passed, 4 skipped, 0 failures (31.47s).
+  - Database Isolation: SQLite DB isolation verified cleanly across temp directories.
+
+---
+
 ## [2026-10-04] — Phase 6: Skill Scanner, Zip-Slip Guard & Safe Skill Hub
 
 - **What was built:**

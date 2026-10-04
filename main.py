@@ -1803,6 +1803,11 @@ class ZezoLive:
                             if full_in and not in_logged and not is_dup and not is_recent_typed:
                                 self._last_user_in_logged = full_in
                                 self._last_out_logged = ""   # new exchange
+                                try:
+                                    from core.loop_gates import loop_gates
+                                    loop_gates.reset_session("global")
+                                except Exception:
+                                    pass
                                 self.ui.write_log(f"You: {full_in}")
                                 self.ui.stream_transcript("user", full_in, done=True)
                                 self._session_log.append(f"User: {full_in}")
@@ -1843,6 +1848,11 @@ class ZezoLive:
                             else:
                                 self.ui.stream_transcript("zezo", "", done=True)
                             out_buf = []
+                            try:
+                                from core.loop_gates import loop_gates
+                                loop_gates.reset_session("global")
+                            except Exception:
+                                pass
 
                             if self._vision_close_pending:
                                 # This turn_complete IS the vision answer — close camera + release busy flag

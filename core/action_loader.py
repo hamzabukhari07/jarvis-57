@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import importlib.util
 import inspect
+import json
 import re
 import sys
 import traceback
@@ -220,6 +221,19 @@ class ActionRegistry:
             print(f"[CircuitBreaker] [WARN] {block_msg}")
             return str(block_msg)
 
+        # Loop Gates & Doom-Loop Steering Evaluation
+        from core.loop_gates import GateDecision, loop_gates
+        sess_id = (ctx or {}).get("session_id") or "global"
+        gate_res = loop_gates.evaluate(name, parameters, session_id=sess_id)
+        if gate_res.decision == GateDecision.BLOCK:
+            msg = f"LoopGate Blocked: {gate_res.reason}"
+            print(f"[LoopGates] 🛑 {msg}")
+            return msg
+        elif gate_res.decision == GateDecision.INTERRUPT:
+            print(f"[LoopGates] ⚠️ {gate_res.reason}")
+            # Steer the agent with corrective feedback instead of executing identical failed loop
+            return gate_res.coaching_feedback or gate_res.reason or "Loop interrupted."
+
         from core.task_manager import ToolExecutionContext
         from core.log_bus import emit_tool_micro_event
 
@@ -374,6 +388,37 @@ def discover_actions(actions_dir: Path, reserved_names: set[str] | None = None,
             logger(f"Action loaded: {rec.name} ({path.name})")
         else:
             logger(f"Action rejected: {path.name} — {rec.error}")
+
+    # Bridge dynamic external MCP tools
+    try:
+        from core.mcp_runtime import mcp_runtime
+        mcp_runtime.load_config()
+        mcp_tools = mcp_runtime.get_registered_tools()
+        for key, mcp_def in mcp_tools.items():
+            tool_name = f"mcp_{mcp_def.server}_{mcp_def.name}"
+
+            def _make_mcp_handler(srv=mcp_def.server, tname=mcp_def.name):
+                def _mcp_dispatch_handler(parameters: dict, **kwargs) -> str:
+                    from core.mcp_runtime import mcp_runtime
+                    res = mcp_runtime.call_tool(srv, tname, parameters or {}, context=kwargs.get("context"))
+                    return json.dumps(res) if isinstance(res, (dict, list)) else str(res)
+                return _mcp_dispatch_handler
+
+            mcp_rec = ActionRecord(
+                name=tool_name,
+                description=mcp_def.description or f"MCP tool {mcp_def.name} on {mcp_def.server}",
+                parameters=mcp_def.parameters,
+                handler=_make_mcp_handler(),
+                file=f"mcp://{mcp_def.server}",
+                valid=True,
+                risk="local_mutation",
+                enabled=True,
+            )
+            valid[tool_name] = mcp_rec
+            all_records.append(mcp_rec)
+            logger(f"MCP Action loaded: {tool_name}")
+    except Exception as e:
+        logger(f"[ActionDiscovery] MCP Tool registration notice: {e}")
 
     global _GLOBAL_REGISTRY
     registry = ActionRegistry(valid, logger)

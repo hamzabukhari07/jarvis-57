@@ -270,6 +270,8 @@ def create_file(path: str, name: str = "", content: str = "") -> str:
 
         warn = _check_recent_duplicate_warning(target)
         target.parent.mkdir(parents=True, exist_ok=True)
+        if target.suffix.lower() in (".pdf", ".docx", ".xlsx"):
+            return write_file(path, name=name, content=content) + warn
         target.write_text(content, encoding="utf-8")
         push_undo(f"created {target.name}", _undo_create(target))
         return f"File created: {target.name} at {target.parent.name}/" + warn
@@ -467,6 +469,97 @@ def read_file(path: str, name: str = "", max_chars: int = 4000) -> str:
         return f"Could not read file: {e}"
 
 
+def _write_pdf_document(target: Path, content: str) -> None:
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+
+    doc = SimpleDocTemplate(
+        str(target), pagesize=letter,
+        rightMargin=54, leftMargin=54, topMargin=54, bottomMargin=54
+    )
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'DocTitle', parent=styles['Heading1'],
+        fontSize=18, leading=22, spaceAfter=10, textColor=colors.HexColor('#1A202C')
+    )
+    h2_style = ParagraphStyle(
+        'DocH2', parent=styles['Heading2'],
+        fontSize=13, leading=16, spaceBefore=8, spaceAfter=4, textColor=colors.HexColor('#2B6CB0')
+    )
+    body_style = ParagraphStyle(
+        'DocBody', parent=styles['BodyText'],
+        fontSize=10, leading=14, spaceAfter=4, textColor=colors.HexColor('#2D3748')
+    )
+    bullet_style = ParagraphStyle(
+        'DocBullet', parent=styles['BodyText'],
+        fontSize=10, leading=14, leftIndent=12, spaceAfter=3, textColor=colors.HexColor('#2D3748')
+    )
+
+    story = []
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line:
+            story.append(Spacer(1, 6))
+            continue
+        clean = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        if line.startswith('# '):
+            story.append(Paragraph(f'<b>{clean[2:].strip()}</b>', title_style))
+        elif line.startswith('## ') or line.startswith('### '):
+            story.append(Paragraph(f'<b>{clean.lstrip("#").strip()}</b>', h2_style))
+        elif line.startswith(('-', '*', '•')):
+            bullet_txt = clean.lstrip("-*•").strip()
+            story.append(Paragraph(f'&bull; {bullet_txt}', bullet_style))
+        else:
+            story.append(Paragraph(clean, body_style))
+
+    if not story:
+        story.append(Paragraph(target.stem, title_style))
+    doc.build(story)
+
+
+def _write_docx_document(target: Path, content: str) -> None:
+    import docx
+    doc = docx.Document()
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith('# '):
+            doc.add_heading(line[2:].strip(), level=0)
+        elif line.startswith('## '):
+            doc.add_heading(line[3:].strip(), level=1)
+        elif line.startswith('### '):
+            doc.add_heading(line[4:].strip(), level=2)
+        elif line.startswith(('-', '*', '•')):
+            doc.add_paragraph(line.lstrip("-*•").strip(), style='List Bullet')
+        else:
+            doc.add_paragraph(line)
+    doc.save(str(target))
+
+
+def _write_xlsx_document(target: Path, content: str) -> None:
+    import csv
+    import io
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = target.stem[:30] or "Sheet1"
+
+    lines = [l for l in content.splitlines() if l.strip()]
+    if lines:
+        delimiter = "\t" if "\t" in lines[0] else ("|" if "|" in lines[0] else ",")
+        reader = csv.reader(io.StringIO(content), delimiter=delimiter)
+        for row in reader:
+            cleaned_row = [col.strip() for col in row]
+            if any(cleaned_row):
+                ws.append(cleaned_row)
+    else:
+        ws.append(["Empty"])
+    wb.save(str(target))
+
+
 def write_file(path: str, name: str = "", content: str = "",
                append: bool = False) -> str:
     try:
@@ -475,6 +568,20 @@ def write_file(path: str, name: str = "", content: str = "",
         if not _is_safe_path(target):
             return f"Access denied: {target}"
         target.parent.mkdir(parents=True, exist_ok=True)
+
+        ext = target.suffix.lower()
+        if ext == ".pdf":
+            _write_pdf_document(target, content)
+            push_undo(f"wrote PDF {target.name}", _undo_create(target))
+            return f"Generated PDF document: {target.name} ({_format_size(target.stat().st_size)}) at {target.parent.name}/"
+        elif ext == ".docx":
+            _write_docx_document(target, content)
+            push_undo(f"wrote Word doc {target.name}", _undo_create(target))
+            return f"Generated Word document: {target.name} ({_format_size(target.stat().st_size)}) at {target.parent.name}/"
+        elif ext == ".xlsx":
+            _write_xlsx_document(target, content)
+            push_undo(f"wrote Excel sheet {target.name}", _undo_create(target))
+            return f"Generated Excel workbook: {target.name} ({_format_size(target.stat().st_size)}) at {target.parent.name}/"
 
         # Snapshot before writing. None means "did not exist", which is a
         # different undo (delete it) from "existed and had this in it".
@@ -806,7 +913,7 @@ def file_controller(
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "file_controller",
-    "description": "Manages files and folders: list, create, delete, move, copy, rename, read, write, find (files and folders), disk usage. ALWAYS use to find or check files/folders on desktop or in filesystem instead of vision screen captures.",
+    "description": "Manages files and folders: list, create, delete, move, copy, rename, read, write (natively generates text, markdown, PDF documents [.pdf], Word [.docx], and Excel spreadsheets [.xlsx]), find files/folders, disk usage. ALWAYS use to find, check, or create files on desktop instead of vision captures.",
     "risk": "local_mutation",
     "enabled": True,
     "parameters": {
