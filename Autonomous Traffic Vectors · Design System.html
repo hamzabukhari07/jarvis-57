@@ -1,0 +1,2607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autonomous Traffic Vectors · Design System</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- Scripts -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+<style>
+  /* ── Design Tokens ── */
+  :root {
+    --bg-deep: #050505;
+    --bg-surface: #0a0a0a;
+    --bg-elevated: #111111;
+    --border-subtle: rgba(255, 255, 255, 0.05);
+    --border-default: rgba(255, 255, 255, 0.10);
+    --border-strong: rgba(255, 255, 255, 0.20);
+    --text-primary: #f5f5f7;
+    --text-secondary: #a0a0ab;
+    --text-muted: rgba(255, 255, 255, 0.40);
+    --accent: #f24e1e;
+    --accent-dim: rgba(242, 78, 30, 0.15);
+    --radius-sm: 2px;
+    --radius-md: 4px;
+    --radius-lg: 6px;
+    --font-sans: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background-color: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  .mono { font-family: var(--font-mono); }
+  .text-muted { color: var(--text-muted); }
+  .text-secondary { color: var(--text-secondary); }
+  .text-accent { color: var(--accent); }
+
+  /* ── Section framing ── */
+  .frame {
+    position: relative;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.10), rgba(255,255,255,0.02), transparent);
+    padding: 1px;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);
+  }
+  .frame-inner {
+    background: rgba(10,10,10,0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
+    padding: 32px;
+  }
+  .corner { position: absolute; width: 12px; height: 1px; background: rgba(255,255,255,0.4); }
+  .corner-v { position: absolute; width: 1px; height: 12px; background: rgba(255,255,255,0.4); }
+  .corner-tl { top: 0; left: 0; }
+  .corner-tr { top: 0; right: 0; }
+  .corner-bl { bottom: 0; left: 0; }
+  .corner-br { bottom: 0; right: 0; }
+  .corner-v-tl { top: 0; left: 0; }
+  .corner-v-tr { top: 0; right: 0; }
+  .corner-v-bl { bottom: 0; left: 0; }
+  .corner-v-br { bottom: 0; right: 0; }
+
+  /* ── Grid layout ── */
+  .spec-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; max-width: 1360px; margin: 0 auto; padding: 48px 24px; }
+  .col-12 { grid-column: span 12; }
+  .col-6 { grid-column: span 6; }
+  .col-4 { grid-column: span 4; }
+  .col-3 { grid-column: span 3; }
+  .col-7 { grid-column: span 7; }
+  .col-5 { grid-column: span 5; }
+
+  @media (max-width: 1024px) {
+    .col-6, .col-4, .col-3, .col-7, .col-5 { grid-column: span 12; }
+  }
+
+  /* ── Section headers ── */
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-subtle);
+  }
+
+  /* ── Typography scale ── */
+  .type-display { font-size: 48px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.1; color: #fff; }
+  .type-heading { font-size: 24px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.2; color: #fff; }
+  .type-body { font-size: 15px; font-weight: 300; line-height: 1.6; color: var(--text-secondary); }
+  .type-label { font-family: var(--font-mono); font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); }
+  .type-code { font-family: var(--font-mono); font-size: 12px; font-weight: 400; color: var(--text-primary); }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 10px 18px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+  .btn:hover { border-color: var(--border-strong); background: var(--bg-elevated); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { filter: brightness(1.15); border-color: var(--accent); }
+  .btn-ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
+  .btn-ghost:hover { color: #fff; background: rgba(255,255,255,0.03); }
+  .btn-danger { border-color: rgba(242,78,30,0.4); color: var(--accent); }
+  .btn-danger:hover { background: var(--accent-dim); border-color: var(--accent); }
+  .btn-sm { padding: 6px 12px; font-size: 9px; }
+  .btn-lg { padding: 14px 24px; font-size: 11px; }
+  .btn-icon { padding: 8px; border-radius: var(--radius-md); }
+
+  /* ── Inputs ── */
+  .input-field {
+    width: 100%;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-primary);
+    outline: none;
+    transition: border 0.2s ease;
+  }
+  .input-field::placeholder { color: var(--text-muted); font-family: var(--font-sans); font-weight: 300; }
+  .input-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(242,78,30,0.1); }
+  .input-label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 8px; display: block; }
+
+  /* ── Dropdown ── */
+  .dropdown {
+    position: relative;
+    display: inline-block;
+  }
+  .dropdown-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: border 0.2s ease;
+    min-width: 160px;
+  }
+  .dropdown-trigger:hover { border-color: var(--border-strong); }
+  .dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 100%;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 4px;
+    z-index: 50;
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8);
+  }
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .dropdown-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+  .dropdown-item.active { color: var(--accent); background: var(--accent-dim); }
+
+  /* ── File drag & drop ── */
+  .dropzone {
+    border: 1.5px dashed var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--bg-deep);
+    padding: 40px 24px;
+    text-align: center;
+    transition: all 0.25s ease;
+    cursor: pointer;
+    position: relative;
+  }
+  .dropzone:hover { border-color: var(--border-strong); background: rgba(255,255,255,0.02); }
+  .dropzone.dragover { border-color: var(--accent); background: var(--accent-dim); }
+  .dropzone-icon {
+    width: 48px; height: 48px;
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+  }
+  .dropzone.dragover .dropzone-icon { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  /* ── Toggle / Checkbox / Radio ── */
+  .toggle-track {
+    width: 40px; height: 22px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: 999px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+  .toggle-track.active { background: var(--accent); border-color: var(--accent); }
+  .toggle-thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+  }
+  .toggle-track.active .toggle-thumb { transform: translateX(18px); }
+
+  .checkbox {
+    width: 18px; height: 18px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    background: var(--bg-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+  }
+  .checkbox.checked { background: var(--accent); border-color: var(--accent); }
+
+  .radio {
+    width: 18px; height: 18px;
+    border: 1px solid var(--border-default);
+    border-radius: 50%;
+    background: var(--bg-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+  }
+  .radio.checked { border-color: var(--accent); }
+  .radio.checked::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+
+  /* ── Badges / Chips ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+  }
+  .badge-accent { background: var(--accent-dim); border-color: rgba(242,78,30,0.3); color: var(--accent); }
+  .badge-success { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.3); color: #22c55e; }
+  .badge-warn { background: rgba(234,179,8,0.1); border-color: rgba(234,179,8,0.3); color: #eab308; }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border-subtle); }
+  .tab {
+    padding: 10px 16px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 1px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.2s ease;
+  }
+  .tab:hover { color: var(--text-secondary); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── Slider ── */
+  .slider-track {
+    width: 100%;
+    height: 4px;
+    background: var(--bg-elevated);
+    border-radius: 999px;
+    position: relative;
+    cursor: pointer;
+  }
+  .slider-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 999px;
+    width: 60%;
+  }
+  .slider-thumb {
+    position: absolute;
+    top: 50%; left: 60%;
+    transform: translate(-50%, -50%);
+    width: 14px; height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    cursor: grab;
+  }
+
+  /* ── Progress ── */
+  .progress-track {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-elevated);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #ff8a5c);
+    border-radius: 999px;
+    transition: width 0.3s ease;
+  }
+
+  /* ── Avatar ── */
+  .avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+  .avatar-sm { width: 28px; height: 28px; font-size: 9px; }
+  .avatar-lg { width: 48px; height: 48px; font-size: 14px; }
+
+  /* ── Tooltip ── */
+  .tooltip-wrap { position: relative; display: inline-block; }
+  .tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: var(--border-default);
+  }
+  .tooltip-wrap:hover .tooltip { opacity: 1; }
+
+  /* ── Alert ── */
+  .alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-default);
+    background: var(--bg-elevated);
+  }
+  .alert-accent { border-color: rgba(242,78,30,0.3); background: var(--accent-dim); }
+  .alert-success { border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.08); }
+  .alert-warn { border-color: rgba(234,179,8,0.3); background: rgba(234,179,8,0.08); }
+
+  /* ── Card ── */
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 20px;
+  }
+
+  /* ── Table ── */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .data-table td {
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+  }
+  .data-table tr:hover td { background: rgba(255,255,255,0.02); color: var(--text-primary); }
+
+  /* ── Toast ── */
+  .toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8);
+  }
+
+  /* ── Skeleton ── */
+  .skeleton {
+    background: linear-gradient(90deg, var(--bg-elevated) 25%, rgba(255,255,255,0.06) 50%, var(--bg-elevated) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: var(--radius-sm);
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  /* ── Breadcrumb ── */
+  .breadcrumb { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
+  .breadcrumb-item { color: var(--text-muted); cursor: pointer; transition: color 0.2s; }
+  .breadcrumb-item:hover { color: var(--text-primary); }
+  .breadcrumb-item.active { color: var(--accent); }
+  .breadcrumb-sep { color: var(--text-muted); }
+
+  /* ── Pagination ── */
+  .pagination { display: flex; gap: 4px; }
+  .page-btn {
+    width: 32px; height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .page-btn:hover { color: #fff; background: rgba(255,255,255,0.04); }
+  .page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* ── Stepper ── */
+  .stepper { display: flex; align-items: center; gap: 0; }
+  .step { display: flex; align-items: center; gap: 8px; }
+  .step-dot {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    border: 1px solid var(--border-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    background: var(--bg-deep);
+  }
+  .step.active .step-dot { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .step.completed .step-dot { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .step-line { width: 32px; height: 1px; background: var(--border-default); }
+  .step-label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+  .step.active .step-label { color: var(--accent); }
+  .step.completed .step-label { color: var(--text-secondary); }
+
+  /* ── Accordion ── */
+  .accordion-item { border-bottom: 1px solid var(--border-subtle); }
+  .accordion-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    transition: color 0.2s;
+  }
+  .accordion-trigger:hover { color: var(--accent); }
+  .accordion-content { padding: 0 0 16px; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+
+  /* ── Divider ── */
+  .divider { height: 1px; background: var(--border-subtle); margin: 24px 0; }
+  .divider-vertical { width: 1px; height: 100%; background: var(--border-subtle); }
+
+  /* ── Grid demo ── */
+  .grid-demo { display: grid; gap: 12px; }
+  .grid-item {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 20px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  /* ── Color swatch ── */
+  .swatch {
+    border-radius: var(--radius-md);
+    padding: 16px;
+    min-height: 90px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border: 1px solid var(--border-subtle);
+  }
+  .swatch-name { font-family: var(--font-mono); font-size: 11px; font-weight: 500; }
+  .swatch-value { font-family: var(--font-mono); font-size: 10px; opacity: 0.7; }
+  .swatch-role { font-size: 10px; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg-deep); }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+  /* ── Section nav ── */
+  .section-nav {
+    position: fixed;
+    top: 50%;
+    right: 24px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 100;
+  }
+  .nav-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+  .nav-dot:hover { background: rgba(255,255,255,0.4); }
+  .nav-dot.active { background: var(--accent); box-shadow: 0 0 12px rgba(242,78,30,0.5); }
+  .nav-dot::after {
+    content: attr(data-label);
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .nav-dot:hover::after { opacity: 1; }
+
+  @media (max-width: 768px) {
+    .section-nav { display: none; }
+    .spec-grid { padding: 24px 16px; }
+    .type-display { font-size: 32px; }
+  }
+
+  /* ── Code block ── */
+  .code-block {
+    background: var(--bg-deep);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    overflow-x: auto;
+  }
+  .code-block .kw { color: var(--accent); }
+  .code-block .str { color: #22c55e; }
+  .code-block .cm { color: var(--text-muted); }
+
+  /* ── WebGL bg ── */
+  #webgl-bg {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.25;
+    mix-blend-mode: screen;
+  }
+
+  /* ── Container lines ── */
+  .container-lines {
+    position: fixed;
+    inset: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 85rem;
+    border-left: 1px solid rgba(255,255,255,0.04);
+    border-right: 1px solid rgba(255,255,255,0.04);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Fade-in animation ── */
+  .fade-in { opacity: 0; transform: translateY(20px); }
+</style>
+</head>
+<body>
+
+<!-- Container lines -->
+<div class="container-lines">
+  <div style="position:absolute;top:0;left:-3px;width:6px;height:6px;background:#050505;border:1px solid rgba(255,255,255,0.2);"></div>
+  <div style="position:absolute;bottom:0;left:-3px;width:6px;height:6px;background:#050505;border:1px solid rgba(255,255,255,0.2);"></div>
+  <div style="position:absolute;top:0;right:-3px;width:6px;height:6px;background:#050505;border:1px solid rgba(255,255,255,0.2);"></div>
+  <div style="position:absolute;bottom:0;right:-3px;width:6px;height:6px;background:#050505;border:1px solid rgba(255,255,255,0.2);"></div>
+</div>
+
+<!-- WebGL background -->
+<div id="webgl-bg"></div>
+
+<!-- Section navigation -->
+<nav class="section-nav">
+  <div class="nav-dot active" data-label="Overview" onclick="scrollToSection('overview')"></div>
+  <div class="nav-dot" data-label="Colors" onclick="scrollToSection('colors')"></div>
+  <div class="nav-dot" data-label="Typography" onclick="scrollToSection('typography')"></div>
+  <div class="nav-dot" data-label="Buttons" onclick="scrollToSection('buttons')"></div>
+  <div class="nav-dot" data-label="Inputs" onclick="scrollToSection('inputs')"></div>
+  <div class="nav-dot" data-label="Dropdowns" onclick="scrollToSection('dropdowns')"></div>
+  <div class="nav-dot" data-label="Selection" onclick="scrollToSection('selection')"></div>
+  <div class="nav-dot" data-label="Data Display" onclick="scrollToSection('data')"></div>
+  <div class="nav-dot" data-label="Feedback" onclick="scrollToSection('feedback')"></div>
+  <div class="nav-dot" data-label="Navigation" onclick="scrollToSection('navigation')"></div>
+  <div class="nav-dot" data-label="Layout" onclick="scrollToSection('layout')"></div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- MAIN CONTENT -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="spec-grid" style="position:relative;z-index:10;">
+
+  <!-- ── OVERVIEW ── -->
+  <div class="col-12 fade-in" id="overview">
+    <div class="frame">
+      <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+      <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+      <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+      <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+      <div class="frame-inner" style="text-align:center;padding:64px 32px;">
+        <div class="section-label" style="justify-content:center;">Design System · v1.0</div>
+        <h1 class="type-display" style="margin-bottom:16px;">Autonomous Traffic Vectors</h1>
+        <p class="type-body" style="max-width:640px;margin:0 auto 24px;">
+          Dark-mode tactical interface system. Deep black canvas, surgical accent orange, 
+          JetBrains Mono telemetry, and precise 1px framing architecture.
+        </p>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+          <span class="badge">Theme: Dark</span>
+          <span class="badge badge-accent">Accent: #f24e1e</span>
+          <span class="badge">Canvas: #050505</span>
+          <span class="badge">Mono: JetBrains</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── COLORS ── -->
+  <div class="col-12 fade-in" id="colors">
+    <div class="section-label">01 · Color Palette</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;">
+      <div class="swatch" style="background:#050505;">
+        <div class="swatch-name" style="color:#fff;">bg-deep</div>
+        <div><div class="swatch-value" style="color:#a0a0ab;">#050505</div><div class="swatch-role" style="color:#a0a0ab;">Master canvas</div></div>
+      </div>
+      <div class="swatch" style="background:#0a0a0a;">
+        <div class="swatch-name" style="color:#fff;">bg-surface</div>
+        <div><div class="swatch-value" style="color:#a0a0ab;">#0a0a0a</div><div class="swatch-role" style="color:#a0a0ab;">Card / panel</div></div>
+      </div>
+      <div class="swatch" style="background:#111111;">
+        <div class="swatch-name" style="color:#fff;">bg-elevated</div>
+        <div><div class="swatch-value" style="color:#a0a0ab;">#111111</div><div class="swatch-role" style="color:#a0a0ab;">Elevated surface</div></div>
+      </div>
+      <div class="swatch" style="background:#f24e1e;">
+        <div class="swatch-name" style="color:#fff;">accent</div>
+        <div><div class="swatch-value" style="color:rgba(255,255,255,0.8);">#f24e1e</div><div class="swatch-role" style="color:rgba(255,255,255,0.8);">Primary accent</div></div>
+      </div>
+      <div class="swatch" style="background:#f5f5f7;">
+        <div class="swatch-name" style="color:#050505;">text-primary</div>
+        <div><div class="swatch-value" style="color:#555;">#f5f5f7</div><div class="swatch-role" style="color:#555;">Primary text</div></div>
+      </div>
+      <div class="swatch" style="background:#a0a0ab;">
+        <div class="swatch-name" style="color:#050505;">text-secondary</div>
+        <div><div class="swatch-value" style="color:#333;">#a0a0ab</div><div class="swatch-role" style="color:#333;">Secondary text</div></div>
+      </div>
+      <div class="swatch" style="background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.1);">
+        <div class="swatch-name" style="color:#fff;">border-default</div>
+        <div><div class="swatch-value" style="color:#a0a0ab;">rgba(255,255,255,0.10)</div><div class="swatch-role" style="color:#a0a0ab;">Borders</div></div>
+      </div>
+      <div class="swatch" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.05);">
+        <div class="swatch-name" style="color:#fff;">border-subtle</div>
+        <div><div class="swatch-value" style="color:#a0a0ab;">rgba(255,255,255,0.05)</div><div class="swatch-role" style="color:#a0a0ab;">Hairlines</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TYPOGRAPHY ── -->
+  <div class="col-12 fade-in" id="typography">
+    <div class="section-label">02 · Typography</div>
+    <div class="frame">
+      <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+      <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+      <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+      <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+      <div class="frame-inner">
+        <div style="display:flex;flex-direction:column;gap:24px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--border-subtle);">
+            <div class="type-display">Autonomous</div>
+            <div class="type-code text-muted">display · 48px / 500 / -0.03em</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--border-subtle);">
+            <div class="type-heading">Traffic Vectors</div>
+            <div class="type-code text-muted">heading · 24px / 500 / -0.02em</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--border-subtle);">
+            <div class="type-body" style="max-width:400px;">Body text for descriptions, helper copy, and paragraph content across the interface.</div>
+            <div class="type-code text-muted">body · 15px / 300 / 1.6</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--border-subtle);">
+            <div class="type-label">Telemetry label</div>
+            <div class="type-code text-muted">label · 10px / mono / 0.15em</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px;">
+            <div class="type-code">const vector = "NA-E";</div>
+            <div class="type-code text-muted">code · 12px / mono / 400</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── BUTTONS ── -->
+  <div class="col-6 fade-in" id="buttons">
+    <div class="section-label">03 · Buttons</div>
+    <div class="frame">
+      <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+      <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+      <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+      <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+      <div class="frame-inner" style="display:flex;flex-direction:column;gap:24px;">
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Primary</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button class="btn btn-primary">Deploy Vector</button>
+            <button class="btn btn-primary btn-sm">Small</button>
+            <button class="btn btn-primary btn-lg">Large</button>
+            <button class="btn btn-primary btn-icon"><iconify-icon icon="solar:add-circle-linear" width="16"></iconify-icon></button>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Secondary / Default</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button class="btn">Configure</button>
+            <button class="btn btn-sm">Small</button>
+            <button class="btn btn-lg">Large</button>
+            <button class="btn btn-icon"><iconify-icon icon="solar:settings-linear" width="16"></iconify-icon></button>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Ghost / Danger / Disabled</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button class="btn btn-ghost">Ghost</button>
+            <button class="btn btn-danger">Quarantine</button>
+            <button class="btn" style="opacity:0.4;cursor:not-allowed;">Disabled</button>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">With Icons</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button class="btn"><iconify-icon icon="solar:play-linear" width="14"></iconify-icon> Execute</button>
+            <button class="btn btn-primary"><iconify-icon icon="solar:cloud-upload-linear" width="14"></iconify-icon> Deploy</button>
+            <button class="btn btn-danger"><iconify-icon icon="solar:trash-bin-linear" width="14"></iconify-icon> Purge</button>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Button Group</div>
+          <div style="display:inline-flex;border:1px solid var(--border-default);border-radius:var(--radius-md);overflow:hidden;">
+            <button class="btn" style="border:none;border-radius:0;border-right:1px solid var(--border-subtle);">Left</button>
+            <button class="btn" style="border:none;border-radius:0;border-right:1px solid var(--border-subtle);">Center</button>
+            <button class="btn" style="border:none;border-radius:0;">Right</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── INPUTS ── -->
+  <div class="col-6 fade-in" id="inputs">
+    <div class="section-label">04 · Inputs</div>
+    <div class="frame">
+      <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+      <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+      <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+      <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+      <div class="frame-inner" style="display:flex;flex-direction:column;gap:20px;">
+        <div>
+          <label class="input-label">Text input</label>
+          <input class="input-field" type="text" placeholder="Enter vector ID...">
+        </div>
+        <div>
+          <label class="input-label">With icon</label>
+          <div style="position:relative;">
+            <iconify-icon icon="solar:magnifer-linear" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);" width="16"></iconify-icon>
+            <input class="input-field" type="text" placeholder="Search vectors..." style="padding-left:38px;">
+          </div>
+        </div>
+        <div>
+          <label class="input-label">Textarea</label>
+          <textarea class="input-field" rows="3" placeholder="Enter configuration payload..."></textarea>
+        </div>
+        <div>
+          <label class="input-label">Input with prefix</label>
+          <div style="display:flex;">
+            <span style="display:flex;align-items:center;padding:0 12px;background:var(--bg-elevated);border:1px solid var(--border-default);border-right:none;border-radius:var(--radius-md) 0 0 var(--radius-md);font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">HTTPS://</span>
+            <input class="input-field" type="text" placeholder="endpoint.vector.net" style="border-radius:0 var(--radius-md) var(--radius-md) 0;">
+          </div>
+        </div>
+        <div>
+          <label class="input-label">Input states</label>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <input class="input-field" type="text" placeholder="Default" >
+            <input class="input-field" type="text" value="Focused state" style="border-color:var(--accent);box-shadow:0 0 0 3px rgba(242,78,30,0.1);">
+            <input class="input-field" type="text" placeholder="Error state" style="border-color:rgba(239,68,68,0.6);">
+            <input class="input-field" type="text" placeholder="Disabled" disabled style="opacity:0.4;cursor:not-allowed;">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DROPDOWNS ── -->
+  <div class="col-6 fade-in" id="dropdowns">
+    <div class="section-label">05 · Dropdowns & Selects</div>
+    <div class="frame">
+      <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+      <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+      <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+      <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+      <div class="frame-inner" style="display:flex;flex-direction:column;gap:24px;">
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Standard dropdown (open state)</div>
+          <div class="dropdown" style="z-index:20;">
+            <div class="dropdown-trigger">
+              <span>Throughput</span>
+              <iconify-icon icon="solar:alt-arrow-down-linear" class="text-muted"></iconify-icon>
+            </div>
+            <div class="dropdown-menu">
+              <div class="dropdown-item active">Throughput <iconify-icon icon="solar:check-circle-linear" style="color:var(--accent);"></iconify-icon></div>
+              <div class="dropdown-item">Delay</div>
+              <div class="dropdown-item">Packet Loss</div>
+              <div class="dropdown-item">Jitter</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Inline select (condition matrix)</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <div class="dropdown-trigger" style="min-width:120px;">
+              <span>Source</span>
+              <iconify-icon icon="solar:alt-arrow-down-linear" class="text-muted"></iconify-icon>
+            </div>
+            <div class="dropdown-trigger" style="min-width:80px;">
+              <span>IN</span>
+              <iconify-icon icon="solar:alt-arrow-down-linear" class="text-muted"></iconify-icon>
+            </div>
+            <div style="background:var(--bg-deep);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:10px 14px;font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);min-width:64px;">NA-E</div>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Operator select</div>
+          <div class="dropdown-trigger" style="min-width:80px;">
+            <span>==</span>
+            <iconify-icon icon="solar:alt-arrow-down-linear" class="text-muted"></iconify-icon>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Multi-select chips</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <span class="badge badge-accent">Throughput <iconify-icon icon="solar:close-circle-linear" style="cursor:pointer;"></iconify-icon></span>
+            <span class="badge">Delay <iconify-icon icon="solar:close-circle-linear" style="cursor:pointer;"></iconify-icon></span>
+            <span class="badge">Jitter <iconify-icon icon="solar:close-circle-linear" style="cursor:pointer;"></iconify-icon></span>
+            <span class="badge" style="border-style:dashed;cursor:pointer;">+ Add</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SELECTION CONTROLS ── -->
+  <div class="col-6 fade-in" id="selection">
+    <div class="section-label">06 · Selection Controls</div>
+    <div class="frame">
+      <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+      <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+      <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+      <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+      <div class="frame-inner" style="display:flex;flex-direction:column;gap:24px;">
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Toggle</div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div class="toggle-track active"><div class="toggle-thumb"></div></div>
+              <span style="font-size:13px;color:var(--text-secondary);">Auto-quarantine enabled</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div class="toggle-track"><div class="toggle-thumb"></div></div>
+              <span style="font-size:13px;color:var(--text-secondary);">Strict evaluation mode</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Checkbox</div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div class="checkbox checked"><iconify-icon icon="solar:check-read-linear" style="color:#fff;" width="12"></iconify-icon></div>
+              <span style="font-size:13px;color:var(--text-secondary);">Throughput monitoring</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div class="checkbox"></div>
+              <span style="font-size:13px;color:var(--text-secondary);">Delay threshold alerts</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;opacity:0.4;">
+              <div class="checkbox"></div>
+              <span style="font-size:13px;color:var(--text-secondary);">Packet loss (unavailable)</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Radio</div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div class="radio checked"></div>
+              <span style="font-size:13px;color:var(--text-secondary);">Structural classification</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div class="radio"></div>
+              <span style="font-size:13px;color:var(--text-secondary);">Spatial classification</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Slider</div>
+          <div class="slider-track">
+            <div class="slider-fill"></div>
+            <div class="slider-thumb"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px;">
+            <span class="type-code text-muted">0</span>
+            <span class="type-code text-muted">100</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FILE DRAG & DROP ── -->
+  <div class="col-6 fade-in" id="file-upload">
+    <div class="section-label">07 · File Drag & Drop</div>
+    <div class="frame">
+      <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+      <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+      <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+      <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+      <div class="frame-inner">
+        <div class="dropzone" id="dropzone">
+          <div class="dropzone-icon">
+            <iconify-icon icon="solar:cloud-upload-linear" width="24"></iconify-icon>
+          </div>
+          <div style="font-size:14px;font-weight:500;color:var(--text-primary);margin-bottom:4px;">Drop payload files here</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">or click to browse · JSON, YAML, CSV up to 50MB</div>
+          <button class="btn btn-sm">Browse Files</button>
+        </div>
+        <div style="margin-top:16px;">
+          <div class="type-label" style="margin-bottom:8px;">Uploaded files</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-md);">
+              <iconify-icon icon="solar:document-text-linear" style="color:var(--accent);" width="18"></iconify-icon>
+              <div style="flex:1;">
+                <div style="font-size:12px;color:var(--text-primary);">traffic_config_v2.json</div>
+                <div class="type-code text-muted">2.4 MB · Complete</div>
+              </div>
+              <span class="badge badge-success">Done</span>
+              <iconify-icon icon="solar:trash-bin-linear" style="color:var(--text-muted);cursor:pointer;" width="16"></iconify-icon>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-md);">
+              <iconify-icon icon="solar:document-text-linear" style="color:var(--text-muted);" width="18"></iconify-icon>
+              <div style="flex:1;">
+                <div style="font-size:12px;color:var(--text-primary);">vector_matrix.yaml</div>
+                <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+                  <div class="progress-track" style="flex:1;"><div class="progress-fill" style="width:65%;"></div></div>
+                  <span class="type-code text-muted">65%</span>
+                </div>
+              </div>
+              <iconify-icon icon="solar:close-circle-linear" style="color:var(--text-muted);cursor:pointer;" width="16"></iconify-icon>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DATA DISPLAY ── -->
+  <div class="col-12 fade-in" id="data">
+    <div class="section-label">08 · Data Display</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:24px;">
+      <!-- Table -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:16px;">Data table</div>
+          <table class="data-table">
+            <thead>
+              <tr><th>Vector</th><th>Source</th><th>Throughput</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="mono">V_01</td><td>NA-E</td><td>98.2</td><td><span class="badge badge-success">Active</span></td></tr>
+              <tr><td class="mono">V_02</td><td>AP-S</td><td>76.4</td><td><span class="badge badge-warn">Degraded</span></td></tr>
+              <tr><td class="mono">V_03</td><td>EU-W</td><td>99.1</td><td><span class="badge badge-success">Active</span></td></tr>
+              <tr><td class="mono">V_04</td><td>NA-W</td><td>0.0</td><td><span class="badge badge-accent">Quarantined</span></td></tr>
+              <tr><td class="mono">V_05</td><td>AP-N</td><td>88.7</td><td><span class="badge">Standby</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Stats / KPI -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:16px;">KPI cards</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;">
+            <div class="card">
+              <div class="type-label">Active vectors</div>
+              <div style="font-size:28px;font-weight:500;color:#fff;margin:8px 0 4px;">1,247</div>
+              <div class="type-code" style="color:#22c55e;">↑ 12.4%</div>
+            </div>
+            <div class="card">
+              <div class="type-label">Throughput</div>
+              <div style="font-size:28px;font-weight:500;color:#fff;margin:8px 0 4px;">98.2<span style="font-size:14px;color:var(--text-muted);"> Gbps</span></div>
+              <div class="type-code" style="color:#22c55e;">↑ 3.1%</div>
+            </div>
+            <div class="card">
+              <div class="type-label">Quarantined</div>
+              <div style="font-size:28px;font-weight:500;color:var(--accent);margin:8px 0 4px;">23</div>
+              <div class="type-code" style="color:#ef4444;">↑ 8.2%</div>
+            </div>
+            <div class="card">
+              <div class="type-label">Avg latency</div>
+              <div style="font-size:28px;font-weight:500;color:#fff;margin:8px 0 4px;">12<span style="font-size:14px;color:var(--text-muted);">ms</span></div>
+              <div class="type-code" style="color:#22c55e;">↓ 4.7%</div>
+            </div>
+          </div>
+          <div style="margin-top:16px;">
+            <div class="type-label" style="margin-bottom:8px;">Progress bars</div>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span class="type-code">NA-E</span><span class="type-code text-muted">92%</span></div><div class="progress-track"><div class="progress-fill" style="width:92%;"></div></div></div>
+              <div><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span class="type-code">EU-W</span><span class="type-code text-muted">78%</span></div><div class="progress-track"><div class="progress-fill" style="width:78%;"></div></div></div>
+              <div><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span class="type-code">AP-S</span><span class="type-code text-muted">45%</span></div><div class="progress-track"><div class="progress-fill" style="width:45%;background:linear-gradient(90deg,#eab308,#f59e0b);"></div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FEEDBACK ── -->
+  <div class="col-6 fade-in" id="feedback">
+    <div class="section-label">09 · Feedback & Status</div>
+    <div class="frame">
+      <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+      <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+      <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+      <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+      <div class="frame-inner" style="display:flex;flex-direction:column;gap:16px;">
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Alerts</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div class="alert alert-accent">
+              <iconify-icon icon="solar:danger-triangle-linear" style="color:var(--accent);" width="18"></iconify-icon>
+              <div><div style="font-size:13px;color:var(--text-primary);font-weight:500;">Vector quarantine triggered</div><div style="font-size:12px;color:var(--text-secondary);">V_04 exceeded delay threshold of 20ms.</div></div>
+            </div>
+            <div class="alert alert-success">
+              <iconify-icon icon="solar:check-circle-linear" style="color:#22c55e;" width="18"></iconify-icon>
+              <div><div style="font-size:13px;color:var(--text-primary);font-weight:500;">Deployment successful</div><div style="font-size:12px;color:var(--text-secondary);">3 vectors deployed to NA-E region.</div></div>
+            </div>
+            <div class="alert alert-warn">
+              <iconify-icon icon="solar:danger-circle-linear" style="color:#eab308;" width="18"></iconify-icon>
+              <div><div style="font-size:13px;color:var(--text-primary);font-weight:500;">Throughput degradation</div><div style="font-size:12px;color:var(--text-secondary);">AP-S region dropped below 80% capacity.</div></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Badges & chips</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <span class="badge">Default</span>
+            <span class="badge badge-accent">Accent</span>
+            <span class="badge badge-success">Success</span>
+            <span class="badge badge-warn">Warning</span>
+            <span class="badge" style="border-color:rgba(239,68,68,0.4);color:#ef4444;">Danger</span>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Toast notification</div>
+          <div class="toast">
+            <iconify-icon icon="solar:check-circle-linear" style="color:#22c55e;" width="18"></iconify-icon>
+            <div style="flex:1;">
+              <div style="font-size:12px;color:var(--text-primary);">Configuration saved</div>
+              <div style="font-size:11px;color:var(--text-muted);">Vector ruleset updated successfully.</div>
+            </div>
+            <iconify-icon icon="solar:close-linear" style="color:var(--text-muted);cursor:pointer;" width="14"></iconify-icon>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Tooltip</div>
+          <div class="tooltip-wrap">
+            <button class="btn btn-sm">Hover for tooltip</button>
+            <div class="tooltip">Quarantine vector V_04</div>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Skeleton loading</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div class="skeleton" style="height:14px;width:60%;"></div>
+            <div class="skeleton" style="height:14px;width:80%;"></div>
+            <div class="skeleton" style="height:14px;width:45%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── NAVIGATION ── -->
+  <div class="col-6 fade-in" id="navigation">
+    <div class="section-label">10 · Navigation</div>
+    <div class="frame">
+      <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+      <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+      <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+      <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+      <div class="frame-inner" style="display:flex;flex-direction:column;gap:24px;">
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Breadcrumb</div>
+          <div class="breadcrumb">
+            <span class="breadcrumb-item">Dashboard</span>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-item">Vectors</span>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-item active">V_04</span>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Tabs</div>
+          <div class="tabs">
+            <div class="tab active">Overview</div>
+            <div class="tab">Configuration</div>
+            <div class="tab">Telemetry</div>
+            <div class="tab">Logs</div>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Pagination</div>
+          <div class="pagination">
+            <div class="page-btn">‹</div>
+            <div class="page-btn active">1</div>
+            <div class="page-btn">2</div>
+            <div class="page-btn">3</div>
+            <div class="page-btn">4</div>
+            <div class="page-btn">›</div>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Stepper</div>
+          <div class="stepper">
+            <div class="step completed"><div class="step-dot"><iconify-icon icon="solar:check-read-linear" width="12"></iconify-icon></div><span class="step-label">Define</span></div>
+            <div class="step-line"></div>
+            <div class="step active"><div class="step-dot">2</div><span class="step-label">Configure</span></div>
+            <div class="step-line"></div>
+            <div class="step"><div class="step-dot">3</div><span class="step-label">Deploy</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="type-label" style="margin-bottom:12px;">Accordion</div>
+          <div class="accordion-item">
+            <div class="accordion-trigger">
+              <span>Evaluation parameters</span>
+              <iconify-icon icon="solar:alt-arrow-down-linear" class="text-muted"></iconify-icon>
+            </div>
+            <div class="accordion-content">Configure throughput, delay, and packet loss thresholds for deterministic rule sequencing.</div>
+          </div>
+          <div class="accordion-item">
+            <div class="accordion-trigger">
+              <span>Classification matrix</span>
+              <iconify-icon icon="solar:alt-arrow-right-linear" class="text-muted"></iconify-icon>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LAYOUT & SPACING ── -->
+  <div class="col-12 fade-in" id="layout">
+    <div class="section-label">11 · Layout, Spacing & Radii</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;">
+      <!-- Spacing -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:16px;">Spacing scale</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);"><span class="type-code">4px</span><span class="type-code text-muted">xs</span></div>
+            <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);"><span class="type-code">8px</span><span class="type-code text-muted">sm</span></div>
+            <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);"><span class="type-code">12px</span><span class="type-code text-muted">md</span></div>
+            <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);"><span class="type-code">16px</span><span class="type-code text-muted">lg</span></div>
+            <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);"><span class="type-code">24px</span><span class="type-code text-muted">xl</span></div>
+            <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);"><span class="type-code">32px</span><span class="type-code text-muted">2xl</span></div>
+            <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);"><span class="type-code">48px</span><span class="type-code text-muted">section</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Radii -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:16px;">Border radii</div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;">
+            <div style="text-align:center;"><div style="width:56px;height:56px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:2px;"></div><div class="type-code text-muted" style="margin-top:6px;">2px</div></div>
+            <div style="text-align:center;"><div style="width:56px;height:56px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:4px;"></div><div class="type-code text-muted" style="margin-top:6px;">4px</div></div>
+            <div style="text-align:center;"><div style="width:56px;height:56px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:6px;"></div><div class="type-code text-muted" style="margin-top:6px;">6px</div></div>
+            <div style="text-align:center;"><div style="width:56px;height:56px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:50%;"></div><div class="type-code text-muted" style="margin-top:6px;">full</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grid -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:16px;">Grid columns</div>
+          <div class="grid-demo" style="grid-template-columns:repeat(4,1fr);">
+            <div class="grid-item">1</div><div class="grid-item">2</div><div class="grid-item">3</div><div class="grid-item">4</div>
+          </div>
+          <div class="grid-demo" style="grid-template-columns:repeat(3,1fr);margin-top:8px;">
+            <div class="grid-item">1</div><div class="grid-item">2</div><div class="grid-item">3</div>
+          </div>
+          <div class="grid-demo" style="grid-template-columns:repeat(2,1fr);margin-top:8px;">
+            <div class="grid-item">1</div><div class="grid-item">2</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── APP SHELL COMPONENTS ── -->
+  <div class="col-12 fade-in" id="app-shell">
+    <div class="section-label">12 · App Shell Components</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:24px;">
+
+      <!-- Top Navbar -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Top navbar</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--radius-md);">
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button class="btn btn-icon btn-sm"><iconify-icon icon="solar:settings-linear" width="14"></iconify-icon></button>
+              <button class="btn btn-icon btn-sm"><iconify-icon icon="solar:document-text-linear" width="14"></iconify-icon></button>
+              <button class="btn btn-icon btn-sm"><iconify-icon icon="solar:layers-minimalistic-linear" width="14"></iconify-icon></button>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:14px;font-weight:700;letter-spacing:3px;color:#fff;">ZEZO</div>
+              <div style="width:24px;height:2px;background:var(--accent);margin:2px auto 0;"></div>
+            </div>
+            <div style="text-align:right;">
+              <div class="type-code" style="font-size:12px;color:#fff;">18:50:38</div>
+              <div class="type-code text-muted" style="font-size:8px;">MON 21 SEP</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal / Dialog -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Modal / dialog</div>
+          <div style="background:rgba(0,0,0,0.75);padding:24px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;min-height:140px;">
+            <div style="width:100%;max-width:320px;background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:16px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <span class="badge badge-accent">CONTROLS</span>
+                <button class="btn btn-ghost btn-sm">✕</button>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <button class="btn btn-sm" style="justify-content:flex-start;"><iconify-icon icon="solar:smartphone-linear" width="13"></iconify-icon> Remote Control</button>
+                <button class="btn btn-sm" style="justify-content:flex-start;"><iconify-icon icon="solar:maximize-square-linear" width="13"></iconify-icon> Fullscreen</button>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);">
+                  <span class="type-code" style="font-size:10px;">Auto-start:</span>
+                  <div class="toggle-track active" style="width:32px;height:18px;"><div class="toggle-thumb" style="width:12px;height:12px;"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat + Input Component -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div class="type-label" style="margin-bottom:0;">Chat + Input</div>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-ghost btn-sm" style="font-size:8px;padding:2px 6px;"><iconify-icon icon="solar:copy-linear" width="10"></iconify-icon></button>
+              <button class="btn btn-ghost btn-sm" style="font-size:8px;padding:2px 6px;"><iconify-icon icon="solar:trash-bin-linear" width="10"></iconify-icon></button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;padding-right:4px;margin-bottom:10px;">
+            <div style="display:flex;gap:8px;">
+              <div class="avatar avatar-sm" style="flex-shrink:0;">U</div>
+              <div style="flex:1;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:8px 10px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                  <span class="type-code" style="font-size:9px;color:#64748b;">USER</span>
+                  <span class="type-code text-muted" style="font-size:8px;">18:49:12</span>
+                </div>
+                <div style="font-size:11px;color:#fff;line-height:1.4;">Deploy vector configuration to NA-E region</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div class="avatar avatar-sm" style="flex-shrink:0;border-color:var(--accent);color:var(--accent);">Z</div>
+              <div style="flex:1;background:rgba(14,14,18,0.95);border:1px solid rgba(255,255,255,0.08);border-left:3px solid var(--accent);border-radius:var(--radius-md);padding:8px 10px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                  <span class="type-code" style="font-size:9px;color:var(--accent);">ZEZO</span>
+                  <span class="type-code text-muted" style="font-size:8px;">18:49:15</span>
+                </div>
+                <div style="font-size:11px;color:#f1f5f9;line-height:1.4;">Deploying 3 vectors to NA-E. ETA 45 seconds.</div>
+                <div style="margin-top:6px;display:flex;gap:4px;">
+                  <span class="badge badge-success" style="font-size:7px;">V_01 ✓</span>
+                  <span class="badge badge-success" style="font-size:7px;">V_02 ✓</span>
+                  <span class="badge badge-accent" style="font-size:7px;">V_03 ...</span>
+                </div>
+              </div>
+            </div>
+            <div style="padding:4px 8px;background:rgba(8,8,10,0.6);border-left:2px solid #22c55e;border-radius:var(--radius-sm);">
+              <span class="type-code" style="font-size:9px;color:#22c55e;">[18:49:18] Vector V_01 deployed successfully</span>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div class="avatar avatar-sm" style="flex-shrink:0;">U</div>
+              <div style="flex:1;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:8px 10px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                  <span class="type-code" style="font-size:9px;color:#64748b;">USER</span>
+                  <span class="type-code text-muted" style="font-size:8px;">18:50:01</span>
+                </div>
+                <div style="font-size:11px;color:#fff;line-height:1.4;">Show throughput analytics for last 24h</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div class="avatar avatar-sm" style="flex-shrink:0;border-color:var(--accent);color:var(--accent);">Z</div>
+              <div style="flex:1;background:rgba(14,14,18,0.95);border:1px solid rgba(255,255,255,0.08);border-left:3px solid var(--accent);border-radius:var(--radius-md);padding:8px 10px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                  <span class="type-code" style="font-size:9px;color:var(--accent);">ZEZO</span>
+                  <span class="type-code text-muted" style="font-size:8px;">18:50:03</span>
+                </div>
+                <div style="font-size:11px;color:#f1f5f9;line-height:1.4;">Throughput stable at 98.2 Gbps. Peak was 99.1 at 14:22.</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;background:var(--bg-deep);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:4px 4px 4px 12px;transition:border-color 0.2s;">
+            <input type="text" placeholder="Ask ZEZO or enter command..." style="flex:1;background:transparent;border:none;outline:none;font-family:var(--font-mono);font-size:11px;color:#fff;padding:6px 0;">
+            <button class="btn btn-ghost btn-icon btn-sm" style="width:24px;height:24px;padding:0;"><iconify-icon icon="solar:paperclip-linear" width="13"></iconify-icon></button>
+            <button class="btn btn-primary btn-icon btn-sm" style="width:28px;height:28px;padding:0;"><iconify-icon icon="solar:arrow-right-linear" width="14"></iconify-icon></button>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+            <span class="type-code text-muted" style="font-size:8px;">Enter to send · Shift+Enter for new line</span>
+            <span class="type-code" style="font-size:8px;color:#22c55e;">● READY</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stream Message Cards -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Stream messages</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="padding:8px 10px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-left:3px solid #64748b;border-radius:var(--radius-sm);">
+              <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+                <span class="badge" style="font-size:8px;">USER</span>
+                <span class="type-code text-muted" style="font-size:9px;">18:49:12</span>
+              </div>
+              <div style="font-size:11px;color:#fff;">Deploy vector configuration to NA-E region</div>
+            </div>
+            <div style="padding:8px 10px;background:rgba(14,14,18,0.95);border:1px solid rgba(255,255,255,0.08);border-left:3px solid var(--accent);border-radius:var(--radius-sm);">
+              <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+                <span class="badge badge-accent" style="font-size:8px;">ZEZO</span>
+                <span class="type-code text-muted" style="font-size:9px;">18:49:15</span>
+              </div>
+              <div style="font-size:11px;color:#f1f5f9;">Deploying 3 vectors to NA-E. ETA 45 seconds.</div>
+            </div>
+            <div style="padding:5px 8px;background:rgba(8,8,10,0.6);border-left:2px solid #22c55e;border-radius:var(--radius-sm);">
+              <span class="type-code" style="font-size:9px;color:#22c55e;">[SYS] Vector V_01 deployed successfully</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Avatar Command Dock -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Avatar command dock</div>
+          <div style="display:inline-flex;align-items:center;gap:4px;background:rgba(10,10,14,0.98);border:1px solid rgba(255,255,255,0.08);border-radius:var(--radius-md);padding:4px 8px;">
+            <button class="btn btn-sm" style="border-color:rgba(249,115,22,0.3);color:#f97316;background:rgba(249,115,22,0.12);"><iconify-icon icon="solar:microphone-3-bold" width="12"></iconify-icon> MIC</button>
+            <div style="width:1px;height:14px;background:rgba(255,255,255,0.10);"></div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div style="width:8px;height:8px;background:var(--accent);border-radius:50%;"></div>
+              <span style="font-size:11px;color:#f1f5f9;">Standby...</span>
+            </div>
+            <div style="width:1px;height:14px;background:rgba(255,255,255,0.10);"></div>
+            <button class="btn btn-sm" style="color:#ef4444;"><iconify-icon icon="solar:stop-circle-bold" width="12"></iconify-icon> STOP</button>
+            <div style="width:1px;height:14px;background:rgba(255,255,255,0.10);"></div>
+            <button class="btn btn-sm" style="color:#a855f7;"><iconify-icon icon="solar:power-bold" width="12"></iconify-icon> SLEEP</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Context Menu -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Context menu</div>
+          <div style="background:#0d0d11;border:1px solid var(--border-default);border-radius:var(--radius-md);padding:4px;min-width:180px;">
+            <div style="padding:5px 8px;font-weight:bold;color:var(--accent);border-bottom:1px solid var(--border-subtle);margin-bottom:2px;font-size:10px;">V_04 · QUARANTINED</div>
+            <div style="padding:6px 8px;font-size:10px;color:#ccc;border-radius:var(--radius-sm);cursor:pointer;">View Details</div>
+            <div style="padding:6px 8px;font-size:10px;color:#ccc;border-radius:var(--radius-sm);cursor:pointer;">Inspect Logs</div>
+            <div style="padding:6px 8px;font-size:10px;color:#ef4444;border-radius:var(--radius-sm);cursor:pointer;">Purge Vector</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Color Dot Picker -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Color dot picker</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <div style="width:17px;height:17px;border-radius:50%;background:#f24e1e;border:2px solid #fff;box-shadow:0 0 10px #f24e1e;cursor:pointer;"></div>
+            <div style="width:17px;height:17px;border-radius:50%;background:#00d2ff;border:2px solid transparent;cursor:pointer;"></div>
+            <div style="width:17px;height:17px;border-radius:50%;background:#10b981;border:2px solid transparent;cursor:pointer;"></div>
+            <div style="width:17px;height:17px;border-radius:50%;background:#a855f7;border:2px solid transparent;cursor:pointer;"></div>
+            <div style="width:17px;height:17px;border-radius:50%;background:#f59e0b;border:2px solid transparent;cursor:pointer;"></div>
+            <div style="width:17px;height:17px;border-radius:50%;background:#ef4444;border:2px solid transparent;cursor:pointer;"></div>
+            <div style="width:17px;height:17px;border-radius:50%;background:#ec4899;border:2px solid transparent;cursor:pointer;"></div>
+            <div style="width:17px;height:17px;border-radius:50%;background:#38bdf8;border:2px solid transparent;cursor:pointer;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Roster Card -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Roster card</div>
+          <div style="display:flex;align-items:center;gap:10px;background:var(--bg-panel);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:8px 10px;">
+            <div style="width:38px;height:52px;background:#18181c;border:1px solid var(--border-strong);border-radius:var(--radius-sm);flex-shrink:0;"></div>
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span class="type-code" style="font-size:11px;font-weight:700;color:#fff;">MICHAEL</span>
+                <span style="font-size:8px;padding:1px 4px;border-radius:var(--radius-sm);color:#22c55e;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);">WORKING</span>
+              </div>
+              <div class="type-code text-muted" style="font-size:9px;margin-top:2px;">Senior Developer</div>
+              <div class="type-code" style="font-size:8px;color:#06b6d4;margin-top:1px;">Synthesizing layout</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spec Grid -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Spec grid</div>
+          <div style="display:grid;grid-template-columns:100px 1fr;gap:4px 8px;background:#0d0d10;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:8px 10px;">
+            <span class="type-code text-muted" style="font-size:10px;">Engine:</span>
+            <span class="type-code" style="font-size:10px;color:#fff;">Antigravity Agent</span>
+            <span class="type-code text-muted" style="font-size:10px;">Model:</span>
+            <span class="type-code" style="font-size:10px;color:var(--accent);">Gemini 3.1 Flash</span>
+            <span class="type-code text-muted" style="font-size:10px;">PID / Job:</span>
+            <span class="type-code" style="font-size:10px;">15128 (Assigned)</span>
+            <span class="type-code text-muted" style="font-size:10px;">Started:</span>
+            <span class="type-code" style="font-size:10px;">18:29:15</span>
+            <span class="type-code text-muted" style="font-size:10px;">Elapsed:</span>
+            <span class="type-code" style="font-size:10px;">1m 12s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Terminal Window -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Terminal window</div>
+          <div style="background:#050507;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:8px 10px;display:flex;flex-direction:column;gap:4px;">
+            <div style="display:flex;gap:6px;font-size:10px;"><span class="type-code text-muted">18:29:15</span><span class="type-code" style="color:var(--accent);">[SYS] Initializing execution plan...</span></div>
+            <div style="display:flex;gap:6px;font-size:10px;"><span class="type-code text-muted">18:29:16</span><span class="type-code" style="color:#22c55e;">[OK] Vector V_01 deployed</span></div>
+            <div style="display:flex;gap:6px;font-size:10px;"><span class="type-code text-muted">18:29:17</span><span class="type-code" style="color:#eab308;">[WARN] High latency on AP-S</span></div>
+            <div style="display:flex;gap:6px;font-size:10px;"><span class="type-code text-muted">18:29:18</span><span class="type-code">[INFO] Throughput at 98.2 Gbps</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Empty state</div>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 16px;text-align:center;color:var(--text-muted);">
+            <iconify-icon icon="solar:checklist-minimalistic-linear" style="font-size:28px;margin-bottom:6px;opacity:0.35;"></iconify-icon>
+            <div style="font-size:11px;font-weight:500;color:#fff;">No Active Tasks</div>
+            <div style="font-size:9px;font-family:var(--font-mono);margin-top:2px;">Tasks dispatched via voice or prompt will appear here.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Splitter Bar -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Splitter bar</div>
+          <div style="height:8px;display:flex;align-items:center;justify-content:center;cursor:row-resize;">
+            <div style="width:36px;height:3px;background:rgba(255,255,255,0.2);border-radius:2px;"></div>
+          </div>
+          <div class="type-code text-muted" style="text-align:center;margin-top:8px;font-size:9px;">Drag to resize</div>
+        </div>
+      </div>
+
+      <!-- Footer Strip -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Footer status strip</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 14px;background:var(--bg-surface);border-top:1px solid var(--border-subtle);font-size:9px;color:var(--text-muted);">
+            <span class="type-code">ZEZO OS · v2.1</span>
+            <span class="type-code" style="color:#22c55e;">● ONLINE</span>
+            <span class="type-code">12 AGENTS</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Badge Variants -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Extended badges</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <span class="badge" style="background:rgba(6,182,212,0.15);border-color:rgba(6,182,212,0.3);color:#06b6d4;">Cyan</span>
+            <span class="badge" style="background:rgba(245,158,11,0.15);border-color:rgba(245,158,11,0.3);color:#f59e0b;">Amber</span>
+            <span class="badge" style="background:rgba(168,85,247,0.15);border-color:rgba(168,85,247,0.3);color:#a855f7;">Purple</span>
+            <span class="badge" style="background:rgba(56,189,248,0.15);border-color:rgba(56,189,248,0.3);color:#38bdf8;">Sky</span>
+            <span class="badge" style="background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.3);color:#ef4444;">Red</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── ADVANCED COMPONENTS ── -->
+  <div class="col-12 fade-in" id="advanced">
+    <div class="section-label">13 · Advanced Components</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:24px;">
+
+      <!-- Search Input -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Search input</div>
+          <div style="position:relative;">
+            <iconify-icon icon="solar:magnifer-linear" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);" width="16"></iconify-icon>
+            <input class="input-field" type="text" placeholder="Search vectors, agents, logs..." style="padding-left:38px;padding-right:38px;">
+            <iconify-icon icon="solar:close-circle-linear" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);cursor:pointer;" width="14"></iconify-icon>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tag Input -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Tag input</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;background:var(--bg-deep);border:1px solid var(--border-default);border-radius:var(--radius-md);">
+            <span class="badge badge-accent">production <iconify-icon icon="solar:close-circle-linear" style="cursor:pointer;" width="10"></iconify-icon></span>
+            <span class="badge">na-east <iconify-icon icon="solar:close-circle-linear" style="cursor:pointer;" width="10"></iconify-icon></span>
+            <span class="badge">v2.1 <iconify-icon icon="solar:close-circle-linear" style="cursor:pointer;" width="10"></iconify-icon></span>
+            <input type="text" placeholder="+ Add tag" style="flex:1;min-width:80px;background:transparent;border:none;outline:none;font-family:var(--font-mono);font-size:11px;color:var(--text-primary);">
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline / Activity Feed -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Timeline / activity feed</div>
+          <div style="display:flex;flex-direction:column;gap:0;">
+            <div style="display:flex;gap:12px;position:relative;padding-bottom:16px;">
+              <div style="display:flex;flex-direction:column;align-items:center;">
+                <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);"></div>
+                <div style="width:1px;flex:1;background:var(--border-default);margin-top:4px;"></div>
+              </div>
+              <div style="padding-top:0;">
+                <div style="font-size:12px;color:#fff;">Vector V_01 deployed</div>
+                <div class="type-code text-muted" style="font-size:9px;margin-top:2px;">18:29:15 · NA-E region</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;position:relative;padding-bottom:16px;">
+              <div style="display:flex;flex-direction:column;align-items:center;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#22c55e;"></div>
+                <div style="width:1px;flex:1;background:var(--border-default);margin-top:4px;"></div>
+              </div>
+              <div>
+                <div style="font-size:12px;color:#fff;">Health check passed</div>
+                <div class="type-code text-muted" style="font-size:9px;margin-top:2px;">18:28:42 · All systems nominal</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;">
+              <div style="display:flex;flex-direction:column;align-items:center;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#eab308;"></div>
+              </div>
+              <div>
+                <div style="font-size:12px;color:#fff;">Latency threshold exceeded</div>
+                <div class="type-code text-muted" style="font-size:9px;margin-top:2px;">18:27:30 · AP-S region · 24ms</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sparkline / Mini Chart -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Sparkline chart</div>
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+              <span class="type-label">Throughput</span>
+              <span class="type-code" style="font-size:14px;color:#fff;">98.2 <span style="font-size:10px;color:var(--text-muted);">Gbps</span></span>
+            </div>
+            <svg width="100%" height="40" viewBox="0 0 200 40" preserveAspectRatio="none">
+              <polyline points="0,30 20,25 40,28 60,20 80,22 100,15 120,18 140,10 160,12 180,8 200,5" fill="none" stroke="#f24e1e" stroke-width="1.5"/>
+              <polyline points="0,30 20,25 40,28 60,20 80,22 100,15 120,18 140,10 160,12 180,8 200,5 200,40 0,40" fill="url(#sparkGrad)" opacity="0.15"/>
+              <defs><linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f24e1e"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>
+            </svg>
+            <div style="display:flex;justify-content:space-between;margin-top:4px;">
+              <span class="type-code text-muted" style="font-size:8px;">18:00</span>
+              <span class="type-code text-muted" style="font-size:8px;">18:30</span>
+              <span class="type-code text-muted" style="font-size:8px;">19:00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Radial Progress -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Radial progress</div>
+          <div style="display:flex;gap:20px;justify-content:center;">
+            <div style="text-align:center;">
+              <svg width="64" height="64" viewBox="0 0 64 64">
+                <circle cx="32" cy="32" r="26" fill="none" stroke="var(--bg-elevated)" stroke-width="4"/>
+                <circle cx="32" cy="32" r="26" fill="none" stroke="#f24e1e" stroke-width="4" stroke-dasharray="163" stroke-dashoffset="40" stroke-linecap="round" transform="rotate(-90 32 32)"/>
+                <text x="32" y="36" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">76%</text>
+              </svg>
+              <div class="type-code text-muted" style="font-size:8px;margin-top:4px;">CPU</div>
+            </div>
+            <div style="text-align:center;">
+              <svg width="64" height="64" viewBox="0 0 64 64">
+                <circle cx="32" cy="32" r="26" fill="none" stroke="var(--bg-elevated)" stroke-width="4"/>
+                <circle cx="32" cy="32" r="26" fill="none" stroke="#22c55e" stroke-width="4" stroke-dasharray="163" stroke-dashoffset="80" stroke-linecap="round" transform="rotate(-90 32 32)"/>
+                <text x="32" y="36" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">51%</text>
+              </svg>
+              <div class="type-code text-muted" style="font-size:8px;margin-top:4px;">MEM</div>
+            </div>
+            <div style="text-align:center;">
+              <svg width="64" height="64" viewBox="0 0 64 64">
+                <circle cx="32" cy="32" r="26" fill="none" stroke="var(--bg-elevated)" stroke-width="4"/>
+                <circle cx="32" cy="32" r="26" fill="none" stroke="#eab308" stroke-width="4" stroke-dasharray="163" stroke-dashoffset="120" stroke-linecap="round" transform="rotate(-90 32 32)"/>
+                <text x="32" y="36" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">25%</text>
+              </svg>
+              <div class="type-code text-muted" style="font-size:8px;margin-top:4px;">GPU</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar Navigation -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Sidebar navigation</div>
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--accent-dim);border-left:2px solid var(--accent);border-radius:var(--radius-sm);cursor:pointer;">
+              <iconify-icon icon="solar:widget-linear" style="color:var(--accent);" width="16"></iconify-icon>
+              <span style="font-size:12px;color:#fff;">Dashboard</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text-secondary);">
+              <iconify-icon icon="solar:layers-minimalistic-linear" width="16"></iconify-icon>
+              <span style="font-size:12px;">Vectors</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text-secondary);">
+              <iconify-icon icon="solar:users-group-two-rounded-linear" width="16"></iconify-icon>
+              <span style="font-size:12px;">Agents</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text-secondary);">
+              <iconify-icon icon="solar:chart-linear" width="16"></iconify-icon>
+              <span style="font-size:12px;">Analytics</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text-secondary);">
+              <iconify-icon icon="solar:settings-linear" width="16"></iconify-icon>
+              <span style="font-size:12px;">Settings</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Command Palette -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Command palette</div>
+          <div style="background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-md);overflow:hidden;">
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border-subtle);">
+              <iconify-icon icon="solar:magnifer-linear" style="color:var(--text-muted);" width="16"></iconify-icon>
+              <span style="font-size:12px;color:var(--text-muted);">Type a command or search...</span>
+              <span class="type-code text-muted" style="font-size:9px;margin-left:auto;">ESC</span>
+            </div>
+            <div style="padding:4px;">
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--accent-dim);border-radius:var(--radius-sm);">
+                <iconify-icon icon="solar:play-linear" style="color:var(--accent);" width="14"></iconify-icon>
+                <span style="font-size:11px;color:#fff;">Deploy vector to region</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;">
+                <iconify-icon icon="solar:stop-circle-linear" style="color:var(--text-muted);" width="14"></iconify-icon>
+                <span style="font-size:11px;color:var(--text-secondary);">Stop all active tasks</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;">
+                <iconify-icon icon="solar:refresh-linear" style="color:var(--text-muted);" width="14"></iconify-icon>
+                <span style="font-size:11px;color:var(--text-secondary);">Refresh telemetry data</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Segmented Control -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Segmented control</div>
+          <div style="display:inline-flex;background:var(--bg-deep);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:2px;">
+            <button class="btn btn-sm" style="border:none;background:var(--accent);color:#fff;">Day</button>
+            <button class="btn btn-sm" style="border:none;background:transparent;color:var(--text-muted);">Week</button>
+            <button class="btn btn-sm" style="border:none;background:transparent;color:var(--text-muted);">Month</button>
+            <button class="btn btn-sm" style="border:none;background:transparent;color:var(--text-muted);">Year</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Drawer / Slide-out Panel -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Drawer / slide-out</div>
+          <div style="background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--radius-md);max-width:280px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border-subtle);">
+              <span class="type-code" style="font-size:11px;color:#fff;">Vector Inspector</span>
+              <iconify-icon icon="solar:close-linear" style="color:var(--text-muted);cursor:pointer;" width="14"></iconify-icon>
+            </div>
+            <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;justify-content:space-between;"><span class="type-code text-muted" style="font-size:10px;">ID:</span><span class="type-code" style="font-size:10px;">V_01</span></div>
+              <div style="display:flex;justify-content:space-between;"><span class="type-code text-muted" style="font-size:10px;">Region:</span><span class="type-code" style="font-size:10px;">NA-E</span></div>
+              <div style="display:flex;justify-content:space-between;"><span class="type-code text-muted" style="font-size:10px;">Status:</span><span class="badge badge-success" style="font-size:8px;">Active</span></div>
+              <div style="display:flex;justify-content:space-between;"><span class="type-code text-muted" style="font-size:10px;">Uptime:</span><span class="type-code" style="font-size:10px;">4d 12h</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Confirmation Dialog -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Confirmation dialog</div>
+          <div style="background:rgba(0,0,0,0.75);padding:20px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;">
+            <div style="background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:16px;max-width:280px;text-align:center;">
+              <iconify-icon icon="solar:danger-triangle-linear" style="color:#eab308;margin-bottom:8px;" width="28"></iconify-icon>
+              <div style="font-size:13px;color:#fff;font-weight:500;margin-bottom:4px;">Purge Vector V_04?</div>
+              <div style="font-size:11px;color:var(--text-secondary);margin-bottom:12px;">This action cannot be undone. All associated data will be permanently removed.</div>
+              <div style="display:flex;gap:8px;justify-content:center;">
+                <button class="btn btn-sm">Cancel</button>
+                <button class="btn btn-danger btn-sm">Purge</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Code Editor Block -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Code editor block</div>
+          <div style="background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-md);overflow:hidden;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border-subtle);">
+              <span class="type-code text-muted" style="font-size:9px;">config.yaml</span>
+              <iconify-icon icon="solar:copy-linear" style="color:var(--text-muted);cursor:pointer;" width="12"></iconify-icon>
+            </div>
+            <div style="padding:10px 0;font-family:var(--font-mono);font-size:10px;line-height:1.7;">
+              <div style="display:flex;"><span style="width:28px;text-align:right;padding-right:10px;color:var(--text-muted);opacity:0.5;">1</span><span style="color:var(--accent);">vector</span><span style="color:var(--text-secondary);">:</span></div>
+              <div style="display:flex;"><span style="width:28px;text-align:right;padding-right:10px;color:var(--text-muted);opacity:0.5;">2</span><span style="padding-left:16px;"><span style="color:#22c55e;">id</span><span style="color:var(--text-secondary);">:</span> <span style="color:#fff;">V_01</span></span></div>
+              <div style="display:flex;"><span style="width:28px;text-align:right;padding-right:10px;color:var(--text-muted);opacity:0.5;">3</span><span style="padding-left:16px;"><span style="color:#22c55e;">region</span><span style="color:var(--text-secondary);">:</span> <span style="color:#fff;">NA-E</span></span></div>
+              <div style="display:flex;"><span style="width:28px;text-align:right;padding-right:10px;color:var(--text-muted);opacity:0.5;">4</span><span style="padding-left:16px;"><span style="color:#22c55e;">throughput</span><span style="color:var(--text-secondary);">:</span> <span style="color:#fff;">98.2</span></span></div>
+              <div style="display:flex;"><span style="width:28px;text-align:right;padding-right:10px;color:var(--text-muted);opacity:0.5;">5</span><span style="padding-left:16px;"><span style="color:#22c55e;">status</span><span style="color:var(--text-secondary);">:</span> <span style="color:#22c55e;">active</span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading States -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Loading states</div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:16px;height:16px;border:2px solid var(--border-default);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+              <span class="type-code text-muted" style="font-size:10px;">Processing vectors...</span>
+            </div>
+            <button class="btn btn-primary btn-sm" style="opacity:0.7;cursor:wait;">
+              <div style="width:10px;height:10px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+              Deploying...
+            </button>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div class="skeleton" style="height:12px;width:100%;"></div>
+              <div class="skeleton" style="height:12px;width:75%;"></div>
+              <div class="skeleton" style="height:12px;width:50%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status Dot with Pulse -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Status dots</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="position:relative;width:8px;height:8px;">
+                <div style="position:absolute;inset:0;background:#22c55e;border-radius:50%;animation:pulse 2s infinite;"></div>
+                <div style="position:absolute;inset:2px;background:#22c55e;border-radius:50%;"></div>
+              </div>
+              <span class="type-code" style="font-size:10px;">Online</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="position:relative;width:8px;height:8px;">
+                <div style="position:absolute;inset:0;background:#eab308;border-radius:50%;animation:pulse 2s infinite;"></div>
+                <div style="position:absolute;inset:2px;background:#eab308;border-radius:50%;"></div>
+              </div>
+              <span class="type-code" style="font-size:10px;">Degraded</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:8px;height:8px;background:#ef4444;border-radius:50%;"></div>
+              <span class="type-code" style="font-size:10px;">Offline</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:8px;height:8px;background:var(--text-muted);border-radius:50%;"></div>
+              <span class="type-code" style="font-size:10px;">Unknown</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kanban Board -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">Kanban board</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+            <div>
+              <div class="type-label" style="font-size:8px;margin-bottom:6px;">QUEUED</div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div class="card" style="padding:8px;"><div style="font-size:10px;color:#fff;">Deploy V_06</div><div class="type-code text-muted" style="font-size:8px;margin-top:2px;">NA-W · Low</div></div>
+                <div class="card" style="padding:8px;"><div style="font-size:10px;color:#fff;">Update config</div><div class="type-code text-muted" style="font-size:8px;margin-top:2px;">EU-W · Med</div></div>
+              </div>
+            </div>
+            <div>
+              <div class="type-label" style="font-size:8px;margin-bottom:6px;">ACTIVE</div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div class="card" style="padding:8px;border-color:var(--accent);"><div style="font-size:10px;color:#fff;">V_01 deploy</div><div class="type-code" style="font-size:8px;margin-top:2px;color:var(--accent);">NA-E · High</div></div>
+              </div>
+            </div>
+            <div>
+              <div class="type-label" style="font-size:8px;margin-bottom:6px;">DONE</div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div class="card" style="padding:8px;opacity:0.6;"><div style="font-size:10px;color:#fff;">V_03 health</div><div class="type-code" style="font-size:8px;margin-top:2px;color:#22c55e;">Complete</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- File Tree Browser -->
+      <div class="frame">
+        <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+        <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+        <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+        <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+        <div class="frame-inner">
+          <div class="type-label" style="margin-bottom:12px;">File tree browser</div>
+          <div style="background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:8px 10px;font-family:var(--font-mono);font-size:10px;">
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0;"><iconify-icon icon="solar:folder-linear" style="color:var(--accent);" width="12"></iconify-icon><span style="color:#fff;">vectors/</span></div>
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0 3px 14px;"><iconify-icon icon="solar:folder-linear" style="color:var(--text-muted);" width="12"></iconify-icon><span style="color:var(--text-secondary);">configs/</span></div>
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0 3px 28px;"><iconify-icon icon="solar:document-text-linear" style="color:#22c55e;" width="12"></iconify-icon><span style="color:var(--text-secondary);">v01.yaml</span></div>
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0 3px 28px;"><iconify-icon icon="solar:document-text-linear" style="color:#22c55e;" width="12"></iconify-icon><span style="color:var(--text-secondary);">v02.yaml</span></div>
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0 3px 14px;"><iconify-icon icon="solar:folder-linear" style="color:var(--text-muted);" width="12"></iconify-icon><span style="color:var(--text-secondary);">logs/</span></div>
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0 3px 28px;"><iconify-icon icon="solar:document-text-linear" style="color:#eab308;" width="12"></iconify-icon><span style="color:var(--text-secondary);">deploy.log</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── AUTOMATION WORKFLOW BUILDER ── -->
+  <div class="col-12 fade-in" id="automation">
+    <div class="section-label">14 · Automation Workflow Builder</div>
+    <div class="frame">
+      <div class="corner corner-tl"></div><div class="corner-v corner-v-tl"></div>
+      <div class="corner corner-tr"></div><div class="corner-v corner-v-tr"></div>
+      <div class="corner corner-bl"></div><div class="corner-v corner-v-bl"></div>
+      <div class="corner corner-br"></div><div class="corner-v corner-v-br"></div>
+      <div class="frame-inner" style="padding:0;overflow:hidden;">
+        <div style="display:flex;height:420px;">
+
+          <!-- Left Sidebar: Node Palette -->
+          <div style="width:180px;flex-shrink:0;border-right:1px solid var(--border-subtle);background:var(--bg-surface);overflow-y:auto;padding:10px;">
+            <div class="type-label" style="font-size:8px;margin-bottom:8px;">NODES</div>
+            <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;">
+              <div class="type-code text-muted" style="font-size:8px;letter-spacing:0.1em;text-transform:uppercase;">Triggers</div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-sm);cursor:grab;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#22c55e;"></div>
+                <span style="font-size:10px;color:#fff;">Webhook</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-sm);cursor:grab;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#22c55e;"></div>
+                <span style="font-size:10px;color:#fff;">Schedule</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-sm);cursor:grab;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#22c55e;"></div>
+                <span style="font-size:10px;color:#fff;">Manual</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;">
+              <div class="type-code text-muted" style="font-size:8px;letter-spacing:0.1em;text-transform:uppercase;">Actions</div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-sm);cursor:grab;">
+                <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);"></div>
+                <span style="font-size:10px;color:#fff;">HTTP Request</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-sm);cursor:grab;">
+                <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);"></div>
+                <span style="font-size:10px;color:#fff;">Deploy Vector</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-sm);cursor:grab;">
+                <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);"></div>
+                <span style="font-size:10px;color:#fff;">Send Email</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-sm);cursor:grab;">
+                <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);"></div>
+                <span style="font-size:10px;color:#fff;">Database</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div class="type-code text-muted" style="font-size:8px;letter-spacing:0.1em;text-transform:uppercase;">Logic</div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-sm);cursor:grab;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#a855f7;"></div>
+                <span style="font-size:10px;color:#fff;">IF / Else</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-sm);cursor:grab;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#a855f7;"></div>
+                <span style="font-size:10px;color:#fff;">Loop</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-elevated);border:1px solid var(--border-default);border-radius:var(--radius-sm);cursor:grab;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#a855f7;"></div>
+                <span style="font-size:10px;color:#fff;">Delay</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Canvas Area -->
+          <div style="flex:1;position:relative;background:var(--bg-deep;background-image:radial-gradient(circle,rgba(255,255,255,0.06) 1px,transparent 1px);background-size:20px 20px;overflow:hidden;">
+
+            <!-- Zoom Controls -->
+            <div style="position:absolute;top:10px;right:10px;display:flex;gap:4px;z-index:10;">
+              <button class="btn btn-icon btn-sm" style="width:24px;height:24px;padding:0;"><iconify-icon icon="solar:add-linear" width="12"></iconify-icon></button>
+              <span class="type-code text-muted" style="font-size:9px;display:flex;align-items:center;padding:0 4px;">100%</span>
+              <button class="btn btn-icon btn-sm" style="width:24px;height:24px;padding:0;"><iconify-icon icon="solar:minus-linear" width="12"></iconify-icon></button>
+            </div>
+
+            <!-- Execute Button -->
+            <div style="position:absolute;top:10px;left:10px;z-index:10;">
+              <button class="btn btn-primary btn-sm"><iconify-icon icon="solar:play-linear" width="12"></iconify-icon> Execute</button>
+            </div>
+
+            <!-- Workflow Nodes -->
+            <svg style="position:absolute;inset:0;width:100%;height:100%;z-index:1;" viewBox="0 0 600 400">
+              <defs>
+                <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="var(--accent)"/></marker>
+              </defs>
+              <path d="M 130 80 C 180 80, 180 80, 230 80" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+              <path d="M 330 80 C 380 80, 380 80, 430 80" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+              <path d="M 480 80 C 510 80, 510 180, 480 180" stroke="#a855f7" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+              <path d="M 430 180 C 380 180, 380 180, 330 180" stroke="#a855f7" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+              <path d="M 280 180 C 280 180, 280 280, 280 280" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+              <path d="M 130 280 C 180 280, 180 280, 230 280" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+              <path d="M 330 280 C 380 280, 380 280, 430 280" stroke="#22c55e" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+              <path d="M 330 280 C 380 280, 380 340, 430 340" stroke="#ef4444" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+            </svg>
+
+            <!-- Node 1: Webhook Trigger -->
+            <div style="position:absolute;top:50px;left:30px;width:100px;z-index:2;">
+              <div style="background:var(--bg-elevated);border:1px solid #22c55e;border-radius:var(--radius-md);padding:10px;text-align:center;">
+                <div style="width:24px;height:24px;margin:0 auto 6px;border-radius:50%;background:rgba(34,197,94,0.15);display:flex;align-items:center;justify-content:center;">
+                  <iconify-icon icon="solar:wifi-linear" style="color:#22c55e;" width="14"></iconify-icon>
+                </div>
+                <div style="font-size:9px;color:#fff;font-weight:600;">Webhook</div>
+                <div style="font-size:8px;color:var(--text-muted);">POST /deploy</div>
+              </div>
+              <div style="position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:#22c55e;border:2px solid var(--bg-deep);"></div>
+            </div>
+
+            <!-- Node 2: HTTP Request -->
+            <div style="position:absolute;top:50px;left:230px;width:100px;z-index:2;">
+              <div style="background:var(--bg-elevated);border:1px solid var(--accent);border-radius:var(--radius-md);padding:10px;text-align:center;">
+                <div style="width:24px;height:24px;margin:0 auto 6px;border-radius:50%;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;">
+                  <iconify-icon icon="solar:global-linear" style="color:var(--accent);" width="14"></iconify-icon>
+                </div>
+                <div style="font-size:9px;color:#fff;font-weight:600;">HTTP Request</div>
+                <div style="font-size:8px;color:var(--text-muted);">api.vector.net</div>
+              </div>
+              <div style="position:absolute;left:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:var(--border-default);border:2px solid var(--bg-deep);"></div>
+              <div style="position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-deep);"></div>
+            </div>
+
+            <!-- Node 3: IF/Else -->
+            <div style="position:absolute;top:50px;left:430px;width:100px;z-index:2;">
+              <div style="background:var(--bg-elevated);border:1px solid #a855f7;border-radius:var(--radius-md);padding:10px;text-align:center;">
+                <div style="width:24px;height:24px;margin:0 auto 6px;border-radius:50%;background:rgba(168,85,247,0.15);display:flex;align-items:center;justify-content:center;">
+                  <iconify-icon icon="solar:branch-linear" style="color:#a855f7;" width="14"></iconify-icon>
+                </div>
+                <div style="font-size:9px;color:#fff;font-weight:600;">IF / Else</div>
+                <div style="font-size:8px;color:var(--text-muted);">status == 200</div>
+              </div>
+              <div style="position:absolute;left:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-deep);"></div>
+              <div style="position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:#a855f7;border:2px solid var(--bg-deep);"></div>
+            </div>
+
+            <!-- Node 4: Deploy Vector -->
+            <div style="position:absolute;top:150px;left:230px;width:100px;z-index:2;">
+              <div style="background:var(--bg-elevated);border:1px solid var(--accent);border-radius:var(--radius-md);padding:10px;text-align:center;">
+                <div style="width:24px;height:24px;margin:0 auto 6px;border-radius:50%;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;">
+                  <iconify-icon icon="solar:cloud-upload-linear" style="color:var(--accent);" width="14"></iconify-icon>
+                </div>
+                <div style="font-size:9px;color:#fff;font-weight:600;">Deploy</div>
+                <div style="font-size:8px;color:var(--text-muted);">NA-E region</div>
+              </div>
+              <div style="position:absolute;left:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:#a855f7;border:2px solid var(--bg-deep);"></div>
+              <div style="position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-deep);"></div>
+            </div>
+
+            <!-- Node 5: Send Email (Success) -->
+            <div style="position:absolute;top:250px;left:30px;width:100px;z-index:2;">
+              <div style="background:var(--bg-elevated);border:1px solid #22c55e;border-radius:var(--radius-md);padding:10px;text-align:center;">
+                <div style="width:24px;height:24px;margin:0 auto 6px;border-radius:50%;background:rgba(34,197,94,0.15);display:flex;align-items:center;justify-content:center;">
+                  <iconify-icon icon="solar:letter-linear" style="color:#22c55e;" width="14"></iconify-icon>
+                </div>
+                <div style="font-size:9px;color:#fff;font-weight:600;">Email</div>
+                <div style="font-size:8px;color:var(--text-muted);">Success</div>
+              </div>
+              <div style="position:absolute;left:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-deep);"></div>
+              <div style="position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:#22c55e;border:2px solid var(--bg-deep);"></div>
+            </div>
+
+            <!-- Node 6: Database Log -->
+            <div style="position:absolute;top:250px;left:230px;width:100px;z-index:2;">
+              <div style="background:var(--bg-elevated);border:1px solid var(--accent);border-radius:var(--radius-md);padding:10px;text-align:center;">
+                <div style="width:24px;height:24px;margin:0 auto 6px;border-radius:50%;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;">
+                  <iconify-icon icon="solar:database-linear" style="color:var(--accent);" width="14"></iconify-icon>
+                </div>
+                <div style="font-size:9px;color:#fff;font-weight:600;">Log to DB</div>
+                <div style="font-size:8px;color:var(--text-muted);">deployments</div>
+              </div>
+              <div style="position:absolute;left:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-deep);"></div>
+              <div style="position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-deep);"></div>
+            </div>
+
+            <!-- Node 7: Slack Notify (Success) -->
+            <div style="position:absolute;top:250px;left:430px;width:100px;z-index:2;">
+              <div style="background:var(--bg-elevated);border:1px solid #22c55e;border-radius:var(--radius-md);padding:10px;text-align:center;">
+                <div style="width:24px;height:24px;margin:0 auto 6px;border-radius:50%;background:rgba(34,197,94,0.15);display:flex;align-items:center;justify-content:center;">
+                  <iconify-icon icon="solar:bell-linear" style="color:#22c55e;" width="14"></iconify-icon>
+                </div>
+                <div style="font-size:9px;color:#fff;font-weight:600;">Notify</div>
+                <div style="font-size:8px;color:var(--text-muted);">#deployments</div>
+              </div>
+              <div style="position:absolute;left:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-deep);"></div>
+            </div>
+
+            <!-- Node 8: Error Handler -->
+            <div style="position:absolute;top:310px;left:430px;width:100px;z-index:2;">
+              <div style="background:var(--bg-elevated);border:1px solid #ef4444;border-radius:var(--radius-md);padding:10px;text-align:center;">
+                <div style="width:24px;height:24px;margin:0 auto 6px;border-radius:50%;background:rgba(239,68,68,0.15);display:flex;align-items:center;justify-content:center;">
+                  <iconify-icon icon="solar:danger-triangle-linear" style="color:#ef4444;" width="14"></iconify-icon>
+                </div>
+                <div style="font-size:9px;color:#fff;font-weight:600;">Alert</div>
+                <div style="font-size:8px;color:var(--text-muted);">On Failure</div>
+              </div>
+              <div style="position:absolute;left:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-deep);"></div>
+            </div>
+
+            <!-- Minimap -->
+            <div style="position:absolute;bottom:10px;right:10px;width:120px;height:80px;background:var(--bg-surface);border:1px solid var(--border-default);border-radius:var(--radius-sm);z-index:10;overflow:hidden;">
+              <div style="position:absolute;top:8px;left:4px;width:12px;height:8px;background:#22c55e;border-radius:1px;"></div>
+              <div style="position:absolute;top:8px;left:28px;width:12px;height:8px;background:var(--accent);border-radius:1px;"></div>
+              <div style="position:absolute;top:8px;left:52px;width:12px;height:8px;background:#a855f7;border-radius:1px;"></div>
+              <div style="position:absolute;top:24px;left:28px;width:12px;height:8px;background:var(--accent);border-radius:1px;"></div>
+              <div style="position:absolute;top:40px;left:4px;width:12px;height:8px;background:#22c55e;border-radius:1px;"></div>
+              <div style="position:absolute;top:40px;left:28px;width:12px;height:8px;background:var(--accent);border-radius:1px;"></div>
+              <div style="position:absolute;top:40px;left:52px;width:12px;height:8px;background:#22c55e;border-radius:1px;"></div>
+              <div style="position:absolute;top:56px;left:52px;width:12px;height:8px;background:#ef4444;border-radius:1px;"></div>
+            </div>
+
+          </div>
+
+          <!-- Right Sidebar: Node Config -->
+          <div style="width:200px;flex-shrink:0;border-left:1px solid var(--border-subtle);background:var(--bg-surface);overflow-y:auto;padding:10px;">
+            <div class="type-label" style="font-size:8px;margin-bottom:8px;">CONFIGURATION</div>
+            <div style="background:var(--bg-elevated);border:1px solid var(--accent);border-radius:var(--radius-md);padding:10px;margin-bottom:10px;">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);"></div>
+                <span style="font-size:10px;color:#fff;font-weight:600;">HTTP Request</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div>
+                  <label class="input-label" style="font-size:8px;margin-bottom:3px;">Method</label>
+                  <div class="dropdown-trigger" style="min-width:100%;padding:5px 8px;font-size:10px;">
+                    <span>POST</span>
+                    <iconify-icon icon="solar:alt-arrow-down-linear" class="text-muted" width="10"></iconify-icon>
+                  </div>
+                </div>
+                <div>
+                  <label class="input-label" style="font-size:8px;margin-bottom:3px;">URL</label>
+                  <input class="input-field" type="text" value="https://api.vector.net/deploy" style="padding:5px 8px;font-size:10px;">
+                </div>
+                <div>
+                  <label class="input-label" style="font-size:8px;margin-bottom:3px;">Content-Type</label>
+                  <div class="dropdown-trigger" style="min-width:100%;padding:5px 8px;font-size:10px;">
+                    <span>application/json</span>
+                    <iconify-icon icon="solar:alt-arrow-down-linear" class="text-muted" width="10"></iconify-icon>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="type-label" style="font-size:8px;margin-bottom:6px;">EXECUTION LOG</div>
+            <div style="background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:8px;font-family:var(--font-mono);font-size:9px;">
+              <div style="color:#22c55e;">[18:30:01] Webhook received</div>
+              <div style="color:var(--text-secondary);">[18:30:01] HTTP 200 OK</div>
+              <div style="color:#a855f7;">[18:30:02] IF branch: true</div>
+              <div style="color:var(--accent);">[18:30:02] Deploying...</div>
+              <div style="color:#22c55e;">[18:30:05] Complete</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CODE EXAMPLE ── -->
+  <div class="col-12 fade-in">
+    <div class="section-label">15 · Code Reference</div>
+    <div class="code-block">
+<span class="cm">/* ── Design Tokens ── */</span>
+<span class="kw">:root</span> {
+  <span class="str">--bg-deep</span>: #050505;
+  <span class="str">--bg-surface</span>: #0a0a0a;
+  <span class="str">--accent</span>: #f24e1e;
+  <span class="str">--text-primary</span>: #f5f5f7;
+  <span class="str">--text-secondary</span>: #a0a0ab;
+  <span class="str">--border-subtle</span>: rgba(255,255,255,0.05);
+  <span class="str">--radius-md</span>: 4px;
+  <span class="str">--font-mono</span>: 'JetBrains Mono', monospace;
+}
+
+<span class="cm">/* ── Button Base ── */</span>
+<span class="kw">.btn</span> {
+  <span class="str">font-family</span>: var(--font-mono);
+  <span class="str">font-size</span>: 10px;
+  <span class="str">text-transform</span>: uppercase;
+  <span class="str">letter-spacing</span>: 0.1em;
+  <span class="str">padding</span>: 10px 18px;
+  <span class="str">border-radius</span>: var(--radius-md);
+  <span class="str">border</span>: 1px solid var(--border-default);
+  <span class="str">background</span>: var(--bg-surface);
+  <span class="str">color</span>: var(--text-primary);
+}
+
+<span class="cm">/* ── Dropzone ── */</span>
+<span class="kw">.dropzone</span> {
+  <span class="str">border</span>: 1.5px dashed var(--border-default);
+  <span class="str">border-radius</span>: var(--radius-md);
+  <span class="str">background</span>: var(--bg-deep);
+  <span class="str">padding</span>: 40px 24px;
+  <span class="str">transition</span>: all 0.25s ease;
+}
+<span class="kw">.dropzone.dragover</span> {
+  <span class="str">border-color</span>: var(--accent);
+  <span class="str">background</span>: var(--accent-dim);
+}
+    </div>
+  </div>
+
+  <!-- ── FOOTER ── -->
+  <div class="col-12 fade-in">
+    <div style="text-align:center;padding:48px 0 24px;border-top:1px solid var(--border-subtle);">
+      <div class="type-label" style="margin-bottom:8px;">Autonomous Traffic Vectors · Design System</div>
+      <div class="type-code text-muted">Dark tactical interface · #f24e1e accent · JetBrains Mono telemetry</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SCRIPTS -->
+<!-- ═══════════════════════════════════════════════ -->
+<script>
+  // ── WebGL Particle Globe ──
+  const initGlobe = () => {
+    const container = document.getElementById('webgl-bg');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    const geometry = new THREE.BufferGeometry();
+    const particlesCount = 2000;
+    const posArray = new Float32Array(particlesCount * 3);
+    const colorArray = new Float32Array(particlesCount * 3);
+    const colorOrange = new THREE.Color(0xf24e1e);
+    const colorWhite = new THREE.Color(0xffffff);
+    const colorGray = new THREE.Color(0x555555);
+
+    for (let i = 0; i < particlesCount * 3; i += 3) {
+      const r = 3;
+      const theta = 2 * Math.PI * Math.random();
+      const phi = Math.acos(2 * Math.random() - 1);
+      posArray[i] = r * Math.sin(phi) * Math.cos(theta);
+      posArray[i + 1] = r * Math.sin(phi) * Math.sin(theta);
+      posArray[i + 2] = r * Math.cos(phi);
+      const mix = Math.random();
+      let selectedColor = colorOrange;
+      if (mix > 0.8) selectedColor = colorWhite;
+      else if (mix > 0.4) selectedColor = colorGray;
+      colorArray[i] = selectedColor.r;
+      colorArray[i + 1] = selectedColor.g;
+      colorArray[i + 2] = selectedColor.b;
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+    const material = new THREE.PointsMaterial({
+      size: 0.012, vertexColors: true, transparent: true,
+      opacity: 0.6, blending: THREE.AdditiveBlending
+    });
+    const particlesMesh = new THREE.Points(geometry, material);
+    scene.add(particlesMesh);
+    camera.position.z = 6; camera.position.x = 2; camera.position.y = -1;
+
+    const animate = () => {
+      requestAnimationFrame(animate);
+      particlesMesh.rotation.y += 0.0005;
+      particlesMesh.rotation.x += 0.0002;
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  };
+
+  // ── GSAP Fade-in ──
+  const initAnimations = () => {
+    gsap.registerPlugin(ScrollTrigger);
+    gsap.utils.toArray('.fade-in').forEach((el) => {
+      gsap.to(el, {
+        opacity: 1, y: 0, duration: 0.8, ease: "power3.out",
+        scrollTrigger: { trigger: el, start: "top 90%" }
+      });
+    });
+  };
+
+  // ── Section nav active state ──
+  const initNav = () => {
+    const dots = document.querySelectorAll('.nav-dot');
+    const sections = ['overview','colors','typography','buttons','inputs','dropdowns','selection','data','feedback','navigation','layout'];
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.getBoundingClientRect().top < window.innerHeight / 2) current = id;
+      });
+      dots.forEach(d => d.classList.remove('active'));
+      const activeDot = document.querySelector(`.nav-dot[data-label="${current.charAt(0).toUpperCase() + current.slice(1)}"]`);
+      if (activeDot) activeDot.classList.add('active');
+    });
+  };
+
+  // ── Drag & drop interaction ──
+  const initDropzone = () => {
+    const dz = document.getElementById('dropzone');
+    if (!dz) return;
+    ['dragenter','dragover'].forEach(ev => {
+      dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('dragover'); });
+    });
+    ['dragleave','drop'].forEach(ev => {
+      dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('dragover'); });
+    });
+  };
+
+  // ── Toggle / checkbox / radio interactions ──
+  const initControls = () => {
+    document.querySelectorAll('.toggle-track').forEach(t => {
+      t.addEventListener('click', () => t.classList.toggle('active'));
+    });
+    document.querySelectorAll('.checkbox').forEach(c => {
+      c.addEventListener('click', () => {
+        c.classList.toggle('checked');
+        if (c.classList.contains('checked')) {
+          c.innerHTML = '<iconify-icon icon="solar:check-read-linear" style="color:#fff;" width="12"></iconify-icon>';
+        } else {
+          c.innerHTML = '';
+        }
+      });
+    });
+    document.querySelectorAll('.radio').forEach(r => {
+      r.addEventListener('click', () => {
+        document.querySelectorAll('.radio').forEach(x => x.classList.remove('checked'));
+        r.classList.add('checked');
+      });
+    });
+    document.querySelectorAll('.dropdown-trigger').forEach(t => {
+      t.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const menu = t.nextElementSibling;
+        if (menu && menu.classList.contains('dropdown-menu')) {
+          menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        }
+      });
+    });
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.dropdown-menu').forEach(m => m.style.display = 'none');
+    });
+    document.querySelectorAll('.dropdown-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const parent = item.closest('.dropdown');
+        if (parent) {
+          parent.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
+          item.classList.add('active');
+          const trigger = parent.querySelector('.dropdown-trigger span');
+          if (trigger) trigger.textContent = item.textContent.trim();
+          parent.querySelector('.dropdown-menu').style.display = 'none';
+        }
+      });
+    });
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const parent = tab.closest('.tabs');
+        if (parent) {
+          parent.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+        }
+      });
+    });
+    document.querySelectorAll('.page-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const parent = btn.closest('.pagination');
+        if (parent && !isNaN(btn.textContent)) {
+          parent.querySelectorAll('.page-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        }
+      });
+    });
+    document.querySelectorAll('.accordion-trigger').forEach(trigger => {
+      trigger.addEventListener('click', () => {
+        const item = trigger.closest('.accordion-item');
+        const content = item.querySelector('.accordion-content');
+        const icon = trigger.querySelector('iconify-icon');
+        if (content) {
+          const isOpen = content.style.display !== 'none';
+          content.style.display = isOpen ? 'none' : 'block';
+          if (icon) icon.setAttribute('icon', isOpen ? 'solar:alt-arrow-right-linear' : 'solar:alt-arrow-down-linear');
+        }
+      });
+    });
+  };
+
+  // ── Scroll to section ──
+  const scrollToSection = (id) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  // ── Init ──
+  window.addEventListener('load', () => {
+    initGlobe();
+    initAnimations();
+    initNav();
+    initDropzone();
+    initControls();
+  });
+</script>
+
+</body>
+</html>
