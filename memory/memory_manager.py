@@ -1,5 +1,7 @@
 import json
+import os
 import re
+import shutil
 from datetime import datetime
 from threading import Lock
 from pathlib import Path
@@ -13,7 +15,8 @@ def get_base_dir() -> Path:
 
 
 BASE_DIR         = get_base_dir()
-MEMORY_PATH      = BASE_DIR / "memory" / "long_term.json"
+_env_mem         = os.environ.get("ZEZO_MEMORY_PATH")
+MEMORY_PATH      = Path(_env_mem) if _env_mem else BASE_DIR / "memory" / "long_term.json"
 _lock            = Lock()
 MAX_VALUE_LENGTH = 380
 
@@ -56,9 +59,25 @@ def _empty_memory() -> dict:
 
 def load_memory() -> dict:
     if not MEMORY_PATH.exists():
-        return _empty_memory()
+        bak = MEMORY_PATH.with_suffix(".json.bak")
+        if bak.exists() and bak.stat().st_size > 0:
+            try:
+                shutil.copy2(bak, MEMORY_PATH)
+                print(f"[Memory] 🔄 Restored missing memory file from backup replica.")
+            except Exception:
+                pass
+        else:
+            return _empty_memory()
+
     with _lock:
         try:
+            if MEMORY_PATH.exists() and MEMORY_PATH.stat().st_size == 0:
+                bak = MEMORY_PATH.with_suffix(".json.bak")
+                if bak.exists() and bak.stat().st_size > 0:
+                    shutil.copy2(bak, MEMORY_PATH)
+                    print(f"[Memory] 🔄 Auto-restored 0-byte memory from backup replica ({bak.stat().st_size} bytes).")
+                else:
+                    return _empty_memory()
             data = json.loads(MEMORY_PATH.read_text(encoding="utf-8"))
             if isinstance(data, dict):
                 base = _empty_memory()
@@ -120,11 +139,18 @@ def save_memory(memory: dict) -> None:
         return
     memory = _trim_to_limit(memory)
     MEMORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    serialized = json.dumps(memory, indent=2, ensure_ascii=False)
+    if not serialized or len(serialized.strip()) < 2:
+        return
+    tmp_path = MEMORY_PATH.with_suffix(".tmp")
     with _lock:
-        MEMORY_PATH.write_text(
-            json.dumps(memory, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        tmp_path.write_text(serialized, encoding="utf-8")
+        if tmp_path.exists() and tmp_path.stat().st_size > 0:
+            tmp_path.replace(MEMORY_PATH)
+            try:
+                shutil.copy2(MEMORY_PATH, MEMORY_PATH.with_suffix(".json.bak"))
+            except Exception:
+                pass
     try:
         from memory import sqlite_memory
         sqlite_memory.sync_facts_from_dict(memory)
