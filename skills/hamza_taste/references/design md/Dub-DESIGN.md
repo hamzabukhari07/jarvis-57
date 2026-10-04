@@ -3,7 +3,7 @@ version: "3.0"
 name: "Dub"
 theme: "light"
 source: "D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/dub.html"
-extracted_at: "2026-10-03T16:39:11.153885+00:00"
+extracted_at: "2026-10-04T08:58:23.974125+00:00"
 description: "Refined editorial light design system extracted deterministically from Dub. Features clean #ffffff cream canvas, high-contrast #171717 ink typography, and elegant Menlo headings."
 colors:
   primary: "#000000"
