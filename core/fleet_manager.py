@@ -653,6 +653,18 @@ def resolve_agent_by_mention_or_capability(query: str) -> Optional[str]:
     return agent.id if agent else None
 
 
+def get_agent(name_or_id: str) -> Optional[Dict[str, Any]]:
+    """Helper to retrieve agent dict by ID or name."""
+    agent = fleet_manager.get_agent(name_or_id)
+    return fleet_manager._agent_to_dict(agent) if agent else None
+
+
+def list_agents() -> List[Dict[str, Any]]:
+    """Helper to list all agents in the fleet as dicts."""
+    return fleet_manager.get_all_agents_state()
+
+
+
 def generate_peer_session_id(from_agent: str, to_agent: str) -> str:
     """Helper to generate peer session ID."""
     return fleet_manager.generate_peer_session_id(from_agent, to_agent)

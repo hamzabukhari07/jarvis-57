@@ -2170,7 +2170,7 @@
           }
 
           return `
-            <div class="card card-interactive" id="task-card-${t.id}" onclick="selectAndShowTask('${t.id}', false)" style="background: ${bgStyle}; border-left: 2px solid ${borderStyle}; ${isSelected ? 'border-color: var(--accent);' : ''} cursor: pointer; transition: all 0.15s ease; margin-bottom: 6px;" title="Click to view output on Live Canvas">
+            <div class="card card-interactive" id="task-card-${t.id}" onclick="selectAndShowTask('${t.id}', false)" style="background: ${bgStyle}; border-left: 2px solid ${borderStyle}; ${isSelected ? 'border-color: var(--accent);' : ''} cursor: pointer; transition: border-color 0.15s ease, background-color 0.15s ease; margin-bottom: 6px;" title="Click to view output on Live Canvas">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                 <span class="badge ${badgeClass}">${toolLabel}</span>
                 <span class="mono text-muted" style="font-size: 9px; ${isDone ? 'color: #22c55e; font-weight: 600;' : ''}">${statusIcon}</span>
@@ -2208,7 +2208,7 @@
           const prog = isDone ? 100 : (t.progress || 0);
           const toolLabel = getFriendlyToolBadge(t.tool);
           return `
-            <div class="card card-interactive" onclick="selectAndShowTask('${t.id}', true)" style="background: var(--bg-elevated); cursor: pointer; transition: all 0.15s ease;" title="Click for detailed inspection">
+            <div class="card card-interactive" onclick="selectAndShowTask('${t.id}', true)" style="background: var(--bg-elevated); cursor: pointer; transition: border-color 0.15s ease, background-color 0.15s ease;" title="Click for detailed inspection">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <span class="badge ${isRunning ? 'badge-accent' : ''}">${toolLabel}</span>
@@ -3044,7 +3044,7 @@ socket.on('disconnect', () => {
       const safeName = (item.name || 'item').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       
       return `
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 7px; background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); transition: all 0.2s ease;">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 7px; background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); transition: border-color 0.2s ease, background-color 0.2s ease;">
           <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; cursor: pointer; flex: 1; min-width: 0;" onclick="selectPayloadItem(${idx})" title="Click to view intel in canvas">
             <iconify-icon icon="${iconName}" style="color:var(--accent); font-size: 13px; flex-shrink: 0;"></iconify-icon>
             <span style="font-size: 9.5px; font-weight: 500; font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary);">${safeName}</span>
