@@ -361,18 +361,6 @@ TOOL_DECLARATIONS = [
     # tools live in their own action file and are auto-discovered by
     # core.action_loader (see ZezoLive.__init__).
     {
-        "name": "system_status",
-        "description": (
-            "Returns real-time system metrics: CPU usage, RAM, GPU load, CPU temperature, "
-            "uptime, and process count. Use when the user asks about computer performance, "
-            "temperature, memory, or resource usage."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {},
-        }
-    },
-    {
         "name": "screen_process",
         "description": (
             "Captures the screen or webcam image and analyzes it to return a factual, detailed visual observation. "
@@ -397,31 +385,6 @@ TOOL_DECLARATIONS = [
             "turn off camera, that's creepy, etc."
         ),
         "parameters": {"type": "OBJECT", "properties": {}, "required": []}
-    },
-    {
-        "name": "manage_monitor",
-        "description": (
-            "Add, remove, or list background monitoring topics. "
-            "Zezo checks these topics once a day and alerts the user when there is a new development. "
-            "Use 'add' when the user says 'monitor X', 'track X', 'follow X'. "
-            "Use 'remove' when the user says 'stop monitoring X'. "
-            "Use 'list' when the user asks what is being monitored. "
-            "Do NOT add crypto, financial, or trading topics."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action": {
-                    "type":        "STRING",
-                    "description": "add | remove | list",
-                },
-                "topic": {
-                    "type":        "STRING",
-                    "description": "Topic to monitor or stop monitoring (e.g. 'space exploration', 'AI news')",
-                },
-            },
-            "required": ["action"],
-        },
     },
     {
         "name": "shutdown_zezo",
@@ -1333,23 +1296,6 @@ class ZezoLive:
         self.ui.stop_camera_stream()
         return "Camera closed."
 
-    async def _handle_system_status(self, args: dict) -> str:
-        loop = asyncio.get_event_loop()
-        r = await loop.run_in_executor(None, get_system_status)
-        return str(r)
-
-    async def _handle_manage_monitor(self, args: dict) -> str:
-        action = args.get("action", "").lower().strip()
-        topic = args.get("topic", "").strip()
-        if action == "add" and topic:
-            return await asyncio.to_thread(add_monitor, topic)
-        if action == "remove" and topic:
-            return await asyncio.to_thread(remove_monitor, topic)
-        if action == "list":
-            topics = await asyncio.to_thread(list_monitors)
-            return ("Monitoring: " + ", ".join(topics)) if topics else "No topics are being monitored."
-        return "Specify action (add/remove/list) and a topic."
-
     async def _handle_read_skill(self, args: dict) -> str:
         s_name = args.get("skill_name", "")
         loop = asyncio.get_event_loop()
@@ -1399,8 +1345,6 @@ class ZezoLive:
             "undo": self._handle_undo,
             "screen_process": self._handle_screen_process,
             "close_camera": self._handle_close_camera,
-            "system_status": self._handle_system_status,
-            "manage_monitor": self._handle_manage_monitor,
             "read_skill": self._handle_read_skill,
             "list_skills": self._handle_list_skills,
             "save_learned_skill": self._handle_save_learned_skill,
@@ -1454,12 +1398,11 @@ class ZezoLive:
             if decision == governance.PolicyDecision.DENY:
                 print(f"[Security] 🛑 Action '{name}' BLOCKED by governance policy: {reason}")
                 self.ui.write_log(f"ERR: Security Block — {name} ({reason})")
-                self.speak("Sir, that action was blocked by security governance for system protection.")
                 if not self.ui.muted:
                     self.ui.set_state("LISTENING")
                 return types.FunctionResponse(
                     id=fc.id, name=name,
-                    response={"result": f"SECURITY POLICY VIOLATION: Action '{name}' was blocked by safety governance. Reason: {reason}"}
+                    response={"result": f"Action '{name}' was blocked by security governance: {reason}. Politely inform the user."}
                 )
             elif decision == governance.PolicyDecision.ASK:
                 print(f"[Security] 🛡️ Action '{name}' requires human confirmation: {reason}")
@@ -1631,12 +1574,9 @@ class ZezoLive:
             # replying the instant it stops still works.
             if self._tail_active():
                 try:
-                    if _lvl > 0.08:
-                        self._tail_until = 0.0      # Audible voice ends the tail immediately
-                    elif not self._echo.is_user_speech(indata, SEND_SAMPLE_RATE, _lvl):
+                    if not self._echo.is_user_speech(indata, SEND_SAMPLE_RATE, _lvl):
                         return
-                    else:
-                        self._tail_until = 0.0      # a real voice ends the tail early
+                    self._tail_until = 0.0
                 except Exception:
                     return
             elif self._echo._hist:
@@ -1780,6 +1720,11 @@ class ZezoLive:
                                 self._last_user_speech = time.monotonic()
                                 self.ui.stream_transcript("user", txt, done=False)
                                 in_logged = False
+
+                        if getattr(sc, "interrupted", False):
+                            if log_bus is not None:
+                                log_bus.emit("INFO", "audio.recv", "Gemini Live turn was interrupted by server")
+                            self._interrupted = True
 
                         if sc.turn_complete:
                             if self._turn_done_event:
@@ -1956,7 +1901,7 @@ class ZezoLive:
                 try:
                     chunk = await asyncio.wait_for(
                         self.audio_in_queue.get(),
-                        timeout=0.2
+                        timeout=0.45
                     )
                 except asyncio.TimeoutError:
                     if self.audio_in_queue.empty():
