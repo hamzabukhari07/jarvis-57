@@ -1,3 +1,30 @@
+## [2026-10-04] — Long-Term Memory Restoration & Zero-Byte Immunity
+
+- **What was built:**
+  - Restored `memory/long_term.json` from `C:\Users\Hamza\zezo_backup_phase2\long_term.json` (size: 8,045 bytes, containing all 8 categories and 59 stored facts, preferences, wishes, and session summaries).
+  - Created a local safety replica at `memory/long_term.json.bak` (8,045 bytes).
+  - Root cause isolated: Git commit `4a93e689` untracked `memory/*.json` with `git rm`, leaving the local file unseeded, which resulted in a 0-byte file that crashed `load_memory()` with `Expecting value: line 1 column 1 (char 0)`.
+  - Added test environment isolation in `tests/conftest.py` via `ZEZO_MEMORY_PATH` pointing to an isolated temporary JSON file, preventing test executions from mutating or truncating the live memory file.
+  - Implemented auto-recovery in `memory/memory_manager.py`: if `memory/long_term.json` is missing or 0 bytes, `load_memory()` automatically restores from `long_term.json.bak`.
+  - Implemented atomic writes in `save_memory()`: writes to a `.tmp` file first, asserts `size > 0`, and atomically replaces `memory/long_term.json`, updating the `.bak` replica on every valid save.
+  - Authored regression test suite in `tests/test_memory_recovery_and_isolation_suite.py` (3/3 passed).
+- **Why this approach was chosen:**
+  - Guarantees crash immunity and zero data loss even if the primary JSON file is corrupted or truncated. Test isolation ensures `pytest` runs cannot contaminate user profile facts.
+- **What alternatives were considered:**
+  - Writing `{}` to the empty file: Rejected as strictly instructed by user; writing `{}` would erase historical facts, user preferences, and personal identity data permanently.
+- **Key files touched:**
+  - `memory/long_term.json`
+  - `memory/long_term.json.bak`
+  - `memory/memory_manager.py`
+  - `tests/conftest.py`
+  - `tests/test_memory_recovery_and_isolation_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Whenever untracking configuration or data files from Git, never delete the local working copy.
+  - Always isolate memory and file persistence paths in `tests/conftest.py` before running test suites.
+
+---
+
 ## [2026-10-04] — Core Tool Name Collision Resolution & Discovery Cleanliness
 
 - **What was built:**
