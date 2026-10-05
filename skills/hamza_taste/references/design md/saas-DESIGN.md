@@ -3,7 +3,7 @@ version: "3.0"
 name: "Saas"
 theme: "light"
 source: "D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/saas.html"
-extracted_at: "2026-10-04T21:49:32.515166+00:00"
+extracted_at: "2026-10-04T22:31:58.331254+00:00"
 description: "Refined editorial light design system extracted deterministically from Saas. Features clean #ececee cream canvas, high-contrast #27272a ink typography, and elegant Plus Jakarta Sans headings."
 colors:
   primary: "#27272a"

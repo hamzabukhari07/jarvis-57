@@ -1,3 +1,47 @@
+## [2026-10-05] — Fleet In-Place Task Execution, Phantom Card Elimination & Office Status Sync Fix
+
+- **What was built:**
+  - **In-Place Execution Support in `kilo_agent` and `opencode_agent` (`actions/kilo_agent.py`, `actions/opencode_agent.py`):** Added support for `run_in_place=True` and `task_ctx` handling in both Kilo Code and OpenCode action handlers. When dispatched from `FleetManager` background worker threads, tasks now run synchronously in the agent's worktree sandbox instead of spawning redundant disconnected `TaskManager` jobs, completely eliminating phantom `ZEZO CODER` failure cards (`X FAILED`, "Invalid directory path").
+  - **Safe `ctx` Guarding (`actions/kilo_agent.py`, `actions/opencode_agent.py`):** Added safe `hasattr()` checks across all lifecycle callbacks (`report`, `set_pid`, `on_complete`, `on_fail`, `cancelled`), preventing `AttributeError` exceptions when running with customized or wrapped task contexts.
+  - **Fixed Office View Agent Working State Stuck Bug (`frontend/office.html`):** Corrected `syncBackendState()` to reset `ag.isBusy = false` and invoke `setState(ag, 'idle')` when `remote.status !== 'working' && remote.status !== 'busy'`, fixing Kelly Kapoor's status badge sticking on green `WORKING` after task completion.
+  - **Normalized CLI Engine Dropdown Mapping (`frontend/office.html`):** In `selectAgent()` and `openEditAgentModal()`, non-CLI tools (e.g. `agent_reach`, `web_search`) are now cleanly normalized to `"none"` (`Tool Specialist (No CLI)`) in the Primary Engine dropdown while preserving them in the skills/tools checkboxes grid, preventing raw tool names from appearing as CLI engines.
+- **Why this approach was chosen:**
+  - Standardized in-place execution pattern across all coding engines (`antigravity_run`, `kilo_run`, `opencode_run`), prevented state synchronization race conditions in the Scranton Office UI, and maintained strict separation between primary CLI engines and secondary specialist tools.
+- **Key files touched:**
+  - `actions/kilo_agent.py`
+  - `actions/opencode_agent.py`
+  - `frontend/office.html`
+  - `tests/test_fleet_control_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - All coding agent handlers must support `run_in_place=True` and receive `task_ctx` to run properly within multi-agent fleet dispatch loops.
+  - In UI state synchronization, always ensure state reset branches (`else`) clear transient boolean flags like `isBusy`.
+
+---
+
+## [2026-10-05] — Fleet Specialist Task Execution Fix, Smart Role Inference & Persona Update Action
+
+- **What was built:**
+  - **Fixed Fatal ActionRegistry AttributeError in Task Execution (`core/fleet_manager.py`):** Replaced invalid `effective_tool not in reg.actions` with `not reg.has(effective_tool)`, fixing immediate task failure across all specialist agents (`Kelly`, `Quantum`, etc.).
+  - **Purged Stale `dev_agent` Fallbacks:** Replaced all remaining fallback strings referencing the deleted `dev_agent` tool in `core/fleet_manager.py` (`save_agent_profile` and `_execute_specialist_task`) with `opencode_run`, `agent_reach`, or `quick_snippet`.
+  - **Role-Aware Smart Tool & Capability Inference (`core/fleet_manager.py`):** Added `_infer_agent_defaults(role, specialty)` to automatically configure `default_tool` (e.g. `agent_reach` for research/media, `antigravity_run` for UI/frontend, `kilo_run` for QA/refactor, `opencode_run` for backend) and appropriate `allowed_tools` and `capabilities` when hiring agents without explicit tool specifications.
+  - **Added Persona Update Action in Fleet Control (`actions/fleet_control.py`):** Implemented `_handle_update` (`action="update"`, `action="edit"`, `action="modify"`) in `fleet_control` tool to modify live agent personas, roles, tools, and permissions.
+  - **System Prompt Anti-Hallucination Directives (`core/prompt.txt`):** Instructed Gemini Live under `[FLEET MANAGEMENT]` to strictly call `fleet_control(action='update', ...)` on persona modifications, forbidding empty verbal confirmations.
+- **Why this approach was chosen:**
+  - Prevented runtime `AttributeError` exceptions when executing specialist tools, eliminated agent provisioning mismatches (e.g. research agents getting coding tools), and provided an end-to-end tool path for live agent modifications.
+- **Key files touched:**
+  - `core/fleet_manager.py`
+  - `actions/fleet_control.py`
+  - `core/prompt.txt`
+  - `tests/test_fleet_control_suite.py`
+  - `planning/PLAN_FIX_FLEET_TASK_CRASH_AND_ROLE_INFERENCE.md`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - `ActionRegistry` exposes `has(name)` and `names()`; never assume a public `.actions` attribute exists on the registry.
+  - When agents are hired via voice without explicit tools, always apply role-aware default heuristics rather than falling back to an arbitrary coding engine.
+
+---
+
 ## [2026-10-05] — Scranton Office Desks, Model Picker, Dev Agent Deprecation & Quick Snippet Rename
 
 - **What was built:**

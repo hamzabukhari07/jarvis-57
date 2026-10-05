@@ -101,6 +101,48 @@ def _handle_fire(params: Dict[str, Any]) -> str:
     return f"Decommissioned agent '{agent_id.upper()}' from the active fleet."
 
 
+def _handle_update(params: Dict[str, Any]) -> str:
+    agent_id = str(params.get("agent_id") or params.get("name") or "").strip()
+    if not agent_id:
+        return "Error: agent_id is required to update an agent persona."
+
+    existing = fleet_manager.get_agent(agent_id)
+    if not existing:
+        return f"Error: Agent '{agent_id}' not found in the active fleet roster."
+
+    profile_data: Dict[str, Any] = {
+        "id": existing.id,
+        "name": str(params.get("name") or existing.name).strip(),
+        "role": str(params.get("role") or existing.role).strip(),
+        "specialty": str(params.get("specialty") or existing.specialty).strip(),
+        "default_tool": str(params.get("default_tool") or existing.default_tool).strip(),
+        "model_id": str(params.get("model_id") or params.get("model") or existing.model_id).strip(),
+        "desk_x": existing.desk_x,
+        "desk_y": existing.desk_y,
+        "color": existing.color,
+        "avatar_pixel": existing.avatar_pixel,
+        "prompt_prefix": str(params.get("prompt_prefix") or existing.prompt_prefix).strip(),
+    }
+
+    if "allowed_tools" in params:
+        raw_tools = params["allowed_tools"]
+        profile_data["allowed_tools"] = [t.strip() for t in raw_tools if str(t).strip()] if isinstance(raw_tools, list) else [t.strip() for t in str(raw_tools).split(",") if t.strip()]
+    if "allowed_skills" in params:
+        raw_skills = params["allowed_skills"]
+        profile_data["allowed_skills"] = [s.strip() for s in raw_skills if str(s).strip()] if isinstance(raw_skills, list) else [s.strip() for s in str(raw_skills).split(",") if s.strip()]
+    if "capabilities" in params:
+        raw_caps = params["capabilities"]
+        profile_data["capabilities"] = [c.strip() for c in raw_caps if str(c).strip()] if isinstance(raw_caps, list) else [c.strip() for c in str(raw_caps).split(",") if c.strip()]
+
+    res = fleet_manager.save_agent_profile(profile_data)
+    if not res.get("success"):
+        return f"Failed to update agent '{existing.name}': {res.get('error', 'Unknown error')}"
+
+    updated = res.get("agent", {})
+    _broadcast_ui("fleet_updated", {"action": "update", "agent": updated})
+    return f"Successfully updated profile for agent '{existing.name}' (Role: {updated.get('role')}, Tool: {updated.get('default_tool')}, Tools: {', '.join(updated.get('allowed_tools', []))})."
+
+
 def _handle_list(params: Dict[str, Any]) -> str:
     deck = fleet_manager.get_fleet_deck_state()
     if not deck:
@@ -200,6 +242,9 @@ _ACTION_DISPATCH: Dict[str, Callable[[Dict[str, Any]], str]] = {
     "dispatch": _handle_dispatch,
     "hire": _handle_hire,
     "fire": _handle_fire,
+    "update": _handle_update,
+    "edit": _handle_update,
+    "modify": _handle_update,
     "list_agents": _handle_list,
     "list": _handle_list,
     "get_status": _handle_status,
@@ -224,9 +269,10 @@ TOOL = {
     "name": "fleet_control",
     "description": (
         "Orchestrate autonomous multi-agent fleet. Dispatch coding/research tasks to named specialist workers "
-        "(Ali, Ahmad, Dwight, Pam, Oscar, Kelly, Michael), trigger P2P peer handoffs with upstream deliverables, "
-        "decompose multi-stage workflows, hire/fire agents, or query agent status. "
-        "Use this whenever the user addresses a specific agent ('Tell Ali to build a landing page', 'Kelly transcribe and summarize this video', "
+        "(Ali, Ahmad, Dwight, Pam, Oscar, Kelly, Michael, Quantum), trigger P2P peer handoffs with upstream deliverables, "
+        "decompose multi-stage workflows, hire/fire/update agents, or query agent status. "
+        "Use action='update' whenever the user wants to change an agent's role, name, specialty, allowed tools, or model. "
+        "Use this whenever the user addresses a specific agent ('Tell Ali to build a landing page', 'Kelly/Quantum transcribe and summarize this video', "
         "'Ahmad build the auth API', 'Michael decompose this project') or for peer handoffs between agents."
     ),
     "risk": "local_mutation",
@@ -237,12 +283,12 @@ TOOL = {
         "properties": {
             "action": {
                 "type": "STRING",
-                "enum": ["dispatch", "hire", "fire", "list_agents", "get_status", "peer_chat", "decompose_workflow"],
+                "enum": ["dispatch", "hire", "fire", "update", "edit", "list_agents", "get_status", "peer_chat", "decompose_workflow"],
                 "description": "The fleet management action to execute.",
             },
             "agent_id": {
                 "type": "STRING",
-                "description": "Target agent name or ID (e.g. 'ALI', 'AHMAD', 'DWIGHT', 'PAM', 'OSCAR', 'KELLY', 'MICHAEL').",
+                "description": "Target agent name or ID (e.g. 'ALI', 'AHMAD', 'DWIGHT', 'PAM', 'OSCAR', 'KELLY', 'MICHAEL', 'QUANTUM').",
             },
             "from_agent": {
                 "type": "STRING",
@@ -262,12 +308,17 @@ TOOL = {
             },
             "role": {
                 "type": "STRING",
-                "description": "Role or title when hiring a new agent (e.g. 'Database Architect', 'QA Tester').",
+                "description": "Role or title when hiring or updating an agent (e.g. 'Detailed Web Researcher', 'Database Architect', 'QA Tester').",
             },
             "default_tool": {
                 "type": "STRING",
-                "enum": ["opencode_run", "kilo_run", "quick_snippet", "antigravity_run", "extract_design_system", "agent_reach", "web_search"],
+                "enum": ["opencode_run", "kilo_run", "quick_snippet", "antigravity_run", "extract_design_system", "agent_reach", "web_search", "web_read_page"],
                 "description": "Underlying execution engine assigned to this agent.",
+            },
+            "allowed_tools": {
+                "type": "ARRAY",
+                "items": {"type": "STRING"},
+                "description": "List of specific action tool IDs permitted for this agent (e.g. ['agent_reach', 'web_search', 'web_read_page']).",
             },
             "model_id": {
                 "type": "STRING",

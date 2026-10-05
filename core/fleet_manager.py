@@ -24,8 +24,42 @@ VALID_RISK_TIERS: set[str] = {"L0_READ_ONLY", "L1_MUTATION", "L2_DESTRUCTIVE"}
 VALID_TOOLS: set[str] = {
     "opencode_run", "kilo_run", "quick_snippet", "code_helper",
     "antigravity_run", "extract_design_system", "agent_reach",
-    "web_reader", "web_search",
+    "web_read_page", "web_reader", "web_search", "browser_control",
+    "file_processor", "file_controller", "fleet_control", "task_status",
 }
+
+
+def _infer_agent_defaults(role: str, specialty: str) -> Dict[str, Any]:
+    """Smartly infers default tool, permissions, and skills from persona keywords."""
+    text = f"{role} {specialty}".lower()
+
+    if any(k in text for k in ("research", "web", "scrape", "transcript", "video", "youtube", "media", "search")):
+        return {
+            "default_tool": "agent_reach",
+            "allowed_tools": ["agent_reach", "web_search", "web_read_page", "web_reader", "file_processor"],
+            "allowed_skills": ["web_scraper", "social_research", "web_research_pipeline"],
+            "capabilities": ["web_research", "media_extraction", "content_analysis"],
+        }
+    if any(k in text for k in ("frontend", "ui", "design", "css", "tailwind", "layout", "animation", "react", "html")):
+        return {
+            "default_tool": "antigravity_run",
+            "allowed_tools": ["antigravity_run", "extract_design_system", "browser_control", "file_processor", "file_controller"],
+            "allowed_skills": ["hamza_taste", "multi_agent_collaboration", "make_plan"],
+            "capabilities": ["web_design", "frontend_coding", "ui_refactor", "animations"],
+        }
+    if any(k in text for k in ("refactor", "qa", "test", "audit", "clean code", "bug hunt")):
+        return {
+            "default_tool": "kilo_run",
+            "allowed_tools": ["kilo_run", "quick_snippet", "file_processor", "file_controller"],
+            "allowed_skills": ["kilo_code", "multi_agent_collaboration", "make_plan", "git_workflow"],
+            "capabilities": ["code_refactor", "qa_testing", "security_audit", "complexity_reduction"],
+        }
+    return {
+        "default_tool": "opencode_run",
+        "allowed_tools": ["opencode_run", "quick_snippet", "file_processor", "file_controller"],
+        "allowed_skills": ["opencode", "multi_agent_collaboration", "make_plan", "git_workflow"],
+        "capabilities": ["backend_architecture", "api_development", "database_design"],
+    }
 
 
 @dataclass
@@ -271,25 +305,30 @@ class FleetManager:
         if not clean_id:
             return {"success": False, "error": "Agent identifier must contain alphanumeric characters."}
 
-        tool = str(data.get("default_tool") or "dev_agent").strip().lower()
-        if tool not in VALID_TOOLS and not tool.endswith("_run") and not tool.endswith("_agent"):
-            tool = "dev_agent"
-
-        risk_tier = str(data.get("risk_tier") or "").upper().strip()
-        if risk_tier not in VALID_RISK_TIERS:
-            risk_tier = "L1_MUTATION" if tool in ("kilo_run", "opencode_run", "antigravity_run") else "L0_READ_ONLY"
-
-        color_str = str(data.get("color") or "").strip()
-        if not re.match(r"^#[0-9a-fA-F]{6}$", color_str):
-            color_str = "#3b82f6"
-
         name_str = str(data.get("name") or clean_id.title()).strip()[:40] or clean_id.title()
         role_str = str(data.get("role") or "Autonomous Specialist").strip()[:80]
         specialty_str = str(data.get("specialty") or role_str).strip()[:120]
         model_id = str(data.get("model_id") or "").strip()
 
+        inferred = _infer_agent_defaults(role_str, specialty_str)
+
+        tool = str(data.get("default_tool") or "").strip().lower()
+        if tool not in VALID_TOOLS and not tool.endswith("_run") and not tool.endswith("_agent"):
+            tool = ""
+
         with self._lock:
             existing = self.agents.get(clean_id)
+            if not tool:
+                tool = existing.default_tool if existing else inferred["default_tool"]
+
+            risk_tier = str(data.get("risk_tier") or (existing.risk_tier if existing else "")).upper().strip()
+            if risk_tier not in VALID_RISK_TIERS:
+                risk_tier = "L1_MUTATION" if tool in ("kilo_run", "opencode_run", "antigravity_run") else "L0_READ_ONLY"
+
+            color_str = str(data.get("color") or (existing.color if existing else "")).strip()
+            if not re.match(r"^#[0-9a-fA-F]{6}$", color_str):
+                color_str = "#3b82f6"
+
             desk_x, desk_y = self._allocate_desk(
                 existing,
                 int(data.get("desk_x", 0)),
@@ -300,6 +339,30 @@ class FleetManager:
                 data.get("prompt_prefix")
                 or (existing.prompt_prefix if existing else f"You are {name_str}, an autonomous fleet specialist focusing on {specialty_str}.")
             ).strip()
+
+            raw_allowed_tools = data.get("allowed_tools")
+            if raw_allowed_tools is not None and len(raw_allowed_tools) > 0:
+                allowed_tools = list(raw_allowed_tools)
+            elif existing and existing.allowed_tools:
+                allowed_tools = list(existing.allowed_tools)
+            else:
+                allowed_tools = list(inferred["allowed_tools"])
+
+            raw_allowed_skills = data.get("allowed_skills")
+            if raw_allowed_skills is not None and len(raw_allowed_skills) > 0:
+                allowed_skills = list(raw_allowed_skills)
+            elif existing and existing.allowed_skills:
+                allowed_skills = list(existing.allowed_skills)
+            else:
+                allowed_skills = list(inferred["allowed_skills"])
+
+            raw_capabilities = data.get("capabilities")
+            if raw_capabilities is not None and len(raw_capabilities) > 0:
+                capabilities = list(raw_capabilities)
+            elif existing and existing.capabilities:
+                capabilities = list(existing.capabilities)
+            else:
+                capabilities = list(inferred["capabilities"])
 
             agent = FleetAgent(
                 id=clean_id,
@@ -317,9 +380,9 @@ class FleetManager:
                 status=existing.status if existing else "idle",
                 current_task_id=existing.current_task_id if existing else None,
                 active_worktree=str(data.get("active_worktree") or data.get("worktree") or data.get("path") or (existing.active_worktree if existing else "")).strip() or None,
-                allowed_tools=list(data.get("allowed_tools") or (existing.allowed_tools if existing else [])),
-                allowed_skills=list(data.get("allowed_skills") or (existing.allowed_skills if existing else [])),
-                capabilities=list(data.get("capabilities") or (existing.capabilities if existing else [])),
+                allowed_tools=allowed_tools,
+                allowed_skills=allowed_skills,
+                capabilities=capabilities,
             )
             self.agents[clean_id] = agent
             ok = self._save_fleet()
@@ -599,8 +662,13 @@ class FleetManager:
 
                 # Determine effective tool to run
                 effective_tool = agent.default_tool
-                if effective_tool in ("none", "", None) or effective_tool not in reg.actions:
-                    effective_tool = "opencode_run" if ("code" in prompt.lower() or "build" in prompt.lower() or "app" in prompt.lower()) else "dev_agent"
+                if effective_tool in ("none", "", None) or not reg.has(effective_tool):
+                    if "code" in prompt.lower() or "build" in prompt.lower() or "app" in prompt.lower():
+                        effective_tool = "opencode_run"
+                    elif any(k in prompt.lower() for k in ("research", "transcript", "video", "youtube", "media", "search", "http")):
+                        effective_tool = "agent_reach" if reg.has("agent_reach") else "web_search"
+                    else:
+                        effective_tool = "quick_snippet" if reg.has("quick_snippet") else "opencode_run"
 
                 call_params = {
                     "task": enriched_prompt,

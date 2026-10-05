@@ -3673,14 +3673,15 @@
 
       const engineEl = document.getElementById('specEngine');
       const pathEl = document.getElementById('specPath');
-      const initialTool = ag.default_tool || 'opencode_run';
       const engineLabelMap = {
         'opencode_run': 'OpenCode',
         'kilo_run': 'KiloCode',
         'antigravity_run': 'Antigravity',
         'none': 'Tool Specialist (No CLI)'
       };
-      if (engineEl) engineEl.innerText = engineLabelMap[initialTool] || initialTool;
+      const rawTool = ag.default_tool || 'none';
+      const initialTool = (rawTool in engineLabelMap) ? rawTool : 'none';
+      if (engineEl) engineEl.innerText = engineLabelMap[initialTool];
 
       const activeWt = ag.active_worktree || ag.worktree;
       if (pathEl) {
@@ -3846,13 +3847,15 @@
         if (cfgDisplayName) cfgDisplayName.value = selectedAgent.displayName || selectedAgent.name || '';
         const cfgSpec = document.getElementById('cfgAgentSpecialty');
         if (cfgSpec) cfgSpec.value = selectedAgent.specialty || selectedAgent.role || '';
-        const toolVal = selectedAgent.default_tool || 'opencode_run';
-        setDropdownValue('cfgAgentTool', toolVal, {
+        const engineLabelMap = {
           'opencode_run': 'OpenCode',
           'kilo_run': 'KiloCode',
           'antigravity_run': 'Antigravity',
           'none': 'Tool Specialist (No CLI)'
-        });
+        };
+        const rawTool = selectedAgent.default_tool || 'none';
+        const toolVal = (rawTool in engineLabelMap) ? rawTool : 'none';
+        setDropdownValue('cfgAgentTool', toolVal, engineLabelMap);
 
         const riskVal = selectedAgent.risk_tier || 'L0_READ_ONLY';
         setDropdownValue('cfgAgentRiskTier', riskVal, {
@@ -4975,8 +4978,9 @@
                 ag.state = 'working';
                 ag.isBusy = true;
                 setState(ag, 'working');
-              } else if (!ag.isBusy) {
+              } else {
                 ag.state = 'idle';
+                ag.isBusy = false;
                 setState(ag, 'idle');
               }
               if (remote.task_title || remote.current_task) {

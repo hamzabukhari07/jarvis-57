@@ -208,7 +208,8 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
 
     cmd = [opencode_bin, "run", task, "--model", model, "--auto"]
 
-    ctx.report(2, f"launching OpenCode in {Path(repo).name}")
+    if ctx and hasattr(ctx, "report"):
+        ctx.report(2, f"launching OpenCode in {Path(repo).name}")
 
     proc = subprocess.Popen(
         cmd,
@@ -224,7 +225,8 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
         **_WIN_HIDE,
     )
 
-    ctx.set_pid(proc.pid)
+    if ctx and hasattr(ctx, "set_pid"):
+        ctx.set_pid(proc.pid)
 
     import psutil
     total = psutil.cpu_count(logical=True) or 4
@@ -277,7 +279,7 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
     try:
         assert proc.stdout is not None
         for line in proc.stdout:
-            if ctx.cancelled():
+            if ctx and hasattr(ctx, "cancelled") and ctx.cancelled():
                 proc.terminate()
                 return {"status": "cancelled", "lines": line_count}
             text = line.rstrip()
@@ -302,13 +304,15 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
                         total_proc_cpu += c_cpu
                         ch_info.append(f"{c.name()}({c.pid})={c_cpu:.1f}%[aff={c.cpu_affinity()},nice={c.nice()}]")
                     
-                    print(f"[Task {ctx.task_id}] PID={proc.pid} total_proc_cpu={total_proc_cpu:.1f}% | {' '.join(ch_info)}")
+                    tid = getattr(ctx, "task_id", "inline") if ctx else "inline"
+                    print(f"[Task {tid}] PID={proc.pid} total_proc_cpu={total_proc_cpu:.1f}% | {' '.join(ch_info)}")
                 except Exception:
                     pass
 
             # coarse progress: first 90% based on line count heuristic
             pct = min(90, 5 + line_count)
-            ctx.report(pct, text)
+            if ctx and hasattr(ctx, "report"):
+                ctx.report(pct, text)
     finally:
         try:
             proc.wait(timeout=10)
@@ -327,19 +331,22 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
         except Exception as e:
             logger.debug("OpenCode undo registration failed: %s", e)
 
+        is_cancelled = bool(ctx and hasattr(ctx, "cancelled") and ctx.cancelled())
         if proc.returncode == 0:
-            ctx.on_complete({
-                "status": "success",
-                "return_code": 0,
-                "repo": repo,
-                "model": model,
-                "tail": tail[-10:],
-            })
-        elif not ctx.cancelled():
+            if ctx and hasattr(ctx, "on_complete"):
+                ctx.on_complete({
+                    "status": "success",
+                    "return_code": 0,
+                    "repo": repo,
+                    "model": model,
+                    "tail": tail[-10:],
+                })
+        elif not is_cancelled:
             err_detail = f"OpenCode process exited with code {proc.returncode}"
             if tail:
                 err_detail += f" ({' | '.join(tail[-3:])})"
-            ctx.on_fail(err_detail)
+            if ctx and hasattr(ctx, "on_fail"):
+                ctx.on_fail(err_detail)
 
     return {
         "status": "success" if proc.returncode == 0 else "failed",
@@ -392,6 +399,21 @@ def opencode_agent(parameters: dict, player=None, speak=None) -> str:
         if resolved_design and resolved_design.is_active():
             design_prompt = format_design_prompt(resolved_design)
             task_with_design = f"{task}\n\n{design_prompt}"
+
+    # In-place execution for fleet tasks (eliminates phantom ZEZO CODER cards)
+    run_in_place = bool(parameters.get("run_in_place", False))
+    task_ctx = parameters.get("task_ctx")
+
+    if run_in_place:
+        worker_params = {
+            "repo": str(repo),
+            "task": task_with_design,
+            "model": model,
+            "bin": opencode_bin,
+        }
+        res = _run_worker(worker_params, ctx=task_ctx)
+        import json
+        return json.dumps(res) if isinstance(res, dict) else str(res)
 
     tm = get_task_manager()
     task_id = tm.submit(

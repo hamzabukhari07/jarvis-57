@@ -238,6 +238,36 @@
         "web_scraping",
         "trend_analysis"
       ]
+    },
+    "QUANTUM": {
+      "name": "Quantum",
+      "role": "Detailed Web Researcher",
+      "specialty": "deep web research and analysis",
+      "color": "#3b82f6",
+      "avatar_pixel": "quantum_pixel.png",
+      "default_tool": "kilo_run",
+      "risk_tier": "L1_MUTATION",
+      "prompt_prefix": "You are Quantum, an autonomous fleet specialist focusing on deep web research and analysis.",
+      "model_id": "",
+      "desk_x": 600,
+      "desk_y": 280,
+      "worktree": "None",
+      "active_worktree": "None",
+      "allowed_tools": [
+        "web_search",
+        "agent_reach",
+        "web_reader"
+      ],
+      "allowed_skills": [
+        "web_search",
+        "agent_reach",
+        "web_reader"
+      ],
+      "capabilities": [
+        "web_research",
+        "media_extraction",
+        "content_analysis"
+      ]
     }
   }
 }
