@@ -1218,7 +1218,7 @@
       inset: 0;
       background-color: #222;
       border: 1px solid var(--border-default);
-      transition: 0.2s ease;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
       border-radius: 10px;
     }
     .toggle-slider:before {
@@ -1229,7 +1229,7 @@
       left: 2px;
       bottom: 2px;
       background-color: #777;
-      transition: 0.2s ease;
+      transition: transform 0.2s ease, background-color 0.2s ease;
       border-radius: 50%;
     }
     .toggle-switch input:checked + .toggle-slider {
@@ -1740,28 +1740,54 @@
     .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(12px);
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.92);
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
       z-index: 100;
       display: none;
       align-items: center;
       justify-content: center;
+      contain: strict;
     }
 
     .modal-overlay.open {
-      display: flex;
+      display: flex !important;
+    }
+
+    @keyframes modalIn {
+      from { opacity: 0; transform: translateY(8px) translateZ(0); }
+      to { opacity: 1; transform: translateY(0) translateZ(0); }
+    }
+
+    /* Pause background office canvas micro-animations when any modal is open to eliminate GPU thrash & flicker */
+    body.modal-open .deck-container *,
+    body.modal-open .agent *,
+    body.modal-open .desk *,
+    body.modal-open .server-rack *,
+    body.modal-open .server-led {
+      animation-play-state: paused !important;
     }
 
     .modal-panel {
       width: 580px;
       max-width: 90vw;
-      background: #0a0a0a;
+      background: #0a0a0a !important;
       border: 1px solid var(--border-default);
       border-radius: 0;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+      box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.98);
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      animation: modalIn 0.2s ease-out;
+      will-change: transform, opacity;
+      transform: translateZ(0);
+      contain: layout style;
     }
 
     .modal-head {
@@ -2549,26 +2575,48 @@
             </div>
           </div>
           <div>
-            <label class="spec-label" style="display:block; margin-bottom:3px;">THEME COLOR</label>
-            <input type="hidden" id="newAgentColor" value="#06b6d4" />
-            <div class="zezo-color-picker-wrap">
-              <div class="zezo-color-swatches" id="newAgentColorSwatches">
-                <button type="button" class="zezo-swatch-btn" style="background: #3b82f6;" onclick="selectZezoSwatch('newAgentColor', '#3b82f6', this)" title="Blue"></button>
-                <button type="button" class="zezo-swatch-btn" style="background: #ec4899;" onclick="selectZezoSwatch('newAgentColor', '#ec4899', this)" title="Pink"></button>
-                <button type="button" class="zezo-swatch-btn active" style="background: #06b6d4;" onclick="selectZezoSwatch('newAgentColor', '#06b6d4', this)" title="Cyan"></button>
-                <button type="button" class="zezo-swatch-btn" style="background: #eab308;" onclick="selectZezoSwatch('newAgentColor', '#eab308', this)" title="Amber"></button>
-                <button type="button" class="zezo-swatch-btn" style="background: #a855f7;" onclick="selectZezoSwatch('newAgentColor', '#a855f7', this)" title="Purple"></button>
-                <button type="button" class="zezo-swatch-btn" style="background: #22c55e;" onclick="selectZezoSwatch('newAgentColor', '#22c55e', this)" title="Emerald"></button>
-                <button type="button" class="zezo-swatch-btn" style="background: #f43f5e;" onclick="selectZezoSwatch('newAgentColor', '#f43f5e', this)" title="Rose"></button>
-                <button type="button" class="zezo-swatch-btn" style="background: #f97316;" onclick="selectZezoSwatch('newAgentColor', '#f97316', this)" title="Orange"></button>
+            <label class="spec-label" style="display:block; margin-bottom:3px;">ENGINE MODEL</label>
+            <div class="custom-dropdown" id="newAgentModelDropdown">
+              <div class="custom-dropdown-trigger" onclick="toggleCustomDropdown('newAgentModelDropdown')">
+                <input type="text" id="newAgentModelId" class="cmd-input" placeholder="Use global default" style="width:100%; border:none; background:transparent; padding:0; height:auto; color:#fff;" onclick="event.stopPropagation(); toggleCustomDropdown('newAgentModelDropdown', true);" oninput="filterNewAgentModelDropdown(this.value)" autocomplete="off" />
+                <iconify-icon icon="solar:alt-arrow-down-bold" style="font-size: 11px; color: var(--text-muted); flex-shrink:0;"></iconify-icon>
+              </div>
+              <div class="custom-dropdown-menu" id="newAgentModelMenu" style="max-height: 180px; overflow-y: auto;">
+                <div class="custom-dropdown-item active" data-val="" onclick="selectNewAgentModelOption('')">
+                  <span>Use global default</span>
+                  <iconify-icon icon="solar:check-bold" style="font-size: 10px;"></iconify-icon>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         <div>
+          <label class="spec-label" style="display:block; margin-bottom:3px;">THEME COLOR</label>
+          <input type="hidden" id="newAgentColor" value="#06b6d4" />
+          <div class="zezo-color-picker-wrap">
+            <div class="zezo-color-swatches" id="newAgentColorSwatches">
+              <button type="button" class="zezo-swatch-btn" style="background: #3b82f6;" onclick="selectZezoSwatch('newAgentColor', '#3b82f6', this)" title="Blue"></button>
+              <button type="button" class="zezo-swatch-btn" style="background: #ec4899;" onclick="selectZezoSwatch('newAgentColor', '#ec4899', this)" title="Pink"></button>
+              <button type="button" class="zezo-swatch-btn active" style="background: #06b6d4;" onclick="selectZezoSwatch('newAgentColor', '#06b6d4', this)" title="Cyan"></button>
+              <button type="button" class="zezo-swatch-btn" style="background: #eab308;" onclick="selectZezoSwatch('newAgentColor', '#eab308', this)" title="Amber"></button>
+              <button type="button" class="zezo-swatch-btn" style="background: #a855f7;" onclick="selectZezoSwatch('newAgentColor', '#a855f7', this)" title="Purple"></button>
+              <button type="button" class="zezo-swatch-btn" style="background: #22c55e;" onclick="selectZezoSwatch('newAgentColor', '#22c55e', this)" title="Emerald"></button>
+              <button type="button" class="zezo-swatch-btn" style="background: #f43f5e;" onclick="selectZezoSwatch('newAgentColor', '#f43f5e', this)" title="Rose"></button>
+              <button type="button" class="zezo-swatch-btn" style="background: #f97316;" onclick="selectZezoSwatch('newAgentColor', '#f97316', this)" title="Orange"></button>
+            </div>
+          </div>
+        </div>
+
+        <div>
           <label class="spec-label" style="display:block; margin-bottom:3px;">ASSIGNED WORKSPACE / FOLDER PATH</label>
-          <input type="text" id="newAgentWorktree" class="cmd-input" placeholder="e.g. D:/projects/my-app, Desktop/landing-page (Optional)" style="width:100%; font-family: var(--font-mono); font-size: 11px;" />
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <input type="text" id="newAgentWorktree" class="cmd-input" placeholder="e.g. D:/projects/my-app, Desktop/landing-page (Optional)" style="width:100%; font-family: var(--font-mono); font-size: 11px;" />
+            <button type="button" class="hud-tool-btn" onclick="browseFolderForInput('newAgentWorktree')" title="Choose Folder from File Explorer" style="padding: 6px 9px; display: flex; align-items: center; gap: 4px; font-size: 10px; white-space: nowrap;">
+              <iconify-icon icon="solar:folder-with-files-bold" style="font-size: 14px; color: var(--cyan);"></iconify-icon>
+              <span>BROWSE</span>
+            </button>
+          </div>
         </div>
 
         <div>
@@ -2774,8 +2822,13 @@
           <label class="spec-label" style="display:block; margin-bottom:4px;">ASSIGNED WORKSPACE / FOLDER PATH</label>
           <div style="display: flex; gap: 6px; align-items: center;">
             <input type="text" id="cfgAgentWorktree" class="cmd-input" placeholder="e.g. D:/projects/portfolio, Desktop/landing-page, or leave empty for Direct Workspace" style="width:100%; font-family: var(--font-mono); font-size: 11px;" />
-            <button type="button" class="hud-tool-btn" onclick="openAgentAssignedFolder()" title="Open Folder in OS File Explorer" style="padding: 6px 9px;">
+            <button type="button" class="hud-tool-btn" onclick="browseFolderForInput('cfgAgentWorktree')" title="Choose Folder from File Explorer" style="padding: 6px 9px; display: flex; align-items: center; gap: 4px; font-size: 10px; white-space: nowrap;">
               <iconify-icon icon="solar:folder-with-files-bold" style="font-size: 14px; color: var(--cyan);"></iconify-icon>
+              <span>BROWSE</span>
+            </button>
+            <button type="button" class="hud-tool-btn" onclick="openAgentAssignedFolder()" title="Open Folder in OS File Explorer" style="padding: 6px 9px; display: flex; align-items: center; gap: 4px; font-size: 10px; white-space: nowrap;">
+              <iconify-icon icon="solar:arrow-right-up-linear" style="font-size: 13px; color: var(--text-muted);"></iconify-icon>
+              <span>OPEN</span>
             </button>
           </div>
         </div>
@@ -3369,6 +3422,28 @@
       }
     }
 
+    async function browseFolderForInput(targetInputId) {
+      playFoley('click');
+      const inputEl = document.getElementById(targetInputId);
+      const currentVal = inputEl ? inputEl.value.trim() : '';
+      try {
+        const res = await fetch('/api/fleet/pick_folder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initial_dir: currentVal })
+        });
+        const data = await res.json();
+        if (data.success && data.path) {
+          if (inputEl) inputEl.value = data.path;
+          showSoundToast(`Workspace folder selected: ${data.path}`);
+        } else if (data.error) {
+          showZezoModalAlert('Folder Error', data.error);
+        }
+      } catch (err) {
+        showZezoModalAlert('Browse Error', 'Network error while opening folder picker: ' + err.message);
+      }
+    }
+
     // ── Inspector Tab Navigation (3 Clean Tabs) ──
     function switchInspectorTab(tabName) {
       playFoley('click');
@@ -3540,8 +3615,8 @@
 
     let cachedModelsData = null;
 
-    async function loadDynamicModelsList(engineName) {
-      const menu = document.getElementById('cfgAgentModelMenu');
+    async function loadDynamicModelsList(engineName, targetPrefix = 'cfg') {
+      const menu = document.getElementById(targetPrefix + 'AgentModelMenu');
       if (!menu) return;
       try {
         if (!cachedModelsData) {
@@ -3556,9 +3631,10 @@
           } else {
             list = cachedModelsData.all_models || [];
           }
-          const currentVal = (document.getElementById('cfgAgentModelId')?.value || '').trim();
+          const currentVal = (document.getElementById(targetPrefix + 'AgentModelId')?.value || '').trim();
+          const selectFn = targetPrefix === 'new' ? 'selectNewAgentModelOption' : 'selectModelOption';
           let html = `
-            <div class="custom-dropdown-item ${!currentVal ? 'active' : ''}" data-val="" onclick="selectModelOption('')">
+            <div class="custom-dropdown-item ${!currentVal ? 'active' : ''}" data-val="" onclick="${selectFn}('')">
               <span>Use global default</span>
               <iconify-icon icon="solar:check-bold" style="font-size: 10px; ${!currentVal ? '' : 'display:none;'}"></iconify-icon>
             </div>
@@ -3566,7 +3642,7 @@
           list.forEach(m => {
             const isSel = currentVal === m;
             html += `
-              <div class="custom-dropdown-item ${isSel ? 'active' : ''}" data-val="${m}" onclick="selectModelOption('${m}')">
+              <div class="custom-dropdown-item ${isSel ? 'active' : ''}" data-val="${m}" onclick="${selectFn}('${m}')">
                 <span>${m}</span>
                 <iconify-icon icon="solar:check-bold" style="font-size: 10px; ${isSel ? '' : 'display:none;'}"></iconify-icon>
               </div>
@@ -3595,6 +3671,22 @@
       }
     }
 
+    function selectNewAgentModelOption(val) {
+      const input = document.getElementById('newAgentModelId');
+      if (input) input.value = val;
+      const dropdown = document.getElementById('newAgentModelDropdown');
+      if (dropdown) dropdown.classList.remove('open');
+      const menu = document.getElementById('newAgentModelMenu');
+      if (menu) {
+        menu.querySelectorAll('.custom-dropdown-item').forEach(item => {
+          const match = item.getAttribute('data-val') === val;
+          item.classList.toggle('active', match);
+          const icon = item.querySelector('iconify-icon');
+          if (icon) icon.style.display = match ? 'inline-block' : 'none';
+        });
+      }
+    }
+
     function filterModelDropdown(query) {
       const q = (query || '').toLowerCase().trim();
       const menu = document.getElementById('cfgAgentModelMenu');
@@ -3608,25 +3700,48 @@
       });
     }
 
+    function filterNewAgentModelDropdown(query) {
+      const q = (query || '').toLowerCase().trim();
+      const menu = document.getElementById('newAgentModelMenu');
+      if (!menu) return;
+      const dropdown = document.getElementById('newAgentModelDropdown');
+      if (dropdown && !dropdown.classList.contains('open')) dropdown.classList.add('open');
+
+      menu.querySelectorAll('.custom-dropdown-item').forEach(item => {
+        const text = (item.textContent || '').toLowerCase();
+        item.style.display = (!q || text.includes(q)) ? 'flex' : 'none';
+      });
+    }
+
     // Engine change listener to auto-suggest model ID and risk tier
     function handleEngineChange(toolName) {
       const modelInput = document.getElementById('cfgAgentModelId');
-      loadDynamicModelsList(toolName);
-      if (!modelInput) return;
+      const newModelInput = document.getElementById('newAgentModelId');
+      loadDynamicModelsList(toolName, 'cfg');
+      loadDynamicModelsList(toolName, 'new');
 
       if (toolName === 'kilo_run') {
-        if (!modelInput.value || modelInput.value.includes('opencode') || modelInput.value.includes('gemini')) {
-          selectModelOption('kilo/stepfun/step-3.7-flash:free');
+        if (modelInput && (!modelInput.value || modelInput.value.includes('opencode') || modelInput.value.includes('gemini'))) {
+          selectModelOption('kilo/kilo-auto/free');
+        }
+        if (newModelInput && (!newModelInput.value || newModelInput.value.includes('opencode') || newModelInput.value.includes('gemini'))) {
+          selectNewAgentModelOption('kilo/kilo-auto/free');
         }
         setDropdownValue('cfgAgentRiskTier', 'L1_MUTATION', { 'L0_READ_ONLY': 'Safe (Read-Only)', 'L1_MUTATION': 'Standard (Edit Code)', 'L2_DESTRUCTIVE': 'Full Access (Build & Delete)' });
       } else if (toolName === 'opencode_run') {
-        if (!modelInput.value || modelInput.value.includes('kilo')) {
-          selectModelOption('opencode/mimo-v2.5-free');
+        if (modelInput && (!modelInput.value || modelInput.value.includes('kilo'))) {
+          selectModelOption('opencode/big-pickle');
+        }
+        if (newModelInput && (!newModelInput.value || newModelInput.value.includes('kilo'))) {
+          selectNewAgentModelOption('opencode/big-pickle');
         }
         setDropdownValue('cfgAgentRiskTier', 'L2_DESTRUCTIVE', { 'L0_READ_ONLY': 'Safe (Read-Only)', 'L1_MUTATION': 'Standard (Edit Code)', 'L2_DESTRUCTIVE': 'Full Access (Build & Delete)' });
       } else if (toolName === 'antigravity_run') {
-        if (!modelInput.value || modelInput.value.includes('kilo') || modelInput.value.includes('opencode')) {
+        if (modelInput && (!modelInput.value || modelInput.value.includes('kilo') || modelInput.value.includes('opencode'))) {
           selectModelOption('gemini-3.7-flash-medium');
+        }
+        if (newModelInput && (!newModelInput.value || newModelInput.value.includes('kilo') || newModelInput.value.includes('opencode'))) {
+          selectNewAgentModelOption('gemini-3.7-flash-medium');
         }
         setDropdownValue('cfgAgentRiskTier', 'L1_MUTATION', { 'L0_READ_ONLY': 'Safe (Read-Only)', 'L1_MUTATION': 'Standard (Edit Code)', 'L2_DESTRUCTIVE': 'Full Access (Build & Delete)' });
       } else if (toolName === 'none') {
@@ -3885,8 +4000,7 @@
         console.warn('Error populating edit modal fields:', err);
       }
 
-      const modal = document.getElementById('editAgentModal');
-      if (modal) modal.classList.add('open');
+      openModal('editAgentModal');
     }
 
     // Open Files & Soul Live Editor Modal
@@ -3903,8 +4017,7 @@
         console.warn('Error selecting core file:', err);
       }
 
-      const modal = document.getElementById('filesModal');
-      if (modal) modal.classList.add('open');
+      openModal('filesModal');
     }
 
     // Save Active Agent Config (From Edit Modal)
@@ -4082,7 +4195,7 @@
         if (typeof onConfirm === 'function') onConfirm();
       };
 
-      modal.classList.add('open');
+      openModal('zezoConfirmModal');
     }
 
     function showZezoModalAlert(title, message) {
@@ -4143,8 +4256,7 @@
     // Modal: Open & Save New Agent Profile
     function openCreateAgentModal() {
       playFoley('click');
-      const modal = document.getElementById('createAgentModal');
-      if (modal) modal.classList.add('open');
+      openModal('createAgentModal');
       const idInput = document.getElementById('newAgentId');
       if (idInput) {
         idInput.value = '';
@@ -4155,6 +4267,21 @@
       document.getElementById('newAgentSoul').value = '';
       const wtInput = document.getElementById('newAgentWorktree');
       if (wtInput) wtInput.value = '';
+
+      // Initialize tool & dynamic models
+      const defaultTool = document.getElementById('newAgentTool')?.value || 'opencode_run';
+      setDropdownValue('newAgentTool', defaultTool, {
+        'opencode_run': 'OpenCode',
+        'kilo_run': 'KiloCode',
+        'antigravity_run': 'Antigravity',
+        'none': 'Tool Specialist (No CLI)'
+      });
+      const modelInput = document.getElementById('newAgentModelId');
+      if (modelInput) modelInput.value = '';
+      loadDynamicModelsList(defaultTool, 'new');
+      if (defaultTool === 'opencode_run') {
+        selectNewAgentModelOption('opencode/big-pickle');
+      }
     }
 
     async function saveNewAgentFromModal() {
@@ -4162,6 +4289,8 @@
       const name = (document.getElementById('newAgentName').value || '').trim() || id;
       const role = (document.getElementById('newAgentRole').value || '').trim() || 'Fleet Specialist';
       const tool = document.getElementById('newAgentTool').value || 'opencode_run';
+      const rawModel = (document.getElementById('newAgentModelId')?.value || '').trim();
+      const modelId = rawModel === 'Use global default' ? '' : rawModel;
       const color = document.getElementById('newAgentColor').value || '#06b6d4';
       const soul = (document.getElementById('newAgentSoul').value || '').trim();
       const worktree = (document.getElementById('newAgentWorktree')?.value || '').trim();
@@ -4181,6 +4310,7 @@
             name: name,
             role: role,
             default_tool: tool,
+            model_id: modelId,
             color: color,
             active_worktree: worktree,
             worktree: worktree,
@@ -4408,17 +4538,30 @@
       }
     }
 
+    function openModal(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.add('open');
+        document.body.classList.add('modal-open');
+      }
+    }
+
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('open');
+      const anyOpen = document.querySelector('.modal-overlay.open');
+      if (!anyOpen) {
+        document.body.classList.remove('modal-open');
+      }
+    }
+
     function openActiveSandboxModal() {
       if (selectedAgent) {
         const path = selectedAgent.active_worktree || selectedAgent.worktree || selectedAgent.sandbox || 'Direct Workspace';
         const displayEl = document.getElementById('modalPathDisplay');
         if (displayEl) displayEl.innerText = path;
       }
-      document.getElementById('sandboxModal').classList.add('open');
-    }
-
-    function closeModal(id) {
-      document.getElementById(id).classList.remove('open');
+      openModal('sandboxModal');
     }
 
     function openInVsCode() {
@@ -4592,8 +4735,7 @@
     // ── Kanban Board & Peer Collaboration Visualizer (Phase 9) ──
     async function openKanbanBoardModal() {
       playFoley('click');
-      const modal = document.getElementById('kanbanModal');
-      if (modal) modal.classList.add('open');
+      openModal('kanbanModal');
       await refreshKanbanBoard();
     }
 
@@ -4765,7 +4907,7 @@
           </div>
         `;
       }
-      modal.classList.add('open');
+      openModal('propModal');
     }
 
     // ── Navigate Back to ZEZO OS Home Interface ──

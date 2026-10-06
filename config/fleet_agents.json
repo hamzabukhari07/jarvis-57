@@ -9,22 +9,22 @@
       "default_tool": "opencode_run",
       "risk_tier": "L1_MUTATION",
       "prompt_prefix": "You are Michael Scott, Regional Manager of the Autonomous Coding Fleet.",
-      "model_id": "",
+      "model_id": "opencode/space-bunny-free",
       "desk_x": 180,
       "desk_y": 160,
-      "worktree": null,
-      "active_worktree": null,
+      "worktree": "C:/Users/Hamza Bukhari/Desktop",
+      "active_worktree": "C:/Users/Hamza Bukhari/Desktop",
       "allowed_tools": [
-        "opencode_run",
-        "fleet_control",
-        "task_status",
+        "web_search",
         "file_processor",
+        "extract_design_system",
         "file_controller"
       ],
       "allowed_skills": [
-        "multi_agent_collaboration",
-        "make_plan",
-        "git_workflow"
+        "web_search",
+        "file_processor",
+        "extract_design_system",
+        "file_controller"
       ],
       "capabilities": [
         "task_decomposition",
@@ -112,7 +112,7 @@
       "default_tool": "opencode_run",
       "risk_tier": "L2_DESTRUCTIVE",
       "prompt_prefix": "You are Ahmad, Senior Python Backend Specialist. Build scalable backend architectures, clean REST/GraphQL APIs, and bulletproof database models with OpenCode.",
-      "model_id": "opencode/mimo-v2.5-free",
+      "model_id": "opencode/nemotron-3-ultra-free",
       "desk_x": 460,
       "desk_y": 160,
       "worktree": null,

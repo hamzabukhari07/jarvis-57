@@ -49,7 +49,7 @@ def _resolve_model(model: Optional[str]) -> str:
         if "pickle" in name:
             return "opencode/big-pickle"
         if "mimo" in name:
-            return "opencode/mimo-v2.5-free"
+            return "opencode/mimo-v2.6-flash-free"
         return f"opencode/{name}"
     return selected
 

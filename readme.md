@@ -31,10 +31,25 @@ A real-time multimodal AI operating system that can hear, see, speak, and autono
 git clone https://github.com/HamzaBukhari/JARVIS.git
 cd JARVIS
 
-# 2. Run OS-aware setup (auto-installs dependencies for your OS)
+# 2. Create and activate a virtual environment (recommended)
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+source .venv/bin/activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. (Optional) Run OS-aware setup for extra system dependencies
 python setup.py
 
-# 3. Launch JARVIS
+# 5. Configure your API key
+copy config\api_keys.example.json config\api_keys.json   # Windows
+cp config/api_keys.example.json config/api_keys.json   # macOS/Linux
+# Then edit config/api_keys.json and paste your Gemini API key
+
+# 6. Launch JARVIS
 python main.py
 ```
 

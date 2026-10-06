@@ -124,6 +124,7 @@ class ZezoUIServer:
         app.router.add_post("/api/fleet/dispatch_task", self._fleet_dispatch_task_handler)
         app.router.add_post("/api/fleet/delete_agent", self._fleet_delete_agent_handler)
         app.router.add_post("/api/fleet/open_folder", self._fleet_open_folder_handler)
+        app.router.add_post("/api/fleet/pick_folder", self._fleet_pick_folder_handler)
         app.router.add_post("/api/upload", self._upload_handler)
         app.router.add_post("/api/settings/assistant", self._save_assistant_settings_handler)
         app.router.add_post("/api/settings/agents", self._save_agents_settings_handler)
@@ -712,6 +713,72 @@ class ZezoUIServer:
             logger.warning("[UI Server] Failed to open folder in explorer: %s", e)
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
+    async def _fleet_pick_folder_handler(self, request: web.Request) -> web.Response:
+        """Open native OS folder selection dialog and return the chosen path."""
+        try:
+            data = await request.json() if request.can_read_body else {}
+        except Exception:
+            data = {}
+        initial_dir = str(data.get("initial_dir") or "").strip()
+        if not initial_dir or not Path(initial_dir).exists():
+            initial_dir = str(Path.home() / "Desktop" if (Path.home() / "Desktop").exists() else Path.home())
+
+        def _open_native_dialog() -> str:
+            selected_path = ""
+            try:
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()
+                root.attributes("-topmost", True)
+                chosen = filedialog.askdirectory(
+                    initialdir=initial_dir,
+                    title="Select Workspace Folder for Fleet Agent"
+                )
+                root.destroy()
+                if chosen:
+                    selected_path = str(Path(chosen).resolve()).replace("\\", "/")
+            except Exception as ex:
+                logger.debug("[UI Server] Tkinter dialog fallback: %s", ex)
+
+            # PowerShell fallback if tkinter failed or returned empty
+            if not selected_path:
+                try:
+                    import platform
+                    if platform.system() == "Windows":
+                        ps_script = (
+                            "[System.Reflection.Assembly]::LoadWithPartialName('System.windows.forms') | Out-Null; "
+                            "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
+                            f"$f.SelectedPath = '{initial_dir.replace('/', chr(92))}'; "
+                            "$f.Description = 'Select Workspace Folder for Fleet Agent'; "
+                            "if ($f.ShowDialog((New-Object System.Windows.Forms.NativeWindow)) -eq [System.Windows.Forms.DialogResult]::OK) { "
+                            "Write-Output $f.SelectedPath }"
+                        )
+                        res = subprocess.run(
+                            ["powershell", "-NoProfile", "-Command", ps_script],
+                            capture_output=True,
+                            text=True,
+                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
+                            timeout=60,
+                        )
+                        out = res.stdout.strip()
+                        if out and Path(out).exists():
+                            selected_path = str(Path(out).resolve()).replace("\\", "/")
+                except Exception as ex:
+                    logger.debug("[UI Server] PowerShell folder dialog fallback error: %s", ex)
+
+            return selected_path
+
+        loop = asyncio.get_running_loop()
+        try:
+            chosen = await loop.run_in_executor(None, _open_native_dialog)
+            if chosen:
+                return web.json_response({"success": True, "path": chosen})
+            return web.json_response({"success": False, "cancelled": True})
+        except Exception as e:
+            logger.warning("[UI Server] Error in pick folder dialog: %s", e)
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
     async def _skills_list_handler(self, request: web.Request) -> web.Response:
         """Return list of discovered declarative skills, optionally filtered by domain."""
         domain = request.query.get("domain")
@@ -732,15 +799,27 @@ class ZezoUIServer:
             engine = request.query.get("engine")
 
             opencode_models = [
-                "opencode/mimo-v2.5-free",
-                "opencode/qwen2.5-coder:free",
-                "opencode/gemini-2.5-flash:free",
+                "opencode/big-pickle",
+                "opencode/nemotron-3-ultra-free",
+                "opencode/nemotron-3.5-lightning-free",
+                "opencode/mimo-v2.6-flash-free",
+                "opencode/ling-3.1-flash-free",
+                "opencode/longcat-2.5-preview-free",
+                "opencode/space-bunny-free",
+                "opencode/fledge-alpha-free",
+                "opencode/muse-spark-1.3-contributor-free",
+                "openrouter/openrouter/free",
+                "openrouter/google/gemma-4-31b-it:free",
+                "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
             ]
             kilo_models = [
+                "kilo/kilo-auto/free",
                 "kilo/stepfun/step-3.7-flash:free",
                 "kilo/deepseek/deepseek-chat:free",
                 "kilo/qwen/qwen-2.5-coder-32b-instruct:free",
                 "kilo/minimax/minimax-01:free",
+                "kilo/nvidia/nemotron-3-ultra-550b-a55b:free",
+                "kilo/poolside/laguna-s-2.1:free",
             ]
             antigravity_models = list(models.ANTIGRAVITY_CLI_MODELS)
             groq_models = [

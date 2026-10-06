@@ -55,14 +55,20 @@ GEMINI_SEARCH_MODELS = (
 # These are the CLI's own model ids (with -medium/-high suffixes) — a different
 # namespace from the Gemini API names above. Do not mix the two.
 ANTIGRAVITY_CLI_MODELS = [
-    "gemini-3.7-flash-medium",     # Gemini 3.7 Flash Medium (Default Fast & Smart)
-    "gemini-3.8-flash-medium",     # Gemini 3.8 Flash Medium
-    "gemini-3.6-flash-medium",     # Gemini 3.6 Flash Medium
-    "gemini-3.1-pro-high",         # Gemini 3.1 Pro High Reasoning
-    "gemini-3.1-pro-low",          # Gemini 3.1 Pro Fast
+    "gemini-3.8-flash-high",       # Gemini 3.8 Flash (High)
+    "gemini-3.8-flash-medium",     # Gemini 3.8 Flash (Medium)
+    "gemini-3.8-flash-low",        # Gemini 3.8 Flash (Low)
+    "gemini-3.7-flash-high",       # Gemini 3.7 Flash (High)
+    "gemini-3.7-flash-medium",     # Gemini 3.7 Flash (Medium) - Default
+    "gemini-3.7-flash-low",        # Gemini 3.7 Flash (Low)
+    "gemini-3.6-flash-high",       # Gemini 3.6 Flash (High)
+    "gemini-3.6-flash-medium",     # Gemini 3.6 Flash (Medium)
+    "gemini-3.6-flash-low",        # Gemini 3.6 Flash (Low)
+    "gemini-3.1-pro-high",         # Gemini 3.1 Pro (High)
+    "gemini-3.1-pro-low",          # Gemini 3.1 Pro (Low)
     "claude-sonnet-4-6",           # Claude Sonnet 4.6 (Thinking)
-    "claude-opus-4-6-thinking",    # Claude Opus 4.6 (Deep Thinking)
-    "gpt-oss-120b-medium",         # GPT-OSS 120B Open Weights
+    "claude-opus-4-6-thinking",    # Claude Opus 4.6 (Thinking)
+    "gpt-oss-120b-medium",         # GPT-OSS 120B (Medium)
 ]
 DEFAULT_ANTIGRAVITY_MODEL = "gemini-3.7-flash-medium"
 

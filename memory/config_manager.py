@@ -826,15 +826,18 @@ def save_plugin_enabled(plugin_name: str, enabled: bool) -> None:
 # ── OpenCode Zen & Free Models Config ─────────────────────────────────────────
 
 OPENCODE_ZEN_FREE_MODELS = [
-    "opencode/nemotron-3-ultra-free",  # 1M Context, complex multi-file refactoring (Default)
-    "opencode/big-pickle",             # Specialized agentic coding stealth model
-    "opencode/mimo-v2.5-free",         # Fast execution code generator
-    "opencode/nemotron-3.5-lightning-free", # High speed NVIDIA model
-    "opencode/ling-3.0-flash-fin-free",     # Multimodal vision & reasoning
-    "toeknh/deepseek-v4.1-flash:free",      # DeepSeek V4.1 Flash free
+    "opencode/big-pickle",                 # Specialized agentic coding model
+    "opencode/nemotron-3-ultra-free",      # NVIDIA Nemotron 3 Ultra (Free)
+    "opencode/nemotron-3.5-lightning-free",# High-speed NVIDIA Nemotron (Free)
+    "opencode/mimo-v2.6-flash-free",       # Fast execution Xiaomi Mimo Flash (Free)
+    "opencode/ling-3.1-flash-free",         # Multimodal reasoning & speed (Free)
+    "opencode/longcat-2.5-preview-free",    # Extended context code model (Free)
+    "opencode/space-bunny-free",           # Lightweight agile coding model (Free)
+    "opencode/fledge-alpha-free",          # Alpha reasoning coding model (Free)
+    "opencode/muse-spark-1.3-contributor-free", # Open-source coding model (Free)
 ]
 
-DEFAULT_OPENCODE_MODEL = "opencode/nemotron-3-ultra-free"
+DEFAULT_OPENCODE_MODEL = "opencode/big-pickle"
 DEFAULT_OPENCODE_PROVIDER = "zen"
 
 
@@ -862,7 +865,7 @@ def get_opencode_model() -> str:
         elif "pickle" in name:
             raw = "opencode/big-pickle"
         elif "mimo" in name:
-            raw = "opencode/mimo-v2.5-free"
+            raw = "opencode/mimo-v2.6-flash-free"
         else:
             raw = f"opencode/{name}"
     return raw

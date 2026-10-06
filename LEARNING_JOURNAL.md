@@ -1,3 +1,46 @@
+## [2026-10-06] — OpenCode, Antigravity & Kilo Code Real Model List Synchronization
+
+- **What was built:**
+  - **Antigravity CLI (`agy`) Full Model Alignment (`core/models.py`):** Replaced static 8-model array with the complete, official 14-model catalog discovered directly via `agy models`: all reasoning tiers for `gemini-3.8-flash` (high/medium/low), `gemini-3.7-flash` (high/medium/low), `gemini-3.6-flash` (high/medium/low), `gemini-3.1-pro` (high/low), `claude-sonnet-4-6`, `claude-opus-4-6-thinking`, and `gpt-oss-120b-medium`.
+  - **OpenCode Free Models Realignment (`core/ui_server.py`, `memory/config_manager.py`, `actions/opencode_agent.py`):** Purged obsolete hardcoded models (`opencode/mimo-v2.5-free`, `opencode/qwen2.5-coder:free`, `opencode/gemini-2.5-flash:free`). Synchronized `/api/models` endpoint, `OPENCODE_ZEN_FREE_MODELS`, and `_resolve_model()` with the actual active OpenCode CLI free catalog: `opencode/big-pickle`, `opencode/nemotron-3-ultra-free`, `opencode/nemotron-3.5-lightning-free`, `opencode/mimo-v2.6-flash-free`, `opencode/ling-3.1-flash-free`, `opencode/longcat-2.5-preview-free`, `opencode/space-bunny-free`, `opencode/fledge-alpha-free`, and OpenRouter free tiers.
+  - **Kilo Code Model Catalog Correction (`core/ui_server.py`, `memory/config_manager.py`):** Added `kilo/kilo-auto/free` (the official free auto router), `kilo/nvidia/nemotron-3-ultra-550b-a55b:free`, and `kilo/poolside/laguna-s-2.1:free` to `ui_server.py` `/api/models`.
+  - **Office UI Auto-Select & Add Agent Modal Model Support (`frontend/office.html`):** Integrated full `ENGINE MODEL` dropdown selector into `HIRE & SPAWN FLEET AGENT` modal (`createAgentModal`) alongside `handleEngineChange()`. Adding new agents now dynamically loads and saves working models for OpenCode, Antigravity, and KiloCode.
+  - **Native OS Folder Picker Integration (`core/ui_server.py`, `frontend/office.html`):** Built `/api/fleet/pick_folder` backend endpoint with a dual native dialog system (Tkinter `filedialog.askdirectory` with PowerShell `System.Windows.Forms.FolderBrowserDialog` fallback). Replaced manual path typing UX with instant **"BROWSE"** buttons in both `HIRE & SPAWN FLEET AGENT` and `EDIT AGENT PROFILE` modals to directly pick workspace directories from OS File Explorer.
+  - **Fleet Config Seed Alignment (`config/fleet_agents.json`):** Updated Ahmad's default configured `model_id` to `opencode/nemotron-3-ultra-free`.
+- **Why this approach was chosen:**
+  - Resolved user confusion where Edit Agent Profile modal displayed dead/non-existent model IDs and Hire New Agent modal lacked model selection entirely. Adding native folder browsing eliminates invalid paths and human typing errors.
+- **Key files touched:**
+  - `core/models.py`
+  - `core/ui_server.py`
+  - `memory/config_manager.py`
+  - `actions/opencode_agent.py`
+  - `frontend/office.html`
+  - `config/fleet_agents.json`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Model lists in UI endpoints (`/api/models`) must reflect the actual outputs of `agy models` and `opencode models`. Never hardcode speculative model versions (like `gemini-2.5` or `mimo-v2.5`) when the providers offer free models with new naming schemes.
+
+---
+
+## [2026-10-06] — Scranton Office Modal Anti-Flicker & Chromium GPU Rasterization Stabilization
+
+- **What was built:**
+  - **Eliminated Full-Viewport `backdrop-filter: blur(12px)` (`frontend/office.html`):** Removed full-viewport blur from `.modal-overlay` which was causing multi-pass GPU shader re-rasterization and visible black/white flashing and tearing in QtWebEngine when popup modals opened. Replaced with clean opaque backdrop `background: rgba(0, 0, 0, 0.92); backdrop-filter: none !important; contain: strict;` complying with AGENTS.md §8 Rule 1.
+  - **Background Micro-Animation Freezing via `body.modal-open` (`frontend/office.html`):** Added `body.modal-open` CSS rules that pause background animations (`monitorWake`, `focusedBob`, `screenPulse`, `forearmTyping`, `walkCycle`, etc.) whenever any modal popup is open, preventing background canvas compositor thrashing and GPU repaints behind dialog panels.
+  - **Hardware-Accelerated Modal Panel Layer (`frontend/office.html`):** Upgraded `.modal-panel` with `@keyframes modalIn`, `will-change: transform, opacity`, and `transform: translateZ(0)` for zero-latency, smooth hardware compositing.
+  - **Centralized `openModal()` and `closeModal()` Management (`frontend/office.html`):** Unified all modal openings (`openKanbanBoardModal`, `openEditAgentModal`, `openFilesModal`, `openActiveSandboxModal`, `openCreateAgentModal`, `openPropModal`, `showZezoConfirm`) to reliably apply and remove `body.modal-open`.
+  - **Replaced Shorthand Transitions (`frontend/office.html`):** Replaced non-explicit `transition: 0.2s ease` on switch sliders with explicit property declarations (`transition: background-color 0.2s ease, border-color 0.2s ease`) respecting AGENTS.md §8 Rule 2.
+- **Why this approach was chosen:**
+  - Matches the established pattern that previously stabilized `frontend/index.html` and `frontend/style.css` on 2026-09-27, eliminating all screen stutter, flicker, and visual tearing across the entire Scranton Office screen.
+- **Key files touched:**
+  - `frontend/office.html`
+  - `tests/test_phase9_office_visual_sync_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Full-viewport `backdrop-filter` in QtWebEngine desktop apps will always cause visible screen flicker on modern GPUs. Use opaque/semi-opaque solid colors (`rgba(0,0,0,0.92)`) and always pause active background DOM animations while modals are open.
+
+---
+
 ## [2026-10-05] — Fleet In-Place Task Execution, Phantom Card Elimination & Office Status Sync Fix
 
 - **What was built:**

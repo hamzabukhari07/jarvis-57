@@ -2,8 +2,8 @@
 version: "3.0"
 name: "Nami Landing Page"
 theme: "dark"
-source: "D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/nami landing page.html"
-extracted_at: "2026-10-03T18:46:58.836326+00:00"
+source: "C:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57/skills/hamza_taste/references/html/nami landing page.html"
+extracted_at: "2026-10-06T06:02:01.094952+00:00"
 description: "High-precision studio design system extracted deterministically from Nami Landing Page. Features deep #0d0d0d void canvas, high-contrast #d8d5d0 typography, vibrant #ef6461 accents, and glassy elevation."
 colors:
   primary: "#ef6461"
@@ -95,7 +95,7 @@ components:
 # Nami Landing Page — Design Specification
 
 > **Aesthetic Profile:** Dark Studio / High-Precision Void  
-> **Extracted Source:** D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/nami landing page.html  
+> **Extracted Source:** C:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57/skills/hamza_taste/references/html/nami landing page.html  
 > **Theme:** DARK  
 
 ---

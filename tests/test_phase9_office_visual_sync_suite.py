@@ -53,7 +53,11 @@ def test_office_html_kanban_modal_and_rules():
     assert 'function openKanbanBoardModal' in content
     assert 'function refreshKanbanBoard' in content
 
-    # 4. AGENTS.md §8 Rule 1 compliance check (No backdrop-filter on modal-panel)
+    # 4. AGENTS.md §8 Rule 1 compliance check (No backdrop-filter on modal-panel or overlay)
     assert '.modal-panel {' in content
     # Panel must be opaque #0a0a0a
-    assert 'background: #0a0a0a;' in content
+    assert 'background: #0a0a0a !important;' in content or 'background: #0a0a0a;' in content
+    assert 'backdrop-filter: blur' not in content
+    assert 'backdrop-filter: none !important;' in content
+    assert 'body.modal-open' in content
+    assert '@keyframes modalIn' in content
