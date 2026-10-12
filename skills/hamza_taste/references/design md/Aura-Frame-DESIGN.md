@@ -3,7 +3,7 @@ version: "3.0"
 name: "Aura Frame"
 theme: "dark"
 source: "C:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57/skills/hamza_taste/references/html/aura frame.html"
-extracted_at: "2026-10-06T06:01:59.254170+00:00"
+extracted_at: "2026-10-11T20:34:53.526034+00:00"
 description: "High-precision studio design system extracted deterministically from Aura Frame. Features deep #050505 void canvas, high-contrast #ffffff typography, vibrant #ffffff accents, and glassy elevation."
 colors:
   primary: "#ffffff"

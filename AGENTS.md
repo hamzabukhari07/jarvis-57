@@ -36,13 +36,14 @@ zezo version 2/
 │   ├── gemini.py               # One-shot Gemini client with model fallback ladder
 │   ├── llm_client.py           # Multi-provider LLM interface (Ollama, OpenAI, Groq)
 │   ├── llm_router.py           # Background text router: Groq → Gemini → Ollama (live voice untouched)
-│   ├── voice_fallback.py       # Offline fallback voice loop (VAD → STT → LLM → TTS) when Gemini Live is down
+│   ├── ui_server.py            # Fast HTTP/WebSocket backend for Next/React HUD & Autonomous Office
 │   ├── wake_word.py            # Local "Hey Jarvis" detector (openWakeWord)
 │   ├── echo.py                 # Self-echo filter & mic bleed suppression
 │   ├── hotkey.py               # Global hotkey listener (Ctrl+Space Push-to-Talk)
 │   ├── audio_devices.py        # Speaker/Mic discovery & endpoint volume manager
-│   ├── tts.py                  # TTS engine fallback (Edge-TTS, Kokoro, ElevenLabs)
-│   ├── stt.py                  # STT engine fallback (Faster-Whisper, Vosk)
+│   ├── fleet_manager.py        # Multi-agent background fleet life cycle & heartbeat coordinator
+│   ├── mcp_runtime.py          # Model Context Protocol client & tool bridge
+│   ├── circuit_breaker.py      # Error burst protection & provider failover limiter
 │   ├── confirm.py              # Safety gate for destructive/irreversible user actions
 │   ├── undo.py                 # Action history & reversible state undo stack
 │   ├── log_bus.py              # Backend log ring buffer (stdlib logging + stdout/stderr tee)
@@ -79,10 +80,18 @@ zezo version 2/
 │   └── desktop.py              # [desktop_control] Desktop icons & window positioning
 │
 ├── memory/                     # 💾 Persistence & Intelligence Layer
+│   ├── vault_engine.py         # Markdown Memory Vault & Obsidian Knowledge Graph engine
+│   ├── vault/                  # Local-first human-readable Markdown notes (*.md with [[wikilinks]])
 │   ├── sqlite_memory.py        # SQLite FTS5 database (zezo_brain.db) with BM25 search
 │   ├── memory_manager.py       # Memory persistence & session summary extractor
 │   ├── config_manager.py       # Thread-safe read/write for user config & API keys
 │   └── repo_context.json       # Persisted active repository path
+│
+├── web/                        # 🖥️ React 19 Desktop OS Workstation & HUD (Port 8765)
+│   ├── src/components/memory/  # Obsidian 2D Canvas force-graph & Markdown Inspector drawer
+│   ├── src/components/settings/# Full-Screen Native OS Settings Screen
+│   ├── src/components/office/  # Scranton Autonomous Pixel Office Screen
+│   └── dist/                   # Production build served by core/ui_server.py
 │
 ├── skills/                     # 📚 Declarative Multi-Step Skill Packages (10 Skills)
 │   ├── hamza_taste/            # Studio UI aesthetic, anti-slop rules & design presets
@@ -176,59 +185,9 @@ zezo version 2/
 | `core/prompt.txt` | `main.py` (`_build_config`) | Ensure prompt tokens `{assistant_name}`, `{platform}`, `{capabilities}`, `{limits}` remain intact. |
 | `ui.py` / `frontend/index.html` | `main.py`, `core/ui_server.py` | Signal-slot / WebSocket connections between UI, server, and live audio engines. |
 | `core/log_bus.py` | `ui.py` (`LogConsoleOverlay`, `Ctrl+L`), `memory/sqlite_memory.py` (`redact_secrets`) | The console renders the bus ring buffer; `redact_secrets` is the sole scrub source and must stay the only secret-pattern list. |
+| `memory/vault_engine.py` | `core/ui_server.py`, `web/src/components/memory/`, `memory/sqlite_memory.py` | Markdown memory vault and Obsidian knowledge graph parsing depend on this engine for live node extraction. |
 
----
 
-## 🔄 4. Integrated Skill System & Automatic Workflow Routing
-
-The ZEZO development ecosystem operates through an integrated two-tier skill architecture located in `.agents/skills/`.
-
-```
-┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                       WORKFLOW SKILLS (STAGES)                                         │
-├───────────────────┬─────────────────────────┬───────────────────┬───────────────────┬──────────────────┤
-│ vision_suggestions│ repo_opportunity_audit  │ debug_diagnosis   │ feature_planning  │ implementation   │
-│ • Idea exploration│ • External repo audit   │ • Bug root cause  │ • Architecture doc│ • Code authoring │
-│ • UX brainstorming│ • Feature extraction    │ • Log diagnosis   │ • Dependency steps│ • Schema & docs  │
-│ • Read-only       │ • Target comparison     │ • Read-only       │ • Read-only       │ • Active mutation│
-└─────────┬─────────┴───────────┬─────────────┴─────────┬─────────┴─────────┬─────────┴────────┬─────────┘
-          │                     │                       │                   │                  │
-          ▼                     ▼                       ▼                   ▼                  ▼
-┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                     FOUNDATIONAL SKILLS (PILLARS)                                      │
-├─────────────────────────────────────────────────────┬──────────────────────────────────────────────────┤
-│ code_graph_intelligence                             │ antislop_code                                    │
-│ • KùzuDB CGC graph pre-flight                       │ • Cyclomatic complexity < 15                     │
-│ • Caller & callee blast radius                      │ • Dictionary dispatch tables                     │
-│ • Symbol definition & complexity hotspots           │ • Zero decorative/echo comments                  │
-└─────────────────────────────────────────────────────┴──────────────────────────────────────────────────┘
-```
-
-### Automatic Request Routing Table
-
-| User Intent / Request Pattern | Active Workflow Skill | Foundational Skills Applied | Execution Boundary |
-| :--- | :--- | :--- | :--- |
-| Exploring an idea, clarifying vision, or asking "how could we build X?" | `vision_suggestions` | `code_graph_intelligence` | **Strictly Read-Only** (No code changes) |
-| Investigating a cloned repo or third-party project for reusable features | `repo_opportunity_audit` | `code_graph_intelligence` | **Strictly Read-Only** (No copying code) |
-| Debugging an error, diagnosing logs, or investigating "why is X failing?" | `debug_diagnosis` | `code_graph_intelligence` | **Strictly Read-Only** (No code edits) |
-| Turning an approved idea into a technical roadmap or architecture plan | `feature_planning` | `code_graph_intelligence` | **Strictly Read-Only** (Generates plan only) |
-| Implementing an approved feature, coding a phase, or authorized refactor | `implementation` | `antislop_code` + `code_graph_intelligence` | **Authorized Mutation** (Requires prior plan/approval) |
-| Checking if something works, running tests, or hunting regressions | `verification` | `code_graph_intelligence` | **Strictly Read-Only** (3-Layer verification evidence) |
-| Authoring or modifying any code file (`.py`, `.js`, `.css`) | (Auto-Enforced) | `antislop_code` | **Mandatory Quality Standard** |
-| Assessing blast radius, callers, or refactoring impact | (Auto-Enforced) | `code_graph_intelligence` | **Structural Navigation & Invariants** |
-
----
-
-## 🛡️ 5. Approval & Safety Boundaries
-
-1. **Discovery is Read-Only:** `vision_suggestions` and `repo_opportunity_audit` produce analysis and options. They MUST NOT modify project files or install packages without authorization.
-2. **Planning is Read-Only:** `feature_planning` creates structured roadmap documents in `planning/`. It MUST NOT modify application source code until implementation is explicitly authorized.
-3. **Implementation Requires Explicit Authorization:** The agent must only modify code when the user explicitly instructs execution (e.g. *"Implement Phase 1"*, *"Apply the approved plan"*).
-4. **Verification-Only is Read-Only:** When asked to verify, test, or check status, report test results and failures. Do NOT silently apply code fixes without authorization.
-5. **Clean-Room Integration:** `repo_opportunity_audit` must never copy third-party code directly. Re-implement cleanly following ZEZO's architecture and Anti-Slop principles.
-6. **Material Scope Change Gate:** If an unexpected roadblock or breaking change is discovered during implementation, STOP and seek user alignment before expanding scope.
-
----
 
 ## 📋 6. Known Quirks & Architectural Constraints
 
@@ -308,6 +267,162 @@ reintroduce a previously-fixed bug.
   `types.Blob(data=..., mime_type=f"audio/pcm;rate={SEND_SAMPLE_RATE}")` (e.g. `audio/pcm;rate=16000`).
 - NEVER send bare `audio/pcm` without `rate=` — omitting it triggers gateway 1011 internal server disconnects.
 - `send_realtime_input()` must use `audio=types.Blob(...)` keyword format.
+- **Sole Active Voice Pipeline:** The active live voice conversation runs strictly via Google Gemini Live API (`main.py` WebSockets bidirectional audio). Offline cascade voice loops (VAD → STT → LLM → TTS) are not yet implemented in `core/` and MUST NOT be exposed as dummy/broken selectors in the UI.
+
+
+
+
+---
+
+## 🎨 3. ReUI Design System — NON-NEGOTIABLE UI RULES
+
+The frontend UI must use **ReUI as the primary design system and component source of truth**.
+
+ReUI is not a visual inspiration only. When a suitable ReUI component exists, the implementation MUST use the actual ReUI component rather than recreating an equivalent component with custom HTML/CSS.
+
+### 3.1 ReUI Source of Truth
+
+- ReUI components MUST be sourced from the official ReUI registry.
+- Use the official ReUI MCP/registry when available:
+  - Registry: `https://reui.io/r/{style}/{name}.json`
+  - Documentation: `https://reui.io/docs`
+  - Components: `https://reui.io/components`
+  - Styling: `https://reui.io/docs/styling`
+
+- NEVER invent ReUI component names, props, variants, APIs, installation commands, or registry paths.
+- NEVER assume that a component exists in ReUI without verifying it.
+- Before using a ReUI component:
+  1. Search the ReUI registry/documentation.
+  2. Read the actual component API/example.
+  3. Install the verified component if required.
+  4. Implement using the verified API.
+  5. Validate the implementation.
+
+### 3.2 Component Reuse Rule
+
+Before creating a custom UI component, check whether ReUI already provides an equivalent.
+
+Priority order:
+
+1. Existing ZEZO/ReUI component already installed
+2. Official ReUI component
+3. Standard shadcn component when ReUI does not provide the required component
+4. Custom component only when neither ReUI nor shadcn provides a suitable solution
+
+Examples:
+
+- Buttons → ReUI Button
+- Inputs → ReUI Input
+- Selects → ReUI Select
+- Dialogs → ReUI Dialog
+- Sheets/Drawers → ReUI Sheet
+- Tabs → ReUI Tabs
+- Progress → ReUI Progress
+- Badges → ReUI Badge
+- Tooltips → ReUI Tooltip
+- Scroll containers → ReUI Scroll Area
+- Separators → ReUI Separator
+- Cards/panels → appropriate ReUI component
+- Tables/data-heavy interfaces → ReUI Data Grid when applicable
+
+DO NOT recreate these components using raw `<div>`, `<button>`, `<input>`, or custom CSS when an appropriate ReUI component exists.
+
+### 3.3 ReUI Visual Language
+
+The application must maintain one coherent ReUI visual language.
+
+Do NOT mix unrelated component styles, spacing systems, border treatments, radii, or interaction patterns.
+
+When a ReUI component is introduced:
+
+- Preserve its intended structure.
+- Preserve its design tokens.
+- Preserve its interaction behavior.
+- Use its documented variants.
+- Extend it only when necessary.
+
+Do NOT visually downgrade ReUI components into generic Tailwind elements.
+
+### 3.4 ReUI Theme & Design Tokens
+
+The ReUI theme must be treated as the source of truth for frontend visual tokens.
+
+Use semantic CSS variables/tokens instead of hardcoding colors throughout components.
+
+Examples:
+
+- `--background`
+- `--foreground`
+- `--card`
+- `--card-foreground`
+- `--primary`
+- `--primary-foreground`
+- `--secondary`
+- `--secondary-foreground`
+- `--muted`
+- `--muted-foreground`
+- `--accent`
+- `--accent-foreground`
+- `--border`
+- `--input`
+- `--ring`
+- `--destructive`
+- `--destructive-foreground`
+- `--success`
+- `--success-foreground`
+- `--warning`
+- `--warning-foreground`
+- `--info`
+- `--info-foreground`
+
+Do NOT scatter arbitrary hex colors throughout the UI.
+
+If the ZEZO visual theme changes, update the theme tokens rather than manually recoloring individual components.
+
+### 3.5 ReUI Style Presets
+
+When selecting a ReUI style, use an official ReUI style preset.
+
+Examples include:
+
+- Vega
+- Nova
+- Maia
+- Lyra
+- Mira
+- Luma
+- Sera
+- Rhea
+
+Do NOT create a fake ReUI style name.
+
+The selected ReUI style must remain consistent across the application unless the user explicitly requests a different style.
+
+### 3.6 Color Theme Rule
+
+ReUI visual style and color palette are separate concerns.
+
+- Style controls the component's visual language, spacing, shape, density, etc.
+- Color tokens control the application's palette.
+
+When changing the ZEZO color theme:
+
+1. Select the desired ReUI style.
+2. Define the global semantic color tokens.
+3. Verify contrast.
+4. Ensure ReUI components automatically inherit the tokens.
+5. Do NOT individually recolor every component.
+
+Custom accent colors are allowed only when they are defined through the global theme/token system.
+
+### 3.7 No Fake ReUI
+
+The following is NOT considered ReUI integration:
+
+```tsx
+<div className="rounded-lg border bg-zinc-950 p-4">
+  ...
+</div>
 
 
 
@@ -321,3 +436,6 @@ reintroduce a previously-fixed bug.
 6. After implementation, run relevant tests and report the exact files changed and test results.
 
 Do not skip Code Graph analysis, and do not modify code until you have completed the dependency analysis.
+
+
+

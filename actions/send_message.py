@@ -1,4 +1,6 @@
 import json
+import os
+import re
 import subprocess
 import sys
 import time
@@ -6,7 +8,7 @@ from pathlib import Path
 
 try:
     import pyautogui
-    pyautogui.FAILSAFE = True
+    pyautogui.FAILSAFE = False
     pyautogui.PAUSE    = 0.06
     _PYAUTOGUI = True
 except ImportError:
@@ -69,6 +71,33 @@ def _open_app(app_name: str) -> bool:
 
     try:
         if os_name == "windows":
+            # 1. Use dedicated actions.open_app launcher (handles Start Menu shortcuts, executables, URIs)
+            try:
+                from actions.open_app import _launch_windows
+                if _launch_windows(app_name):
+                    time.sleep(2.0)
+                    return True
+            except Exception as e:
+                print(f"[SendMessage] _launch_windows fallback: {e}")
+
+            # 2. Known messaging URI protocol schemes (uncloaks UWP/Store apps)
+            uri_protocols = {
+                "whatsapp": "whatsapp:",
+                "telegram": "tg:",
+                "discord": "discord:",
+                "signal": "signal:",
+                "spotify": "spotify:",
+            }
+            clean_app = app_name.lower().strip()
+            if clean_app in uri_protocols:
+                try:
+                    os.startfile(uri_protocols[clean_app])
+                    time.sleep(2.0)
+                    return True
+                except Exception as e:
+                    print(f"[SendMessage] os.startfile({uri_protocols[clean_app]}) failed: {e}")
+
+            # 3. Fallback: Start Menu key search
             pyautogui.press("win")
             time.sleep(0.5)
             _paste_text(app_name)
@@ -135,18 +164,28 @@ def _search_in_app(query: str) -> None:
     time.sleep(0.8)
 
 def _desktop_send(app_name: str, receiver: str, message: str = "") -> str:
-    # Try focusing already-running application window first
+    # 1. Try focusing already-running application window first
     focused = False
     try:
         from actions.computer_control import _focus_window
-        focused = _focus_window(app_name)
+        res = _focus_window(app_name)
+        res_str = str(res).lower()
+        # Ensure return string actually indicates success, not failure
+        focused = bool(res and "focused" in res_str and not res_str.startswith("could not"))
     except Exception:
-        pass
+        focused = False
 
+    # 2. If not focused, explicitly launch/uncloak the application
     if not focused:
         if not _open_app(app_name):
-            return f"Could not open {app_name}."
-        time.sleep(1.2)
+            return f"Could not open or focus {app_name} on your desktop."
+        time.sleep(2.0)
+        try:
+            from actions.computer_control import _focus_window
+            _focus_window(app_name)
+        except Exception:
+            pass
+        time.sleep(0.8)
 
     time.sleep(0.5)
     _search_in_app(receiver)
@@ -156,17 +195,32 @@ def _desktop_send(app_name: str, receiver: str, message: str = "") -> str:
 
     # Navigate down from the search bar to the first search result contact
     pyautogui.press("down")
-    time.sleep(0.3)
+    time.sleep(0.4)
     pyautogui.press("enter")
     time.sleep(0.8)
 
     _paste_text(message)
-    time.sleep(0.2)
+    time.sleep(0.3)
     pyautogui.press("enter")
     time.sleep(0.3)
     return f"Message sent to {receiver} via {app_name}."
 
 def _send_whatsapp(receiver: str, message: str = "") -> str:
+    # If receiver is an international phone number (e.g. +923001234567)
+    clean_digits = re.sub(r"[\s\-\(\)]", "", receiver)
+    if clean_digits.startswith("+") and clean_digits[1:].isdigit() and len(clean_digits) > 8:
+        import urllib.parse
+        encoded = urllib.parse.quote(message) if message else ""
+        url = f"whatsapp://send?phone={clean_digits.replace('+', '')}&text={encoded}"
+        try:
+            os.startfile(url)
+            time.sleep(2.5)
+            if message:
+                time.sleep(0.8)
+                pyautogui.press("enter")
+            return f"Message sent to {receiver} via WhatsApp."
+        except Exception as e:
+            print(f"[SendMessage] WhatsApp URL scheme fallback: {e}")
     return _desktop_send("WhatsApp", receiver, message)
 
 def _send_telegram(receiver: str, message: str = "") -> str:

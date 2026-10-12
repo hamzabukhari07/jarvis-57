@@ -46,7 +46,7 @@ os.environ.setdefault(
     "--ignore-gpu-blocklist --enable-gpu-rasterization")
 
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
+from PyQt6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile, QWebEnginePage
 
 try:
     from core import log_bus
@@ -67,8 +67,8 @@ CONFIG_DIR = BASE_DIR / "config"
 API_FILE = CONFIG_DIR / "api_keys.json"
 
 APP_VERSION = "ZEZO"
-_DEFAULT_W, _DEFAULT_H = 1020, 720
-_MIN_W, _MIN_H = 860, 600
+_DEFAULT_W, _DEFAULT_H = 1240, 780
+_MIN_W, _MIN_H = 920, 600
 _OS = platform.system()
 
 
@@ -197,6 +197,7 @@ class MainWindow(QMainWindow):
         self._sleeping = False
         self._ready = True
         self._current_file = ""
+        self._speaker_muted = False
 
         # Initialize and start local UI Server
         self._server = get_ui_server()
@@ -204,6 +205,7 @@ class MainWindow(QMainWindow):
         self._server.on_interrupt = self._handle_interrupt
         self._server.on_mute_toggle = self._handle_mute_toggle
         self._server.on_sleep_toggle = self._handle_sleep_toggle
+        self._server.on_speaker_mute_toggle = self._handle_speaker_mute_toggle
         self._server.on_remote_clicked = self._handle_remote_clicked
         self._server.on_file_uploaded = self._handle_file_uploaded
         self.on_pipeline_change = None
@@ -216,8 +218,17 @@ class MainWindow(QMainWindow):
         self._server.get_initial_state = self._get_initial_state
         self._server.start()
 
-        # WebEngine View
+        # Configure persistent web profile directory so localStorage is always retained
+        profile_storage = CONFIG_DIR / "web_profile"
+        profile_storage.mkdir(parents=True, exist_ok=True)
+        self._web_profile = QWebEngineProfile("zezo_profile", self)
+        self._web_profile.setPersistentStoragePath(str(profile_storage))
+        self._web_profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies)
+
+        # WebEngine View with persistent page
         self.web_view = QWebEngineView(self)
+        self._web_page = QWebEnginePage(self._web_profile, self.web_view)
+        self.web_view.setPage(self._web_page)
         self.web_view.setStyleSheet("background: #050505;")
 
         # Enable local storage, WebGL, smooth scrolling
@@ -253,10 +264,10 @@ class MainWindow(QMainWindow):
         sc_intr = QShortcut(QKeySequence("Escape"), self)
         sc_intr.activated.connect(self._do_interrupt)
 
-        # Telemetry timer (500ms). psutil.net_io_counters() costs ~15 ms on
-        # Windows, so _poll_telemetry refreshes it only every 4th tick (2 s)
-        # and reuses the cached value in between — the Qt thread never blocks.
-        self._net_cache_mb = 0.0
+        # Telemetry timer (500ms). Refresh network throughput every 1 s.
+        self._net_speed_mb = 0.0
+        self._net_prev_bytes = 0
+        self._net_prev_time = 0.0
         self._net_tick = 0
         self._telemetry_timer = QTimer(self)
         self._telemetry_timer.timeout.connect(self._poll_telemetry)
@@ -281,20 +292,43 @@ class MainWindow(QMainWindow):
             pass
 
         from memory.config_manager import (
-            get_voice, get_response_language,
+            get_assistant_name, get_voice, get_response_language,
             get_autostart_enabled, get_brief_enabled,
             get_wake_word_enabled, get_push_to_talk_enabled,
+            get_masked_gemini_key, get_masked_groq_key, get_masked_elevenlabs_key, get_masked_tavily_key,
+            is_configured, get_opencode_model, get_kilo_model, get_antigravity_model,
+            get_pipeline_mode, get_stt_engine, get_llm_engine, get_tts_engine, get_tts_voice,
+            get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
+            AVAILABLE_LANGUAGES, AVAILABLE_VOICES,
         )
         return {
             "state": "OFFLINE",
             "muted": self._muted,
-            "assistant_name": self._assistant_name,
+            "assistant_name": self._assistant_name or get_assistant_name(),
             "voice_name": get_voice(),
             "response_language": get_response_language(),
             "autostart_enabled": get_autostart_enabled(),
             "morning_brief_enabled": get_brief_enabled(),
             "wake_word_enabled": get_wake_word_enabled(),
             "push_to_talk_enabled": get_push_to_talk_enabled(),
+            "has_gemini_key": is_configured(),
+            "gemini_api_key_masked": get_masked_gemini_key(),
+            "has_groq_key": bool(get_groq_api_key()),
+            "groq_api_key_masked": get_masked_groq_key(),
+            "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
+            "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
+            "has_tavily_key": bool(get_tavily_api_key()),
+            "tavily_api_key_masked": get_masked_tavily_key(),
+            "opencode_model": get_opencode_model(),
+            "kilo_model": get_kilo_model(),
+            "antigravity_model": get_antigravity_model(),
+            "pipeline_mode": get_pipeline_mode(),
+            "stt_engine": get_stt_engine(),
+            "llm_engine": get_llm_engine(),
+            "tts_engine": get_tts_engine(),
+            "tts_voice": get_tts_voice(),
+            "available_languages": list(AVAILABLE_LANGUAGES),
+            "available_voices": list(AVAILABLE_VOICES),
             "tasks": tasks,
             "timestamp": time.time(),
         }
@@ -349,7 +383,21 @@ class MainWindow(QMainWindow):
                 self.on_sleep_toggle(sleeping)
             except Exception as e:
                 logger.warning("Error in on_sleep_toggle: %s", e)
-        self._server.broadcast("state_change", {"state": "SLEEPING" if self._sleeping else ("MUTED" if self._muted else "LISTENING")})
+    def _handle_speaker_mute_toggle(self, muted: bool):
+        self._speaker_muted = bool(muted)
+        self._server.broadcast("speaker_status", {"muted": self._speaker_muted})
+
+    @property
+    def muted(self) -> bool:
+        return self._muted
+
+    @property
+    def sleeping(self) -> bool:
+        return self._sleeping
+
+    @property
+    def speaker_muted(self) -> bool:
+        return self._speaker_muted
 
     def _on_state_emitted(self, state: str):
         # If user has muted or put the assistant to sleep, do not overwrite with transient listening states
@@ -395,8 +443,11 @@ class MainWindow(QMainWindow):
             get_assistant_name, get_voice, get_response_language,
             get_autostart_enabled, get_brief_enabled,
             get_wake_word_enabled, get_push_to_talk_enabled,
-            get_masked_gemini_key, get_masked_groq_key, is_configured,
-            get_opencode_model, get_kilo_model, get_antigravity_model,
+            get_masked_gemini_key, get_masked_groq_key, get_masked_elevenlabs_key, get_masked_tavily_key,
+            is_configured, get_opencode_model, get_kilo_model, get_antigravity_model,
+            get_pipeline_mode, get_stt_engine, get_llm_engine, get_tts_engine, get_tts_voice,
+            get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
+            AVAILABLE_LANGUAGES, AVAILABLE_VOICES,
         )
         return {
             "state": state_str,
@@ -412,30 +463,49 @@ class MainWindow(QMainWindow):
             "push_to_talk_enabled": get_push_to_talk_enabled(),
             "has_gemini_key": is_configured(),
             "gemini_api_key_masked": get_masked_gemini_key(),
+            "has_groq_key": bool(get_groq_api_key()),
             "groq_api_key_masked": get_masked_groq_key(),
+            "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
+            "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
+            "has_tavily_key": bool(get_tavily_api_key()),
+            "tavily_api_key_masked": get_masked_tavily_key(),
             "opencode_model": get_opencode_model(),
             "kilo_model": get_kilo_model(),
             "antigravity_model": get_antigravity_model(),
+            "pipeline_mode": get_pipeline_mode(),
+            "stt_engine": get_stt_engine(),
+            "llm_engine": get_llm_engine(),
+            "tts_engine": get_tts_engine(),
+            "tts_voice": get_tts_voice(),
+            "available_languages": list(AVAILABLE_LANGUAGES),
+            "available_voices": list(AVAILABLE_VOICES),
         }
 
     def _poll_telemetry(self):
         try:
             from actions.system_monitor import _get_gpu_usage
+            import time
             cpu = psutil.cpu_percent()
             mem = psutil.virtual_memory().percent
-            # net_io_counters() is the one expensive sample here (~15 ms on
-            # Windows). Refresh it every 4th tick (2 s) and reuse the cached
-            # value on the rest so this timer never blocks the Qt thread.
-            self._net_tick = (self._net_tick + 1) % 4
+            # Refresh network throughput every 2 ticks (1 s)
+            self._net_tick = (self._net_tick + 1) % 2
             if self._net_tick == 1:
+                now = time.monotonic()
                 net = psutil.net_io_counters()
-                self._net_cache_mb = (net.bytes_sent + net.bytes_recv) / (1024 * 1024)
+                total_bytes = net.bytes_sent + net.bytes_recv
+                if self._net_prev_time > 0 and self._net_prev_bytes > 0:
+                    dt = max(0.1, now - self._net_prev_time)
+                    speed = (total_bytes - self._net_prev_bytes) / (1024 * 1024 * dt)
+                    self._net_speed_mb = max(0.0, round(speed, 2))
+                self._net_prev_bytes = total_bytes
+                self._net_prev_time = now
+
             gpu_val = _get_gpu_usage()
             self._server.broadcast("telemetry_update", {
                 "cpu": cpu,
                 "mem": mem,
                 "gpu": gpu_val if gpu_val >= 0 else 0,
-                "net": self._net_cache_mb % 10.0,
+                "net": getattr(self, "_net_speed_mb", 0.0),
                 "tmp": -1
             })
         except Exception:
@@ -470,7 +540,8 @@ class MainWindow(QMainWindow):
             tag, msg = "SYS", text[4:].strip()
 
         self._server.broadcast("log_entry", {"tag": tag, "message": msg})
-        self._server.broadcast("transcript_stream", {"speaker": tag.lower(), "text": msg, "done": True})
+        if tag in ("USER", "AI"):
+            self._server.broadcast("transcript_stream", {"speaker": tag.lower(), "text": msg, "done": True})
 
     def _on_stream_emitted(self, speaker: str, text: str, done: bool):
         self._server.broadcast("transcript_stream", {
@@ -563,6 +634,19 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
         return home / "Desktop"
+
+    def closeEvent(self, event):
+        try:
+            if hasattr(self, "web_view") and self.web_view:
+                self.web_view.stop()
+                if hasattr(self, "_web_page") and self._web_page:
+                    page = self._web_page
+                    self._web_page = None
+                    self.web_view.setPage(None)
+                    page.deleteLater()
+        except Exception as e:
+            logger.warning("Error during WebEnginePage teardown: %s", e)
+        super().closeEvent(event)
 
 
 class ZezoUI:
@@ -702,11 +786,12 @@ class ZezoUI:
         self.on_push_to_talk = cb
 
     def is_alive(self) -> bool:
-        if not hasattr(self, "_win") or self._win is None:
+        win = self.__dict__.get("_win")
+        if win is None:
             return False
         try:
             from PyQt6 import sip
-            return not sip.isdeleted(self._win)
+            return not sip.isdeleted(win)
         except Exception:
             return False
 
@@ -719,7 +804,15 @@ class ZezoUI:
             pass
 
     def set_audio_level(self, level: float):
-        pass
+        now = time.monotonic()
+        if now - getattr(self, "_last_audio_bc", 0.0) < 0.05:
+            return
+        self._last_audio_bc = now
+        try:
+            from core.ui_server import get_ui_server
+            get_ui_server().broadcast("audio_level", {"level": float(level)})
+        except Exception:
+            pass
 
     def set_mic_level(self, level: float):
         """Push the raw microphone level to the web UI's mic meter.
@@ -827,14 +920,43 @@ class ZezoUI:
         except (RuntimeError, AttributeError):
             return "Zezo"
 
+    @property
+    def muted(self) -> bool:
+        if not self.is_alive():
+            return False
+        return getattr(self._win, "_muted", False)
+
+    @property
+    def sleeping(self) -> bool:
+        if not self.is_alive():
+            return False
+        return getattr(self._win, "_sleeping", False)
+
+    @property
+    def speaker_muted(self) -> bool:
+        if not self.is_alive():
+            return False
+        return getattr(self._win, "_speaker_muted", False)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        super().__setattr__(name, value)
+        win = self.__dict__.get("_win")
+        if win is not None:
+            if hasattr(win, name) or name.startswith("on_") or name in ("ptt_hold", "current_file"):
+                try:
+                    setattr(win, name, value)
+                except Exception:
+                    pass
+
     def __getattr__(self, name: str) -> Any:
-        if not hasattr(self, "_win") or self._win is None:
+        win = self.__dict__.get("_win")
+        if win is None:
             raise AttributeError(f"'ZezoUI' object has no attribute '{name}'")
         try:
             from PyQt6 import sip
-            if sip.isdeleted(self._win):
+            if sip.isdeleted(win):
                 raise AttributeError(f"'ZezoUI' underlying window has been deleted, cannot access '{name}'")
-            return getattr(self._win, name)
+            return getattr(win, name)
         except (RuntimeError, AttributeError):
             raise AttributeError(f"'ZezoUI' underlying window deleted or invalid, cannot access '{name}'")
 

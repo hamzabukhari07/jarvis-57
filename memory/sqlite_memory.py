@@ -668,3 +668,33 @@ def record_condensation(session_id: str, last_turn_id: int, summary: str) -> Non
         finally:
             conn.close()
 
+
+def wipe_all_sqlite_memory() -> dict[str, int]:
+    """Atomically purge all historical turns, FTS indices, facts, rules, conflicts, and vacuum disk."""
+    counts: dict[str, int] = {}
+    with _db_lock:
+        conn = _get_connection()
+        try:
+            with conn:
+                for tbl in ["turns", "facts", "user_explicit_rules", "memory_conflicts", "session_condensations"]:
+                    try:
+                        cur = conn.execute(f"SELECT COUNT(*) FROM {tbl}")
+                        counts[tbl] = cur.fetchone()[0]
+                    except Exception:
+                        counts[tbl] = 0
+
+                conn.execute("DELETE FROM turns;")
+                try:
+                    conn.execute("DELETE FROM turns_fts;")
+                except Exception:
+                    pass
+                conn.execute("DELETE FROM facts;")
+                conn.execute("DELETE FROM user_explicit_rules;")
+                conn.execute("DELETE FROM memory_conflicts;")
+                conn.execute("DELETE FROM session_condensations;")
+
+            conn.execute("VACUUM;")
+            return counts
+        finally:
+            conn.close()
+

@@ -3,6 +3,8 @@ import os
 import platform
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
 # Canonical model identifiers live in ONE place: core/models.py.
@@ -25,6 +27,7 @@ def get_base_dir() -> Path:
 BASE_DIR    = get_base_dir()
 CONFIG_DIR  = BASE_DIR / "config"
 CONFIG_FILE = CONFIG_DIR / "api_keys.json"
+_CONFIG_LOCK = threading.RLock()
 
 def ensure_config_dir() -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -49,19 +52,37 @@ def clean_api_key(k: str | None) -> str | None:
 
 
 def _atomic_write_config(data: dict) -> None:
-    """Safely write config dictionary to disk via staging file and atomic replace."""
+    """Safely write config dictionary to disk via staging file and atomic replace with retry on Windows."""
     ensure_config_dir()
-    tmp_file = CONFIG_FILE.with_suffix(".json.tmp")
-    tmp_file.write_text(json.dumps(data, indent=4), encoding="utf-8")
-    try:
-        os.replace(tmp_file, CONFIG_FILE)
-    except Exception:
+    with _CONFIG_LOCK:
+        tmp_file = CONFIG_FILE.with_suffix(f".json.{os.getpid()}_{threading.get_ident()}_{time.time_ns()}.tmp")
+        payload = json.dumps(data, indent=4)
+        last_err = None
+        for attempt in range(5):
+            try:
+                tmp_file.write_text(payload, encoding="utf-8")
+                break
+            except (PermissionError, OSError) as e:
+                last_err = e
+                time.sleep(0.04 * (attempt + 1))
+        else:
+            if last_err:
+                raise last_err
+
+        for attempt in range(5):
+            try:
+                os.replace(tmp_file, CONFIG_FILE)
+                return
+            except (PermissionError, OSError) as e:
+                last_err = e
+                time.sleep(0.05 * (attempt + 1))
         if tmp_file.exists():
             try:
                 tmp_file.unlink()
             except Exception:
                 pass
-        raise
+        if last_err:
+            raise last_err
 
 
 def validate_gemini_key(api_key: str, timeout: float = 5.0) -> tuple[bool, str]:
@@ -302,11 +323,23 @@ def save_api_keys(
 def load_api_keys() -> dict:
     if not CONFIG_FILE.exists():
         return {}
-    try:
-        return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-    except Exception as e:
-        print(f"❌ Failed to load api_keys.json: {e}")
-        return {}
+    last_err = None
+    for attempt in range(5):
+        try:
+            return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        except (PermissionError, OSError) as e:
+            last_err = e
+            time.sleep(0.04 * (attempt + 1))
+        except json.JSONDecodeError as e:
+            last_err = e
+            time.sleep(0.04 * (attempt + 1))
+        except Exception as e:
+            last_err = e
+            break
+
+    if last_err:
+        print(f"❌ Failed to load api_keys.json after retries: {last_err}")
+    return {}
 
 def get_gemini_key() -> str | None:
     return load_api_keys().get("gemini_api_key")
@@ -345,8 +378,8 @@ def is_configured() -> bool:
 
 
 def get_assistant_name() -> str:
-    """Return the configured assistant name, or 'JARVIS' if not set."""
-    return load_api_keys().get("assistant_name", "JARVIS") or "JARVIS"
+    """Return the fixed operating system assistant identity 'ZEZO'."""
+    return "ZEZO"
 
 
 def get_user_name() -> str:
@@ -354,12 +387,13 @@ def get_user_name() -> str:
     return load_api_keys().get("user_name", "")
 
 
-def save_assistant_config(assistant_name: str, user_name: str) -> None:
-    """Persist assistant name and user name to config."""
+def save_assistant_config(assistant_name: str = "ZEZO", user_name: str = "") -> None:
+    """Persist user name to config (assistant identity is permanently ZEZO)."""
     ensure_config_dir()
     data: dict = load_api_keys()
-    data["assistant_name"] = assistant_name.strip() or "JARVIS"
-    data["user_name"] = user_name.strip()
+    data["assistant_name"] = "ZEZO"
+    if user_name is not None:
+        data["user_name"] = str(user_name).strip()
     _atomic_write_config(data)
 
 
@@ -653,9 +687,10 @@ def save_media_resolution(value: str) -> None:
 def _save_flag(key: str, value) -> None:
     """Read-modify-write one key without disturbing the rest of the config."""
     ensure_config_dir()
-    data: dict = load_api_keys()
-    data[key] = bool(value) if isinstance(value, bool) else value
-    _atomic_write_config(data)
+    with _CONFIG_LOCK:
+        data: dict = load_api_keys()
+        data[key] = bool(value) if isinstance(value, bool) else value
+        _atomic_write_config(data)
 
 
 def get_brief_enabled() -> bool:
@@ -667,6 +702,44 @@ def save_brief_enabled(enabled: bool) -> None:
     data: dict = load_api_keys()
     data["morning_brief_enabled"] = bool(enabled)
     _atomic_write_config(data)
+
+
+def get_theme() -> str:
+    return str(load_api_keys().get("theme", "copper")).strip() or "copper"
+
+
+def save_theme(theme: str) -> None:
+    _save_flag("theme", str(theme or "copper").strip())
+
+
+def get_accent() -> str:
+    return str(load_api_keys().get("accent", "#ea580c")).strip() or "#ea580c"
+
+
+def save_accent(accent: str) -> None:
+    _save_flag("accent", str(accent or "#ea580c").strip())
+
+
+def get_avatar_settings() -> dict:
+    keys = load_api_keys()
+    return {
+        "avatar_preset": str(keys.get("avatar_preset", "qivi")).strip() or "qivi",
+        "avatar_shape": str(keys.get("avatar_shape", "blob")).strip() or "blob",
+        "avatar_theme": str(keys.get("avatar_theme", "match_theme")).strip() or "match_theme",
+        "avatar_quality": str(keys.get("avatar_quality", "high")).strip() or "high",
+        "avatar_lighting": float(keys.get("avatar_lighting", 0.85) or 0.85),
+    }
+
+
+def save_avatar_settings(settings: dict) -> None:
+    for k in ("avatar_preset", "avatar_shape", "avatar_theme", "avatar_quality"):
+        if k in settings and settings[k]:
+            _save_flag(k, str(settings[k]).strip())
+    if "avatar_lighting" in settings and settings["avatar_lighting"] is not None:
+        try:
+            _save_flag("avatar_lighting", float(settings["avatar_lighting"]))
+        except (ValueError, TypeError):
+            pass
 
 
 def get_startup_lnk_path() -> Path | None:

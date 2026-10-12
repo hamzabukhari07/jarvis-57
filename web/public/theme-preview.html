@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZEZO V2 — Theme Studio Playground</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://code.iconify.design/iconify-icon/2.0.0/iconify-icon.min.js"></script>
+  <style>
+    :root {
+      --font-sans: 'Outfit', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-canvas, #111a30);
+      color: var(--text-primary, #edf2ff);
+      user-select: none;
+      overflow-x: hidden;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+    .font-mono { font-family: var(--font-mono); }
+
+    /* ── 1. QIVI OFFICIAL DARK (Midnight Navy) ── */
+    .theme-qivi-dark {
+      --bg-canvas: #111a30;
+      --bg-paper: #18233d;
+      --bg-sunk: #152038;
+      --bg-card: #18233d;
+      --bg-input: #121b33;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-card: rgba(146, 173, 255, 0.15);
+      --text-primary: #edf2ff;
+      --text-muted: #aab7d1;
+      --accent: #92adff;
+      --accent-rgb: 146, 173, 255;
+      --accent-glow: rgba(146, 173, 255, 0.45);
+      --accent-bg: rgba(146, 173, 255, 0.15);
+      --accent-border: rgba(146, 173, 255, 0.35);
+      --accent-text: #92adff;
+      --sub-accent: #72d9bc;
+      --tag-kernel: #92adff;
+      --tag-router: #72d9bc;
+      --tag-audio: #ffb58e;
+      --tag-tasks: #92adff;
+      --tag-telemetry: #72d9bc;
+      --btn-primary-bg: #92adff;
+      --btn-primary-text: #111a30;
+      --avatar-core-1: #92adff;
+      --avatar-core-2: #72d9bc;
+      --is-light: 0;
+    }
+
+    /* ── 2. QIVI OFFICIAL LIGHT (Porcelain / Royal Blue) ── */
+    .theme-qivi-light {
+      --bg-canvas: #f5f7fc;
+      --bg-paper: #ffffff;
+      --bg-sunk: #edf1f9;
+      --bg-card: #ffffff;
+      --bg-input: #f0f3fa;
+      --border-subtle: rgba(0, 0, 0, 0.08);
+      --border-card: rgba(52, 93, 227, 0.15);
+      --text-primary: #17254a;
+      --text-muted: #596783;
+      --accent: #345de3;
+      --accent-rgb: 52, 93, 227;
+      --accent-glow: rgba(52, 93, 227, 0.3);
+      --accent-bg: rgba(52, 93, 227, 0.1);
+      --accent-border: rgba(52, 93, 227, 0.3);
+      --accent-text: #345de3;
+      --sub-accent: #117861;
+      --tag-kernel: #345de3;
+      --tag-router: #117861;
+      --tag-audio: #a74421;
+      --tag-tasks: #345de3;
+      --tag-telemetry: #117861;
+      --btn-primary-bg: #345de3;
+      --btn-primary-text: #ffffff;
+      --avatar-core-1: #345de3;
+      --avatar-core-2: #72d9bc;
+      --is-light: 1;
+    }
+
+    /* ── 3. Cyber Emerald ── */
+    .theme-emerald {
+      --bg-canvas: #000000;
+      --bg-paper: #121110;
+      --bg-sunk: #1a1918;
+      --bg-card: #141312;
+      --bg-input: #1a1918;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-card: rgba(16, 185, 129, 0.2);
+      --text-primary: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #10b981;
+      --accent-rgb: 16, 185, 129;
+      --accent-glow: rgba(16, 185, 129, 0.4);
+      --accent-bg: rgba(16, 185, 129, 0.12);
+      --accent-border: rgba(16, 185, 129, 0.35);
+      --accent-text: #34d399;
+      --sub-accent: #06b6d4;
+      --tag-kernel: #10b981;
+      --tag-router: #38bdf8;
+      --tag-audio: #a855f7;
+      --tag-tasks: #34d399;
+      --tag-telemetry: #06b6d4;
+      --btn-primary-bg: #10b981;
+      --btn-primary-text: #022c22;
+      --avatar-core-1: #10b981;
+      --avatar-core-2: #06b6d4;
+      --is-light: 0;
+    }
+
+    /* ── 4. Electric Violet ── */
+    .theme-violet {
+      --bg-canvas: #000000;
+      --bg-paper: #121110;
+      --bg-sunk: #1a1918;
+      --bg-card: #141312;
+      --bg-input: #1a1918;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-card: rgba(139, 92, 246, 0.2);
+      --text-primary: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #8b5cf6;
+      --accent-rgb: 139, 92, 246;
+      --accent-glow: rgba(139, 92, 246, 0.45);
+      --accent-bg: rgba(139, 92, 246, 0.12);
+      --accent-border: rgba(139, 92, 246, 0.35);
+      --accent-text: #a78bfa;
+      --sub-accent: #14b8a6;
+      --tag-kernel: #8b5cf6;
+      --tag-router: #a78bfa;
+      --tag-audio: #14b8a6;
+      --tag-tasks: #6366f1;
+      --tag-telemetry: #c084fc;
+      --btn-primary-bg: #8b5cf6;
+      --btn-primary-text: #ffffff;
+      --avatar-core-1: #8b5cf6;
+      --avatar-core-2: #6366f1;
+      --is-light: 0;
+    }
+
+    /* ── 5. Forma OS Warm Sand ── */
+    .theme-sand {
+      --bg-canvas: #000000;
+      --bg-paper: #121110;
+      --bg-sunk: #1a1918;
+      --bg-card: #141312;
+      --bg-input: #1a1918;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-card: rgba(226, 216, 202, 0.15);
+      --text-primary: #e4e0d8;
+      --text-muted: #9a948a;
+      --accent: #e2d8ca;
+      --accent-rgb: 226, 216, 202;
+      --accent-glow: rgba(226, 216, 202, 0.35);
+      --accent-bg: rgba(226, 216, 202, 0.12);
+      --accent-border: rgba(226, 216, 202, 0.3);
+      --accent-text: #e4e0d8;
+      --sub-accent: #d8d2c8;
+      --tag-kernel: #e4e0d8;
+      --tag-router: #d8d2c8;
+      --tag-audio: #c2baba;
+      --tag-tasks: #e2d8ca;
+      --tag-telemetry: #9a948a;
+      --btn-primary-bg: #e4e0d8;
+      --btn-primary-text: #121110;
+      --avatar-core-1: #e4e0d8;
+      --avatar-core-2: #9a948a;
+      --is-light: 0;
+    }
+
+    .ui-panel {
+      background-color: var(--bg-paper);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+    }
+    .ui-sunk {
+      background-color: var(--bg-sunk);
+      border: 1px solid var(--border-subtle);
+    }
+    .ui-input {
+      background-color: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+    }
+
+    .accent-color { color: var(--accent); }
+    .accent-bg { background-color: var(--accent); }
+    .accent-border { border-color: var(--accent-border); }
+    .accent-pill { background: var(--accent-bg); border: 1px solid var(--accent-border); color: var(--accent-text); }
+    .accent-btn { background: var(--btn-primary-bg); color: var(--btn-primary-text); }
+
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); opacity: 0.6; }
+      50% { transform: scale(1.08); opacity: 0.9; }
+    }
+    .animate-glow { animation: pulseGlow 3s ease-in-out infinite; }
+  </style>
+</head>
+<body class="theme-qivi-dark min-h-screen flex flex-col">
+
+  <!-- ── Master Theme Selector Bar (Top Playground Controller) ── -->
+  <div class="ui-sunk border-b border-white/10 px-6 py-3.5 flex flex-wrap items-center justify-between sticky top-0 z-50 shadow-2xl backdrop-blur-md">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg ui-panel flex items-center justify-center">
+        <iconify-icon icon="lucide:sparkles" class="text-lg accent-color"></iconify-icon>
+      </div>
+      <div>
+        <h1 class="text-sm font-bold tracking-wide flex items-center gap-2">
+          Qivi Design Token Theme Playground
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded-full border accent-pill">Yogesh Rathod / Qivi</span>
+        </h1>
+        <p class="text-[11px] opacity-75">Click a preset to test Qivi Official Dark, Qivi Light, or alternative dark palettes.</p>
+      </div>
+    </div>
+
+    <!-- Theme Switcher Buttons -->
+    <div class="flex items-center gap-2 ui-panel p-1.5 rounded-xl">
+      <!-- Qivi Dark -->
+      <button onclick="setTheme('theme-qivi-dark')" id="btn-qivi-dark" class="theme-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all accent-pill">
+        <span class="w-2.5 h-2.5 rounded-full bg-[#92adff] shadow-[0_0_8px_#92adff]"></span>
+        <span>✨ Qivi Dark (Midnight)</span>
+      </button>
+
+      <!-- Qivi Light -->
+      <button onclick="setTheme('theme-qivi-light')" id="btn-qivi-light" class="theme-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all opacity-75 hover:opacity-100">
+        <span class="w-2.5 h-2.5 rounded-full bg-[#345de3] shadow-[0_0_8px_#345de3]"></span>
+        <span>☀️ Qivi Light (Porcelain)</span>
+      </button>
+
+      <!-- Cyber Emerald -->
+      <button onclick="setTheme('theme-emerald')" id="btn-emerald" class="theme-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all opacity-75 hover:opacity-100">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+        <span>Cyber Emerald</span>
+      </button>
+
+      <!-- Electric Violet -->
+      <button onclick="setTheme('theme-violet')" id="btn-violet" class="theme-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all opacity-75 hover:opacity-100">
+        <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+        <span>Electric Violet</span>
+      </button>
+
+      <!-- Forma Sand -->
+      <button onclick="setTheme('theme-sand')" id="btn-sand" class="theme-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all opacity-75 hover:opacity-100">
+        <span class="w-2.5 h-2.5 rounded-full bg-[#e2d8ca]"></span>
+        <span>Warm Sand</span>
+      </button>
+    </div>
+
+    <!-- Quick Modal Triggers -->
+    <div class="flex items-center gap-2">
+      <button onclick="openModal('settings-modal')" class="px-3 py-1.5 rounded-lg ui-panel text-xs font-medium flex items-center gap-1.5 hover:opacity-80 transition-all">
+        <iconify-icon icon="lucide:settings" class="text-sm"></iconify-icon>
+        <span>Test Settings Modal</span>
+      </button>
+      <button onclick="openModal('logs-modal')" class="px-3 py-1.5 rounded-lg ui-panel text-xs font-medium flex items-center gap-1.5 hover:opacity-80 transition-all">
+        <iconify-icon icon="lucide:terminal" class="text-sm"></iconify-icon>
+        <span>Test Logs (Ctrl+L)</span>
+      </button>
+      <button onclick="openModal('tasks-modal')" class="px-3 py-1.5 rounded-lg ui-panel text-xs font-medium flex items-center gap-1.5 hover:opacity-80 transition-all">
+        <iconify-icon icon="lucide:layers" class="text-sm"></iconify-icon>
+        <span>Test Task Matrix</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── 1. EXACT REUI APP HEADER ── -->
+  <header class="h-12 ui-sunk px-4 flex items-center justify-between z-40 select-none">
+    <div class="flex items-center gap-1.5">
+      <button onclick="openModal('settings-modal')" class="h-8 w-8 rounded-md ui-panel flex items-center justify-center hover:opacity-80">
+        <iconify-icon icon="lucide:settings" class="text-sm"></iconify-icon>
+      </button>
+      <button onclick="openModal('logs-modal')" class="h-8 w-8 rounded-md ui-panel flex items-center justify-center hover:opacity-80">
+        <iconify-icon icon="lucide:terminal" class="text-sm"></iconify-icon>
+      </button>
+      <button onclick="openModal('tasks-modal')" class="h-8 w-8 rounded-md ui-panel flex items-center justify-center hover:opacity-80">
+        <iconify-icon icon="lucide:layers" class="text-sm"></iconify-icon>
+      </button>
+      <div class="h-4 w-px bg-current opacity-20 mx-1"></div>
+      <button class="h-8 px-3 rounded-md ui-panel font-medium text-xs flex items-center gap-1.5">
+        <iconify-icon icon="lucide:users" class="text-sm accent-color"></iconify-icon>
+        <span>DASHBOARD</span>
+      </button>
+    </div>
+
+    <!-- Center Brand -->
+    <div class="flex items-center gap-2">
+      <span class="font-bold tracking-widest text-sm">ZEZO</span>
+      <span class="text-[10px] font-mono px-1.5 py-0.5 rounded ui-panel">v2.4 Qivi Engine</span>
+    </div>
+
+    <!-- Right Telemetry & Clock -->
+    <div class="flex items-center gap-3 font-mono text-xs">
+      <div class="flex items-center gap-2 px-2.5 py-1 rounded-md ui-panel text-[11px]">
+        <span class="font-semibold">15:58:30</span>
+        <span class="opacity-30">|</span>
+        <span class="opacity-75 text-[10px]">FRI 9 OCT</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── 2. EXACT 3-COLUMN TACTICAL DASHBOARD ── -->
+  <main class="flex-1 grid grid-cols-[280px_1fr_340px] gap-2.5 p-2.5 min-h-[640px]">
+    
+    <!-- LEFT COLUMN: Telemetry & Task Queue -->
+    <aside class="flex flex-col gap-2.5">
+      <!-- System Telemetry Card -->
+      <div class="rounded-xl ui-panel p-3 flex flex-col gap-2.5">
+        <div class="flex items-center justify-between pb-2 border-b border-current border-opacity-10">
+          <span class="text-[11px] font-semibold">System Telemetry</span>
+          <span class="text-[9px] font-mono px-2 py-0.5 rounded-full font-bold accent-pill">LIVE 16kHz</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 font-mono">
+          <div class="p-2.5 rounded-lg ui-sunk">
+            <div class="flex items-center justify-between text-[10px] opacity-75">
+              <span>CPU LOAD</span>
+              <iconify-icon icon="lucide:cpu" class="text-xs"></iconify-icon>
+            </div>
+            <div class="text-base font-semibold my-1">28%</div>
+            <div class="w-full h-1 bg-black/20 rounded-full overflow-hidden">
+              <div class="h-full w-[28%] accent-bg transition-all"></div>
+            </div>
+          </div>
+          <div class="p-2.5 rounded-lg ui-sunk">
+            <div class="flex items-center justify-between text-[10px] opacity-75">
+              <span>RAM USAGE</span>
+              <iconify-icon icon="lucide:hard-drive" class="text-xs"></iconify-icon>
+            </div>
+            <div class="text-base font-semibold my-1">54%</div>
+            <div class="w-full h-1 bg-black/20 rounded-full overflow-hidden">
+              <div class="h-full w-[54%] accent-bg transition-all"></div>
+            </div>
+          </div>
+          <div class="p-2.5 rounded-lg ui-sunk">
+            <div class="flex items-center justify-between text-[10px] opacity-75">
+              <span>GPU LOAD</span>
+              <iconify-icon icon="lucide:activity" class="text-xs"></iconify-icon>
+            </div>
+            <div class="text-base font-semibold my-1">41%</div>
+            <div class="w-full h-1 bg-black/20 rounded-full overflow-hidden">
+              <div class="h-full w-[41%] accent-bg transition-all"></div>
+            </div>
+          </div>
+          <div class="p-2.5 rounded-lg ui-sunk">
+            <div class="flex items-center justify-between text-[10px] opacity-75">
+              <span>NETWORK</span>
+              <iconify-icon icon="lucide:wifi" class="text-xs"></iconify-icon>
+            </div>
+            <div class="text-base font-semibold my-1">ONLINE</div>
+            <div class="w-full h-1 bg-black/20 rounded-full overflow-hidden">
+              <div class="h-full w-[95%] accent-bg transition-all"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tasks List Card -->
+      <div class="flex-1 rounded-xl ui-panel p-3 flex flex-col gap-2">
+        <div class="flex items-center justify-between pb-2 border-b border-current border-opacity-10">
+          <span class="text-[11px] font-semibold">Active Tasks</span>
+          <span class="text-[10px] font-mono opacity-75">3 QUEUED</span>
+        </div>
+        <div class="space-y-2 overflow-y-auto">
+          <div class="p-3 rounded-lg ui-sunk flex flex-col gap-2">
+            <div class="font-medium text-xs">Opencode: Refactoring UI components to ReUI standard</div>
+            <div class="flex items-center justify-between gap-2 pt-1 border-t border-current border-opacity-5">
+              <span class="text-[9px] font-mono font-semibold px-2 py-0.5 rounded accent-pill flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full accent-bg animate-pulse"></span>
+                RUNNING
+              </span>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-mono font-semibold">72%</span>
+                <div class="w-12 h-1.5 bg-black/20 rounded-full overflow-hidden">
+                  <div class="h-full w-[72%] accent-bg transition-all"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-3 rounded-lg ui-sunk flex flex-col gap-2">
+            <div class="font-medium text-xs">Web Reader: Extracting documentation tokens from mcp.reui.io</div>
+            <div class="flex items-center justify-between gap-2 pt-1 border-t border-current border-opacity-5">
+              <span class="text-[9px] font-mono font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/30">
+                COMPLETED
+              </span>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-mono font-semibold">100%</span>
+                <div class="w-12 h-1.5 bg-black/20 rounded-full overflow-hidden">
+                  <div class="h-full w-full bg-emerald-500 transition-all"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER COLUMN: Particle Visualizer & Display Canvas -->
+    <section class="flex flex-col gap-2">
+      <!-- 3D Particle Companion Visualizer Frame -->
+      <div class="h-64 rounded-xl ui-panel p-3 flex flex-col justify-between items-center text-center relative overflow-hidden">
+        
+        <!-- Interactive Simulated Particle Halo -->
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div id="avatar-glow" class="w-48 h-48 rounded-full blur-3xl animate-glow" style="background: var(--accent-glow);"></div>
+          <div class="w-32 h-32 rounded-full border border-dashed accent-border animate-spin" style="animation-duration: 12s;"></div>
+          <div class="w-24 h-24 rounded-full border border-dotted accent-border animate-[spin_8s_linear_infinite_reverse] absolute"></div>
+          <div id="avatar-core" class="w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all" style="background: linear-gradient(135deg, var(--avatar-core-1), var(--avatar-core-2));">
+            <div class="w-9 h-9 rounded-full bg-white/40 backdrop-blur-sm shadow-inner"></div>
+          </div>
+        </div>
+
+        <!-- Audio State Banner -->
+        <div class="relative z-20 flex items-center gap-2 px-3 py-1 rounded-full ui-sunk backdrop-blur-md">
+          <span class="w-2 h-2 rounded-full accent-bg animate-pulse"></span>
+          <span class="text-[11px] font-mono uppercase tracking-wider font-semibold">LISTENING</span>
+          <div class="flex items-center gap-0.5 ml-1">
+            <span class="w-1 h-3 accent-bg rounded-full animate-bounce"></span>
+            <span class="w-1 h-2 accent-bg rounded-full"></span>
+          </div>
+        </div>
+
+        <!-- Avatar Command Dock -->
+        <div class="relative z-20 mt-auto flex items-center gap-1.5">
+          <button class="h-8 px-3 rounded-lg ui-sunk text-xs font-semibold flex items-center gap-1.5 hover:opacity-80">
+            <iconify-icon icon="lucide:mic" class="text-sm accent-color"></iconify-icon>
+            <span>MUTE</span>
+          </button>
+          <div class="h-4 w-px bg-current opacity-20 mx-0.5"></div>
+          <button class="h-8 px-3 rounded-lg ui-sunk text-xs font-semibold flex items-center gap-1.5 hover:opacity-80">
+            <iconify-icon icon="lucide:square" class="text-xs text-red-500"></iconify-icon>
+            <span>STOP</span>
+          </button>
+          <div class="h-4 w-px bg-current opacity-20 mx-0.5"></div>
+          <button class="h-8 px-3 rounded-lg ui-sunk text-xs font-semibold flex items-center gap-1.5 hover:opacity-80">
+            <iconify-icon icon="lucide:moon" class="text-xs opacity-75"></iconify-icon>
+            <span>SLEEP</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Execution Canvas -->
+      <div class="flex-1 rounded-xl ui-panel p-3 flex flex-col">
+        <div class="flex items-center justify-between pb-2 border-b border-current border-opacity-10">
+          <span class="text-[11px] font-semibold">Execution Canvas Output</span>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] font-mono opacity-75">STREAMING</span>
+            <button class="text-xs opacity-75 hover:opacity-100 px-2 py-0.5 rounded ui-sunk">COPY</button>
+          </div>
+        </div>
+        <div class="flex-1 ui-input rounded-lg p-3 font-mono text-xs leading-relaxed overflow-y-auto mt-2">
+          <span class="opacity-50">// Qivi Particle Ecosystem Attached</span><br>
+          <span class="accent-color font-bold">import</span> { QiviAvatar, QiviVoice } <span class="accent-color font-bold">from</span> <span class="text-emerald-500">"qivi-react"</span>;<br>
+          <span class="accent-color font-bold">const</span> qivi = <span class="text-amber-500">new</span> QiviEngine({ quality: <span class="text-emerald-500">"high"</span>, palette: <span class="text-emerald-500">"midnight"</span> });<br>
+          <span class="opacity-75">[15:58:30] Three.js r180 WebGL context active. Dynamic morph shapes mounted.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: Assistant-UI Chat Thread -->
+    <aside class="flex flex-col gap-2.5">
+      <div class="flex-1 rounded-xl ui-panel p-3 flex flex-col">
+        <div class="flex items-center justify-between pb-2 border-b border-current border-opacity-10">
+          <div class="flex items-center gap-2">
+            <span class="text-[11px] font-semibold">Chat Stream</span>
+            <span class="text-[9px] font-mono px-1.5 py-0.5 rounded ui-sunk">assistant-ui</span>
+          </div>
+        </div>
+
+        <div class="flex-1 space-y-3 overflow-y-auto py-2 pr-1">
+          <!-- User message -->
+          <div class="flex justify-end">
+            <div class="rounded-2xl px-3.5 py-2 text-xs leading-relaxed max-w-[85%] ui-sunk">
+              Run system status check and verify active tool registrations.
+            </div>
+          </div>
+
+          <!-- Assistant Thinking Block -->
+          <div class="rounded-lg p-2.5 ui-input text-[11px] font-mono">
+            <div class="flex items-center gap-1.5 accent-color font-semibold mb-1">
+              <iconify-icon icon="lucide:brain" class="text-xs"></iconify-icon>
+              <span>Thinking Process (3 steps)</span>
+            </div>
+            <div class="opacity-75 text-[10px] leading-tight">
+              - Polled 25 modules in actions/<br>
+              - Verified tool signatures and memory bus ring buffer.
+            </div>
+          </div>
+
+          <!-- Tool Call Card -->
+          <div class="rounded-lg p-2.5 ui-sunk text-xs">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-[10px] font-bold accent-color">tool: system_status</span>
+              <span class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/30">SUCCESS</span>
+            </div>
+          </div>
+
+          <!-- Assistant Bubble -->
+          <div class="flex justify-start">
+            <div class="rounded-2xl px-3.5 py-2 text-xs leading-relaxed max-w-[85%] ui-panel border border-current border-opacity-10">
+              All 25 tools verified. Telemetry is optimal with 3 background daemons active.
+            </div>
+          </div>
+        </div>
+
+        <!-- Composer Input -->
+        <div class="mt-2 pt-2 border-t border-current border-opacity-10 flex items-center gap-2">
+          <input type="text" placeholder="Type a message or prompt..." class="flex-1 ui-input rounded-lg px-3 py-2 text-xs focus:outline-none">
+          <button class="h-8 px-3 rounded-lg accent-btn text-xs font-semibold flex items-center justify-center">
+            <iconify-icon icon="lucide:arrow-up" class="text-sm"></iconify-icon>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- ── 3. INTERACTIVE MODAL 1: SYSTEM SETTINGS ── -->
+  <div id="settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+    <div class="w-full max-w-xl ui-panel rounded-xl overflow-hidden shadow-2xl">
+      <div class="px-5 py-4 border-b border-current border-opacity-10 ui-sunk flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg ui-panel flex items-center justify-center accent-color">
+            <iconify-icon icon="lucide:sliders" class="text-base"></iconify-icon>
+          </div>
+          <div>
+            <div class="text-sm font-semibold flex items-center gap-2">
+              System & Pipeline Settings
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded border accent-pill">ZEZO V2</span>
+            </div>
+            <div class="text-[11px] opacity-75 font-mono mt-0.5">Configure audio pipeline architectures and multi-provider keys</div>
+          </div>
+        </div>
+        <button onclick="closeModal('settings-modal')" class="opacity-75 hover:opacity-100">
+          <iconify-icon icon="lucide:x" class="text-lg"></iconify-icon>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs">
+        <div>
+          <label class="text-[11px] font-semibold uppercase tracking-wider block mb-1.5">Audio Pipeline Architecture</label>
+          <div class="p-2.5 rounded-lg ui-sunk flex items-center justify-between">
+            <span>Google Gemini Live WebSockets (Bidirectional Streaming)</span>
+            <iconify-icon icon="lucide:chevron-down" class="opacity-50"></iconify-icon>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider opacity-75 block mb-1">STT Engine</label>
+            <div class="p-2 rounded-lg ui-sunk">Faster-Whisper (Local GPU)</div>
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider opacity-75 block mb-1">TTS Engine</label>
+            <div class="p-2 rounded-lg ui-sunk">Microsoft Edge-TTS</div>
+          </div>
+        </div>
+
+        <div class="space-y-3 pt-2 border-t border-current border-opacity-10">
+          <label class="text-[11px] font-semibold uppercase tracking-wider block">API Credentials</label>
+          <div class="space-y-2">
+            <input type="password" value="AIzaSyXXXXXXXXXXXXXXXX" class="w-full ui-input rounded-lg px-3 py-2 font-mono text-xs">
+            <input type="password" value="gsk_XXXXXXXXXXXXXXXXXX" class="w-full ui-input rounded-lg px-3 py-2 font-mono text-xs">
+          </div>
+        </div>
+      </div>
+
+      <div class="px-5 py-3 border-t border-current border-opacity-10 ui-sunk flex items-center justify-end gap-2">
+        <button onclick="closeModal('settings-modal')" class="px-3 py-1.5 rounded-lg ui-panel text-xs hover:opacity-80">Cancel</button>
+        <button class="px-4 py-1.5 rounded-lg accent-btn text-xs font-semibold shadow-sm flex items-center gap-1.5">
+          <iconify-icon icon="lucide:save" class="text-sm"></iconify-icon>
+          <span>Save Settings</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4. INTERACTIVE MODAL 2: BACKEND LOG CONSOLE ── -->
+  <div id="logs-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+    <div class="w-full max-w-2xl ui-panel rounded-xl overflow-hidden shadow-2xl">
+      <div class="px-5 py-4 border-b border-current border-opacity-10 ui-sunk flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <iconify-icon icon="lucide:terminal" class="text-base accent-color"></iconify-icon>
+          <div class="text-sm font-semibold flex items-center gap-2">
+            Backend Log Console
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded border accent-pill">CTRL+L</span>
+          </div>
+        </div>
+        <button onclick="closeModal('logs-modal')" class="opacity-75 hover:opacity-100">
+          <iconify-icon icon="lucide:x" class="text-lg"></iconify-icon>
+        </button>
+      </div>
+
+      <div class="p-4">
+        <div class="h-80 rounded-xl ui-input p-3.5 font-mono text-[11px] overflow-y-auto space-y-1.5">
+          <div><span class="opacity-50">[15:58:30]</span> <span class="font-semibold" style="color: var(--tag-kernel);">[KERNEL]</span> ZEZO Autonomous OS v2 initialized successfully.</div>
+          <div><span class="opacity-50">[15:58:31]</span> <span class="font-semibold" style="color: var(--tag-router);">[ROUTER]</span> LLM Client: Primary router online (Groq → Gemini Flash).</div>
+          <div><span class="opacity-50">[15:58:32]</span> <span class="font-semibold" style="color: var(--tag-audio);">[AUDIO]</span> Mic endpoint stream established @ 16000Hz PCM16.</div>
+          <div><span class="opacity-50">[15:58:33]</span> <span class="font-semibold accent-color">[AVATAR]</span> Neural Fluid Companion mounted with Qivi particle engine.</div>
+          <div><span class="opacity-50">[15:58:34]</span> <span class="font-semibold" style="color: var(--tag-tasks);">[TASKS]</span> Task runner queue active. 3 background workers registered.</div>
+          <div><span class="opacity-50">[15:58:35]</span> <span class="font-semibold" style="color: var(--tag-telemetry);">[TELEMETRY]</span> Telemetry metrics live: CPU 28% | RAM 54% | GPU 41%.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. INTERACTIVE MODAL 3: TASK MATRIX ── -->
+  <div id="tasks-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+    <div class="w-full max-w-xl ui-panel rounded-xl overflow-hidden shadow-2xl">
+      <div class="px-5 py-4 border-b border-current border-opacity-10 ui-sunk flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <iconify-icon icon="lucide:layers" class="text-base accent-color"></iconify-icon>
+          <div class="text-sm font-semibold flex items-center gap-2">
+            Task Matrix & Registry
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded border accent-pill">ACTIVE</span>
+          </div>
+        </div>
+        <button onclick="closeModal('tasks-modal')" class="opacity-75 hover:opacity-100">
+          <iconify-icon icon="lucide:x" class="text-lg"></iconify-icon>
+        </button>
+      </div>
+
+      <div class="p-4 space-y-2.5">
+        <div class="p-3 rounded-xl ui-sunk space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-medium text-xs">Opencode: Refactoring UI components to ReUI system</span>
+            <span class="text-[9px] font-mono font-semibold px-2 py-0.5 rounded accent-pill">IN_PROGRESS</span>
+          </div>
+          <div class="w-full h-1.5 bg-black/20 rounded-full overflow-hidden">
+            <div class="h-full w-[65%] accent-bg"></div>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl ui-sunk space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-medium text-xs">Web Reader: Extracting documentation tokens from mcp.reui.io</span>
+            <span class="text-[9px] font-mono font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/30">COMPLETED</span>
+          </div>
+          <div class="w-full h-1.5 bg-black/20 rounded-full overflow-hidden">
+            <div class="h-full w-full bg-emerald-500"></div>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl ui-sunk space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-medium text-xs">Fleet Control: Syncing background workers and audio loop</span>
+            <span class="text-[9px] font-mono font-semibold px-2 py-0.5 rounded ui-panel">QUEUED</span>
+          </div>
+          <div class="w-full h-1.5 bg-black/20 rounded-full overflow-hidden">
+            <div class="h-full w-[20%] opacity-50 bg-current"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function setTheme(themeName) {
+      document.body.className = themeName + " min-h-screen flex flex-col";
+      
+      document.querySelectorAll('.theme-btn').forEach(b => {
+        b.className = "theme-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all opacity-75 hover:opacity-100";
+      });
+
+      const activeMap = {
+        'theme-qivi-dark': 'btn-qivi-dark',
+        'theme-qivi-light': 'btn-qivi-light',
+        'theme-emerald': 'btn-emerald',
+        'theme-violet': 'btn-violet',
+        'theme-sand': 'btn-sand'
+      };
+
+      const btn = document.getElementById(activeMap[themeName]);
+      if (btn) {
+        btn.className = "theme-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all accent-pill";
+      }
+    }
+
+    function openModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    }
+
+    function closeModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) {
+        modal.classList.remove('flex');
+        modal.classList.add('hidden');
+      }
+    }
+  </script>
+</body>
+</html>

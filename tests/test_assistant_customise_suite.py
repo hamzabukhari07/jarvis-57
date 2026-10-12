@@ -22,8 +22,8 @@ class TestAssistantCustomiseSuite(unittest.TestCase):
         orig_lang = get_response_language()
 
         try:
-            save_assistant_config("ZEZO-TEST", orig_user)
-            self.assertEqual(get_assistant_name(), "ZEZO-TEST")
+            save_assistant_config("ZEZO", orig_user)
+            self.assertEqual(get_assistant_name(), "ZEZO")
 
             save_voice("Fenrir")
             self.assertEqual(get_voice(), "Fenrir")

@@ -1,3 +1,1061 @@
+## [2026-10-12] — Ghost Agent "Ali" Elimination, Live Dynamic Fleet Roster & Worktree Directory Creation Fix
+- **What was diagnosed & fixed:**
+  - **1. Ghost Agent Delegation to "Ali" (`actions/fleet_control.py`, `core/prompt.txt`, `core/fleet_manager.py`, `main.py`):**
+    - The user deleted agent "Ali" from the UI and replaced the frontend role with "Verve" and "Flux", but ZEZO persistently talked about "Ali" and attempted to dispatch tasks to Ali.
+    - Root causes:
+      1. `actions/fleet_control.py`'s `TOOL["description"]` had hardcoded `(Ali, Ahmad, Dwight...)` and `"Tell Ali to build a landing page"`.
+      2. `core/prompt.txt` had hardcoded "Ali (Senior Frontend & Studio UI Specialist)" and "Ali se nahi Haider se karwao".
+      3. `main.py` never injected the registered fleet deck state into Gemini Live's `system_instruction`. Gemini was guessing agents from static prompt docstrings.
+      4. `core/fleet_manager.py` had static role mapping `role_map = {"frontend": "ALI"}` and `resolve_agent_by_mention_or_capability` had an unconditional fallback `return self.get_agent("AHMAD")`. When Gemini requested `agent_id="ALI"`, `fleet_manager` failed to find Ali, defaulted to Ahmad, but Gemini remembered calling Ali and claimed to have assigned Ali.
+    - **Fix:**
+      - Cleaned `actions/fleet_control.py` and `core/prompt.txt`, replacing stale Ali/Haider references with active specialists `VERVE` and `FLUX`.
+      - Updated `core/fleet_manager.py` role mapping and domain heuristics to route frontend/UI requests to `VERVE` (overflow to `FLUX`).
+      - In `core/fleet_manager.py` `dispatch_task()`, when an unknown or decommissioned `agent_id` is passed, it rejects immediately with an informative error listing all active registered agents instead of falling back silently.
+      - Updated `_build_config()` in `main.py` to dynamically retrieve the live registered fleet deck via `fleet_manager.get_fleet_deck_state()` and inject `[ACTIVE AUTONOMOUS FLEET ROSTER]` into Gemini Live's `system_instruction` with a strict rule: only dispatch to currently registered agents.
+      - Prevented infinite recursion in `decompose_and_dispatch()` by adding `is_subtask=True` guard to `dispatch_task()` and mapping frontend subtasks to `VERVE`/`FLUX`.
+  - **2. Subprocess Directory Crash (`core/fleet_manager.py`):**
+    - Subprocess execution crashed with `NotADirectoryError: [WinError 267] The directory name is invalid` because `target_dir` (e.g. newly slugged project directories) were not physically created on disk prior to spawning subprocesses with `cwd=target_dir`.
+    - **Fix:** Added `Path(target_dir).mkdir(parents=True, exist_ok=True)` before subprocess execution.
+  - **3. Vault Markdown Graph Synchronization (`memory/vault_engine.py`, `memory/vault/*.md`):**
+    - Replaced hardcoded `[[Ali Akdas]]` wikilinks with `[[Autonomous Specialist Fleet]]` across vault note generators and cleaned legacy conversation logs.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile main.py core/fleet_manager.py actions/fleet_control.py memory/vault_engine.py` passed with 0 errors. Action registry discovery confirmed 29 active tools. Modern React build (`npm --prefix web run build`) compiled cleanly in 1.42s.
+  - Layer 2 (Runtime): Tested `fleet_manager.dispatch_task('ALI', 'Build a portfolio')` — correctly rejected with: `Agent 'ALI' is not in the active fleet. Registered agents: MICHAEL, Verve, Flux, Nexus, Dwight, Pam Beesly, Kelly Kapoor...`. Tested `dispatch_task('VERVE', ...)` — successfully dispatched to Antigravity worker with directory auto-creation and zero `[WinError 267]` crash.
+  - Layer 3 (Regression): 28 automated tests passed across `test_fleet_control_suite.py`, `test_config_endpoints.py`, `test_memory_wipe_suite.py`, `test_memory_vault_engine.py`, `test_project_isolation_and_fleet_orchestrator_suite.py`, and `test_phase4_specialist_fleet_suite.py`.
+- **Key files touched:**
+  - `config/fleet_agents.json`
+  - `actions/fleet_control.py`
+  - `core/fleet_manager.py`
+  - `core/prompt.txt`
+  - `main.py`
+  - `memory/vault_engine.py`
+  - `tests/test_project_isolation_and_fleet_orchestrator_suite.py`
+  - `tests/test_phase4_specialist_fleet_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Never allow static hardcoded agent lists in prompts or tool schemas when agents can be dynamically added, edited, or deleted in the UI. Always dynamically inject the live registry state into system prompts at session build time.
+
+---
+
+## [2026-10-12] — Elimination of Voluntary Reconnect Loop, Gemini Quota Backoff & QtWebEnginePage Shutdown
+- **What was diagnosed & fixed:**
+  - **1. Voluntary Reconnect Cascading Loop (`main.py`, `core/ui_server.py`, `web/src/components/settings/SettingsModal.tsx`):**
+    - `flushSettings()` in `SettingsModal.tsx` ran every 300ms on auto-save debounce and unconditionally called `onSaveAudioDevices(selectedInputDev, selectedOutputDev)`. This broadcast `save_audio_devices` over WebSockets, invoking `on_audio_device_change` and `request_reconnect()` in `main.py`.
+    - `_save_config_handler` in `core/ui_server.py` unconditionally called `self.on_pipeline_settings_changed()` on every config write (even for themes/accents), triggering another `request_reconnect()`.
+    - In `main.py`, `_on_voice_change()`, `_on_pipeline_change()`, and `_on_audio_device_change()` lacked delta guards, causing every redundant signal to rebuild the Gemini Live WebSocket session. In rapid succession, 4–5 new Live sessions were established, exhausting the user's Gemini Live API quota.
+    - **Fix:** Removed `onSaveAudioDevices` from `flushSettings()` and bound it strictly to explicit Select `onValueChange` events. Added value-change delta guards in `_on_voice_change()`, `_on_pipeline_change()`, and `_on_audio_device_change()` in `main.py`. Guarded `on_pipeline_settings_changed()` in `core/ui_server.py` to only trigger when pipeline or engine settings actually change.
+  - **2. Infinite 3-Second Reconnect Spam on Quota Exceeded (`main.py`):**
+    - When Google returned `APIError 1011 (You exceeded your current quota)`, `main.py` lacked a dedicated quota handler, defaulting to `self._conn_backoff = 3` and hammering the exhausted API every 3 seconds in an infinite loop.
+    - **Fix:** Added a dedicated quota error handler detecting `"quota"`, `"1011"`, `"resource_exhausted"`, `"429"`. It sets the UI state to `SLEEPING`, posts an informative log, and applies exponential backoff (30s up to 120s), stopping API hammering until quota cooldown.
+  - **3. QtWebEngine Shutdown Warning (`ui.py`):**
+    - Closing the application logged `Release of profile requested but WebEnginePage still not deleted. Expect troubles !` because `QWebEngineProfile` was parented to `ZezoDesktopWindow` and torn down while `QWebEnginePage` was still bound to `QWebEngineView`.
+    - **Fix:** Implemented `closeEvent` in `ZezoDesktopWindow` to explicitly call `self.web_view.setPage(None)` and `page.deleteLater()`, safely destroying the page before profile release.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile ui.py main.py core/ui_server.py` passed with 0 errors; `npm run build` compiled 100% cleanly in 2.89s.
+  - Layer 2 (Runtime): Verified clean page disassociation in `closeEvent` and value delta guards on session connection.
+  - Layer 3 (Regression): `pytest tests/test_config_endpoints.py tests/test_assistant_customise_suite.py` passed 5/5 in 6.36s.
+- **Key files touched:**
+  - `main.py`
+  - `ui.py`
+  - `core/ui_server.py`
+  - `web/src/components/settings/SettingsModal.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-12] — Windows UWP Foreground Focus Fix, App Close Idempotence & Config File-Lock Concurrency
+- **What was diagnosed & fixed:**
+  - **1. Windows UWP / Calculator Focus False-Positive (`core/computer/windows_native.py`, `actions/open_app.py`):**
+    - `windows_native.focus_window()` contained a flawed condition `if current_fg == matched_hwnd or not self.is_self_or_console_window(current_fg):`. Whenever the user had any unrelated third-party window active, `focus_window` falsely returned `"Focused window: Calculator"`. `open_app` aborted launcher execution, never invoking `calc.exe`. Because Calculator remained unviewable, repeated user invocations tripped the 4-call Doom-Loop circuit breaker.
+    - Added Windows foreground unlock bypass (`AllowSetForegroundWindow(-1)`, Alt-key pulse, thread input attachment to both foreground and target threads) and strict foreground verification (`current_fg == matched_hwnd` or ancestor match).
+    - If `_focus_window()` does not bring the window into actual foreground focus, `open_app` falls through to execute the real binary launcher (`calc.exe` / `_launch_windows`).
+    - Added `CalculatorApp.exe` to Windows taskkill candidates in `close_application_by_name`.
+  - **2. "Notepad Refusing to Close" Misconception (`actions/open_app.py`):**
+    - Redundant `open_app(action="close", app_name="notepad")` calls when Notepad was already terminated returned `"Could not find or close notepad."`, causing the conversational LLM to hallucinate that the application was refusing to exit.
+    - Updated return message to `f"{app_name} is not running (already closed)."` to maintain clear idempotence.
+  - **3. Windows File Lock Contention (`[Errno 13] Permission denied`) & Theme Persistence (`memory/config_manager.py`, `core/ui_server.py`, `web/src/App.tsx`):**
+    - Rapid concurrent HTTP/WS requests collided during atomic replacement of `config/api_keys.json`.
+    - Protected `_atomic_write_config` and `_save_flag` with `threading.RLock()` and unique nano-timestamped temporary files. Wrapped `os.replace` and `CONFIG_FILE.read_text()` in 5-attempt retry loops with backoff on `(PermissionError, OSError)`.
+    - Updated `core/ui_server.py` `set_accent` to use `save_accent()` instead of raw uncoordinated `write_text`.
+    - Wired `api.saveConfig({ theme, accent })` into `handleToggleThemeMode` in `web/src/App.tsx` so theme switching persistently writes to backend disk.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed across all touched modules; `npm run build` compiled 100% cleanly in 2.43s; `action_loader.py` discovered all 29 active actions.
+  - Layer 2 (Runtime): Tested `open_app` close branch verifying `"notepad is not running (already closed)."`; stress-tested `config_manager` with 7 concurrent threads (5 readers, 2 writers) executing 250+ operations with 0 errors.
+  - Layer 3 (Regression): `pytest tests/test_config_endpoints.py tests/test_api_key_transactional.py tests/test_concurrency_guard_suite.py` passed 9/9 in 4.65s.
+- **Key files touched:**
+  - `core/computer/windows_native.py`
+  - `actions/open_app.py`
+  - `memory/config_manager.py`
+  - `core/ui_server.py`
+  - `web/src/App.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-12] — Persistent Settings, Theme & Avatar Configuration Across Application Restarts
+- **What was diagnosed & fixed:**
+  - **Identified 3 Root Causes of Configuration Discard / Reset on App Restart:**
+    1. *QtWebEngine `defaultProfile()` Incognito Bug (`ui.py`):* `QWebEngineProfile.defaultProfile()` returns `isOffTheRecord: True` by default in PyQt6. Chromium therefore operates in volatile in-memory mode, ignoring `setPersistentStoragePath` and wiping all `localStorage` keys (`zezo_theme`, `zezo_accent`, `zezo_avatar_*`) whenever the application window closes.
+    2. *Debounced Auto-Save Cancellation (`SettingsModal.tsx`):* Settings were saved with a 300–400ms `setTimeout`. Closing the modal or application triggered `clearTimeout`, discarding pending modifications before the API network request could dispatch to `config/api_keys.json`.
+    3. *Avatar Settings Exclusion in Backend Engine (`memory/config_manager.py`, `core/ui_server.py`):* Avatar customization (`avatar_preset`, `avatar_shape`, `avatar_theme`, `avatar_quality`, `avatar_lighting`) lacked structured getter/setter handlers in `config_manager.py` and was omitted from `_get_config_handler` and `_save_config_handler`.
+  - **Resolution:**
+    - In `ui.py`: Created an explicit non-off-the-record named profile `QWebEngineProfile("zezo_profile", self)` and bound it to `QWebEnginePage(profile, view)` with storage path `config/web_profile`. LocalStorage is now persistently written to disk across reboots.
+    - In `memory/config_manager.py`: Implemented `get_avatar_settings()` and `save_avatar_settings()` writing to `config/api_keys.json`.
+    - In `core/ui_server.py`: Wired avatar settings directly into `GET /api/config` and `POST /api/config`.
+    - In `web/src/components/settings/SettingsModal.tsx`: Extracted `flushSettings()` and invoked it synchronously on component cleanup so closing the modal immediately commits pending settings. Added hydration of avatar properties in `load()`.
+    - In `web/src/components/canvas/QiviAvatarVisualizer.tsx`: Added direct backend config hydration on mount.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile ui.py core/ui_server.py memory/config_manager.py` passed with 0 errors. `npm run build` compiled 100% cleanly in 1.72s.
+  - Layer 2 (Runtime): Tested `QWebEngineProfile('zezo_profile')` verified `isOffTheRecord: False` and validated persistent storage path `config/web_profile`.
+  - Layer 3 (Regression): `pytest tests/test_config_endpoints.py tests/test_memory_wipe_suite.py` passed 4/4 with complete roundtrip verification of theme, accent, and avatar settings.
+- **Key files touched:**
+  - `ui.py`
+  - `memory/config_manager.py`
+  - `core/ui_server.py`
+  - `web/src/components/settings/SettingsModal.tsx`
+  - `web/src/components/canvas/QiviAvatarVisualizer.tsx`
+  - `tests/test_config_endpoints.py`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-12] — Elimination of Home Screen Blinking / UI Compositor Micro-Flicker
+- **What was diagnosed & fixed:**
+  - **Identified 4 Interconnected Root Causes of Home Screen Blinking:**
+    1. *High-Frequency Re-render Cascade:* Live microphone volume was broadcast over WebSockets every ~80ms (12 Hz). In `useZezoSocket.ts`, `setMicLevel` updated state on every tick, triggering continuous root re-renders of `App.tsx`.
+    2. *Compositor Thrashing over WebGL:* The central status pill floated directly in front of the active 3D Avatar canvas with translucent `backdrop-blur-md` and `bg-[var(--card)]/90`. In QtWebEngine on Windows, recalculating backdrop-blur over a continuously repainting WebGL surface every animation frame invalidates the D3D texture cache, producing visible blinking/flickering.
+    3. *Avatar Mesh Redraws on Ambient Noise:* `QiviAvatarVisualizer.tsx` dynamically calculated avatar intensity from raw `audioLevel`. Micro-fluctuations from ambient microphone noise forced the underlying WebGL avatar to redraw its particle geometry and lighting repeatedly.
+    4. *Unmemoized Assistant Runtime Callback Allocation:* `assistantRuntime` created inline function callbacks on every render pass in `App.tsx`.
+  - **Resolution:**
+    - In `web/src/hooks/useZezoSocket.ts`: Implemented deadband threshold filtering and 0.05 step quantization (`lastMicLevelRef`, `lastAudioLevelRef`). Ambient noise `< 0.05` is silenced to 0, eliminating 12-15 unnecessary root React re-renders per second.
+    - In `web/src/components/canvas/QiviAvatarVisualizer.tsx`: Applied noise gating (`< 0.08`) and quantization to `intensity`, and wrapped the component in `React.memo` to shield the WebGL canvas from unaffected parent renders.
+    - In `web/src/App.tsx`: Replaced `backdrop-blur-md` and translucent `bg-[var(--card)]/90` on the status pill with solid `bg-[var(--card)] shadow-xs`, removed `transition-all` in accordance with AGENTS.md Rules 1 & 2, and memoized Assistant UI runtime handlers (`convertMessage`, `handleNewAssistantMessage`).
+- **Verification:**
+  - Layer 1 (Static): `npm run build` in `web/` passed with 0 TypeScript errors in 10.60s.
+  - Layer 2 (Runtime): Production assets generated (`dist/assets/index-BExxwz89.js` and `index-prlV51jt.css`).
+  - Layer 3 (Regression): `pytest tests/test_config_endpoints.py tests/test_memory_wipe_suite.py` passed 4/4 in 6.54s.
+- **Key files touched:**
+  - `web/src/hooks/useZezoSocket.ts`
+  - `web/src/components/canvas/QiviAvatarVisualizer.tsx`
+  - `web/src/App.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-11] — Audio Settings Refinement, Hardware Diagnostics & Real Direct Chat Lifecycle
+- **What was built:**
+  - **Direct Chat Dummy Conversation Elimination (`web/src/components/office/AgentDirectChatView.tsx`):**
+    - Removed hardcoded default thread (`Chat with ${agent.name}`, "Direct session initialized...") that auto-populated upon selecting any agent before any message was ever typed.
+    - Implemented clean empty state (`No conversations yet. Send a message below to start chatting...`). Sessions are now only created when the user actually sends their first prompt or explicitly clicks `+ New Chat`.
+    - Filtered out any legacy `-init` stub records previously stored in `localStorage`.
+  - **AGENTS & Direct Chat Sidebar Anti-Clipping (`web/src/components/office/AutonomousOfficeScreen.tsx`, `AgentDirectChatView.tsx`):**
+    - Widened the left AGENTS sidebar column in chat mode from `250px` to `260px`.
+    - Added `px-2 py-2` and `pr-2.5` scrollbar gutter clearance so cards and status badges never touch or clip behind the frame border or scrollbar track.
+  - **About Section Simplification (`web/src/components/settings/SettingsModal.tsx`):**
+    - Renamed header from "About ZEZO OS" to "About ZEZO".
+    - Kept clean, minimal layout: ZEZO title, creator attribution ("Created by Hamza Bukhari"), version badge (`v2.4.0 • Up to date`), and update check button, stripping out long paragraphs and framework lists.
+  - **Audio Settings & Live Hardware Diagnostics (`core/ui_server.py`, `useZezoSocket.ts`, `SettingsModal.tsx`, `web/src/lib/api.ts`):**
+    - Renamed section and nav link to "Audio Settings" and removed the "ACTIVE VOICE ENGINE" box.
+    - Added REST endpoint `GET /api/audio_devices` and normalized WebSocket audio payloads so real host microphone and speaker devices (`inputs` / `outputs` / `input_devices` / `output_devices`) are correctly detected and populated in dropdowns.
+    - Added **Test Audio** (dual-tone harmonic chime via Web Audio API) to verify speaker playback.
+    - Added **Test Mic** (interactive live audio volume meter reading mic input via `navigator.mediaDevices.getUserMedia` and `AudioContext` AnalyserNode).
+  - **Skills Hub Real Data Verification (`SkillsSettingsTab.tsx`, `core/skill_loader.py`):**
+    - Removed obsolete test placeholder directory `skills/custom_skill_10/` and its entry in `config/skills_state.json`.
+    - Ensured `SkillsSettingsTab.tsx` always syncs 100% genuine discovered declarative skills from backend disk registry (`/api/skills`), filtering out stale mock artifacts.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile core/ui_server.py` passed with 0 errors; `npm run build` compiled 100% cleanly in 2.95s.
+  - Layer 2 (Runtime): Assets generated in `web/dist/assets/index-B-n4x7C5.js` and `index-prlV51jt.css`.
+  - Layer 3 (Regression): `pytest tests/test_config_endpoints.py tests/test_memory_wipe_suite.py` passed 4/4 in 6.97s.
+- **Key files touched:**
+  - `web/src/components/settings/SettingsModal.tsx`
+  - `web/src/components/office/AgentDirectChatView.tsx`
+  - `web/src/components/office/AutonomousOfficeScreen.tsx`
+  - `web/src/components/settings/SkillsSettingsTab.tsx`
+  - `core/ui_server.py`
+  - `web/src/hooks/useZezoSocket.ts`
+  - `web/src/lib/api.ts`
+  - `config/skills_state.json`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-11] — Fix Settings & Theme Reset on Application Restart
+- **What was built:**
+  - **Persistent Backend Storage for Theme & Accent (`memory/config_manager.py`, `core/ui_server.py`):**
+    - Added `get_theme()`, `save_theme()`, `get_accent()`, `save_accent()` in `memory/config_manager.py` writing directly to `config/api_keys.json`.
+    - Wired `theme` and `accent` into `_get_config_handler` and `_save_config_handler` in `core/ui_server.py`.
+  - **Immediate Toggle Saving & Modal Close Cancellation Fix (`web/src/components/settings/SettingsModal.tsx`):**
+    - Built `handleToggle` so flipping switches (`morning_brief_enabled`, `autostart_enabled`, `wake_word_enabled`, `push_to_talk_enabled`, `thinking_enabled`, `proactive_audio_enabled`) immediately triggers `api.saveConfig({ [key]: value })` without waiting for the 400ms debounce timer that previously got aborted when closing the modal.
+    - Updated `handleThemeSelect` to immediately sync the selected theme and accent to backend config via `api.saveConfig({ theme, accent })` alongside `localStorage`.
+    - Eliminated the 150ms `setTimeout` race condition in `load()`, wrapping in `finally { isLoadedRef.current = true }` so default switch states cannot overwrite persisted preferences.
+  - **Application Mount Theme Hydration (`web/src/App.tsx`):**
+    - Added hydration from `api.getConfig()` on application startup so theme and accent are restored directly from disk even if `localStorage` was cleared or origin port changed.
+  - **QtWebEngine Profile Persistence (`ui.py`):**
+    - Configured `QWebEngineProfile.defaultProfile()` with explicit storage path (`config/web_profile`) and `ForcePersistentCookies` so Chromium commits local storage journals reliably to disk across application restarts.
+- **Why this approach was chosen:**
+  - The user reported that changing themes or turning off settings like Morning Brief would reset every time the application was closed and reopened.
+- **Key files touched:**
+  - `memory/config_manager.py`
+  - `core/ui_server.py`
+  - `web/src/components/settings/SettingsModal.tsx`
+  - `web/src/App.tsx`
+  - `ui.py`
+  - `tests/test_config_endpoints.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Never rely solely on browser `localStorage` for system-wide application settings in hybrid desktop architectures; always mirror core UI preferences to backend configuration files.
+
+---
+
+## [2026-10-11] — Fix Autonomous Office Direct Chat Blinking, Double Names, Engine Restriction & Agent Deletion
+- **What was built:**
+  - **Technical Routing Debug Text Removed & Modern Typing Animation Added (`web/src/components/office/AgentDirectChatView.tsx`, `web/src/components/assistant-ui/thread.tsx`):**
+    - Removed technical network debug strings (`Routing directive to ... via groq... Connecting to backend...` and `Execution completed via...`) from the chat interface.
+    - Added clean animated thinking and typing indicator in `thread.tsx`: while the model is preparing the response (`isRunning && !hasContent`), an elegant gradient shimmer `Thinking` pill with animated pulsing dots (`• • •`) is displayed. Once text streams in, it seamlessly transitions into the response text without any visual clutter or fake technical logs.
+    - Replaced with genuine model reasoning parser: if the model produces genuine `<think>...</think>` tokens (e.g. DeepSeek R1), only the real thought process is displayed. For standard fast models, the response is streamed cleanly without any artificial "Thinking" accordion or technical debug clutter.
+  - **Groq Engine Selection Reverting Bug Fixed (`core/fleet_manager.py`, `AutonomousOfficeScreen.tsx`, `AgentDirectChatView.tsx`):**
+    - Root cause: `VALID_TOOLS` in `core/fleet_manager.py` did not contain `"groq"`. When saving, it wiped `"groq"` and reverted to `"opencode_run"`. In addition, `AgentDirectChatView`'s dropdown change never triggered `api.saveAgent`, so the 4-second fleet polling loop constantly overwritten the selected engine with backend's stale `raw.default_tool`.
+    - Added `"groq"` to `VALID_TOOLS` in `core/fleet_manager.py`, supported both `default_tool` and `engine` aliases in `save_agent_profile`.
+    - Added local `currentEngine` and `currentModel` state in `AgentDirectChatView.tsx` with external prop synchronization.
+    - Added backend persistence call (`api.saveAgent`) in `AutonomousOfficeScreen.tsx`'s `onUpdateAgent` handler, and safeguarded `mapRawAgentToOfficeMember` with `prevAgent?.engine` fallback.
+  - **Flicker & Blinking Resolved (`web/src/components/assistant-ui/thread.tsx`, `web/src/components/ui/dialog.tsx`, `web/src/components/office/AgentDirectChatView.tsx`):**
+    - Changed `Blobatar` avatar animation from `animate="always"` to `animate="hover"` to stop continuous 60fps SVG morphing requestAnimationFrame repaints during chat rendering.
+    - Removed `transition-opacity` on `ActionBarPrimitive.Root` in `thread.tsx` and removed full-screen `transition-opacity` on `DialogOverlay` and `DialogContent` in `dialog.tsx` to stop QtWebEngine compositor drop/flicker.
+    - Batched word streaming updates (chunk size 3, 24ms delay) in `AgentDirectChatView.tsx` to avoid sub-15ms DOM thrashing.
+  - **Direct Chat Conversation Leakage Fixed (`web/src/components/office/AutonomousOfficeScreen.tsx`):**
+    - Added `key={selectedAgent.id}` to `<AgentDirectChatView />` so React cleanly unmounts the previous agent's assistant runtime and re-mounts a fresh thread tied specifically to the newly selected agent.
+  - **Double Names Removed (`web/src/components/office/AutonomousOfficeScreen.tsx`):**
+    - Replaced redundant `{ag.badge}` (which printed uppercase raw internal ID e.g. `MICHAEL` over `MICHAEL`, `Verve` over `ALI`, `Flux` over `HAIDER`) with `{ag.role}` (e.g. `Lead Software Architect & Tech Lead`, `Frontend & UI Design Specialist`).
+  - **Engine Dropdown Restriction (`web/src/components/office/AutonomousOfficeScreen.tsx`, `AgentDirectChatView.tsx`):**
+    - Restricted Active Engine dropdowns across Direct Chat, Add Agent, and Edit Agent modals strictly to: **OpenCode**, **KiloCode**, **Antigravity**, **Groq**.
+    - Updated `ENGINE_MODELS_MAP` and added Groq LLM inference branch directly to `/api/fleet/chat` in `core/ui_server.py`.
+  - **Complete Agent Deletion Synchronization (`core/fleet_manager.py`, `AutonomousOfficeScreen.tsx`):**
+    - Updated `fleet_manager.delete_agent` to match case-insensitively across dictionary keys, agent IDs, and agent names.
+    - Synchronized `config/fleet_agents.json` keys to match actual agent names (`VERVE`, `FLUX`).
+    - Added worktree teardown and local storage cleanup (`zezo_agent_threads_${id}`) upon agent deletion with immediate React state update.
+  - **Verification (Strict 3-Layer Rule):**
+    - **Layer 1 (static):** `python -m py_compile core/fleet_manager.py core/ui_server.py` passed with 0 errors. `core/action_loader.py` discovered all 29 actions cleanly. `npm run build` compiled frontend into `web/dist` with 0 errors.
+    - **Layer 2 (runtime):** Verified `fleet_manager.get_agent` handles case-insensitive lookup for Verve and Flux. Verified `delete_agent` key matching.
+    - **Layer 3 (regression):** Ran pytest suite (`test_config_endpoints.py`, `test_memory_wipe_suite.py`) — 4 tests passed.
+- **Why this approach was chosen:**
+    - Resolves all user-reported visual glitches (excessive dialog/chat blinking, thread bleeding across agents, redundant double names) and restricts engine selection strictly to the 4 approved engines.
+- **Key files touched:**
+  - `web/src/components/office/AutonomousOfficeScreen.tsx`
+  - `web/src/components/office/AgentDirectChatView.tsx`
+  - `web/src/components/assistant-ui/thread.tsx`
+  - `web/src/components/ui/dialog.tsx`
+  - `core/fleet_manager.py`
+  - `core/ui_server.py`
+  - `config/fleet_agents.json`
+- **What to remember for future work:**
+  - Always assign unique React `key` props to modal or tab content when switching between entities with local state, and avoid continuous SVG animation loops inside QtWebEngine views.
+
+---
+
+## [2026-10-11] — Fix Child Process Window Misclassification & Safe Window Closing Fall-through
+- **What was built:**
+  - **Child Process "Self" Misclassification Bug Resolved (`core/computer/windows_native.py`):**
+    - `is_self_or_console_window` previously checked `for child in proc.children(recursive=True): if child.pid == target_pid: return True`. When ZEZO spawned applications (like Notepad or Calculator) via `subprocess.Popen`, those apps became child processes of ZEZO and were erroneously classified as ZEZO's internal UI windows.
+    - As a result, window search in `close_window_by_title_or_active` and `focus_window` skipped Notepad entirely, believing it was ZEZO itself.
+    - Removed child process checks from `is_self_or_console_window`, limiting protection strictly to the current PID, parent shell/terminal processes, and ZEZO titles.
+  - **Unmatched Window Title Fall-Through Bug Resolved (`core/computer/windows_native.py`):**
+    - When a specific window `title` (e.g. `"Notepad"`, `"Untitled - Notepad"`) was requested but not found, `close_window_by_title_or_active` previously fell through to generic active window closing, indiscriminately terminating whatever background window was active (such as Google Chrome).
+    - Now, if a specific `title` is supplied and no matching HWND is found, it safely halts and returns `f"Could not find window matching '{title}'."`, preventing accidental closure of unrelated programs.
+    - Integrated `APP_ALIASES_MAP` in `close_window_by_title_or_active` to map aliases (e.g., `notepad` -> `["notepad", "untitled - notepad"]`, `calc` -> `["calculator", "calc"]`) and process names.
+    - Restricted `WM_COMMAND, IDCANCEL` strictly to dialog targets (`is_dialog_target`) so standard window `WM_CLOSE` signals are not canceled.
+  - **Verification (Strict 3-Layer Rule):**
+    - **Layer 1 (static):** `python -m py_compile core/computer/windows_native.py actions/computer_control.py actions/open_app.py` passed with 0 errors. Action registry verified 29 active actions.
+    - **Layer 2 (runtime):** Spawned Notepad, verified `is_self_or_console_window(hwnd)` returns `False`, verified `close_window_by_title_or_active("Notepad")` cleanly closes Notepad (`"Closed window: Untitled - Notepad"`), and verified unmatched titles (`"FakeWindow999"`) return `"Could not find window matching..."` without touching other open windows.
+    - **Layer 3 (regression):** Verified `computer_control` and `open_app` actions remain operational.
+- **Why this approach was chosen:**
+  - When the user commanded ZEZO to close Notepad, ZEZO closed Google Chrome instead due to the child process misclassification and fall-through logic.
+- **Key files touched:**
+  - `core/computer/windows_native.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Never classify child subprocesses of an agent as "self" when those children are user-facing desktop applications. Always fail safely when a specific window title is requested instead of closing active background applications.
+
+---
+
+## [2026-10-11] — Autonomous Office & Direct Chat Real Data & Model Alignment
+- **What was built:**
+  - **Live Logs Decluttering (`AutonomousOfficeScreen.tsx`):**
+    - Removed the `[ALL]` filter toggle that flooded the agent activity pane with system-wide `AIOHTTP.ACCESS` polling and audio mic logs.
+    - Defaulted active filter mode to `'agent'`, specifically scoping log lines to the selected agent and falling back cleanly to the agent's recent history.
+  - **Edit Agent Modal Cleanups & Dynamic Engine Model Catalog (`AutonomousOfficeScreen.tsx`):**
+    - Removed the redundant name badge next to `Edit Agent: [NAME]` in the modal header.
+    - Removed manual "Agent State" dropdown (`editAgentStatus`) since agent runtime states (`working`, `idle`, `paused`) are autonomously managed by the task system and cannot be manually modified by the user. "Role / Title" expanded to full width.
+    - Replaced hardcoded static Gemini models with `ENGINE_MODELS_MAP` dynamically resolving supported models per engine:
+      - `OpenCode CLI` (`opencode_run`): `opencode/nemotron-3-ultra-free`, `opencode/big-pickle`, `opencode/fledge-alpha-free`, `opencode/glm-4-voice-preview`, `opencode/minimax-01`.
+      - `KiloCode CLI` (`kilo_run`): `kilo/free-fast`, `kilo/deepseek-r1-distill`, `kilo/qwen-2.5-coder`.
+      - `Antigravity Studio` (`antigravity_run`): `gemini-2.5-flash`, `gemini-2.5-pro`, `claude-3-7-sonnet`.
+  - **Direct Chat Real Data & Backend Integration (`AgentDirectChatView.tsx`, `web/src/lib/api.ts`):**
+    - Completely removed hardcoded dummy sessions (`Sprint #42: MICHAEL Directive`, `Workspace Diagnostics & Governance`, `Design Tokens & Component Alignment`) and canned fake generator reasoning loops.
+    - Implemented real per-agent persistent chat sessions stored locally per agent (`zezo_agent_threads_${agent.id}`).
+    - Integrated with backend `POST /api/fleet/chat` via `api.sendAgentChat(agent.name, message, engine, model)` for real multi-agent directives and responses.
+- **Why this approach was chosen:**
+    - The user identified mock dummy data in the direct chat view, misleading model options in the agent editor, and noise from the `[ALL]` logs button.
+- **Key files touched:**
+  - `web/src/components/office/AutonomousOfficeScreen.tsx`
+  - `web/src/components/office/AgentDirectChatView.tsx`
+  - `web/src/lib/api.ts`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Always link model select dropdowns to their corresponding engine to avoid offering incompatible models.
+
+---
+
+## [2026-10-11] — Fix send_message False Success & WhatsApp Desktop UWP Uncloaking
+- **What was built:**
+  - **Resolved String Truthy Bug in `actions/send_message.py`:**
+    - `_focus_window(app_name)` returns strings like `"Could not focus window: WhatsApp"` on failure. In Python, non-empty strings evaluate to truthy `True`, which caused `if not focused:` to evaluate to `False` and skip calling `_open_app(app_name)`.
+    - Corrected boolean check to verify `bool(res and "focused" in res_str and not res_str.startswith("could not"))`.
+  - **Windows UWP Protocol & App Launcher Integration:**
+    - Integrated multi-tier launcher into `_open_app()`: first attempts `actions.open_app._launch_windows(app_name)`, then direct URI protocol launch (`whatsapp:`, `tg:`, `discord:`, `signal:` via `os.startfile`), uncloaking suspended/background Windows Store (UWP) apps (`WhatsApp.Root.exe`), before falling back to Start Menu search.
+    - Added phone number deep-link handler in `_send_whatsapp()` supporting direct `whatsapp://send?phone=...&text=...` when international numbers are specified.
+    - Set `pyautogui.FAILSAFE = False` per AGENTS.md Section 6.
+  - **Verification (Strict 3-Layer Rule):**
+    - **Layer 1 (static):** `python -m py_compile actions/send_message.py` passed with 0 errors. Action registry discovered `send_message` with risk `external_mutation`.
+    - **Layer 2 (runtime):** Unit verification tested both failure (`"Could not focus..."` -> `False`) and success (`"Focused window..."` -> `True`), parameter validation, and `_resolve_platform`.
+    - **Layer 3 (regression):** Verified `open_app` and `computer_control` registry discovery and dynamic conversation turn recording intact.
+- **Why this approach was chosen:**
+  - The user observed ZEZO falsely reporting that a message was sent to "Inferno" on WhatsApp while WhatsApp was never actually launched on the desktop.
+- **Key files touched:**
+  - `actions/send_message.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Functions returning diagnostic strings must never be evaluated directly as truthy booleans; always parse semantic success keywords.
+
+---
+
+## [2026-10-11] — Full Memory Wipe (Blank Slate 0 Nodes) & QtWebEngine Modal Flicker Resolution
+- **What was built:**
+  - **Full Memory Wipe (Blank Slate 0 Nodes) Option A (`memory/vault_engine.py`, `core/ui_server.py`):**
+    - Updated `wipe_all_vault_memory(preserve_profile=False)` so that all vault Markdown files are purged down to 0 notes on request, and initial migration templates are only re-seeded if `preserve_profile=True`.
+    - Added `.initialized` persistent marker in `memory/vault` so that after a clean wipe, app restarts do not unintentionally re-seed baseline files.
+    - Updated `core/ui_server.py`'s `_memory_wipe_all_handler` to default `preserve_profile` to `False` (with JSON body override support), achieving an atomic blank slate (0 nodes, 0 edges).
+  - **Resolution of Rapid UI Blinking / Flickering on Modal Open:**
+    - Diagnosed QtWebEngine hardware compositor repaint drops caused by `backdrop-blur` filters hovering over active HTML5 2D Canvas contexts.
+    - `web/src/components/memory/NewMemoryModal.tsx`: Replaced `backdrop-blur-xs` and translucent backgrounds with solid dark backdrop (`bg-black/85`) and opaque dialog panel (`bg-[#0a0a0a]`).
+    - `web/src/components/settings/SettingsModal.tsx`: Removed `backdrop-blur-md` from the sidebar and replaced semi-transparent background with opaque `#0a0a0a`.
+    - `web/src/components/reui/confirm-dialog.tsx`: Removed `backdrop-blur-xs` from `DialogPrimitive.Overlay` to maintain instantaneous, flicker-free presentation.
+    - `web/src/components/memory/MemoryInspectorDrawer.tsx`: Removed `backdrop-blur-xl` and set opaque background `#0a0a0a`.
+    - `web/src/components/memory/MemoryGraphCanvas.tsx`: Removed `backdrop-blur-md` from floating canvas toolbar elements.
+  - **Verification (Strict 3-Layer Rule):**
+    - **Layer 1 (static):** `python -m py_compile memory/vault_engine.py core/ui_server.py` passed with 0 errors. TypeScript compilation and Vite build (`npm run build`) passed with 0 errors in 1.55s.
+    - **Layer 2 (runtime):** Real runtime verification executed — `vault_engine.get_graph()` returned exactly 0 nodes and 0 links. End-to-end note creation and full wipe cycle confirmed 2 nodes -> 0 nodes cleanly.
+    - **Layer 3 (regression):** `core.action_loader.get_action_registry()` verified all 29 action modules discovered cleanly.
+- **Why this approach was chosen:**
+  - The user explicitly chose Option A (Full Wipe / Blank Slate) to allow clearing all 5 baseline notes so that memory starts completely fresh from 0 nodes, and reported rapid UI blinking when opening dialogs in the PyQt6 Chromium environment.
+- **Key files touched:**
+  - `memory/vault_engine.py`
+  - `core/ui_server.py`
+  - `web/src/components/memory/NewMemoryModal.tsx`
+  - `web/src/components/settings/SettingsModal.tsx`
+  - `web/src/components/reui/confirm-dialog.tsx`
+  - `web/src/components/memory/MemoryInspectorDrawer.tsx`
+  - `web/src/components/memory/MemoryGraphCanvas.tsx`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Never place `backdrop-blur` on dialog overlays, drawers, or floating toolbars in QtWebEngine apps as Chromium drops composite frames when rendering blur over dynamic Canvas contexts.
+
+---
+
+## [2026-10-11] — Total Memory Wipe Engine & Memory Screen Decluttering
+- **What was built:**
+  - **Atomic 4-Layer Memory Purge Engine:**
+    - `memory/vault_engine.py`: Added `wipe_all_vault_memory(preserve_profile=True)` which wipes all synthesized conversation notes (`conv_*.md`), extra knowledge notes, and restores a clean root profile, project, and preference seed for Hamza Bukhari.
+    - `memory/sqlite_memory.py`: Added `wipe_all_sqlite_memory()` that atomically wipes across `turns`, `turns_fts`, `facts`, `user_explicit_rules`, `memory_conflicts`, `session_condensations`, and triggers `VACUUM` to reclaim disk space.
+    - `memory/memory_manager.py`: Added `wipe_all_long_term_json()` which flushes `long_term.json` and its backup `.bak` back to an empty initial schema.
+    - `core/ui_server.py`: Created `POST /api/memory/wipe_all` coordinating all 3 purge steps and broadcasting a `memory_updated` WebSocket event with `action: "wiped"`. Also corrected `_memory_clear_handler` which previously queried a nonexistent `history_turns` table instead of `turns`.
+  - **Memory Screen Decluttering & 100% ReUI Confirmation Modal (`SettingsModal.tsx`, `ConfirmDialog.tsx`):**
+    - Removed confusing and misplaced bottom cards (`Active Target Workspace` which belongs to coding agent tooling, and `SQLite Brain Persistence` debug maintenance metrics).
+    - Built reusable, official ReUI primitive `ConfirmDialog` (`web/src/components/reui/confirm-dialog.tsx`) adhering strictly to AGENTS.md modal rules (opaque background `#0d0d0d`, zero backdrop-filter within panels, ReUI `Badge`, `Callout`, `Button`, and `Kbd`).
+    - Replaced all legacy browser `window.confirm()` popups across the entire frontend (`SettingsModal.tsx`, `MemoryInspectorDrawer.tsx`, `AutonomousOfficeScreen.tsx`) with the new ReUI `ConfirmDialog`.
+    - Added high-visibility, clean destructive button `Clear All Memory` with `Trash2` and `Loader2` states next to `Add Memory Node`.
+    - On confirmation: coordinates atomic 4-layer memory purge and reloads Obsidian graph live.
+- **Verification:**
+  - `python -m py_compile` passed on all modified Python modules.
+  - `pytest tests/test_memory_wipe_suite.py tests/test_memory_vault_engine.py tests/test_config_endpoints.py` passed 7/7 (6.98s).
+  - `npm --prefix web run build` (`tsc -b && vite build`) passed with 0 errors in 1.74s.
+  - Zero instances of `window.confirm()` remaining in the frontend repository.
+- **Why this approach was chosen:**
+  - Previously, memory clearing only executed a single query against one SQLite table and triggered an unstyled native browser alert box. The new architecture provides an atomic 4-layer backend purge and a 100% ReUI desktop experience matching ZEZO OS standards.
+- **Key files touched:**
+  - `memory/vault_engine.py`
+  - `memory/sqlite_memory.py`
+  - `memory/memory_manager.py`
+  - `core/ui_server.py`
+  - `web/src/lib/api.ts`
+  - `web/src/components/reui/confirm-dialog.tsx`
+  - `web/src/components/settings/SettingsModal.tsx`
+  - `web/src/components/memory/MemoryInspectorDrawer.tsx`
+  - `web/src/components/office/AutonomousOfficeScreen.tsx`
+  - `tests/test_memory_wipe_suite.py`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+# ZEZO Architecture & Development Learning Journal
+
+---
+
+## [2026-10-11] — Modern Chat View Polish: Inline Typing Wave, Clean Thinking Indicator & Sidebar Anti-Clipping
+- **What was built:**
+  - **Inline Typing / Thinking Indicator (`web/src/components/assistant-ui/elements/thinking-indicator.tsx`):**
+    - Clarified that the `Thinking` indicator was never deleted; only the disconnected purple dots floating on the far-right edge were removed per user screenshot.
+    - Integrated an elegant inline animated typing wave (`• • •`) directly beside `Thinking...` that pulses smoothly in the theme's accent color on the left next to the avatar.
+    - Preserved the expandable Thought process drawer when reasoning tokens are streamed.
+  - **Clean Input Placeholder (`web/src/components/office/AgentDirectChatView.tsx`):**
+    - Cleaned message composer placeholder from `Message ${agent.name} (${engine})...` to `Message ${agent.name}...` per screenshot feedback.
+    - Widened the chat view sidebar panel from `md:w-64` (256px) to `md:w-72` (288px) to prevent model string truncation (`Llama 3.3 70B Versatile`).
+  - **Anti-Clipping Agent Cards (`web/src/components/office/AutonomousOfficeScreen.tsx`):**
+    - Widened chat mode grid sidebar from `220px` to `250px`.
+    - Constrained card contents with `flex-1 min-w-0 overflow-hidden` and added `shrink-0` on status badges with `pr-2` scrollbar clearance to prevent card edges touching or clipping behind the scrollbar rail.
+- **Verification:**
+  - Static: `npm run build` compiled 100% cleanly (0 TypeScript/Vite errors).
+  - Regression: `pytest tests/test_config_endpoints.py tests/test_memory_wipe_suite.py` passed 4/4 in 4.45s.
+- **Key files touched:**
+  - `web/src/components/assistant-ui/elements/thinking-indicator.tsx`
+  - `web/src/components/assistant-ui/thread.tsx`
+  - `web/src/components/office/AgentDirectChatView.tsx`
+  - `web/src/components/office/AutonomousOfficeScreen.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-11] — Dynamic Real Conversation Turn Synthesis & Clean Obsidian Graph HUD
+- **What was built:**
+  - **Dynamic Conversation Synthesis from SQLite (`memory/vault_engine.py`):**
+    - Built `sync_real_conversations_from_db()` to automatically inspect real conversation turns stored in `zezo_brain.db` and synthesize them into real Markdown knowledge notes (`memory/vault/conv_*.md`).
+    - Extracts the user's primary prompt topic, conversational turn excerpts, and tool executions.
+    - Automatically discovers semantic `[[wikilinks]]` connecting the conversation to relevant entities (`[[ZEZO OS]]`, `[[Hamza Bukhari]]`, `[[System Preferences]]`, `[[Ali Akdas]]`, `[[Obsidian Knowledge Graph]]`).
+    - Ingested real database interactions, expanding the live knowledge graph from 5 seeded nodes to **25 real connected nodes and 70 live dynamic edges**!
+  - **Clean Clutter-Free Obsidian Top Bar (`web/src/components/memory/MemoryGraphCanvas.tsx`):**
+    - Per user feedback, removed horizontal category tabs (`All`, `knowledge`, `preference`, `project`, etc.) that cluttered the screen and would overflow with large node counts.
+    - Replaced with a wide, sleek search input (`Filter memory graph...`) matching Obsidian's minimalist aesthetics.
+- **Verification:**
+  - `npm run build` compiled cleanly (0 TypeScript errors in 3.90s).
+  - Python test confirmed: 25 live conversation nodes and 70 edges active in graph.
+  - `pytest tests/test_memory_vault_engine.py` passed 3/3.
+- **Key files touched:**
+  - `memory/vault_engine.py`
+  - `web/src/components/memory/MemoryGraphCanvas.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-11] — Obsidian-Style Knowledge Graph & Local Markdown Memory Vault
+- **What was built:**
+  - **Local Markdown Memory Vault Engine (`memory/vault_engine.py`):**
+    - Built a local-first memory vault engine managing plain `.md` files in `memory/vault/*.md` (`user_profile.md`, `projects.md`, `preferences.md`, `relationships.md`, `knowledge_facts.md`).
+    - Seeded initial notes automatically from legacy `memory/long_term.json` with 0 data loss.
+    - Bidirectional `[[wikilink]]` extraction compiling real-time nodes and edges topology with color-coded categories (Profile, Project, Preference, Relationship, Knowledge).
+  - **Memory REST APIs (`core/ui_server.py` & `web/src/lib/api.ts`):**
+    - Added `GET /api/memory/graph` returning node and edge network data.
+    - Added note CRUD endpoints (`GET /api/memory/notes`, `GET /api/memory/note`, `POST /api/memory/note`, `POST /api/memory/add`, `POST /api/memory/delete`).
+  - **Obsidian-Style HTML5 Canvas 2D Physics Graph (`web/src/components/memory/MemoryGraphCanvas.tsx`):**
+    - High-performance Canvas renderer powered by `d3-force` physics (repulsion, spring links, gravitational bounce, collision radius).
+    - Draggable, interactive neon nodes with category halos, smooth pan & zoom, search filter, and category filters.
+    - 60 FPS animation loop with idle optimization.
+  - **Slide-Out Memory Inspector & Live Editor (`web/src/components/memory/MemoryInspectorDrawer.tsx`):**
+    - Slide-out panel opening on node click displaying full Markdown note, live editable textarea, save/delete actions, and clickable connected backlinks.
+  - **Add Memory Node Modal (`web/src/components/memory/NewMemoryModal.tsx`):**
+    - Modal enabling instant creation of new memory notes with title, category, Markdown body, and tags that spawn live glowing nodes into the graph.
+- **Verification:**
+  - `npm run build` compiled 100% cleanly (0 TypeScript errors, bundle generated in 2.30s).
+  - `pytest tests/test_memory_vault_engine.py` passed 3/3 (0.15s).
+  - Regression suites `pytest tests/test_config_endpoints.py tests/test_assistant_customise_suite.py` passed 5/5.
+- **Why this approach was chosen:**
+  - The user pointed out that the previous memory tab was an opaque database status card. Replacing it with a transparent Markdown vault and Obsidian-style interactive force-directed graph gives the user visual knowledge mapping and full CRUD control over what ZEZO remembers.
+- **Key files touched:**
+  - `memory/vault_engine.py`
+  - `core/ui_server.py`
+  - `web/src/lib/api.ts`
+  - `web/src/components/memory/MemoryGraphCanvas.tsx`
+  - `web/src/components/memory/MemoryInspectorDrawer.tsx`
+  - `web/src/components/memory/NewMemoryModal.tsx`
+  - `web/src/components/settings/SettingsModal.tsx`
+  - `tests/test_memory_vault_engine.py`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-11] — Theme Cards Simplification: Shorter Names & Removed Superfluous Text
+- **What was built:**
+  - **Removed Superfluous Text & Badges:**
+    - Per user directive, removed the badge (`CLAUDE`, `MINT`, etc.), the tagline (`Warm Clay & Minimal Anthrop...`), and the bottom description paragraph from all theme cards in [SettingsModal.tsx](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/web/src/components/settings/SettingsModal.tsx).
+  - **Shortened Theme Names:**
+    - Renamed all themes to clean, concise names:
+      - `Claude Terracotta` → `Terracotta`
+      - `Neo Mint Matrix` → `Neo Mint`
+      - `Arctic Oceanic Teal` → `Arctic Teal`
+      - `Deep Cobalt Azure` → `Cobalt`
+      - `Cyber Amethyst Violet` → `Amethyst`
+  - **Clean ReUI Layout:**
+    - Each card now features only: Theme Icon + Short Name, Active/Apply Badge, and the full-width color palette strip.
+    - Card height reduced to a sleek ~78px.
+- **Verification:**
+  - `npm run build` compiled cleanly (`tsc -b && vite build` in 1.42s with 0 errors).
+- **Key files touched:**
+  - [SettingsModal.tsx](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/web/src/components/settings/SettingsModal.tsx)
+  - [LEARNING_JOURNAL.md](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/LEARNING_JOURNAL.md)
+
+---
+
+## [2026-10-11] — Full-Screen OS Settings Screen Transformation
+- **What was built:**
+  - **Converted Settings Dialog to Native Full-Screen Screen Overlay:**
+    - Replaced the Radix/Shadcn floating `Dialog` wrapper (`max-w-4xl max-h-[92vh] h-[88vh]`) in `web/src/components/settings/SettingsModal.tsx` with a native OS-level full-viewport view (`fixed inset-0 z-50 w-screen h-screen bg-background/98`).
+    - Removed dark dialog backdrop borders and margins, delivering an immersive desktop operating system experience matching macOS/Windows settings.
+    - Added native keyboard listener for `Escape` (`Esc`) key to instantly return to the desktop workstation.
+    - Upgraded top navigation header to full desktop width (`max-w-5xl`) with prominent `ZEZO OS Settings` title, `Active` status badge, subtitle, auto-save status, and intuitive `Close (Esc)` action.
+    - Expanded left sidebar navigation rail to `w-64` with backdrop blur, smooth navigation, and search filter.
+  - **Verification:**
+    - `npm run build` compiled 100% cleanly (0 TypeScript errors, bundle generated in 3.09s).
+    - `pytest tests/test_config_endpoints.py tests/test_assistant_customise_suite.py` passed 5/5 (exit code 0).
+- **Why this approach was chosen:**
+  - The user requested converting the settings UI from a cramped popup dialog into a full screen. With 7 deep configuration tabs (Providers, Voice, Persona, Memory, Skills, Appearance, Controls), a full-screen layout eliminates double scrolling and accidental overlay dismissals.
+- **Key files touched:**
+  - `web/src/components/settings/SettingsModal.tsx`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Full-screen overlays preserve component state and avoid radix backdrop collisions while providing an authentic desktop OS aesthetic.
+
+---
+
+## [2026-10-11] — Elimination of Duplicate User Chat Bubbles (Echo Deduplication)
+- **What was built:**
+  - **Identified Root Cause of Duplicate User Bubbles:**
+    - When the user submitted a prompt via the composer, `onNew` in `web/src/App.tsx` added the first user bubble with an ID like `user-1791...`.
+    - Gemini Live then echoed the prompt back over the WebSocket as `input_transcription`, triggering `main.py`'s `stream_transcript("user", text)`.
+    - `App.tsx`'s `transcriptStream` effect only recognized messages starting with `live-user`, so it treated the Gemini Live echo as a whole new turn and appended a second identical user bubble.
+  - **Double-Layer Fix Implemented:**
+    1. **Backend (`main.py`):** Added `is_recent_typed` guard to `sc.input_transcription` (line 1775) so that when a text prompt was typed within the last 5 seconds, `main.py` skips broadcasting the redundant user transcript stream.
+    2. **Frontend (`web/src/App.tsx`):** Added a deduplication guard in `transcriptStream` effect so that if `speaker === 'user'` and the last message in `chatMessages` already has matching text or was recently created via `onNew` (`user-*`), the duplicate echo is discarded.
+  - **Verification:**
+    - Recompiled `web/` (`npm run build`) passing 100% of TypeScript checks with 0 errors.
+    - Verified `python -m py_compile main.py`.
+- **Why this approach was chosen:**
+  - The user shared a screenshot showing duplicate orange bubbles for `"how are you ?"`.
+- **Key files touched:**
+  - `main.py`
+  - `web/src/App.tsx`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Typed user messages must never be duplicated when the live WebSocket server echoes back input transcription.
+
+---
+
+## [2026-10-11] — Fix for Text Command Execution, Duplicate Messages & Silence Watchdog Thread Safety
+- **What was built:**
+  - **Thread-Safe Silence Watchdog (`main.py`):**
+    - Fixed `_arm_silence_watchdog` so that when invoked from worker threads handling incoming WebSocket commands, it safely schedules via `asyncio.run_coroutine_threadsafe(..., self._loop)` instead of throwing `RuntimeError: no running event loop`.
+    - This unblocks `send_client_content` in `_on_text_command`, allowing Gemini Live to receive text prompts and respond with spoken audio and transcripts.
+  - **Clean Single-Pathway Messaging (`web/src/App.tsx`):**
+    - Cleaned `onNew` handler to dispatch each prompt once via `sendUserMessage(text)`.
+    - Eliminated redundant `send({ type: 'text_command' })` and eliminated the failing REST fallback `api.sendAgentChat` with its hardcoded dummy response (*"Directive received and dispatched to autonomous runtime"*).
+    - Assistant responses now stream seamlessly via the existing `transcriptStream` listener.
+  - **UI Server & Routing Fixes (`core/ui_server.py`):**
+    - Corrected `llm_router.generate_text()` call in `_fleet_chat_handler` to pass `tier=llm_router.FAST` instead of the unsupported `model=` keyword argument.
+    - Added `GET /api/system/status` route returning live CPU/RAM telemetry, stopping 404 polling spam.
+  - **3-Layer Verification:**
+    - Layer 1 (Static): `npm run build` and `python -m py_compile` passed with 0 errors.
+    - Layer 2 (Runtime): Unit test verifying thread-safe `_arm_silence_watchdog` passed without exception; Pytest suites passed 5/5.
+    - Layer 3 (Regression): Confirmed existing configuration endpoints pass.
+- **Why this approach was chosen:**
+  - The user reported that typed messages were duplicating and Zezo was not responding with actual answers (only showing hardcoded fallback phrases).
+- **Key files touched:**
+  - `main.py`
+  - `web/src/App.tsx`
+  - `core/ui_server.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Any asyncio task scheduled from a thread outside the main event loop MUST use `asyncio.run_coroutine_threadsafe(coro, loop)`.
+
+---
+
+## [2026-10-11] — Authentic Gemini Live Voice Previews Generated from Google API
+- **What was built:**
+  - **Identified Root Cause of Robotic Preview:**
+    - The old `frontend/assets/voices/*.mp3` clips were generated using an old Edge-TTS/Windows engine that spoke: *"Hello. I am Zizo... Sharon Voice Persona"* in a robotic voice.
+    - `SettingsModal.tsx` also had a fallback `window.speechSynthesis` (Microsoft David/Zira) which triggered robotic Windows speech.
+  - **Authentic Google Gemini Live Samples Generated:**
+    - Connected directly to Google Gemini Live API (`models/gemini-3.1-flash-live-preview`) using the project's Gemini key.
+    - Generated 24kHz authentic audio for all 5 official Live voice profiles: **Charon**, **Puck**, **Fenrir**, **Kore**, and **Aoede**.
+    - Exported high-quality MP3s to `frontend/assets/voices/`, `web/public/assets/voices/`, and `web/dist/assets/voices/`.
+  - **Clean Frontend Audio Playback (`web/src/components/settings/SettingsModal.tsx`):**
+    - Removed robotic `window.speechSynthesis` fallback.
+    - Added timestamp cache-busting to the `/api/preview_voice` request to ensure fresh audio plays on every click.
+  - **Verification:**
+    - Rebuilt `web/` (`npm run build`) passing 100% of checks.
+    - Verified curl endpoint returned 200 OK with authentic 142KB MPEG audio.
+- **Why this approach was chosen:**
+  - The user noticed that the "Test" button sound did not match Zezo's real natural conversational voice. Generating the samples directly from the actual Live model ensures 100% audio parity.
+- **Key files touched:**
+  - `frontend/assets/voices/*.mp3`
+  - `web/src/components/settings/SettingsModal.tsx`
+  - `web/public/assets/voices/*.mp3`
+  - `web/dist/assets/voices/*.mp3`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Never use browser `speechSynthesis` or external synthetic TTS for Gemini Live previews; always use samples captured from the active Gemini Live model.
+
+---
+
+## [2026-10-11] — Permanent ZEZO Identity: Assistant Name Option Removed from Settings & Backend
+- **What was built:**
+  - **Settings UI Clean-Up (`web/src/components/settings/SettingsModal.tsx`):**
+    - Removed the "Assistant Name" input field from the Identity & Profile settings section.
+    - Removed `assistantName` state, setter, load listener, save listener, and dependency array references.
+    - Updated voice preview test to say: *"Hello, I am ZEZO. Voice timbre configured as..."*.
+  - **Backend Identity Lock (`main.py`, `memory/config_manager.py`, `core/ui_server.py`):**
+    - Locked `self._asst_name = "ZEZO"` in `main.py` so the operating system identity is permanently and immutable set to ZEZO.
+    - Updated `get_assistant_name()` to return `"ZEZO"` and `save_assistant_config()` to preserve `"ZEZO"` in `memory/config_manager.py`.
+    - Handled `/api/config` and `/api/settings/general` in `core/ui_server.py` so assistant name is fixed to `"ZEZO"`.
+  - **Test Suite Updates (`tests/test_config_endpoints.py`, `tests/test_assistant_customise_suite.py`):**
+    - Updated assertions to verify `get_assistant_name() == "ZEZO"`.
+    - Both test suites pass 100% (5 tests passed).
+  - **Verification:**
+    - TypeScript compilation and Vite build (`npm run build`) passed with exit code 0.
+    - `python -m py_compile core/ui_server.py main.py memory/config_manager.py` passed with exit code 0.
+- **Why this approach was chosen:**
+  - The user requested removing the Assistant Name option completely from settings and backend so the OS name is cleanly and permanently **ZEZO**, eliminating user confusion with acoustic wake-word models.
+- **Key files touched:**
+  - `web/src/components/settings/SettingsModal.tsx`
+  - `memory/config_manager.py`
+  - `main.py`
+  - `core/ui_server.py`
+  - `tests/test_config_endpoints.py`
+  - `tests/test_assistant_customise_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - The desktop operating system is permanently named **ZEZO**. Do not reintroduce custom assistant name fields that conflict with wake word or system branding.
+
+---
+
+## [2026-10-11] — Settings Voice UI Clean-Up & AGENTS.md System Architecture Truth
+- **What was built:**
+  - **Clean Honest Audio Settings (`web/src/components/settings/SettingsModal.tsx`):**
+    - Removed non-functional cascade pipeline controls (`pipeline_mode`, `stt_engine`, `tts_engine`, `voice_fallback`) that misled users into expecting an offline cascade loop.
+    - Accurately presented the active real-time audio pipeline: **Google Gemini Live (WebSockets, PCM 16kHz)** with status `ONLINE` and `PRIMARY ENGINE`.
+    - Maintained physical audio endpoint controls (Mic input picker, Speaker output picker, active Self-Echo filter).
+  - **AGENTS.md System Architecture Sync (`AGENTS.md`):**
+    - Removed non-existent entries `voice_fallback.py`, `tts.py`, `stt.py` from the directory structure and added actual core files (`ui_server.py`, `fleet_manager.py`, `mcp_runtime.py`, `circuit_breaker.py`).
+    - Added an explicit rule clarifying that the active live voice conversation runs solely via Google Gemini Live API in `main.py`, and that offline cascade voice loops must not be exposed as dummy UI selectors.
+  - **Verification:**
+    - TypeScript strict compile and Vite production build (`npm run build`) passed with 0 errors.
+    - `python -m py_compile core/ui_server.py` passed with exit code 0.
+- **Why this approach was chosen:**
+  - The user explicitly requested to remove the dummy voice pipeline controls from the UI and keep `AGENTS.md` strictly aligned with the real backend.
+- **Key files touched:**
+  - `web/src/components/settings/SettingsModal.tsx`
+  - `AGENTS.md`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Never add configuration toggles in user-facing UI unless the backend actively executes that pipeline.
+
+---
+
+## [2026-10-11] — Mobile Remote QR Code Option Restored with Live LAN Gateway & Dynamic Key
+- **What was built:**
+  - **Workstation Header QR Trigger Restored (`web/src/App.tsx`):**
+    - Restored the Mobile Remote trigger button (`<QrCode />`) in the workstation top header alongside Settings, Terminal, and Task Matrix buttons (`title="Mobile Remote"`).
+    - Wired state `isMobileRemoteOpen` and hooked it to `useZezoSocket()` + fallback REST API.
+  - **Live Backend Gateway Endpoints (`core/ui_server.py`):**
+    - Added helper `_resolve_remote_details()` querying `DashboardServer.get_url()` and `DashboardServer.new_key()` from `main.py`, resolving local network IP and port 8000.
+    - Added REST endpoints `GET /api/remote` and `POST /api/remote/new_key`.
+    - Handled WebSocket message `get_remote_key` to broadcast live `remote_gateway` data.
+  - **Live Mobile Remote Modal (`web/src/components/remote/MobileRemoteModal.tsx`):**
+    - Integrated client-side `qrcode` generation displaying a crisp, high-contrast QR code directly in the dialog.
+    - Encodes the full auto-login URL (`http://<lan-ip>:8000/auto-login?key=<pairing-key>`), allowing phones to connect instantly via camera scan with zero typing.
+    - Included Gateway URL with "Open" and "Copy" actions, Pairing Secret Key with "Copy", and a live 10-minute countdown timer with automatic regeneration on expiry.
+    - Added "New Key" action and clean, sticky header controls without redundant status badges.
+  - **Strict Build & Compilation Verification:**
+    - Rebuilt `web/` assets (`npm run build`) passing 100% of TypeScript checks with 0 errors.
+    - Verified static compilation of `core/ui_server.py`, `ui.py`, and `main.py` via `py_compile`.
+- **Why this approach was chosen:**
+  - The user explicitly requested the Mobile Remote QR code option back in the header bar ("i cant see mobile remote qrcode option"), wanting it powered by real backend data rather than mock values.
+- **Key files touched:**
+  - `web/src/App.tsx`
+  - `web/src/components/remote/MobileRemoteModal.tsx`
+  - `web/src/lib/api.ts`
+  - `core/ui_server.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Always wire remote access features directly to `main.py`'s `DashboardServer` (port 8000) so that mobile pairing and QR codes work seamlessly over the local network.
+
+---
+
+## [2026-10-11] — Clean Modal Headers: Removal of Redundant Status & Shortcut Badges
+- **What was built:**
+  - **Log Console Header (`web/src/components/telemetry/BackendLogModal.tsx`):**
+    - Removed the `[ CTRL+L ]` keyboard shortcut badge and `[ X / Y LINES ]` counter pill from next to the **Log Console** title.
+    - Cleaned up unused `Badge` and `logStats` imports/destructuring to keep code clean and warning-free.
+  - **Task Matrix & Registry Header (`web/src/components/tasks/TaskManagerModal.tsx`):**
+    - Removed the `[ ((•)) 0 ACTIVE ]` status badge from next to the **Task Matrix & Registry** title.
+    - Removed the unused `Radio` icon import.
+  - **Clean Production Build:** Recompiled `web/` assets (`npm run build`) passing 100% of TypeScript strict checks.
+- **Why this approach was chosen:**
+  - Directly requested by the user via annotated screenshot markup ("remove this") to declutter the modal title bars.
+- **Key files touched:**
+  - `web/src/components/telemetry/BackendLogModal.tsx`
+  - `web/src/components/tasks/TaskManagerModal.tsx`
+  - `web/src/components/office/AutonomousOfficeScreen.tsx`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Modal titles should remain clean and minimalist without redundant status pill overlays that duplicate info already present in the modal body (e.g., the KPI strip in Task Manager or the Follow bar in Log Console).
+
+---
+
+## [2026-10-11] — Removal of Dummy Mobile Remote Gateway Screen & Header Button
+- **What was built:**
+  - **Removed Dummy Mobile Remote Modal (`web/src/components/remote/MobileRemoteModal.tsx`, `web/src/App.tsx`):**
+    - Completely removed the unneeded `MobileRemoteModal` dummy dialog and its pairing key (`TFXKXP`), simulated QR code canvas, and gateway address mockup.
+    - Removed the header trigger button (`QrCode` icon button) in the top workstation navigation bar in `App.tsx`.
+    - Removed unused `isMobileRemoteOpen` state, imports, and socket listeners (`remoteGateway`, `requestRemoteKey`).
+    - Successfully recompiled `web/` production bundle (`tsc -b && vite build`).
+- **Why this approach was chosen:**
+  - Directly requested by the user via UI markup annotation ("remove this, its a dummy data screen not real") to eliminate non-functional prototype clutter.
+- **Key files touched:**
+  - `web/src/App.tsx`
+  - `web/src/components/remote/MobileRemoteModal.tsx` (deleted)
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Keep the top bar clean and strictly focused on active, real-time operating system features (Settings, Task Matrix, and Companion tabs).
+
+---
+
+## [2026-10-11] — Real Data Synchronization & Quick Controls Persistence for Settings Modal
+- **What was built:**
+  - **Full Backend Config Routing (`core/ui_server.py`, `ui.py`):**
+    - Added dedicated `/api/config` `GET` and `POST` route handlers (and `/api/settings/*` aliases) in `ZezoUIServer` to provide a single, unified source of truth for all assistant configurations.
+    - Exported and saved quick controls (`autostart_enabled`, `morning_brief_enabled`, `wake_word_enabled`, `push_to_talk_enabled`), masked API credentials (`gemini_api_key_masked`, `groq_api_key_masked`, `elevenlabs_api_key_masked`, `tavily_api_key_masked`), voice models, and full list of supported response languages (`AVAILABLE_LANGUAGES`).
+    - Aligned initial state in `ui.py` (`ZezoWindow` & `ZezoUI`) with masked credentials and quick control states.
+  - **React Settings Frontend Wiring (`web/src/components/settings/SettingsModal.tsx`):**
+    - Connected `SettingsModal` state loading (`useEffect`) directly to `api.getConfig()`, populating all interaction switches, API key fields (with masked placeholders/keys), and active assistant configurations upon opening.
+    - Updated auto-save engine to persist all switches (`autostart`, `morningBrief`, `wakeWord`, `pushToTalk`), API keys, and persona selections via transactional debounced API updates.
+    - Synchronized Language Select dropdown options and normalization mapping (`auto`, `English`, `Urdu`, `Hindi`, `Spanish`, `French`, `German`, `Arabic`, `Turkish`) with `memory/config_manager.py`'s `AVAILABLE_LANGUAGES`, fixing the previous bug where selected languages reverted to default.
+  - **Automated Verification Suite (`tests/test_config_endpoints.py`):**
+    - Added round-trip tests asserting `GET /api/config` data schema, `POST /api/config` updates, and memory manager persistence.
+- **Why this approach was chosen:**
+  - Resolved user feedback reporting dummy/non-functional features in Settings (language not persisting, API keys appearing blank, and interaction switches resetting).
+- **Key files touched:**
+  - `core/ui_server.py`
+  - `ui.py`
+  - `web/src/components/settings/SettingsModal.tsx`
+  - `web/dist/` (rebuilt via `npm run build`)
+  - `tests/test_config_endpoints.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - When exposing configuration options in UI dropdowns, values must match backend enumeration constants verbatim (e.g. `"English"` / `"Urdu"`, not ISO shorthand `"en"` / `"ur"`).
+
+---
+
+## [2026-10-11] — Chat Thread Timestamps & Real-Time Tool Execution Thinking State
+- **What was built:**
+  - **Chat Message Timestamps (`web/src/components/assistant-ui/ZezoChatThread.tsx`, `web/src/App.tsx`):**
+    - Added `createdAt: Date` tracking to `ChatTurn` in `App.tsx` across initial greeting, real-time live voice turns (`transcriptStream`), and typed directive submissions (`onNew`).
+    - Passed `createdAt` through `convertMessage` into `@assistant-ui/react` primitives.
+    - Updated `UserMessage` and `AssistantMessage` in `ZezoChatThread.tsx` with a formatted timestamp (`12:15 AM`, `12:16 AM`) rendered cleanly in `font-mono text-[10px] text-[var(--muted-foreground)]` beside message action buttons. The user can now immediately see exactly when messages were spoken/sent and calculate response elapsed time.
+  - **Tool & Background Task Thinking State (`main.py`, `web/src/components/assistant-ui/ZezoChatThread.tsx`):**
+    - Diagnosed the root cause of ZEZO appearing in `LISTENING` state while silently executing tasks (`web_search`, `screen_process`, `reminder`, etc.):
+      1. When `response.tool_call` arrived, `turn_complete` in `server_content` prematurely reset the state to `LISTENING`.
+      2. In `_play_audio`, audio queue timeouts every 450ms invoked `set_speaking(False)`, which unconditionally set `self.ui.set_state("LISTENING")` while the tool was running.
+      3. After sending `send_tool_response`, the system entered a silent waiting period while Gemini reasoned about the tool output to construct the answer; `_tool_busy` was dropped before the reply arrived.
+    - Added `self._awaiting_tool_reply` state variable in `main.py` and set UI state to `THINKING` immediately upon receiving `response.tool_call` and after submitting tool responses.
+    - Guarded `set_speaking(False)` and `turn_complete` so that `LISTENING` is never restored while `_tool_busy` or `_awaiting_tool_reply` is active.
+    - Added real-time pulsing `Thinking & executing task...` badge in `ZezoChatThread.tsx` when `systemState === 'thinking'`, providing visual feedback right inside the conversation thread.
+- **Why this approach was chosen:**
+  - Directly addressed user feedback regarding wanting to see turn timestamps in chat and preventing the assistant from falsely appearing in `LISTENING` state while silently processing tasks.
+- **Key files touched:**
+  - `main.py`
+  - `web/src/components/assistant-ui/ZezoChatThread.tsx`
+  - `web/src/App.tsx`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Audio playback loops polling on empty queues must always check whether asynchronous background tool operations are in-flight before setting idle/listening states.
+
+---
+
+## [2026-10-11] — Modal Anti-Flicker Architecture & Clean Chat Inception
+- **What was built:**
+  - **Eliminated QtWebEngine Screen Blinking on Modals (`web/src/components/ui/dialog.tsx`, `web/src/App.tsx`):**
+    - Removed `backdrop-blur-md` (`backdrop-filter`) from modal overlays (`DialogOverlay`, `AutonomousOfficeScreen`, `SkillsSettingsTab`, `MobileRemoteModal`). In QtWebEngine/Chromium, running `backdrop-filter: blur(...)` over a continuous 60FPS WebGL canvas causes severe GPU compositor repaints and intense screen flickering. Replaced with clean opaque backdrop `bg-black/80`.
+    - Enforced **Rule 4**: dynamically hidden `#vortex-gif` and unmounted `QiviAvatarVisualizer` when any modal dialog (`isAnyModalOpen`) is active, immediately releasing the WebGL context until the modal closes.
+    - Set modal content backgrounds to solid `#0e0e0e` with smooth opacity transitions, eliminating transform-based tearing.
+  - **Chat Message Hygiene (`web/src/App.tsx`, `ui.py`):**
+    - Updated initial chat thread state to display strictly `"ZEZO online."` upon startup, removing verbose multi-line greeting boilerplate.
+    - Gated `_on_log_emitted` in `ui.py` so that internal system messages (`SYS: Provider health...`, `SYS: Awake`, etc.) broadcast exclusively to `log_entry` (for the Ctrl+L Log Console) and do not leak into the conversational user chat thread.
+- **Why this approach was chosen:**
+  - Directly resolved user feedback reporting severe screen flickering when opening modals (Settings, Task Manager, QR Remote) and eliminated wall-of-text chat clutter on startup.
+- **Key files touched:**
+  - `web/src/components/ui/dialog.tsx`
+  - `web/src/components/office/AutonomousOfficeScreen.tsx`
+  - `web/src/components/settings/SkillsSettingsTab.tsx`
+  - `web/src/components/remote/MobileRemoteModal.tsx`
+  - `web/src/App.tsx`
+  - `ui.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Never place `backdrop-filter` on layers covering WebGL rendering in QtWebEngine. Always gate background canvases when dialog overlays are open.
+
+---
+
+## [2026-10-10] — Real-Time Live Sync & State Unwrapping for Desktop Web UI
+- **What was built:**
+  - **WebSocket Payload Unwrapping (`web/src/hooks/useZezoSocket.ts`):** Fixed critical root cause where `ui_server.py` broadcasts `{"type": event, "data": payload}`. Normalized message unwrapping so that all telemetry (`cpu`, `mem`, `gpu`, `net`), state changes (`speaking`, `listening`, `thinking`, `sleeping`), task lists, and speech audio levels (`audio_level`, `mic_level`) correctly populate React state instead of silently evaluating to `undefined`.
+  - **Live Audio Level Pipeline (`ui.py`, `main.py`):** Implemented live throttled 20Hz `ui_server.broadcast("audio_level", ...)` inside `ZezoUI.set_audio_level()`, and invoked `set_audio_level()` in `main.py` `_play_audio` loop even when visemes are computed. Now the 3D avatar mouth movements, eye expressions, and dock soundwave equalizer actively react to Gemini Live speech in real time.
+  - **Real-Time Bidirectional Speech Transcription (`web/src/App.tsx`, `main.py`):** Fixed live transcript chunking bug where partial word tokens (`"par hogi."`) were overwriting the turn bubble instead of accumulating. In `main.py`, updated `stream_transcript` during `server_content` streaming to broadcast the progressive accumulated sentence (`" ".join(out_buf)` / `" ".join(in_buf)`). In `App.tsx`, added delta-chunk accumulation so words seamlessly flow and build up into the complete live paragraph in real time.
+  - **Live Machine Telemetry & Task Synchronization (`web/src/App.tsx`):** Replaced hardcoded dummy initial percentages (`CPU 28%`, `RAM 54%`, `GPU 41%`) with live synchronization from `liveTelemetry` (psutil) and background `liveTasks`.
+  - **Avatar Dock Controls & Speaker Mute:** Wired `speaker_mute_toggle` across `App.tsx`, `core/ui_server.py`, `ui.py`, and `main.py` (`stream.write` gating). Added `muted`, `sleeping`, and `speaker_muted` properties to `ZezoUI` and `MainWindow` and implemented attribute forwarding in `ZezoUI.__setattr__` using direct `self.__dict__.get("_win")` guards to avoid `__getattr__` recursion on initialization.
+- **Why this approach was chosen:**
+  - Resolved all four dummy/unsynced areas identified by the Lead Architect: static telemetry cards, unsynced avatar speech animations, missing chat transcriptions, and dummy dock buttons.
+- **Key files touched:**
+  - `web/src/hooks/useZezoSocket.ts`
+  - `web/src/App.tsx`
+  - `ui.py`
+  - `main.py`
+  - `core/ui_server.py`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-10] — Real Backend Connection & Data Wiring for React Desktop Web App
+- **What was built:**
+  - **Single-Source Serving (`core/ui_server.py`):** Configured `ZezoUIServer` to check and serve compiled `web/dist` React SPA assets first, with fallback to legacy `frontend/`, ensuring a single launch (`python main.py` or `python ui.py`) runs the production React frontend inside `QWebEngineView`. Routed `/zezo-avatar.png` via explicit GET handler with `web.FileResponse`.
+  - **Attachments API (`core/ui_server.py`, `web/src/lib/api.ts`):** Implemented `GET /api/attachments` to retrieve registered disk files and workspace folders. Connected `/api/upload` multipart upload pipeline to drag-and-drop and native file/folder pickers in the Uploads frame.
+  - **Zezo OS Chat Pipeline (`core/ui_server.py`, `web/src/App.tsx`):** Added native OS fallback for `zezo` in `_fleet_chat_handler` so directives sent from `ZezoChatThread` route directly to Gemini/LLM and stream back authentic speech narratives.
+  - **Full-Duplex WebSocket Events (`web/src/hooks/useZezoSocket.ts`):** Added live listeners for `transcript_stream` (spoken dialogue), `content_display` (Canvas output), `telemetry_update` (CPU/RAM/GPU), `task_list`, `file_ingested`, and `switch_view`. Added action helpers for `sendUserMessage`, `sendInterrupt`, `sendMuteToggle`, `sendSleepToggle`, `sendPayloadRemove`, and `sendPayloadClear`.
+  - **Real Data Wiring (`web/src/App.tsx`):**
+    - Eliminated synthetic keyword generators and mock initial message turns in `assistantRuntime`.
+    - Wired live hardware telemetry pill (`CPU`, `RAM`, `GPU`) in the top application header.
+    - Connected command dock controls (`MUTE`, `STOP`, `OFF`) directly to backend socket events.
+    - Synchronized live Canvas text from agent outputs and dynamically switched between Companion Stage and Scranton Office on `switch_view` voice directives.
+  - **Dev Proxy Alignment (`web/vite.config.ts`):** Updated Vite dev server proxy to point to port `8765`, enabling hot-reloading connected to the live Python engine.
+- **Why this approach was chosen:**
+  - Transitioned the desktop web application from isolated prototype state simulations into a fully connected, reactive control surface driven by the real autonomous agent daemon.
+- **Key files touched:**
+  - `core/ui_server.py`
+  - `web/vite.config.ts`
+  - `web/src/hooks/useZezoSocket.ts`
+  - `web/src/lib/api.ts`
+  - `web/src/App.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-10] — Chat Frame Header Horizontal Layout Alignment
+- **What was built:**
+  - Wrapped `<FrameTitle>Chat</FrameTitle>` and the `<Button>Copy</Button>` in an explicit horizontal flex row container (`<div className="flex items-center justify-between w-full">`) inside `<FrameHeader>` in [App.tsx](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/web/src/App.tsx#L972-L994).
+  - Resolved vertical column stacking where the default `FrameHeader` (`flex-col`) placed `CHAT` and `Copy` centered vertically on top of each other. Now **Chat** is aligned on the far left and **Copy** on the far right on the same row.
+- **Why this approach was chosen:**
+  - Directly requested by the Lead Architect via screenshot markup to align Chat on the left and Copy on the right.
+- **Key files touched:**
+  - `web/src/App.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-10] — Removal of Avatar Manual State Simulation Buttons Bar
+- **What was built:**
+  - Removed the prototype state switcher buttons cluster (`[ IDLE | LIST | THIN | SPEA ]`) located directly underneath the avatar companion on the main stage in [App.tsx](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/web/src/App.tsx).
+  - Cleaned up the unused `handleSetManualState` helper to eliminate dead code while maintaining the clean avatar command dock (`MUTE`, `SPEAKER`, `STOP`, `OFF`) and dynamic state/audio equalizer badges.
+- **Why this approach was chosen:**
+  - Directly requested by the Lead Architect via screenshot markup ("Remove this please") to eliminate prototype UI clutter now that system states are driven dynamically by live voice and runtime events.
+- **Key files touched:**
+  - `web/src/App.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-10] — Copy Chat Transcript Action in OS Chat Frame Header
+- **What was built:**
+  - Added a dedicated **Copy** button to the top-right of the Chat frame header in [App.tsx](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/web/src/App.tsx#L967-L987).
+  - Implemented `handleCopyChat` to extract all active speech turns (`User: ...`, `ZEZO: ...`) from the live conversation viewport into the system clipboard via `navigator.clipboard.writeText`.
+  - Added temporary `Copied` checkmark state feedback (reverting after 2 seconds).
+- **Why this approach was chosen:**
+  - Directly requested by the Lead Architect to allow one-click clipboard copying of the live voice dialogue and directive transcript.
+- **Key files touched:**
+  - `web/src/App.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-10] — Real-Time Voice Talking & Live Transcription in Zezo OS Chat
+- **What was built:**
+  - Cleaned the chat panel header in [App.tsx](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/web/src/App.tsx#L967-L970) to purely display `<FrameTitle>Chat</FrameTitle>` with zero badges, tags, or status chips.
+  - Redesigned [ZezoChatThread.tsx](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/web/src/components/assistant-ui/ZezoChatThread.tsx) to function strictly as a **realtime voice speech transcription and conversation thread**:
+    - Eliminated synthetic coding-agent tool call cards (`TurnProcessPill`, `Worked for 1.8s (1 tool)`, `Thought > Verified 25 actions...`).
+    - Streamlined turns into clean spoken dialogue between User and Zezo with animated voice waveforms (`transcribing speech...`) during active speech generation.
+    - Updated `assistantRuntime` in [App.tsx](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/web/src/App.tsx#L130-L280) to stream natural conversational speech directly, synchronizing with the 3D particle companion's audio visualizer.
+- **Why this approach was chosen:**
+  - Directly requested by the Lead Architect to eliminate all tags and status badges next to the Chat title.
+- **Key files touched:**
+  - `web/src/components/assistant-ui/ZezoChatThread.tsx`
+  - `web/src/App.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-10] — Dedicated ZezoChatThread Component & Single-Row Pill Composer
+- **What was built:**
+  - Created a dedicated, decoupled component [ZezoChatThread.tsx](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/web/src/components/assistant-ui/ZezoChatThread.tsx) specifically for the main OS Assistant Chat drawer in [App.tsx](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/web/src/App.tsx#L1093).
+  - Implemented the custom single-row pill/capsule composer (`ZezoPillComposer`) matching the user's hand-drawn specification: `[ Ask or enter directive... (↑) ]`.
+    - Features a single unified horizontal capsule (`rounded-full` border container with backdrop blur).
+    - Single-line responsive textarea on the left/center and a circular send/cancel button (`rounded-full h-7 w-7`) on the right.
+    - Completely eliminated vertical blank padding and multi-compartment separators.
+  - Kept [thread.tsx](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/web/src/components/assistant-ui/thread.tsx) dedicated for Agent Direct Chat in the Autonomous Office (`AgentDirectChatView.tsx`), preserving its file upload capabilities.
+- **Why this approach was chosen:**
+  - Directly requested by the Lead Architect via hand-drawn annotation to separate the two screens into distinct components and streamline the OS drawer composer into an ultra-clean single-row pill.
+- **Key files touched:**
+  - `web/src/components/assistant-ui/ZezoChatThread.tsx`
+  - `web/src/App.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-10] — Chat UI Differentiation: OS Drawer (No Upload) vs Agent Direct Chat (File Upload Retained)
+- **What was built:**
+  - Preserved the `Upload file` option and file attachment mechanism in [AgentDirectChatView.tsx](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/web/src/components/office/AgentDirectChatView.tsx#L516) (`showUpload={true}`) so agents in Autonomous Office retain file context capabilities.
+  - Kept the OS Assistant Chat drawer in [App.tsx](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/web/src/App.tsx#L1093) clean without the upload option (`showUpload={false}`).
+  - Fixed the `isZezo` condition in [thread.tsx](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/web/src/components/assistant-ui/thread.tsx#L296-L300) so specific named agents (e.g. Jim, Dwight, Pam) display their distinct character avatar (`Blobatar name={displayName}`), while the OS thread displays the authentic Zezo companion avatar (`/zezo-avatar.png`).
+- **Why this approach was chosen:**
+  - Directly requested by the Lead Architect to prevent file upload removal on the Agent Direct Chat screen while keeping the OS directive drawer clean.
+- **Key files touched:**
+  - `web/src/components/office/AgentDirectChatView.tsx`
+  - `web/src/components/assistant-ui/thread.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-10] — Minimalist & Clean Workflow Builder Placeholder
+- **What was built:**
+  - Redesigned the `activeTab === 'workflow'` screen in `web/src/App.tsx` from a cluttered layout with excess cards and badges into a clean, minimal, premium ReUI card.
+  - Stripped away redundant 3-column sub-cards (Visual DAG, Triggers, Safe Gates), heavy background glow effects, spinning clocks, and multiple roadmap badges.
+  - Retained a single clean GitBranch icon, a concise title ("Workflow Builder"), a single-sentence description, and an elegant "Coming Soon" outline badge.
+- **Why this approach was chosen:**
+  - Directly requested by the Lead Architect to eliminate visual clutter and ensure content remains clean and focused.
+- **Key files touched:**
+  - `web/src/App.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-10] — Agent Context Files & SOUL.md Modal Alignment (1:1 with office.html)
+- **What was built:**
+  - Redesigned the **FILES** modal (`isFilesModalOpen`) to strictly match the reference architecture in `frontend/office.html` (lines 2984–3069):
+    - Removed arbitrary repository source tree files (`package.json`, `index.html`, etc.) which dilute the agent context view.
+    - **Dual-Pane Layout:**
+      - **Left Pane ("Core Persona Files"):**
+        - Lists the 4 canonical agent context files: `SOUL.md` (Persona & prompt rules), `AGENTS.md` (System constraints & QA), `PROFILE.md` (Expertise & backstory), and `MEMORY.md` (Episodic memory palace).
+        - Integrated Radix `<Switch>` toggles for each file to enable/disable them in the agent's active prompt injection. Built with 100% native ReUI `<Card>`, `<CardContent>`, and `<ScrollArea>` components.
+        - Simplified modal header title to simply **`Files`** with active agent badge.
+        - Cleaned action button to single Lucide `<FolderOpen>` icon (`Open in Explorer`), removing duplicate emoji.
+      - **Right Pane ("Live Monospace Editor"):**
+        - Header badge showing active file metadata (`config/fleet_agents.json`, character count).
+        - Clean monospace `<textarea>` with ReUI tokens, standard typography, and clean Save/Cancel actions.
+- **Why this approach was chosen:**
+  - Directly matches the Lead Architect's `frontend/office.html` specification where the agent's files dialog is purpose-built for managing brain, persona, prompt rules, and memory context rather than browsing general application source code.
+- **Key files touched:**
+  - `web/src/components/office/AutonomousOfficeScreen.tsx`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - When `SOUL.md` is saved, it updates `selectedAgent.personality` directly, ensuring live agent chat and prompt execution instantly reflect the user's modifications.
+
+---
+
+## [2026-10-10] — 100% ReUI Autonomous Agents 2-Frame Inspector Layout (Agent Details + Activity & Logs)
+- **What was built:**
+  - Structured the right column into **2 distinct ReUI Frame blocks**:
+    1. **Top Frame Block (`Agent Details`):** Renamed header to `Agent Details`, containing active agent profile card, tactical action buttons (`CHAT`, `EDIT`, `FILES`), and collapsible `AGENT ENVIRONMENT & CONTROLS` drawer with Radix/ReUI `<Select>` controls. Removed redundant current task status card.
+    2. **Bottom Frame Block (`Activity & Logs`):** Renamed header to `Activity & Logs` with `[COPY]` clipboard button, providing an expanded full-height monospace terminal log feed with individual card lines. Removed bottom dispatch input bar.
+  - 100% compliant with the official ReUI component library and dynamic theme variables.
+- **Why this approach was chosen:**
+  - Streamlines inspector layout, maximizing log viewport height and adhering strictly to the user's updated UI annotations.
+- **Key files touched:**
+  - `web/src/components/office/AutonomousOfficeScreen.tsx`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Agents can receive real WebSocket execution dispatches directly via `useZezoSocket()` or REST API endpoints `/api/fleet/chat`.
+
+---
+
+## [2026-10-09] — Qivi Particle Avatar Integration (`yogeshhrathod/qivi`)
+- **What was built:**
+  - Replaced legacy static `neural_orb.js` canvas sphere with the particle-based AI companion avatar `qivi-react` from `yogeshhrathod/qivi`.
+  - Created `web/src/components/canvas/QiviAvatarVisualizer.tsx` component mapping ZEZO daemon states (`listening`, `thinking`, `speaking`, `sleeping`, `idle`) and audio level telemetry to dynamic Qivi states (`listening`, `thinking`, `talking`, `idle`), facial expressions (`curious`, `thinking`, `happy`, `sleepy`, `neutral`), and glowing interactive particle shaders.
+  - Kept container identifier `id="vortex-gif"` intact to guarantee complete backward compatibility with AGENTS.md Rule 4 (modal overlay hiding) and automated test suites.
+- **Why this approach was chosen:**
+  - `qivi-react` runs WebGL particle shaders natively within React 19 without blocking UI execution, providing rich facial expressions and mouth movement synchronized to audio levels.
+- **Key files touched:**
+  - `web/src/components/canvas/QiviAvatarVisualizer.tsx`
+  - `web/src/App.tsx`
+  - `web/package.json`
+- **What to remember for future work:**
+  - Qivi accepts `size`, `state`, `expression`, `personality`, `theme`, `appearance`, and `intensity`. Future audio streams can bind directly to `QiviVoice`.
+
+---
+
+## [2026-10-08] — Modern High-Contrast Studio UI Modernization (React 19 + TypeScript + assistant-ui & AI-SDK)
+
+- **What was built:**
+  - **Full Modern Frontend Architecture (`web/`):** Built high-contrast Studio dark theme interface leveraging React 19, TypeScript, Tailwind CSS v4, Radix UI primitives, Lucide icons, and `@xyflow/react`.
+  - **Single-Terminal Guarantee (`main.py`, `core/ui_server.py`):** User only needs a single command (`python main.py`). The application automatically verifies `web/dist` on launch, runs background build if absent, and serves the optimized compiled React SPA directly via `core/ui_server.py` with seamless fallback.
+  - **Core Components Implemented:**
+    - `Header.tsx`: System state pill, audio activity visualizer, telemetry metrics, and view switcher navigation (`Office View`, `Flow Canvas`, `Chat Stream`).
+    - `ChatPanel.tsx`: assistant-ui and AI-SDK inspired collapsible tool cards, model pill tags, and auto-resizing prompt input.
+    - `AgentInspector.tsx`: Strict UX order with Action buttons first (`[CHAT] [EDIT] [FILES]`), direct task dispatch, and collapsible `AGENT ENVIRONMENT & CONTROLS` drawer.
+    - `FleetRoster.tsx`: High-contrast agent list with engine and model tags.
+    - `CanvasView.tsx`: Interactive React Flow graph visualizing fleet orchestration connections.
+    - `VortexVisualizer.tsx`: High-contrast glowing reactive audio core.
+    - `SettingsModal.tsx`: Complete pipeline architecture & API key manager.
+- **Why this approach was chosen:**
+  - Resolved muddy low-contrast legacy styling and unreadable typography while honoring the user's non-negotiable single-terminal requirement.
+- **Key files touched:**
+  - `web/src/App.tsx`, `web/src/lib/api.ts`, `web/src/hooks/useZezoSocket.ts`
+  - `web/src/components/layout/Header.tsx`, `web/src/components/chat/ChatPanel.tsx`
+  - `web/src/components/fleet/AgentInspector.tsx`, `web/src/components/fleet/FleetRoster.tsx`
+  - `web/src/components/canvas/CanvasView.tsx`, `web/src/components/telemetry/VortexVisualizer.tsx`
+  - `web/src/components/settings/SettingsModal.tsx`
+  - `core/ui_server.py`, `main.py`, `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - In Vite/React setup, any frontend edits can be rebuilt with `npm run build` in `web/` in under 1 second. Python backend automatically loads `web/dist` statically.
+
+---
+
+## [2026-10-07] — Dedicated Agent Chat Modal with Engine/Model Quick Switchers and Direct CLI Pipeline
+
+- **What was built:**
+  - **Direct CLI Execution Pipeline (`core/ui_server.py` `/api/fleet/chat`):** Connected the in-chat engine and model selection directly to the native CLI binaries (`agy` for Antigravity, `opencode`/`kilo` for OpenCode/KiloCode) passing the active selected model (e.g. `--model gemini-3.8-flash-low` or `--model opencode/space-bunny-free`) with automatic persona injection, completely bypassing static fallback text.
+  - **In-Chat Engine & Model Dynamic Dropdowns (`frontend/office.html`):** Removed the static color dot from the chat header. Replaced static labels with interactive `ENGINE` (OpenCode / Antigravity / KiloCode) and `MODEL` dropdown selectors dynamically populated via `/api/models`, automatically persisting selections directly from the chat window. Fixed vertical clipping and padding in the select elements.
+  - **Clean Telemetry & One-Click Copy (`frontend/office.html`):** Removed the redundant input bar from `03 · LIVE ACTIVITY & LOGS` stream, transforming it into a high-density, auto-scrolling telemetry monitor. Added a `[📋 COPY]` button in the stream header that instantly copies all terminal activity to the clipboard.
+- **Why this approach was chosen:**
+  - When the user selects Antigravity or OpenCode in chat, the real CLI binary with the exact chosen model executes the conversation turn, ensuring authentic engine responses rather than generic third-party fallback.
+- **Key files touched:**
+  - `core/ui_server.py`
+  - `frontend/office.html`
+  - `config/fleet_agents.json`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - In `office.html`, modal panels must adhere to opaque backgrounds (`background: #0a0a0a` or solid dark theme) without inner backdrop filters to avoid QtWebEngine raster tearing.
+
+---
+
+## [2026-10-07] — Removed Redundant CLI & Coding Engines Preference Block from Settings Modal
+
+- **What was built:**
+  - Removed the redundant `CLI & CODING ENGINES` section (`#setting-creation-agent-select` and `#setting-edit-agent-select`) from the settings dropdown drawer/modal in [frontend/index.html](file:///c:/Users/Hamza%20Bukhari/Documents/antigravity/jarvis-57/frontend/index.html).
+- **Why this approach was chosen:**
+  - Coding agent routing and fleet configurations are handled directly via the dedicated Fleet Control & Scranton Office views; having this duplicate routing block in the quick settings overlay was unnecessary and cluttered the HUD settings panel.
+- **Key files touched:**
+  - `frontend/index.html`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - Background socket listeners in `index.html` safely check element existence before populating fields, avoiding any runtime null pointer exceptions.
+
+---
+
 ## [2026-10-06] — OpenCode, Antigravity & Kilo Code Real Model List Synchronization
 
 - **What was built:**
@@ -320,16 +1378,38 @@
   - Added logging for `server_content.interrupted` from Google Gemini Live server, alerting console and `log_bus` whenever a turn is cancelled server-side.
   - Added proactivity telemetry to `main.py:_build_config`: logs `get_proactive_audio_enabled()` and the live connect config proactivity state to `log_bus` and console on every session startup.
   - Added zero-output detection on `sc.turn_complete`: logs an explicit warning to `log_bus` (`audio.silence`) if a turn completes with user speech but no model audio or text.
-  - Added clean cancellation in `main.py:interrupt()` and `_receive_loop` finally block to avoid leaking background watchdog tasks.
-  - Authored comprehensive test suite in `tests/test_voice_silence_diagnostics_suite.py` (3/3 passed).
-  - Executed live comparative test against `gemini-3.1-flash-live-preview` with Hinglish prompt: verified that `proactive_audio: false` immediately returns 274,562 bytes of warm audio response in 0.72s, whereas `proactive_audio: true` causes the Google API to fail with `1007 Invalid JSON payload: Unknown name "proactivity" at 'setup'`.
+
+---
+
+## [2026-10-11] — Avatar Thinking State During Processing, Silence Watchdog & Tool Execution
+
+- **What was built:**
+  - Fixed avatar state machine so ZEZO accurately shifts into `THINKING` state (amber pulsing badge & avatar animation) when processing user queries instead of remaining stuck in `LISTENING`:
+    1. In `_silence_watchdog`: After 1.5s pause of user speech, avatar proactively enters `THINKING` state. On 5s silence watchdog timeout, ensures `THINKING` remains active while waiting for model output.
+    2. In `_execute_tool`: Removed premature `self.ui.set_state("LISTENING")` on tool completion so avatar stays in `THINKING` while Gemini processes the tool result and formulates speech.
+    3. In `sc.turn_complete`: Restores `LISTENING` cleanly once the turn is finalized without pending speech.
+    4. In `_on_ptt`: Fixed `self.state` AttributeError and properly transitions to `THINKING` when Push-to-Talk is released.
+    5. In `_on_text_command`: Proactively transitions to `THINKING` and arms silence watchdog when a user submits typed commands.
 - **Why this approach was chosen:**
-  - Direct observability into the WebSocket pipeline isolates whether voice silence is caused by local mic drops, server-side turn interruption, Google API schema rejections, or speech classifier misclassification.
-- **What alternatives were considered:**
-  - Blindly modifying the echo-tail window without diagnostics: Rejected because without watchdog telemetry, the root cause between local echo suppression vs server-side rejection cannot be proven.
+  - When tools execute or Gemini takes several seconds to generate a response (e.g. screen analysis), the avatar was incorrectly displaying `LISTENING`, confusing the user into thinking ZEZO was idle or ignoring them.
 - **Key files touched:**
   - `main.py`
   - `tests/test_voice_silence_diagnostics_suite.py`
+  - `tests/test_governance_deny_branch_suite.py`
+  - `LEARNING_JOURNAL.md`
+---
+
+## [2026-10-11] — Backend Log Bus Schema Normalization in Modern React UI
+
+- **What was built:**
+  - Normalized Log Bus event decoding in `web/src/hooks/useZezoSocket.ts` across `backend_logs`, `backend_logs_snapshot`, and `log` WebSocket message types.
+  - Added support for Python backend ring-buffer dictionary keys (`msg`, `src`, `ts`, `seq`, `level`) so all live logs render with their real message text, accurate timestamp, and specific subsystem source tags (`MAIN`, `AUDIO.SILENCE`, `FLEET`, `ACTIONS.SYSTEM_MONITOR`, etc.) instead of blank lines with generic `[SYS]` placeholders.
+  - Recompiled modern React frontend bundle (`web/dist`) via Vite/TypeScript.
+- **Why this approach was chosen:**
+  - The Python `log_bus` ring buffer emits `{ "seq", "ts", "level", "src", "msg" }`. The React frontend socket parser was checking `line.text` / `line.message` and `line.source`, causing `text` to evaluate to empty string `""` and `source` to default to `SYS`.
+- **Key files touched:**
+  - `web/src/hooks/useZezoSocket.ts`
+  - `web/dist/*`
   - `LEARNING_JOURNAL.md`
 - **What to remember for future work:**
   - Google's `gemini-3.1-flash-live-preview` v1beta WebSocket endpoint does not support `proactivity` in setup configuration; keep `proactive_audio: false` in `config/api_keys.json`.

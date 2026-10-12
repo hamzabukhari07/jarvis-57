@@ -268,12 +268,12 @@ def fleet_control(parameters: Dict[str, Any], **kwargs: Any) -> str:
 TOOL = {
     "name": "fleet_control",
     "description": (
-        "Orchestrate autonomous multi-agent fleet. Dispatch coding/research tasks to named specialist workers "
-        "(Ali, Ahmad, Dwight, Pam, Oscar, Kelly, Michael, Quantum), trigger P2P peer handoffs with upstream deliverables, "
-        "decompose multi-stage workflows, hire/fire/update agents, or query agent status. "
+        "Orchestrate autonomous multi-agent fleet. Dispatch coding/research tasks to active specialist workers "
+        "(e.g. Verve for frontend, Nexus/Ahmad for backend, Michael for architecture, Dwight for testing, Kelly for research), "
+        "trigger P2P peer handoffs with upstream deliverables, decompose multi-stage workflows, hire/fire/update agents, or query agent status. "
         "Use action='update' whenever the user wants to change an agent's role, name, specialty, allowed tools, or model. "
-        "Use this whenever the user addresses a specific agent ('Tell Ali to build a landing page', 'Kelly/Quantum transcribe and summarize this video', "
-        "'Ahmad build the auth API', 'Michael decompose this project') or for peer handoffs between agents."
+        "Use this whenever the user addresses a specific agent ('Tell Verve to build a landing page', 'Kelly transcribe and summarize this video', "
+        "'Ahmad build the auth API', 'Michael decompose this project') or for delegating work to the autonomous specialist fleet."
     ),
     "risk": "local_mutation",
     "enabled": True,
@@ -288,7 +288,7 @@ TOOL = {
             },
             "agent_id": {
                 "type": "STRING",
-                "description": "Target agent name or ID (e.g. 'ALI', 'AHMAD', 'DWIGHT', 'PAM', 'OSCAR', 'KELLY', 'MICHAEL', 'QUANTUM').",
+                "description": "Target agent name or ID from the active fleet roster (e.g. 'VERVE', 'FLUX', 'MICHAEL', 'AHMAD', 'DWIGHT', 'KELLY').",
             },
             "from_agent": {
                 "type": "STRING",
@@ -296,7 +296,7 @@ TOOL = {
             },
             "to_agent": {
                 "type": "STRING",
-                "description": "Destination agent ID for P2P delegation (e.g. 'ALI', 'AHMAD', 'DWIGHT').",
+                "description": "Destination agent ID for P2P delegation (e.g. 'VERVE', 'AHMAD', 'DWIGHT').",
             },
             "task": {
                 "type": "STRING",
@@ -306,9 +306,13 @@ TOOL = {
                 "type": "STRING",
                 "description": "Extracted deliverables, analysis findings, or code from an upstream agent to inject into the recipient agent's context.",
             },
+            "name": {
+                "type": "STRING",
+                "description": "Human-readable display name of the agent (e.g. 'DevDynamo', 'Dwight Schrute'). When the user asks to rename or name an agent ('call them X', 'name this agent X'), pass X as 'name', NEVER as 'role'.",
+            },
             "role": {
                 "type": "STRING",
-                "description": "Role or title when hiring or updating an agent (e.g. 'Detailed Web Researcher', 'Database Architect', 'QA Tester').",
+                "description": "Functional job title/responsibility (e.g. 'Full-Stack Developer', 'QA Tester', 'Web Researcher'). Do NOT put an agent's proper personal name here; put their job title.",
             },
             "default_tool": {
                 "type": "STRING",

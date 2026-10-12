@@ -2,8 +2,8 @@
 version: "3.0"
 name: "Image Gen"
 theme: "dark"
-source: "D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/image gen.html"
-extracted_at: "2026-10-03T09:56:42.702183+00:00"
+source: "C:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57/skills/hamza_taste/references/html/image gen.html"
+extracted_at: "2026-10-11T20:34:53.692816+00:00"
 description: "High-precision studio design system extracted deterministically from Image Gen. Features deep #09090b void canvas, high-contrast #ececec typography, vibrant #ececec accents, and glassy elevation."
 colors:
   primary: "#ececec"
@@ -95,7 +95,7 @@ components:
 # Image Gen — Design Specification
 
 > **Aesthetic Profile:** Dark Studio / High-Precision Void  
-> **Extracted Source:** D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/image gen.html  
+> **Extracted Source:** C:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57/skills/hamza_taste/references/html/image gen.html  
 > **Theme:** DARK  
 
 ---

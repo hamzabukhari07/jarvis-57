@@ -2,8 +2,8 @@
 version: "3.0"
 name: "Crazy Ui Landing Page"
 theme: "light"
-source: "D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/Crazy UI landing page.html"
-extracted_at: "2026-10-04T22:31:58.263472+00:00"
+source: "C:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57/skills/hamza_taste/references/html/Crazy UI landing page.html"
+extracted_at: "2026-10-11T20:34:43.100571+00:00"
 description: "Refined editorial light design system extracted deterministically from Crazy Ui Landing Page. Features clean #f6f4f2 cream canvas, high-contrast #0a0a0a ink typography, and elegant Instrument Serif headings."
 colors:
   primary: "#000000"
@@ -95,7 +95,7 @@ components:
 # Crazy Ui Landing Page — Design Specification
 
 > **Aesthetic Profile:** Light Editorial / Cream Precision  
-> **Extracted Source:** D:/anitgravity/zezo work/jarvis-57/skills/hamza_taste/references/html/Crazy UI landing page.html  
+> **Extracted Source:** C:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57/skills/hamza_taste/references/html/Crazy UI landing page.html  
 > **Theme:** LIGHT  
 
 ---

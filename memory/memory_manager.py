@@ -534,3 +534,17 @@ def pop_last_session() -> dict | None:
         except Exception as e:
             print(f"[Memory] ⚠️ pop_last_session error: {e}")
             return None
+
+
+def wipe_all_long_term_json() -> None:
+    """Flush memory/long_term.json and replica backup back to empty template."""
+    with _lock:
+        empty = _empty_memory()
+        MEMORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        MEMORY_PATH.write_text(json.dumps(empty, indent=2, ensure_ascii=False), encoding="utf-8")
+        bak = MEMORY_PATH.with_suffix(".json.bak")
+        if bak.exists():
+            try:
+                bak.write_text(json.dumps(empty, indent=2, ensure_ascii=False), encoding="utf-8")
+            except Exception:
+                pass

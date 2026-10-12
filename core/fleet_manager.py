@@ -23,7 +23,7 @@ OFFICE_DESK_COORDINATES: list[tuple[int, int]] = [
 VALID_RISK_TIERS: set[str] = {"L0_READ_ONLY", "L1_MUTATION", "L2_DESTRUCTIVE"}
 VALID_TOOLS: set[str] = {
     "opencode_run", "kilo_run", "quick_snippet", "code_helper",
-    "antigravity_run", "extract_design_system", "agent_reach",
+    "antigravity_run", "groq", "extract_design_system", "agent_reach",
     "web_read_page", "web_reader", "web_search", "browser_control",
     "file_processor", "file_controller", "fleet_control", "task_status",
 }
@@ -220,9 +220,9 @@ class FleetManager:
         role_map = {
             "manager": "MICHAEL",
             "orchestrator": "MICHAEL",
-            "frontend": "ALI",
-            "ui": "ALI",
-            "designer": "ALI",
+            "frontend": "VERVE",
+            "ui": "VERVE",
+            "designer": "VERVE",
             "backend": "AHMAD",
             "database": "AHMAD",
             "fullstack": "AHMAD",
@@ -252,11 +252,12 @@ class FleetManager:
         if any(w in low for w in ("token", "tokens", "palette", "design system", "extract design")):
             return self.get_agent("PAM")
         if any(w in low for w in ("html", "css", "landing", "page", "react", "tailwind", "component", "studio", "ui", "frontend", "website", "portfolio", "web-project")):
-            if self.get_agent_active_task_count("ALI") >= 3:
-                haider = self.get_agent("HAIDER")
-                if haider and self.get_agent_active_task_count("HAIDER") < 3:
-                    return haider
-            return self.get_agent("ALI")
+            verve = self.get_agent("VERVE") or self.get_agent("ALI")
+            flux = self.get_agent("FLUX") or self.get_agent("HAIDER")
+            if verve and self.get_agent_active_task_count(verve.id) >= 3:
+                if flux and self.get_agent_active_task_count(flux.id) < 3:
+                    return flux
+            return verve or flux
         if any(w in low for w in ("fastapi", "postgres", "sql", "api", "endpoint", "schema", "microservice", "auth", "backend", "database")):
             return self.get_agent("AHMAD")
         if any(w in low for w in ("test", "verify", "audit", "regression", "pytest", "edge case", "security")):
@@ -264,14 +265,15 @@ class FleetManager:
         if any(w in low for w in ("scrape", "transcribe", "summary", "web search", "market research", "research", "social", "trend", "trends")):
             return self.get_agent("KELLY") or FleetAgent(id="KELLY", name="Kelly", role="Research Specialist", specialty="Research", color="#e11d48", avatar_pixel="pixel.png", default_tool="agent_reach", risk_tier="L0_READ_ONLY", prompt_prefix="")
 
-        # 4. Default dispatch fallback: Ali for UI/frontend, Ahmad for general coding
-        if any(w in low for w in ("build", "create", "make", "design")):
-            if self.get_agent_active_task_count("ALI") >= 3:
-                haider = self.get_agent("HAIDER")
-                if haider and self.get_agent_active_task_count("HAIDER") < 3:
-                    return haider
-            return self.get_agent("ALI")
-        return self.get_agent("AHMAD") or self.get_agent("ALI") or list(self.agents.values())[0]
+        # 4. Default dispatch fallback: Verve for UI/frontend, Ahmad for general coding
+        if any(w in low for w in ("build", "create", "make", "design", "develop", "code", "program")):
+            verve = self.get_agent("VERVE") or self.get_agent("ALI")
+            flux = self.get_agent("FLUX") or self.get_agent("HAIDER")
+            if verve and self.get_agent_active_task_count(verve.id) >= 3:
+                if flux and self.get_agent_active_task_count(flux.id) < 3:
+                    return flux
+            return verve or flux or self.get_agent("AHMAD")
+        return None
 
     def get_agent_active_task_count(self, agent_id: str) -> int:
         """Returns the number of currently active (running/queued) tasks assigned to an agent."""
@@ -312,7 +314,7 @@ class FleetManager:
 
         inferred = _infer_agent_defaults(role_str, specialty_str)
 
-        tool = str(data.get("default_tool") or "").strip().lower()
+        tool = str(data.get("default_tool") or data.get("engine") or "").strip().lower()
         if tool not in VALID_TOOLS and not tool.endswith("_run") and not tool.endswith("_agent"):
             tool = ""
 
@@ -416,9 +418,19 @@ class FleetManager:
     def delete_agent(self, agent_id: str) -> Dict[str, Any]:
         key = agent_id.upper().strip()
         with self._lock:
-            if key not in self.agents:
+            matched_key = None
+            if key in self.agents:
+                matched_key = key
+            else:
+                for k, a in self.agents.items():
+                    if a.name.upper().strip() == key or a.id.upper().strip() == key or k.upper().strip() == key:
+                        matched_key = k
+                        break
+
+            if not matched_key:
                 return {"success": False, "error": f"Agent '{agent_id}' not found."}
 
+            key = matched_key
             agent = self.agents[key]
             # Teardown any active worktree if present
             if agent.active_worktree:
@@ -542,7 +554,8 @@ class FleetManager:
         if any(w in low for w in ("research", "scrape", "youtube", "investigate", "find")):
             subtasks.append(("KELLY", "Perform deep research and gather key technical requirements: " + prompt))
         if any(w in low for w in ("ui", "frontend", "landing", "page", "css", "html", "react", "view")):
-            subtasks.append(("ALI", "Design and build responsive frontend user interface and components: " + prompt))
+            frontend_id = "VERVE" if self.get_agent("VERVE") else ("FLUX" if self.get_agent("FLUX") else "ALI")
+            subtasks.append((frontend_id, "Design and build responsive frontend user interface and components: " + prompt))
         if any(w in low for w in ("api", "backend", "database", "crud", "endpoint", "server", "model", "auth")):
             subtasks.append(("AHMAD", "Implement robust backend APIs, database schemas, and service logic: " + prompt))
         if any(w in low for w in ("test", "qa", "verify", "audit", "security", "bug", "check")):
@@ -555,7 +568,7 @@ class FleetManager:
         dispatched = []
         for target_id, sub_prompt in subtasks:
             target_agent = self.get_agent(target_id) or self.resolve_agent_by_mention_or_capability(target_id) or list(self.agents.values())[0]
-            res = self.dispatch_task(target_agent.id, sub_prompt, path=path)
+            res = self.dispatch_task(target_agent.id, sub_prompt, path=path, is_subtask=True)
             dispatched.append(res)
 
         return {
@@ -578,24 +591,26 @@ class FleetManager:
         except Exception:
             pass
 
-    def dispatch_task(self, agent_id: str, prompt: str, path: Optional[str] = None, model_override: Optional[str] = None) -> Dict[str, Any]:
+    def dispatch_task(self, agent_id: str, prompt: str, path: Optional[str] = None, model_override: Optional[str] = None, is_subtask: bool = False) -> Dict[str, Any]:
         """Launch an autonomous task executed by this agent's designated tool."""
         # Check if Michael orchestrator should auto-decompose multi-faceted full-stack tasks
-        if agent_id.upper() in ("MICHAEL", "MANAGER") and any(w in prompt.lower() for w in ("full-stack", "fullstack", "entire app", "both frontend and backend")):
+        if not is_subtask and agent_id.upper() in ("MICHAEL", "MANAGER") and any(w in prompt.lower() for w in ("full-stack", "fullstack", "entire app", "both frontend and backend")):
             return self.decompose_and_dispatch(prompt, path)
 
         agent = self.get_agent(agent_id) or self.resolve_agent_by_mention_or_capability(agent_id)
         if not agent:
-            agent = self.resolve_agent_by_mention_or_capability(prompt)
-        if not agent:
-            return {"success": False, "error": f"Agent '{agent_id}' not found."}
+            registered_names = [f"{a.name} ({a.id})" for a in self.agents.values()]
+            return {
+                "success": False,
+                "error": f"Agent '{agent_id}' is not in the active fleet. Registered agents: {', '.join(registered_names)}",
+            }
 
-        # Overflow Load Balancing: If Ali is at capacity (>= 3 active tasks), auto-route to Haider
-        if agent.id == "ALI" and self.get_agent_active_task_count("ALI") >= 3:
-            haider = self.get_agent("HAIDER")
-            if haider and self.get_agent_active_task_count("HAIDER") < 3:
-                logger.info("[FleetManager] Ali at max capacity (3 tasks). Auto-routing task to Haider.")
-                agent = haider
+        # Overflow Load Balancing: If Verve is at capacity (>= 3 active tasks), auto-route to Flux
+        if agent.id in ("VERVE", "ALI") and self.get_agent_active_task_count(agent.id) >= 3:
+            flux = self.get_agent("FLUX") or self.get_agent("HAIDER")
+            if flux and self.get_agent_active_task_count(flux.id) < 3:
+                logger.info("[FleetManager] Verve at max capacity (3 tasks). Auto-routing task to Flux.")
+                agent = flux
 
         # Capability check via Circuit Breaker
         can_run, block_reason = circuit_breaker.can_execute(agent.default_tool)
@@ -616,6 +631,12 @@ class FleetManager:
         if not target_dir or target_dir == str(Path.cwd()):
             from core.repo_context import get_unique_project_dir
             target_dir = str(get_unique_project_dir(prompt))
+
+        # Ensure target_dir exists physically on disk before subprocess execution
+        try:
+            Path(target_dir).mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.warning("[FleetManager] Could not ensure directory %s: %s", target_dir, e)
 
         enriched_prompt = f"[{agent.name} • {agent.role}]\n{agent.prompt_prefix}\n\nTask: {prompt}"
         active_model = model_override or agent.model_id or None
@@ -852,6 +873,13 @@ class FleetManager:
                             a.status = "idle"
                             a.current_task_id = None
 
+                logs = list(a.recent_logs)
+                if not logs:
+                    logs = [
+                        f"[READY] Agent '{a.name}' registered into autonomous fleet",
+                        f"[MODEL] Engine: {a.default_tool} | Model: {a.model_id or 'default'}",
+                        f"[STATUS] Standby on office deck — ready for task assignment",
+                    ]
                 state.append({
                     "id": a.id,
                     "name": a.name,
@@ -869,6 +897,8 @@ class FleetManager:
                     "worktree": a.active_worktree,
                     "desk_x": a.desk_x,
                     "desk_y": a.desk_y,
+                    "logs": logs,
+                    "recent_logs": logs,
                     "allowed_tools": a.allowed_tools,
                     "allowed_skills": a.allowed_skills,
                     "capabilities": a.capabilities,
@@ -876,6 +906,13 @@ class FleetManager:
             return state
 
     def _agent_to_dict(self, a: FleetAgent) -> Dict[str, Any]:
+        logs = list(a.recent_logs)
+        if not logs:
+            logs = [
+                f"[READY] Agent '{a.name}' registered into autonomous fleet",
+                f"[MODEL] Engine: {a.default_tool} | Model: {a.model_id or 'default'}",
+                f"[STATUS] Standby on office deck — ready for task assignment",
+            ]
         return {
             "id": a.id,
             "name": a.name,
@@ -892,6 +929,8 @@ class FleetManager:
             "active_worktree": a.active_worktree,
             "desk_x": a.desk_x,
             "desk_y": a.desk_y,
+            "logs": logs,
+            "recent_logs": logs,
             "allowed_tools": a.allowed_tools,
             "allowed_skills": a.allowed_skills,
             "capabilities": a.capabilities,

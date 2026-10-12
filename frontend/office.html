@@ -1406,6 +1406,88 @@
       font-size: 11px;
     }
 
+    /* Agent Environment Collapsible Drawer */
+    .agent-env-drawer {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      margin-top: 4px;
+      transition: border-color 0.15s ease;
+    }
+    .agent-env-drawer:hover {
+      border-color: rgba(242, 78, 30, 0.4);
+    }
+    .agent-env-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      cursor: pointer;
+      user-select: none;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.02);
+      transition: background-color 0.15s ease;
+    }
+    .agent-env-header:hover {
+      background: rgba(242, 78, 30, 0.08);
+      color: var(--accent);
+    }
+    .agent-env-chevron {
+      font-size: 11px;
+      color: var(--text-muted);
+      transition: transform 0.2s ease;
+    }
+    .agent-env-drawer.open .agent-env-chevron {
+      transform: rotate(180deg);
+      color: var(--accent);
+    }
+    .agent-env-body {
+      display: none;
+      padding: 10px 12px;
+      border-top: 1px solid var(--border-subtle);
+      background: var(--bg-deep);
+      gap: 8px;
+      flex-direction: column;
+    }
+    .agent-env-drawer.open .agent-env-body {
+      display: flex;
+    }
+    .agent-env-row {
+      display: grid;
+      grid-template-columns: 95px 1fr;
+      align-items: center;
+      gap: 8px;
+    }
+    .agent-env-label {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.3px;
+    }
+    .agent-env-select {
+      width: 100%;
+      background: #0f1117 !important;
+      border: 1px solid var(--border-subtle) !important;
+      border-radius: var(--radius-sm) !important;
+      color: var(--text-primary) !important;
+      font-family: var(--font-mono) !important;
+      font-size: 10.5px !important;
+      padding: 4px 8px !important;
+      outline: none !important;
+      cursor: pointer;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .agent-env-select:focus {
+      border-color: var(--accent) !important;
+      box-shadow: 0 0 0 2px rgba(242, 78, 30, 0.15) !important;
+    }
+
     .spec-label {
       color: var(--text-muted);
       margin-bottom: 0;
@@ -2332,34 +2414,76 @@
             </div>
           </div>
 
-          <!-- Quick Telemetry Specs Grid (Engine, Path, Safety) -->
-          <div class="spec-grid">
-            <div class="spec-label">ENGINE</div>
-            <div class="spec-val" id="specEngine">opencode_run</div>
-
-            <div class="spec-label">WORKSPACE</div>
-            <div class="spec-val">
-              <span class="path-action-link" id="specPathLink" onclick="openActiveSandboxModal()"
-                title="Click to open workspace folder">
-                <iconify-icon icon="solar:folder-open-bold" style="font-size: 12px;"></iconify-icon>
-                <span id="specPath">Direct Workspace</span>
-              </span>
-            </div>
-
-            <div class="spec-label">SAFETY</div>
-            <div class="spec-val" id="specRiskTier" style="color: var(--green);">Read-Only</div>
+          <!-- 1. Pro Tactical Action Modals Launchers (CHAT, EDIT, FILES first) -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-top: 4px; margin-bottom: 4px;">
+            <button class="hud-tool-btn" onclick="openAgentChatModal()" style="justify-content: center; padding: 7px 4px; font-size: 9px; font-weight: 600; color: #a855f7;">
+              <iconify-icon icon="solar:chat-round-dots-bold" style="font-size: 12px; color: #a855f7;"></iconify-icon>
+              CHAT
+            </button>
+            <button class="hud-tool-btn" onclick="openEditAgentModal()" style="justify-content: center; padding: 7px 4px; font-size: 9px; font-weight: 600;">
+              <iconify-icon icon="solar:pen-bold" style="font-size: 12px; color: var(--accent);"></iconify-icon>
+              EDIT
+            </button>
+            <button class="hud-tool-btn" onclick="openFilesModal()" style="justify-content: center; padding: 7px 4px; font-size: 9px; font-weight: 600;">
+              <iconify-icon icon="solar:folder-with-files-bold" style="font-size: 12px; color: var(--cyan);"></iconify-icon>
+              FILES
+            </button>
           </div>
 
-          <!-- Pro Tactical Action Modals Launchers -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 2px;">
-            <button class="hud-tool-btn" onclick="openEditAgentModal()" style="justify-content: center; padding: 7px 8px; font-size: 9.5px; font-weight: 600;">
-              <iconify-icon icon="solar:pen-bold" style="font-size: 12px; color: var(--accent);"></iconify-icon>
-              EDIT AGENT
-            </button>
-            <button class="hud-tool-btn" onclick="openFilesModal()" style="justify-content: center; padding: 7px 8px; font-size: 9.5px; font-weight: 600;">
-              <iconify-icon icon="solar:document-text-bold" style="font-size: 12px; color: var(--cyan);"></iconify-icon>
-              FILES & SOUL
-            </button>
+          <!-- 2. Collapsible Agent Environment & Controls Drawer -->
+          <div class="agent-env-drawer open" id="agentEnvDrawer">
+            <div class="agent-env-header" onclick="toggleAgentEnvDrawer()">
+              <span style="display: inline-flex; align-items: center; gap: 6px;">
+                <iconify-icon icon="solar:tuning-square-bold" style="font-size: 13px; color: var(--accent);"></iconify-icon>
+                <span>AGENT ENVIRONMENT &amp; CONTROLS</span>
+              </span>
+              <iconify-icon icon="solar:alt-arrow-down-bold" class="agent-env-chevron" id="agentEnvChevron"></iconify-icon>
+            </div>
+            <div class="agent-env-body" id="agentEnvBody">
+              <!-- ENGINE -->
+              <div class="agent-env-row">
+                <span class="agent-env-label">ENGINE :</span>
+                <select class="agent-env-select" id="inlineEnvEngine" onchange="onInlineEnvEngineChanged()">
+                  <option value="opencode_run">OpenCode</option>
+                  <option value="kilo_run">KiloCode</option>
+                  <option value="antigravity_run">Antigravity</option>
+                  <option value="none">Tool Only (No CLI)</option>
+                </select>
+              </div>
+
+              <!-- WORKSPACE -->
+              <div class="agent-env-row">
+                <span class="agent-env-label">WORKSPACE :</span>
+                <div style="display: flex; gap: 4px; align-items: center;">
+                  <select class="agent-env-select" id="inlineEnvWorkspace" onchange="onInlineEnvWorkspaceChanged()" style="flex: 1;">
+                    <option value="">📁 None / Sandbox</option>
+                    <option value="C:/Users/Hamza Bukhari/Desktop">📁 Desktop</option>
+                    <option value="custom">📁 Custom Worktree...</option>
+                  </select>
+                  <button type="button" class="hud-tool-btn" onclick="openActiveSandboxModal()" title="View folder path" style="padding: 4px 6px; height: 26px;">
+                    <iconify-icon icon="solar:folder-open-bold" style="font-size: 11px; color: var(--accent);"></iconify-icon>
+                  </button>
+                </div>
+              </div>
+
+              <!-- MODEL -->
+              <div class="agent-env-row">
+                <span class="agent-env-label">MODEL :</span>
+                <select class="agent-env-select" id="inlineEnvModel" onchange="onInlineEnvModelChanged()">
+                  <option value="">Global Default</option>
+                </select>
+              </div>
+
+              <!-- SAFETY TIER -->
+              <div class="agent-env-row">
+                <span class="agent-env-label">SAFETY TIER :</span>
+                <select class="agent-env-select" id="inlineEnvSafety" onchange="onInlineEnvSafetyChanged()">
+                  <option value="L0_READ_ONLY">🛡️ Read-Only (L0)</option>
+                  <option value="L1_MUTATION">⚡ Standard Edit (L1)</option>
+                  <option value="L2_DESTRUCTIVE">🔥 Full Destructive (L2)</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           <!-- Active Task & Status Box -->
@@ -2387,22 +2511,20 @@
         <div class="corner corner-br"></div>
         <div class="corner-v corner-v-br"></div>
 
-        <div class="frame-inner">
-          <div class="stream-header-strip">
-            <div class="section-label" style="margin-bottom:0; flex: 1;">03 · ACTIVITY</div>
+        <div class="frame-inner" style="display: flex; flex-direction: column; height: 100%;">
+          <div class="stream-header-strip" style="display: flex; align-items: center; justify-content: space-between;">
+            <div class="section-label" style="margin-bottom:0;">03 · LIVE ACTIVITY & LOGS</div>
+            <button class="hud-tool-btn" id="btnCopyTerminalLogs" onclick="copyTerminalLogs()" title="Copy all logs to clipboard" style="padding: 2px 6px; font-size: 8.5px; height: 20px;">
+              <iconify-icon icon="solar:copy-bold" style="font-size: 11px;"></iconify-icon>
+              <span>COPY</span>
+            </button>
           </div>
 
-          <div class="terminal-window" id="terminalLog">
+          <div class="terminal-window" id="terminalLog" style="flex: 1; height: 100%;">
             <div class="log-line">
               <span class="log-ts">[01:54:10]</span>
               <span class="log-msg highlight">Scranton pixel office simulation attached</span>
             </div>
-          </div>
-
-          <div class="cmd-bar-row" style="background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 4px 10px; margin-top: 8px;">
-            <span class="cmd-prompt" style="color: var(--accent); font-family: var(--font-mono);">&gt;</span>
-            <input type="text" class="cmd-input" id="terminalCmdInput" placeholder="Send quick task or message to active agent..."
-              onkeydown="handleTerminalCommand(event)" style="border:none !important; background:transparent !important; box-shadow:none !important; padding: 4px 8px !important; font-size:11px !important;">
           </div>
         </div>
       </div>
@@ -2946,13 +3068,75 @@
     </div>
   </div>
 
+  <!-- Modal: Dedicated Interactive Agent Chat -->
+  <div class="modal-overlay" id="agentChatModal">
+    <div class="modal-panel" style="max-width: 680px; width: 680px; height: 560px; display: flex; flex-direction: column;">
+      <div class="modal-head" style="flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <iconify-icon icon="solar:chat-round-dots-bold" style="font-size: 16px; color: #a855f7;"></iconify-icon>
+          <span style="font-weight: 700; letter-spacing: 0.05em;" id="chatAgentTitle">CHAT WITH AGENT</span>
+          <span class="badge badge-accent mono" id="chatAgentRoleBadge" style="font-size: 8px; margin-left: 4px;">TECH LEAD</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <button class="hud-tool-btn" onclick="clearActiveAgentChat()" title="Clear chat history" style="padding: 2px 6px; font-size: 8.5px; height: 22px;">
+            <iconify-icon icon="solar:trash-bin-trash-bold" style="font-size: 11px;"></iconify-icon>
+            <span>CLEAR</span>
+          </button>
+          <button class="hud-tool-btn" onclick="closeModal('agentChatModal')">✕</button>
+        </div>
+      </div>
+
+      <!-- Agent Engine & Model Interactive Selector Sub-Header -->
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: #0c0d10; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; font-size: 10px; font-family: var(--font-mono); gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="color: var(--text-muted); font-size: 9px; font-weight: 600;">ENGINE:</span>
+            <select id="chatEngineSelect" onchange="onChatEngineChanged()" style="font-size: 10.5px; font-family: var(--font-mono); padding: 4px 8px; height: 28px; line-height: 20px; background: #14161c; border-radius: 4px; color: var(--cyan); border: 1px solid rgba(255,255,255,0.1); outline: none; cursor: pointer; box-sizing: border-box;">
+              <option value="opencode_run">OpenCode</option>
+              <option value="antigravity_run">Antigravity</option>
+              <option value="kilo_run">KiloCode</option>
+            </select>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; flex: 1; max-width: 360px;">
+            <span style="color: var(--text-muted); font-size: 9px; font-weight: 600;">MODEL:</span>
+            <select id="chatModelSelect" onchange="onChatModelChanged()" style="font-size: 10.5px; font-family: var(--font-mono); padding: 4px 8px; height: 28px; line-height: 20px; background: #14161c; border-radius: 4px; color: var(--text-primary); border: 1px solid rgba(255,255,255,0.1); outline: none; cursor: pointer; width: 100%; box-sizing: border-box;">
+              <!-- Dynamic model options -->
+            </select>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+          <span style="color: var(--text-muted); font-size: 9px; font-weight: 600;">STATUS:</span>
+          <span id="chatAgentStatusTag" style="color: var(--green); font-weight: 600; font-size: 9.5px;">IDLE</span>
+        </div>
+      </div>
+
+      <!-- Chat Messages Scroll Pane -->
+      <div class="inspector-scroll-pane" id="chatMessagesContainer" style="flex: 1; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: rgba(0,0,0,0.25);">
+        <!-- Message bubbles populated dynamically -->
+      </div>
+
+      <!-- Chat Bottom Input Bar -->
+      <div style="padding: 10px 14px; border-top: 1px solid var(--border-subtle); background: var(--bg-surface); flex-shrink: 0;">
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input type="text" class="cmd-input" id="agentChatInput" placeholder="Message agent... (Press Enter to dispatch)" 
+            onkeydown="handleAgentChatKeyDown(event)" 
+            style="flex: 1; height: 34px; font-size: 11.5px; padding: 0 10px;" />
+          <button class="modal-btn primary" id="btnSendAgentChat" onclick="sendAgentChatMessage()" style="height: 34px; padding: 0 14px; font-size: 10.5px;">
+            <iconify-icon icon="solar:plain-bold"></iconify-icon>
+            <span>SEND</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Scranton Autonomous Office Simulation Engine -->
   <script>
     const office = document.getElementById('office');
 
     // 8 Scranton Agents matching config/fleet_agents.json
     const agents = [
-      { name: 'MICHAEL', role: "Regional Manager & Master Orchestrator", specialty: "Task decomposition & delegation", worktree: 'main', active_worktree: null, sandbox: '', files: [], logs: ['[SYSTEM] Fleet Orchestrator attached to workspace.'], x: 6.5, y: 17, shirt: '#243b63', hair: '#33251e', skin: '#e9bd91', tie: '#b63e3b', state: 'idle', deskX: 4, deskY: 23, isBusy: false, default_tool: 'opencode_run', risk_tier: 'L1_MUTATION', prompt_prefix: 'You are Michael Scott, Regional Manager of the Autonomous Coding Fleet.' },
+      { name: 'MICHAEL', role: "Lead Software Architect & Tech Lead", specialty: "High-level architecture design, code review, and structural planning", worktree: 'main', active_worktree: null, sandbox: '', files: [], logs: ['[SYSTEM] Tech Lead attached to workspace.'], x: 6.5, y: 17, shirt: '#243b63', hair: '#33251e', skin: '#e9bd91', tie: '#b63e3b', state: 'idle', deskX: 4, deskY: 23, isBusy: false, default_tool: 'opencode_run', risk_tier: 'L1_MUTATION', prompt_prefix: 'You are Michael, Lead Software Architect & Tech Lead of the Autonomous Coding Fleet.' },
       { name: 'ALI', role: "Frontend & UI Design Specialist", specialty: "Responsive web apps, Tailwind/CSS layouts, and animations", worktree: 'main', active_worktree: null, sandbox: '', files: [], logs: ['[SYSTEM] Ali ready for Studio UI tasks.'], x: 40, y: 30, shirt: '#ec4899', hair: '#33251e', skin: '#e9bd91', tie: '#b63e3b', state: 'idle', deskX: 38, deskY: 55, isBusy: false, default_tool: 'antigravity_run', risk_tier: 'L1_MUTATION', prompt_prefix: 'You are Ali, Senior Frontend and UI Architecture Specialist.' },
       { name: 'AHMAD', role: "Full-Stack & Backend Specialist", specialty: "FastAPI, PostgreSQL, microservices, and database models", worktree: 'main', active_worktree: null, sandbox: '', files: [], logs: ['[SYSTEM] Ahmad ready for Backend tasks.'], x: 78, y: 68, shirt: '#06b6d4', hair: '#3b2a22', skin: '#d9aa87', tie: '#3d4c51', state: 'idle', deskX: 62, deskY: 55, isBusy: false, default_tool: 'opencode_run', risk_tier: 'L2_DESTRUCTIVE', prompt_prefix: 'You are Ahmad, Senior Full-Stack and Backend Specialist.' },
       { name: 'DWIGHT', role: 'Safety, Security & QA Auditor', specialty: "Governance policy enforcement and test suites", worktree: 'main', active_worktree: null, sandbox: '', files: [], logs: ['[SYSTEM] Dwight ready for security audits.'], x: 40, y: 30, shirt: '#c49b31', hair: '#32251c', skin: '#e6b98e', tie: '#604b25', state: 'idle', deskX: 65, deskY: 27.5, isBusy: false, default_tool: 'kilo_run', risk_tier: 'L1_MUTATION', prompt_prefix: 'You are Dwight Schrute, Assistant to the Regional Manager & Lead QA Auditor.' },
@@ -2988,7 +3172,7 @@
       el.style.left = a.x + '%';
       el.style.top = a.y + '%';
       ['shirt', 'hair', 'skin', 'tie'].forEach(k => el.style.setProperty('--' + k, a[k]));
-      el.innerHTML = '<span class="hair"></span><span class="head"></span><span class="face"></span><span class="body"></span><span class="tie"></span><span class="arm l"></span><span class="arm r"></span><span class="leg l"></span><span class="leg r"></span><span class="tag">' + a.name + '</span>';
+      el.innerHTML = '<span class="hair"></span><span class="head"></span><span class="face"></span><span class="body"></span><span class="tie"></span><span class="arm l"></span><span class="arm r"></span><span class="leg l"></span><span class="leg r"></span><span class="tag">' + (a.displayName || a.name) + '</span>';
       el.title = a.name + ' · ' + a.state;
       office.appendChild(el);
       a.el = el;
@@ -3825,6 +4009,9 @@
         );
       }
 
+      // 4. Update Inline Environment & Controls Drawer
+      syncInlineEnvControls(ag);
+
       // Populate EDIT Tab Fields
       const cfgId = document.getElementById('cfgAgentId');
       if (cfgId) cfgId.value = ag.name;
@@ -4061,6 +4248,10 @@
         const data = await res.json();
         if (data.success) {
           selectedAgent.displayName = displayName || selectedAgent.name;
+          if (selectedAgent.el) {
+            const tagEl = selectedAgent.el.querySelector('.tag');
+            if (tagEl) tagEl.textContent = selectedAgent.displayName;
+          }
           selectedAgent.specialty = specialty || selectedAgent.specialty;
           selectedAgent.default_tool = tool;
           selectedAgent.risk_tier = riskTier;
@@ -4490,43 +4681,452 @@
       }
     }
 
-    async function handleTerminalCommand(event) {
-      if (event.key === 'Enter') {
-        const input = document.getElementById('terminalCmdInput');
-        const text = input ? input.value.trim() : '';
-        if (!text || !selectedAgent) return;
-
-        appendLog('YOU', text, 'highlight');
-        input.value = '';
+    // Copy Full Terminal Logs to Clipboard
+    function copyTerminalLogs() {
+      const logContainer = document.getElementById('terminalLog');
+      if (!logContainer) return;
+      const text = logContainer.innerText || '';
+      if (!text.trim()) {
+        showSoundToast('No logs to copy');
+        return;
+      }
+      navigator.clipboard.writeText(text).then(() => {
         playFoley('click');
+        showSoundToast('Logs copied to clipboard! ✓');
+        const btn = document.getElementById('btnCopyTerminalLogs');
+        if (btn) {
+          const original = btn.innerHTML;
+          btn.innerHTML = '<iconify-icon icon="solar:check-bold" style="color:var(--green); font-size:11px;"></iconify-icon> <span>COPIED</span>';
+          setTimeout(() => { btn.innerHTML = original; }, 2000);
+        }
+      }).catch(err => {
+        showSoundToast('Failed to copy: ' + err);
+      });
+    }
 
-        // Show bubble on agent
-        showBubble(selectedAgent, text.slice(0, 28) + '...', 3500);
+    // ── Dedicated Agent Chat State & Functions ──
+    const agentChatHistories = {}; // { [agentName]: Array<{ sender: 'user'|'agent', text: string, time: string }> }
 
-        try {
-          const res = await fetch('/api/fleet/dispatch_task', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              agent_id: selectedAgent.name,
-              prompt: text
-            })
-          });
-          const data = await res.json();
-          if (data.success) {
-            selectedAgent.isBusy = true;
-            selectedAgent.state = 'working';
-            setState(selectedAgent, 'working');
-            showSoundToast(`Task sent to ${selectedAgent.name}`);
-            appendLog(selectedAgent.name, `Started: "${text}"`, 'success');
-            selectAgent(selectedAgent.name);
-          } else {
-            appendLog(selectedAgent.name, `Received: "${text}"`, 'info');
+    async function openAgentChatModal() {
+      if (!selectedAgent && agents && agents.length) {
+        selectedAgent = agents[0];
+      }
+      if (!selectedAgent) return;
+
+      const titleEl = document.getElementById('chatAgentTitle');
+      const badgeEl = document.getElementById('chatAgentRoleBadge');
+      const engineSelect = document.getElementById('chatEngineSelect');
+      const statusEl = document.getElementById('chatAgentStatusTag');
+
+      const name = selectedAgent.displayName || selectedAgent.name;
+      if (titleEl) titleEl.innerText = `CHAT WITH ${name.toUpperCase()}`;
+      if (badgeEl) badgeEl.innerText = selectedAgent.role || 'SPECIALIST';
+      
+      const currentTool = selectedAgent.default_tool || 'opencode_run';
+      if (engineSelect) {
+        engineSelect.value = currentTool;
+      }
+      await populateChatModelDropdown(currentTool, selectedAgent.model_id);
+
+      if (statusEl) {
+        statusEl.innerText = selectedAgent.isBusy ? 'WORKING' : 'IDLE';
+        statusEl.style.color = selectedAgent.isBusy ? 'var(--accent)' : 'var(--green)';
+      }
+
+      renderAgentChatHistory(selectedAgent.name);
+      openModal('agentChatModal');
+
+      setTimeout(() => {
+        const input = document.getElementById('agentChatInput');
+        if (input) input.focus();
+      }, 100);
+    }
+
+    async function populateChatModelDropdown(engine, currentModel) {
+      const modelSelect = document.getElementById('chatModelSelect');
+      if (!modelSelect) return;
+      modelSelect.innerHTML = '<option value="">Loading models...</option>';
+
+      try {
+        const res = await fetch(`/api/models?engine=${encodeURIComponent(engine)}`);
+        const data = await res.json();
+        const modelsList = (data && data.models) ? data.models : [];
+        modelSelect.innerHTML = '';
+
+        // Default option
+        const defOpt = document.createElement('option');
+        defOpt.value = '';
+        defOpt.textContent = 'Global Default Model';
+        modelSelect.appendChild(defOpt);
+
+        let modelFound = false;
+        modelsList.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = m;
+          if (currentModel && currentModel === m) {
+            opt.selected = true;
+            modelFound = true;
           }
-        } catch (e) {
-          appendLog(selectedAgent.name, `Acknowledged: "${text}"`, 'info');
+          modelSelect.appendChild(opt);
+        });
+
+        // Only append custom option if it legitimately belongs to this engine prefix or engine has none
+        if (currentModel && !modelFound) {
+          const isEngineCompatible = (
+            (engine === 'antigravity_run' && (currentModel.startsWith('gemini-') || currentModel.startsWith('claude-') || currentModel.startsWith('gpt-'))) ||
+            (engine === 'opencode_run' && (currentModel.startsWith('opencode/') || currentModel.startsWith('openrouter/'))) ||
+            (engine === 'kilo_run' && currentModel.startsWith('kilo/'))
+          );
+          if (isEngineCompatible) {
+            const customOpt = document.createElement('option');
+            customOpt.value = currentModel;
+            customOpt.textContent = currentModel;
+            customOpt.selected = true;
+            modelSelect.appendChild(customOpt);
+          } else {
+            // Model belongs to a different engine, reset agent model to default!
+            if (selectedAgent) {
+              selectedAgent.model_id = '';
+            }
+            defOpt.selected = true;
+          }
+        }
+      } catch (e) {
+        modelSelect.innerHTML = `<option value="${currentModel || ''}">${currentModel || 'Global Default'}</option>`;
+      }
+    }
+
+    async function onChatEngineChanged() {
+      if (!selectedAgent) return;
+      const engineSelect = document.getElementById('chatEngineSelect');
+      const newEngine = engineSelect ? engineSelect.value : 'opencode_run';
+      selectedAgent.default_tool = newEngine;
+      // Reset incompatible model id when engine changes
+      selectedAgent.model_id = '';
+      const inlineEngineSel = document.getElementById('inlineEnvEngine');
+      if (inlineEngineSel) inlineEngineSel.value = newEngine;
+
+      await populateChatModelDropdown(newEngine, '');
+      const inlineModelSel = document.getElementById('inlineEnvModel');
+      if (inlineModelSel) await populateInlineModelDropdown(newEngine, '');
+      saveActiveAgentEngineAndModel();
+    }
+
+    async function onChatModelChanged() {
+      if (!selectedAgent) return;
+      const modelSelect = document.getElementById('chatModelSelect');
+      const newModel = modelSelect ? modelSelect.value : '';
+      selectedAgent.model_id = newModel;
+      saveActiveAgentEngineAndModel();
+    }
+
+    async function saveActiveAgentEngineAndModel() {
+      if (!selectedAgent) return;
+      try {
+        await fetch('/api/fleet/save_agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: selectedAgent.name,
+            name: selectedAgent.displayName || selectedAgent.name,
+            role: selectedAgent.role || 'Autonomous Specialist',
+            specialty: selectedAgent.specialty || '',
+            default_tool: selectedAgent.default_tool,
+            model_id: selectedAgent.model_id,
+            active_worktree: selectedAgent.active_worktree || selectedAgent.worktree,
+            worktree: selectedAgent.active_worktree || selectedAgent.worktree,
+            risk_tier: selectedAgent.risk_tier || 'L1_MUTATION',
+            color: selectedAgent.shirt || selectedAgent.color || '#a855f7',
+            prompt_prefix: selectedAgent.prompt_prefix || ''
+          })
+        });
+        showSoundToast(`Saved: ${selectedAgent.default_tool} / ${selectedAgent.model_id || 'Default'} ✓`);
+      } catch (e) {
+        console.warn('Failed to sync agent engine/model change:', e);
+      }
+    }
+
+    // Toggle Collapsible Agent Environment & Controls Drawer
+    function toggleAgentEnvDrawer() {
+      const drawer = document.getElementById('agentEnvDrawer');
+      if (drawer) {
+        drawer.classList.toggle('open');
+        playFoley('click');
+      }
+    }
+
+    // Synchronize Drawer Dropdowns with Active Agent
+    async function syncInlineEnvControls(ag) {
+      if (!ag) return;
+      const engineSel = document.getElementById('inlineEnvEngine');
+      const wsSel = document.getElementById('inlineEnvWorkspace');
+      const safetySel = document.getElementById('inlineEnvSafety');
+
+      if (engineSel) {
+        engineSel.value = ag.default_tool || 'opencode_run';
+      }
+
+      if (wsSel) {
+        const currentWt = ag.active_worktree || ag.worktree || '';
+        if (currentWt === 'C:/Users/Hamza Bukhari/Desktop') {
+          wsSel.value = 'C:/Users/Hamza Bukhari/Desktop';
+        } else if (!currentWt || currentWt === 'main' || currentWt === 'None') {
+          wsSel.value = '';
+        } else {
+          // Custom worktree option
+          let customOpt = wsSel.querySelector('option[data-custom="true"]');
+          if (!customOpt) {
+            customOpt = document.createElement('option');
+            customOpt.setAttribute('data-custom', 'true');
+            wsSel.appendChild(customOpt);
+          }
+          customOpt.value = currentWt;
+          customOpt.textContent = `📁 ${currentWt.split(/[\\/]/).pop() || currentWt}`;
+          wsSel.value = currentWt;
         }
       }
+
+      if (safetySel) {
+        safetySel.value = ag.risk_tier || 'L1_MUTATION';
+      }
+
+      await populateInlineModelDropdown(ag.default_tool || 'opencode_run', ag.model_id);
+    }
+
+    async function populateInlineModelDropdown(engine, currentModel) {
+      const modelSelect = document.getElementById('inlineEnvModel');
+      if (!modelSelect) return;
+      modelSelect.innerHTML = '<option value="">Loading models...</option>';
+
+      try {
+        const res = await fetch(`/api/models?engine=${encodeURIComponent(engine || 'opencode_run')}`);
+        const data = await res.json();
+        const modelsList = (data && data.models) ? data.models : [];
+        modelSelect.innerHTML = '';
+
+        const defOpt = document.createElement('option');
+        defOpt.value = '';
+        defOpt.textContent = 'Global Default Model';
+        modelSelect.appendChild(defOpt);
+
+        let inlineFound = false;
+        modelsList.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = m;
+          if (currentModel && currentModel === m) {
+            opt.selected = true;
+            inlineFound = true;
+          }
+          modelSelect.appendChild(opt);
+        });
+
+        if (currentModel && !inlineFound) {
+          const isEngineCompatible = (
+            (engine === 'antigravity_run' && (currentModel.startsWith('gemini-') || currentModel.startsWith('claude-') || currentModel.startsWith('gpt-'))) ||
+            (engine === 'opencode_run' && (currentModel.startsWith('opencode/') || currentModel.startsWith('openrouter/'))) ||
+            (engine === 'kilo_run' && currentModel.startsWith('kilo/'))
+          );
+          if (isEngineCompatible) {
+            const customOpt = document.createElement('option');
+            customOpt.value = currentModel;
+            customOpt.textContent = currentModel;
+            customOpt.selected = true;
+            modelSelect.appendChild(customOpt);
+          } else {
+            if (selectedAgent) selectedAgent.model_id = '';
+            defOpt.selected = true;
+          }
+        }
+      } catch (e) {
+        modelSelect.innerHTML = `<option value="${currentModel || ''}">${currentModel || 'Global Default'}</option>`;
+      }
+    }
+
+    async function onInlineEnvEngineChanged() {
+      if (!selectedAgent) return;
+      const sel = document.getElementById('inlineEnvEngine');
+      const newEngine = sel ? sel.value : 'opencode_run';
+      selectedAgent.default_tool = newEngine;
+      selectedAgent.model_id = '';
+      const chatEngineSel = document.getElementById('chatEngineSelect');
+      if (chatEngineSel) chatEngineSel.value = newEngine;
+
+      await populateInlineModelDropdown(newEngine, '');
+      const chatModelSel = document.getElementById('chatModelSelect');
+      if (chatModelSel) await populateChatModelDropdown(newEngine, '');
+      saveActiveAgentEngineAndModel();
+    }
+
+    function onInlineEnvModelChanged() {
+      if (!selectedAgent) return;
+      const sel = document.getElementById('inlineEnvModel');
+      const newModel = sel ? sel.value : '';
+      selectedAgent.model_id = newModel;
+      const chatModelSel = document.getElementById('chatModelSelect');
+      if (chatModelSel) chatModelSel.value = newModel;
+
+      saveActiveAgentEngineAndModel();
+    }
+
+    function onInlineEnvWorkspaceChanged() {
+      if (!selectedAgent) return;
+      const sel = document.getElementById('inlineEnvWorkspace');
+      const val = sel ? sel.value : '';
+      if (val === 'custom') {
+        openEditAgentModal();
+        return;
+      }
+      selectedAgent.active_worktree = val || null;
+      selectedAgent.worktree = val || null;
+      saveActiveAgentEngineAndModel();
+    }
+
+    function onInlineEnvSafetyChanged() {
+      if (!selectedAgent) return;
+      const sel = document.getElementById('inlineEnvSafety');
+      const val = sel ? sel.value : 'L1_MUTATION';
+      selectedAgent.risk_tier = val;
+      saveActiveAgentEngineAndModel();
+    }
+
+    function renderAgentChatHistory(agentName) {
+      const container = document.getElementById('chatMessagesContainer');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const history = agentChatHistories[agentName] || [];
+      if (!history.length) {
+        const emptyNotice = document.createElement('div');
+        emptyNotice.style.cssText = 'color: var(--text-muted); font-size: 11px; text-align: center; margin: auto; padding: 20px;';
+        emptyNotice.innerHTML = `
+          <iconify-icon icon="solar:chat-round-dots-bold" style="font-size: 28px; opacity: 0.4; margin-bottom: 6px; display: block;"></iconify-icon>
+          Start a conversation or direct task execution with <b>${agentName}</b>.
+        `;
+        container.appendChild(emptyNotice);
+        return;
+      }
+
+      history.forEach(msg => {
+        appendChatMessageDOM(msg.sender, msg.text, msg.time, msg.agentName || agentName);
+      });
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function appendChatMessageDOM(sender, text, time, agentName) {
+      const container = document.getElementById('chatMessagesContainer');
+      if (!container) return;
+
+      const isUser = sender === 'user';
+      const msgRow = document.createElement('div');
+      msgRow.style.cssText = `display: flex; flex-direction: column; align-items: ${isUser ? 'flex-end' : 'flex-start'}; gap: 2px;`;
+
+      const meta = document.createElement('div');
+      meta.style.cssText = 'font-size: 8.5px; font-family: var(--font-mono); color: var(--text-muted); display: flex; gap: 6px;';
+      meta.innerHTML = isUser ? `<span>YOU</span><span>${time}</span>` : `<span>${agentName}</span><span>${time}</span>`;
+
+      const bubble = document.createElement('div');
+      bubble.style.cssText = `
+        max-width: 85%;
+        padding: 8px 12px;
+        border-radius: var(--radius-md);
+        font-size: 11.5px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+        ${isUser 
+          ? 'background: var(--accent); color: #fff; border-bottom-right-radius: 2px;' 
+          : 'background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-primary); border-bottom-left-radius: 2px;'}
+      `;
+      bubble.textContent = text;
+
+      msgRow.appendChild(meta);
+      msgRow.appendChild(bubble);
+      container.appendChild(msgRow);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function handleAgentChatKeyDown(event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        sendAgentChatMessage();
+      }
+    }
+
+    async function sendAgentChatMessage() {
+      const input = document.getElementById('agentChatInput');
+      const text = input ? input.value.trim() : '';
+      if (!text || !selectedAgent) return;
+
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+      const agentKey = selectedAgent.name;
+
+      if (!agentChatHistories[agentKey]) agentChatHistories[agentKey] = [];
+      agentChatHistories[agentKey].push({ sender: 'user', text, time: timeStr });
+
+      // If first message, remove empty placeholder
+      const container = document.getElementById('chatMessagesContainer');
+      if (container && agentChatHistories[agentKey].length === 1) {
+        container.innerHTML = '';
+      }
+      appendChatMessageDOM('user', text, timeStr, agentKey);
+
+      input.value = '';
+      playFoley('click');
+
+      // Mirror to terminal log as well
+      appendLog('YOU', text, 'highlight');
+      showBubble(selectedAgent, text.slice(0, 28) + '...', 3500);
+
+      const sendBtn = document.getElementById('btnSendAgentChat');
+      if (sendBtn) sendBtn.innerHTML = '<iconify-icon icon="solar:refresh-bold" class="spinning"></iconify-icon> THINKING...';
+
+      const engineSelect = document.getElementById('chatEngineSelect');
+      const modelSelect = document.getElementById('chatModelSelect');
+      const activeEngine = engineSelect ? engineSelect.value : (selectedAgent.default_tool || 'opencode_run');
+      const activeModel = modelSelect ? modelSelect.value : (selectedAgent.model_id || '');
+
+      try {
+        const res = await fetch('/api/fleet/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agent_id: selectedAgent.name,
+            prompt: text,
+            engine: activeEngine,
+            model: activeModel
+          })
+        });
+        const data = await res.json();
+        const respTime = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}:${String(new Date().getSeconds()).padStart(2, '0')}`;
+
+        if (data.success && data.reply) {
+          agentChatHistories[agentKey].push({ sender: 'agent', text: data.reply, time: respTime, agentName: agentKey });
+          appendChatMessageDOM('agent', data.reply, respTime, agentKey);
+          appendLog(selectedAgent.name, data.reply.slice(0, 60) + '...', 'info');
+        } else {
+          const errMsg = data.error || 'No response received from agent.';
+          agentChatHistories[agentKey].push({ sender: 'agent', text: `Error: ${errMsg}`, time: respTime, agentName: agentKey });
+          appendChatMessageDOM('agent', `Error: ${errMsg}`, respTime, agentKey);
+          appendLog(selectedAgent.name, `Error: ${errMsg}`, 'warn');
+        }
+      } catch (e) {
+        const errTime = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}:${String(new Date().getSeconds()).padStart(2, '0')}`;
+        const errorText = `Network error: ${e.message}`;
+        agentChatHistories[agentKey].push({ sender: 'agent', text: errorText, time: errTime, agentName: agentKey });
+        appendChatMessageDOM('agent', errorText, errTime, agentKey);
+      } finally {
+        if (sendBtn) sendBtn.innerHTML = '<iconify-icon icon="solar:plain-bold"></iconify-icon> <span>SEND</span>';
+      }
+    }
+
+    function clearActiveAgentChat() {
+      if (!selectedAgent) return;
+      agentChatHistories[selectedAgent.name] = [];
+      renderAgentChatHistory(selectedAgent.name);
+      showSoundToast('Chat history cleared');
     }
 
     function triggerStaplerEasterEgg() {
@@ -5107,6 +5707,10 @@
               setState(ag, ag.state);
             } else {
               ag.displayName = remote.name || ag.displayName || ag.name;
+              if (ag.el) {
+                const tagEl = ag.el.querySelector('.tag');
+                if (tagEl) tagEl.textContent = ag.displayName || ag.name;
+              }
               ag.role = remote.role || ag.role;
               ag.specialty = remote.specialty || ag.specialty;
               ag.default_tool = remote.default_tool || ag.default_tool;

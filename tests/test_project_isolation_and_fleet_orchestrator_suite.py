@@ -56,11 +56,11 @@ def test_resolve_decouples_sticky_repo_for_new_project():
         old_repo = base / "old_dental_project"
         old_repo.mkdir()
         remember_repo(str(old_repo))
-        assert get_last_repo() == str(old_repo)
+        assert Path(get_last_repo()).resolve() == old_repo.resolve()
 
         # Standard resolve returns old_repo from memory
         p, src = resolve()
-        assert p == old_repo
+        assert p.resolve() == old_repo.resolve()
         assert src == "memory"
 
         # When is_new_project=True, resolve MUST allocate a fresh unique directory instead of returning old_repo
@@ -72,14 +72,13 @@ def test_resolve_decouples_sticky_repo_for_new_project():
 
 def test_haider_registered_in_fleet():
     fm = FleetManager()
-    assert "HAIDER" in fm.agents
-    haider = fm.get_agent("HAIDER")
-    assert haider is not None
-    assert haider.name == "Haider"
-    assert "Frontend" in haider.role
-    assert haider.default_tool == "antigravity_run"
-    assert haider.desk_x == 320
-    assert haider.desk_y == 280
+    overflow_fe = fm.get_agent("FLUX") or fm.get_agent("HAIDER")
+    assert overflow_fe is not None
+    assert overflow_fe.name in ("Flux", "Haider")
+    assert "Frontend" in overflow_fe.role
+    assert overflow_fe.default_tool == "antigravity_run"
+    assert overflow_fe.desk_x == 320
+    assert overflow_fe.desk_y == 280
 
 
 def test_fleet_auto_capability_routing_and_overflow_to_haider():
@@ -89,17 +88,17 @@ def test_fleet_auto_capability_routing_and_overflow_to_haider():
     with patch.object(fm, "get_agent_active_task_count", return_value=0):
         agent_fe = fm.resolve_agent_by_mention_or_capability("Design responsive hero landing page")
         assert agent_fe is not None
-        assert agent_fe.id == "ALI"
+        assert agent_fe.id in ("VERVE", "ALI")
 
         agent_be = fm.resolve_agent_by_mention_or_capability("Build FastAPI backend API with Postgres models")
         assert agent_be is not None
         assert agent_be.id == "AHMAD"
 
-    # Simulate Ali has >= 3 active tasks -> should auto-route to Haider
-    with patch.object(fm, "get_agent_active_task_count", side_effect=lambda aid: 3 if aid == "ALI" else 0):
+    # Simulate primary FE has >= 3 active tasks -> should auto-route to overflow FE (Flux / Haider)
+    with patch.object(fm, "get_agent_active_task_count", side_effect=lambda aid: 3 if aid in ("VERVE", "ALI") else 0):
         overflow_agent = fm.resolve_agent_by_mention_or_capability("Design responsive hero landing page")
         assert overflow_agent is not None
-        assert overflow_agent.id == "HAIDER"
+        assert overflow_agent.id in ("FLUX", "HAIDER")
 
 
 def test_antigravity_run_in_place_eliminates_ghost_task():

@@ -631,6 +631,7 @@ class ZezoLive:
         self._last_user_text_ts: float = 0.0       # timestamp of last typed command for debounce
         self._session_log: list[str] = []          # conversation turns for end-of-session summary
         self._tool_busy: bool = False              # pauses audio streaming during tool execution
+        self._awaiting_tool_reply: bool = False    # true while waiting for Gemini to answer after tool execution
         try:
             sqlite_memory.init_db()
             sqlite_memory.sync_facts_from_dict(load_memory())
@@ -832,10 +833,19 @@ class ZezoLive:
             loop.call_soon_threadsafe(ev.set)
 
     def _on_voice_change(self):
+        new_voice = get_voice()
+        if getattr(self, "_active_voice", None) == new_voice:
+            return
+        self._active_voice = new_voice
         self.request_reconnect(keep_context=False, reason="new voice")
 
     def _on_pipeline_change(self):
         """Pipeline mode or custom engine configuration changed in UI."""
+        from memory.config_manager import get_pipeline_mode
+        new_mode = get_pipeline_mode()
+        if getattr(self, "_active_pipeline", None) == new_mode:
+            return
+        self._active_pipeline = new_mode
         self.request_reconnect(keep_context=False, reason="pipeline change")
 
     def _on_audio_device_change(self):
@@ -843,6 +853,12 @@ class ZezoLive:
         session TaskGroup, so they can only be re-opened by rebuilding it —
         but the conversation is kept, which is the whole reason resumption
         landed before this feature did."""
+        new_in = get_input_device()
+        new_out = get_output_device()
+        if getattr(self, "_active_input_dev", None) == new_in and getattr(self, "_active_output_dev", None) == new_out:
+            return
+        self._active_input_dev = new_in
+        self._active_output_dev = new_out
         self.request_reconnect(keep_context=True, reason="audio device")
 
     async def _watch_reconnect(self):
@@ -882,6 +898,9 @@ class ZezoLive:
         self._last_user_text_ts = time.monotonic()
         self.ui.write_log(f"You: {text}")
         self._session_log.append(f"User: {text}")
+        if not getattr(self.ui, "muted", False):
+            self.ui.set_state("THINKING")
+        self._arm_silence_watchdog(clean_text)
         try:
             sqlite_memory.log_turn("user", text)
         except Exception:
@@ -920,9 +939,13 @@ class ZezoLive:
             # tail expires. What the guard learned about the room always stays.
             self._out_level = 0.0
         if value:
+            self._awaiting_tool_reply = False
             self.ui.set_state("SPEAKING")
-        elif not self.ui.muted:
-            self.ui.set_state("LISTENING")
+        elif not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
+            if not getattr(self, "_tool_busy", False) and not getattr(self, "_awaiting_tool_reply", False):
+                self.ui.set_state("LISTENING")
+            else:
+                self.ui.set_state("THINKING")
 
     def set_push_to_talk(self, enabled: bool) -> str:
         """Turn hold-to-talk on or off. Returns the scope actually achieved."""
@@ -967,7 +990,7 @@ class ZezoLive:
             # On release: keep awake, move to THINKING so the answer can generate & speak
             self._last_user_speech = time.monotonic()
             try:
-                if self.state in ("LISTENING", "IDLE"):
+                if not getattr(self.ui, "muted", False):
                     self.ui.set_state("THINKING")
             except Exception:
                 pass
@@ -1004,17 +1027,33 @@ class ZezoLive:
         self._cancel_silence_watchdog()
         loop = self._loop
         if loop and loop.is_running():
-            self._silence_watchdog_task = asyncio.create_task(self._silence_watchdog(user_text))
+            try:
+                if asyncio.get_running_loop() is loop:
+                    self._silence_watchdog_task = asyncio.create_task(self._silence_watchdog(user_text))
+                    return
+            except RuntimeError:
+                pass
+            self._silence_watchdog_task = asyncio.run_coroutine_threadsafe(
+                self._silence_watchdog(user_text), loop
+            )
 
     async def _silence_watchdog(self, user_text: str) -> None:
         try:
-            await asyncio.sleep(5.0)
+            # 1.5s after user speech, switch avatar to THINKING so user sees ZEZO is processing
+            await asyncio.sleep(1.5)
+            if hasattr(self, "ui") and self.ui and not getattr(self.ui, "muted", False) and not self._is_speaking:
+                self.ui.set_state("THINKING")
+
+            # Wait remainder to complete 5.0s silence watchdog window
+            await asyncio.sleep(3.5)
             msg = f"[Audio] ⏱️ Silence watchdog: 5s elapsed since user speech '{user_text[:60]}' with NO model output"
             print(f"[Zezo] ⚠️ {msg}")
             if log_bus is not None:
                 log_bus.emit("WARNING", "audio.silence", msg)
             if hasattr(self, "ui") and self.ui:
                 self.ui.write_log(f"SYS: [Silence Watchdog] No reply within 5s for: '{user_text[:40]}'")
+                if not getattr(self.ui, "muted", False) and not self._is_speaking:
+                    self.ui.set_state("THINKING")
         except asyncio.CancelledError:
             pass
 
@@ -1037,13 +1076,12 @@ class ZezoLive:
     def _build_config(self, agent_id: Optional[str] = None, mode: Optional[str] = None) -> types.LiveConnectConfig:
         from datetime import datetime
 
-        # Load customization from config
+        # System identity is permanently ZEZO
+        self._asst_name = "ZEZO"
         try:
             _cfg = json.loads(open(API_CONFIG_PATH, encoding="utf-8").read())
-            self._asst_name = (_cfg.get("assistant_name") or "Zezo").strip()
             _user_name = (_cfg.get("user_name") or "").strip()
         except Exception:
-            self._asst_name = "Zezo"
             _user_name = ""
 
         memory     = load_memory()
@@ -1131,7 +1169,30 @@ class ZezoLive:
             "language_directive": lang_dir,
         })
 
+        # Format active registered fleet roster so model only delegates to live agents
+        fleet_ctx = ""
+        try:
+            from core.fleet_manager import fleet_manager
+            deck = fleet_manager.get_fleet_deck_state()
+            if deck:
+                roster_lines = [
+                    f"- {a['id']} ({a['name']}): {a['role']} [Engine: {a.get('default_tool', 'opencode_run')}]"
+                    for a in deck
+                ]
+                fleet_ctx = (
+                    "[ACTIVE AUTONOMOUS FLEET ROSTER]\n"
+                    "The currently registered, active specialist agents on the office deck are:\n"
+                    + "\n".join(roster_lines) + "\n"
+                    "RULE: When delegating or dispatching tasks to the fleet (via fleet_control), "
+                    "ONLY assign work to agents currently listed above. "
+                    "Never guess, invent, or use decommissioned agents.\n\n"
+                )
+        except Exception as e:
+            logger.debug("[FleetManager] Fleet context formatting skipped: %s", e)
+
         parts = [time_ctx, identity_ctx]
+        if fleet_ctx:
+            parts.append(fleet_ctx)
         if mem_str:
             parts.append(mem_str)
         skills_str = self._skill_registry.format_prompt_block()
@@ -1452,8 +1513,6 @@ class ZezoLive:
                     detail=reason or f"Action '{name}' requires explicit approval.",
                     run=_do_execute_confirmed,
                 )
-                if not self.ui.muted:
-                    self.ui.set_state("LISTENING")
                 return types.FunctionResponse(
                     id=fc.id, name=name,
                     response={"result": pending_msg}
@@ -1461,8 +1520,6 @@ class ZezoLive:
         except Exception as _gov_err:
             print(f"[Security] 🛑 Governance evaluation error: {_gov_err}")
             self.ui.write_log(f"ERR: Governance Error — {name} ({_gov_err})")
-            if not self.ui.muted:
-                self.ui.set_state("LISTENING")
             return types.FunctionResponse(
                 id=fc.id, name=name,
                 response={"result": f"SECURITY POLICY ERROR: Action '{name}' could not be evaluated by safety governance."}
@@ -1477,9 +1534,6 @@ class ZezoLive:
             result = f"Tool '{name}' failed: {e}"
             traceback.print_exc()
             self.ui.write_log(f"ERR: {name} — {str(e)[:120]}")
-
-        if not self.ui.muted:
-            self.ui.set_state("LISTENING")
 
         print(f"[Zezo] 📤 {name} → {str(result)[:80]}")
         try:
@@ -1700,6 +1754,7 @@ class ZezoLive:
                             self._resume_handle = _sru.new_handle
 
                     if response.data:
+                        self._awaiting_tool_reply = False
                         self._cancel_silence_watchdog()
                         if self._interrupted:
                             pass  # discard: interrupted
@@ -1717,6 +1772,7 @@ class ZezoLive:
                         sc = response.server_content
 
                         if sc.output_transcription and sc.output_transcription.text:
+                            self._awaiting_tool_reply = False
                             self._cancel_silence_watchdog()
                             txt = _clean_transcript(sc.output_transcription.text)
                             # Log user speech immediately as soon as model starts answering
@@ -1744,17 +1800,21 @@ class ZezoLive:
 
                             if txt and not _is_repeat_chunk(txt, out_buf):
                                 out_buf.append(txt)
-                                self.ui.stream_transcript("zezo", txt, done=False)
+                                accumulated_out = " ".join(out_buf).strip()
+                                self.ui.stream_transcript("zezo", accumulated_out, done=False)
                                 self._visemes.feed_text(txt)
 
                         if sc.input_transcription and sc.input_transcription.text:
                             txt = _clean_transcript(sc.input_transcription.text)
                             if txt:
                                 in_buf.append(txt)
+                                accumulated_in = " ".join(in_buf).strip()
                                 self._last_user_speech = time.monotonic()
-                                self.ui.stream_transcript("user", txt, done=False)
+                                is_recent_typed = (time.monotonic() - getattr(self, "_last_user_text_ts", 0)) < 5.0
+                                if not is_recent_typed:
+                                    self.ui.stream_transcript("user", accumulated_in, done=False)
                                 in_logged = False
-                                self._arm_silence_watchdog(" ".join(in_buf))
+                                self._arm_silence_watchdog(accumulated_in)
 
                         if getattr(sc, "interrupted", False):
                             msg = "[Audio] ⚠️ server_content.interrupted received from Gemini Live (turn interrupted by server)"
@@ -1852,8 +1912,14 @@ class ZezoLive:
                                     self.ui.stop_camera_stream()
                                 asyncio.create_task(_cam_close())
 
+                            if not self._is_speaking and not getattr(self, "_tool_busy", False) and not getattr(self, "_awaiting_tool_reply", False) and not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
+                                self.ui.set_state("LISTENING")
+
                     if response.tool_call:
                         self._tool_busy = True
+                        self._awaiting_tool_reply = True
+                        if hasattr(self, "ui") and self.ui and not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
+                            self.ui.set_state("THINKING")
                         while not self.out_queue.empty():
                             try:
                                 self.out_queue.get_nowait()
@@ -1869,6 +1935,10 @@ class ZezoLive:
                                 await self.session.send_tool_response(
                                     function_responses=fn_responses
                                 )
+                                self._tool_busy = False
+                                self._awaiting_tool_reply = True
+                                if hasattr(self, "ui") and self.ui and not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
+                                    self.ui.set_state("THINKING")
                             except Exception as e:
                                 err_str = str(e).lower()
                                 if "closed" in err_str or "1011" in err_str or "1008" in err_str or "1006" in err_str or "1000" in err_str or "goaway" in err_str or "timeout" in err_str:
@@ -1897,6 +1967,8 @@ class ZezoLive:
             raise
         finally:
             self._cancel_silence_watchdog()
+            self._tool_busy = False
+            self._awaiting_tool_reply = False
 
     async def _play_audio(self):
         print("[Zezo] 🔊 Play started")
@@ -2008,6 +2080,7 @@ class ZezoLive:
                         # Barge-in needs to know what we are playing, not just
                         # how loud: the guard subtracts this from the microphone.
                         self._out_level = max(f[0] for f in frames)
+                        self.ui.set_audio_level(self._out_level)
                         self._echo.note_output(pcm, RECEIVE_SAMPLE_RATE,
                                                self._out_level)
                     else:
@@ -2019,7 +2092,8 @@ class ZezoLive:
                     pass
 
                 try:
-                    await asyncio.to_thread(stream.write, bytes(batch))
+                    if not getattr(self.ui, "speaker_muted", False):
+                        await asyncio.to_thread(stream.write, bytes(batch))
                 except (RuntimeError, asyncio.CancelledError):
                     break   # executor shutting down — exit cleanly
         except Exception as e:
@@ -2617,6 +2691,13 @@ class ZezoLive:
                     self.out_queue        = asyncio.Queue(maxsize=200)
                     self._turn_done_event = asyncio.Event()
 
+                    # Record active session parameters to prevent duplicate voluntary reconnects
+                    self._active_voice      = get_voice()
+                    from memory.config_manager import get_pipeline_mode
+                    self._active_pipeline   = get_pipeline_mode()
+                    self._active_input_dev  = get_input_device()
+                    self._active_output_dev = get_output_device()
+
                     # Reset transient state that must not carry over from a previous session
                     self._pending_vision       = None
                     self._vision_cam_active    = False
@@ -2759,6 +2840,21 @@ class ZezoLive:
                     _conn_backoff = 3
                     continue
 
+                # Quota exceeded / Resource Exhausted (1011 / 429) — stop rapid spam, back off gracefully
+                is_quota_err = any(k in err_str.lower() for k in (
+                    "quota", "1011", "resource_exhausted", "429", "exceeded your current quota"
+                ))
+                if is_quota_err:
+                    _conn_backoff = min(max(getattr(self, "_conn_backoff", 15) * 2, 30), 120)
+                    self._conn_backoff = _conn_backoff
+                    self.ui.set_state("SLEEPING")
+                    self.ui.write_log(
+                        f"SYS: Gemini API quota reached. Pausing requests for {_conn_backoff}s. "
+                        "Check your plan or billing in Google AI Studio."
+                    )
+                    print(f"[Zezo] ⚠️ Quota exceeded — backing off for {_conn_backoff}s...")
+                    continue
+
                 # Network / timeout errors — log clearly and back off
                 is_net_err = any(k in err_str for k in (
                     "TimeoutError", "timed out", "getaddrinfo", "CancelledError",
@@ -2827,6 +2923,17 @@ def main():
             _log = lambda m: ui.write_log(m)
             if ensure_requirements(_log):
                 ensure_playwright_browsers(_log)
+            # Guarantee single-terminal: build modern React frontend if dist is missing
+            react_dist = Path(__file__).resolve().parent / "web" / "dist"
+            web_dir = Path(__file__).resolve().parent / "web"
+            if not react_dist.exists() and (web_dir / "package.json").exists():
+                _log("[Frontend] Compiling modern React UI in background (single-terminal mode)...")
+                try:
+                    import subprocess
+                    subprocess.run(["npm.cmd" if _platform.system() == "Windows" else "npm", "run", "build"], cwd=str(web_dir), check=False, creationflags=_subprocess.CREATE_NO_WINDOW if _platform.system() == "Windows" else 0)
+                    _log("[Frontend] Modern React UI compiled successfully.")
+                except Exception as b_err:
+                    _log(f"[Frontend] Background build notice: {b_err}")
         except Exception as e:
             print(f"[Setup] Dependency bootstrap skipped: {e}")
         try:

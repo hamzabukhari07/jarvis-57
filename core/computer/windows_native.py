@@ -72,14 +72,11 @@ class WindowsNativeDriver:
             if _PSUTIL:
                 try:
                     proc = psutil.Process(my_pid)
-                    if target_pid == proc.pid:
-                        return True
                     for parent in proc.parents():
                         if parent.pid == target_pid:
-                            return True
-                    for child in proc.children(recursive=True):
-                        if child.pid == target_pid:
-                            return True
+                            pname = (parent.name() or "").lower()
+                            if any(k in pname for k in ("powershell", "cmd", "terminal", "python", "code")):
+                                return True
                 except Exception:
                     pass
 
@@ -88,7 +85,7 @@ class WindowsNativeDriver:
                 buff = ctypes.create_unicode_buffer(length + 1)
                 self.user32.GetWindowTextW(hwnd, buff, length + 1)
                 t = buff.value.lower().strip()
-                if any(k in t for k in ("zezo", "jarvis", "antigravity", "powershell", "cmd.exe", "windowsterminal", "python")):
+                if any(k in t for k in ("zezo", "jarvis", "antigravity")):
                     return True
         except Exception:
             pass
@@ -295,23 +292,47 @@ class WindowsNativeDriver:
                     fg_hwnd = self.user32.GetForegroundWindow()
                     fg_thread = self.user32.GetWindowThreadProcessId(fg_hwnd, None) if fg_hwnd else 0
                     my_thread = self.kernel32.GetCurrentThreadId()
+                    target_thread = self.user32.GetWindowThreadProcessId(matched_hwnd, None) if matched_hwnd else 0
 
+                    try:
+                        self.user32.AllowSetForegroundWindow(-1)
+                    except Exception:
+                        pass
+
+                    try:
+                        VK_MENU = 0x12
+                        KEYEVENTF_KEYUP = 0x0002
+                        self.user32.keybd_event(VK_MENU, 0, 0, 0)
+                        self.user32.keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0)
+                    except Exception:
+                        pass
+
+                    attached_fg = False
+                    attached_target = False
                     if fg_thread and fg_thread != my_thread:
-                        self.user32.AttachThreadInput(my_thread, fg_thread, True)
-                        self.user32.ShowWindow(matched_hwnd, SW_RESTORE)
-                        self.user32.SetForegroundWindow(matched_hwnd)
-                        self.user32.BringWindowToTop(matched_hwnd)
+                        attached_fg = bool(self.user32.AttachThreadInput(my_thread, fg_thread, True))
+                    if target_thread and target_thread != my_thread:
+                        attached_target = bool(self.user32.AttachThreadInput(my_thread, target_thread, True))
+
+                    self.user32.ShowWindow(matched_hwnd, SW_RESTORE)
+                    self.user32.SetForegroundWindow(matched_hwnd)
+                    self.user32.BringWindowToTop(matched_hwnd)
+
+                    if attached_target:
+                        self.user32.AttachThreadInput(my_thread, target_thread, False)
+                    if attached_fg:
                         self.user32.AttachThreadInput(my_thread, fg_thread, False)
-                    else:
-                        self.user32.ShowWindow(matched_hwnd, SW_RESTORE)
-                        self.user32.SetForegroundWindow(matched_hwnd)
 
                     time.sleep(0.15)
                     current_fg = self.user32.GetForegroundWindow()
-                    if current_fg == matched_hwnd or not self.is_self_or_console_window(current_fg):
+                    is_focused = (
+                        current_fg == matched_hwnd
+                        or (current_fg and self.user32.GetAncestor(current_fg, 2) == matched_hwnd)
+                        or (matched_hwnd and self.user32.GetAncestor(matched_hwnd, 2) == current_fg)
+                    )
+                    if is_focused:
                         return f"Focused window: {matched_title}"
-                    else:
-                        print(f"[WindowsNative] Window '{matched_title}' did not gain foreground focus.")
+                    print(f"[WindowsNative] Window '{matched_title}' (HWND {matched_hwnd}) did not gain foreground focus (Current FG HWND: {current_fg}).")
             except Exception as e:
                 print(f"[WindowsNative] Focus error: {e}")
 
@@ -411,6 +432,23 @@ class WindowsNativeDriver:
 
                     is_dialog_target = any(k in cleaned_title for k in ("reminder", "popup", "pop-up", "dialog", "alert", "message", "notification", "toast", "modal", "msg"))
 
+                    APP_ALIASES_MAP = {
+                        "vs code": ["visual studio code", " - code", "visual studio"],
+                        "vscode": ["visual studio code", " - code", "visual studio"],
+                        "code": ["visual studio code", " - code"],
+                        "visual studio code": ["visual studio code", " - code"],
+                        "calc": ["calculator", "calc"],
+                        "calculator": ["calculator", "calc"],
+                        "notepad": ["notepad", "untitled - notepad"],
+                        "whatsapp": ["whatsapp"],
+                        "chrome": ["google chrome", "chrome"],
+                        "edge": ["microsoft edge", "msedge", "edge"],
+                        "explorer": ["file explorer", " - file explorer", "home", "documents", "downloads", "this pc"],
+                        "file explorer": ["file explorer", " - file explorer", "home", "documents", "downloads", "this pc"],
+                        "terminal": ["terminal", "powershell", "command prompt"],
+                    }
+                    target_aliases = APP_ALIASES_MAP.get(cleaned_title, [cleaned_title])
+
                     matched_hwnd: Optional[int] = None
                     matched_title: str = ""
 
@@ -422,7 +460,12 @@ class WindowsNativeDriver:
                             w_title = self.get_window_title(hwnd)
                             w_lower = w_title.lower().strip()
                             pattern = r"\b" + re.escape(cleaned_title) + r"\b"
-                            is_match = (cleaned_title == w_lower or re.search(pattern, w_lower) or cleaned_title in w_lower)
+                            is_match = (
+                                any(a in w_lower for a in target_aliases) or
+                                cleaned_title == w_lower or
+                                re.search(pattern, w_lower) or
+                                cleaned_title in w_lower
+                            )
                             
                             # Also check process name if title matching fails
                             if not is_match and _PSUTIL:
@@ -430,7 +473,7 @@ class WindowsNativeDriver:
                                     pid = ctypes.c_ulong()
                                     self.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
                                     pname = (psutil.Process(pid.value).name() or "").lower()
-                                    if cleaned_title in pname or pname.startswith(cleaned_title):
+                                    if any(a in pname for a in target_aliases) or cleaned_title in pname:
                                         is_match = True
                                 except Exception:
                                     pass
@@ -450,11 +493,15 @@ class WindowsNativeDriver:
 
                     if matched_hwnd:
                         self.user32.PostMessageW(matched_hwnd, WM_CLOSE, 0, 0)
-                        self.user32.PostMessageW(matched_hwnd, WM_COMMAND, IDCANCEL, 0)
+                        if is_dialog_target:
+                            self.user32.PostMessageW(matched_hwnd, WM_COMMAND, IDCANCEL, 0)
                         return f"Closed window: {matched_title}"
 
                     if is_dialog_target:
                         return "Dismissed active dialog / reminder popup."
+
+                    # When a specific title was requested and not found, never fall through to close unrelated windows
+                    return f"Could not find window matching '{title}'."
 
                 # Generic active window closing
                 fg_hwnd = self.user32.GetForegroundWindow()

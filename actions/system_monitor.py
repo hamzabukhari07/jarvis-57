@@ -87,6 +87,8 @@ class _WindowsPDH_GPU:
                     res = self.pdh.PdhAddEnglishCounterW(self.hQuery, r"\GPU Engine(*)\Utilization Percentage", 0, ctypes.byref(self.hCounter))
                 if res == 0:
                     self.pdh.PdhCollectQueryData(self.hQuery)
+                    self.buf_size = wintypes.DWORD(32768)
+                    self.buf = ctypes.create_string_buffer(32768)
                     self.ok = True
         except Exception:
             self.ok = False
@@ -96,13 +98,35 @@ class _WindowsPDH_GPU:
             return -1.0
         try:
             from ctypes import wintypes
-            class PDH_FMT_COUNTERVALUE(ctypes.Structure):
-                _fields_ = [("CStatus", wintypes.DWORD), ("doubleValue", ctypes.c_double)]
+            class PDH_FMT_COUNTERVALUE_ITEM_W(ctypes.Structure):
+                _fields_ = [
+                    ("szName", wintypes.LPWSTR),
+                    ("CStatus", wintypes.DWORD),
+                    ("doubleValue", ctypes.c_double),
+                ]
             self.pdh.PdhCollectQueryData(self.hQuery)
-            val = PDH_FMT_COUNTERVALUE()
-            res = self.pdh.PdhGetFormattedCounterValue(self.hCounter, 0x00000200, None, ctypes.byref(val))
-            if res == 0 and val.CStatus == 0:
-                return max(0.0, min(100.0, round(val.doubleValue, 1)))
+            item_count = wintypes.DWORD(0)
+            b_size = wintypes.DWORD(self.buf_size.value)
+            res = self.pdh.PdhGetFormattedCounterArrayW(
+                self.hCounter, 0x00000200, ctypes.byref(b_size), ctypes.byref(item_count),
+                ctypes.cast(self.buf, ctypes.POINTER(PDH_FMT_COUNTERVALUE_ITEM_W))
+            )
+            # PDH_MORE_DATA = 0x800007D2
+            if res == 0x800007D2 or b_size.value > self.buf_size.value:
+                self.buf_size = wintypes.DWORD(b_size.value + 4096)
+                self.buf = ctypes.create_string_buffer(self.buf_size.value)
+                res = self.pdh.PdhGetFormattedCounterArrayW(
+                    self.hCounter, 0x00000200, ctypes.byref(self.buf_size), ctypes.byref(item_count),
+                    ctypes.cast(self.buf, ctypes.POINTER(PDH_FMT_COUNTERVALUE_ITEM_W))
+                )
+            if res == 0:
+                items = ctypes.cast(self.buf, ctypes.POINTER(PDH_FMT_COUNTERVALUE_ITEM_W))
+                total = 0.0
+                for i in range(item_count.value):
+                    item = items[i]
+                    if item.CStatus == 0 and item.doubleValue > 0:
+                        total += item.doubleValue
+                return max(0.0, min(100.0, round(total, 1)))
         except Exception:
             pass
         return 0.0
@@ -116,8 +140,17 @@ _nvml_py_failed = False
 
 def _get_gpu_usage() -> float:
     global _pdh_gpu_tracker, _nvml_py, _nvml_py_handle, _nvml_py_failed
-    # nvmlInit()/nvmlDeviceGetHandleByIndex() are not free and this runs on the
-    # UI's 500 ms telemetry tick. Initialise the binding once, then reuse it.
+    gpu_vals: list[float] = []
+
+    # 1. Windows Native Performance Data Helper (Active 3D across Intel, AMD, NVIDIA)
+    if _OS == "Windows":
+        if _pdh_gpu_tracker is None:
+            _pdh_gpu_tracker = _WindowsPDH_GPU()
+        pdh_val = _pdh_gpu_tracker.read()
+        if pdh_val >= 0:
+            gpu_vals.append(pdh_val)
+
+    # 2. NVIDIA NVML Python bindings
     if not _nvml_py_failed:
         try:
             if _nvml_py is None:
@@ -128,24 +161,17 @@ def _get_gpu_usage() -> float:
                 pynvml.nvmlInit()
                 _nvml_py = pynvml
                 _nvml_py_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-            return float(_nvml_py.nvmlDeviceGetUtilizationRates(_nvml_py_handle).gpu)
+            gpu_vals.append(float(_nvml_py.nvmlDeviceGetUtilizationRates(_nvml_py_handle).gpu))
         except Exception:
             _nvml_py_failed = True
 
-    # 2. nvml.dll fallback (NVIDIA)
-    nvml_val = _nvml_gpu()
-    if nvml_val >= 0:
-        return nvml_val
+    # 3. nvml.dll ctypes fallback (NVIDIA)
+    if not gpu_vals:
+        nvml_val = _nvml_gpu()
+        if nvml_val >= 0:
+            gpu_vals.append(nvml_val)
 
-    # 3. Windows Native Performance Data Helper (AMD Radeon RX series, Intel Arc/Iris, NVIDIA)
-    if _OS == "Windows":
-        if _pdh_gpu_tracker is None:
-            _pdh_gpu_tracker = _WindowsPDH_GPU()
-        val = _pdh_gpu_tracker.read()
-        if val >= 0:
-            return val
-
-    return -1.0
+    return max(gpu_vals) if gpu_vals else -1.0
 
 
 _cpu_temp_cache = (0.0, -1.0)     # (monotonic timestamp, value)

@@ -1,0 +1,2110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>heyclicky · Full Design System</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Geist+Mono:wght@100..900&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+
+<!-- Icons -->
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+
+<style>
+/* ═══════════════════════════════════════════════
+   heyclicky · Design Tokens
+   ═══════════════════════════════════════════════ */
+:root {
+  --bg-canvas: #f5f5f5;
+  --bg-white: #ffffff;
+  --ink: #000000;
+  --ink-80: rgba(0,0,0,0.8);
+  --ink-60: rgba(0,0,0,0.6);
+  --ink-40: rgba(0,0,0,0.4);
+  --ink-24: rgba(0,0,0,0.24);
+  --ink-12: rgba(0,0,0,0.12);
+  --ink-08: rgba(0,0,0,0.08);
+
+  --blue: #0f7fff;
+  --blue-grad: linear-gradient(#d6e6ff 0%, #9ec5ff 42%, #d2f1f7 100%);
+  --blue-border: #221898;
+  --orange: #ff6600;
+  --orange-grad: linear-gradient(#ffe9d6 0%, #ffc999 42%, #ffe9d6 100%);
+  --orange-border: #9a5518;
+  --teal: #00c8b3;
+  --teal-grad: linear-gradient(#d6fffb 0%, #00c8b3 42%, #d6fffb 100%);
+  --teal-border: #158479;
+  --yellow: #feea3d;
+  --yellow-soft: rgba(254,234,61,0.35);
+  --green: #34c759;
+  --red: #ff3b30;
+
+  --win-gradient: linear-gradient(90deg, #d6d5d7 0%, #f0f0f0 50%, #d6d5d7 100%);
+  --win-close: #ff5f57;
+  --win-min: #febc2e;
+  --win-zoom: #28c840;
+
+  --glass-bg: linear-gradient(rgba(255,255,255,0.30) 0%, rgba(231,231,231,0.30) 42%, rgba(251,251,251,0.30) 100%);
+  --glass-border: 1px solid #626262;
+
+  --btn-mac: linear-gradient(#edf4ff 0%, #d6e7ff 18%, #a2c7ff 50%, #99cbf8 80%, #a2d2f7 100%);
+  --btn-win: linear-gradient(#fbfbfb 0%, #ededed 42%, #e4e4e4 100%);
+
+  --r-xs: 2px;
+  --r-sm: 3px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 10px 24px rgba(0,0,0,0.12);
+  --shadow-xl: 0 20px 40px rgba(0,0,0,0.16);
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-canvas);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  padding: 48px 24px;
+  background-image: radial-gradient(rgba(0,0,0,0.13) 1px, transparent 1.3px);
+  background-size: 34.238px 34px;
+}
+.spec-container { max-width: 1280px; margin: 0 auto; }
+
+/* ── Section framing ── */
+.section { margin-bottom: 64px; }
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 2px dotted rgba(0,0,0,0.15);
+}
+.section-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--ink-40);
+}
+.section-title {
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+/* ── Page header ── */
+.page-header { margin-bottom: 56px; text-align: center; }
+.plabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: -0.03em;
+  color: var(--ink-60);
+  text-shadow: 0 2px 2px rgba(255,255,255,0.8);
+  background: linear-gradient(#fff 0%, #e7e7e7 42%, #fbfbfb 100%);
+  border: 1px solid rgba(0,0,0,0.3);
+  border-radius: var(--r-pill);
+  height: 28px;
+  padding: 0 12px 1px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-md);
+}
+.page-header h1 {
+  font-size: 56px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  margin-bottom: 12px;
+}
+.page-header h1 .accent { color: var(--blue); }
+.page-header p {
+  font-size: 20px;
+  color: var(--ink-60);
+  letter-spacing: -0.03em;
+  max-width: 580px;
+  margin: 0 auto 20px;
+}
+.page-header .badges { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+/* ── Typography ── */
+.type-display { font-size: 56px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.2; }
+.type-heading { font-size: 32px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.2; }
+.type-subheading { font-size: 20px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.5; }
+.type-body { font-size: 16px; font-weight: 400; letter-spacing: -0.03em; line-height: 1.5; color: var(--ink-60); }
+.type-label { font-family: var(--font-mono); font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: -0.03em; color: var(--ink-40); }
+.type-mono { font-family: var(--font-mono); font-size: 14px; font-weight: 400; letter-spacing: -0.03em; }
+.type-serif { font-family: var(--font-serif); font-style: italic; font-size: 20px; font-weight: 400; letter-spacing: -0.02em; }
+
+/* ── Cards ── */
+.card {
+  background: var(--bg-white);
+  border: 1px solid var(--ink-08);
+  border-radius: var(--r-md);
+  padding: 24px;
+  box-shadow: var(--shadow-md);
+  position: relative;
+}
+
+/* ── Window chrome (signature) ── */
+.win {
+  background: var(--win-gradient) padding-box;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  padding: 8px 4px 4px;
+  position: relative;
+  box-shadow: var(--shadow-lg);
+  display: inline-flex;
+  flex-direction: column;
+}
+.win::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid transparent;
+  background: linear-gradient(#000 0%, rgba(0,0,0,0.1) 100%) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.win::after {
+  content: '';
+  position: absolute;
+  inset: -0.5px;
+  border-radius: inherit;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.8);
+  pointer-events: none;
+}
+.win-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 8px;
+  gap: 8px;
+}
+.win-dots { display: flex; align-items: center; gap: 5px; }
+.win-dot { width: 12px; height: 12px; border-radius: 50%; margin: 0 -1px; }
+.win-dot.close { background: var(--win-close); }
+.win-dot.min { background: var(--win-min); }
+.win-dot.zoom { background: var(--win-zoom); }
+.win-title {
+  font-size: 12px;
+  color: var(--ink-40);
+  text-shadow: 0 1px 1px rgba(255,255,255,0.8);
+  letter-spacing: -0.03em;
+  flex: 1;
+  text-align: center;
+}
+.win-screen {
+  background: #e9e8ea;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+.win-caption {
+  font-size: 12px;
+  color: var(--ink-40);
+  text-align: center;
+  margin-top: 6px;
+  letter-spacing: -0.03em;
+  text-shadow: 0 1px 1px rgba(255,255,255,0.8);
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 20px 1px 16px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  text-shadow: 0 2px 2px rgba(255,255,255,0.8);
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  transition: opacity 0.15s, transform 0.12s;
+  border: none;
+}
+.btn:hover { opacity: 0.8; }
+.btn:active { transform: scale(0.97); }
+.btn::before {
+  content: '';
+  position: absolute;
+  top: 3px; left: 12px; right: 12px;
+  height: 12px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(rgba(255,255,255,0.8), rgba(255,255,255,0.1));
+  opacity: 0.6;
+  pointer-events: none;
+}
+.btn.mac { background: var(--btn-mac); border: 1px solid var(--blue-border); }
+.btn.win { background: var(--btn-win); border: 1px solid #626262; }
+.btn.blue { background: var(--blue-grad); border: 1px solid var(--blue-border); }
+.btn.orange { background: var(--orange-grad); border: 1px solid var(--orange-border); }
+.btn.teal { background: var(--teal-grad); border: 1px solid var(--teal-border); }
+.btn-sm { height: 32px; font-size: 14px; padding: 0 16px 1px 12px; }
+.btn-lg { height: 48px; font-size: 20px; padding: 0 24px 1px 20px; }
+.btn-sub { font-size: 12px; color: var(--ink-40); letter-spacing: -0.03em; margin-top: 8px; text-align: center; }
+
+/* ── Inputs ── */
+.input-field {
+  width: 100%;
+  background: var(--bg-white);
+  border: 1px solid var(--ink-12);
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--ink);
+  outline: none;
+  transition: border 0.15s, box-shadow 0.15s;
+}
+.input-field::placeholder { color: var(--ink-40); }
+.input-field:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(15,127,255,0.12);
+}
+.input-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: lowercase;
+  letter-spacing: -0.02em;
+  color: var(--ink-60);
+  margin-bottom: 6px;
+}
+.input-with-icon { position: relative; }
+.input-with-icon .icon {
+  position: absolute;
+  left: 12px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-40);
+  pointer-events: none;
+}
+.input-with-icon .input-field { padding-left: 38px; }
+
+/* ── Custom Dropdown (signature heyclicky style) ── */
+.hc-dropdown { position: relative; width: 100%; }
+.hc-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  background: linear-gradient(#fff 0%, #ededed 42%, #f9f9f9 100%);
+  border: 1px solid #626262;
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12), inset 0 -11px 5px -9px rgba(255,255,255,0.35), inset 0 -8px 7px -6px rgba(0,0,0,0.18);
+  position: relative;
+  overflow: hidden;
+  transition: filter 0.15s;
+}
+.hc-dropdown-trigger:hover { filter: brightness(0.97); }
+.hc-dropdown-trigger::before {
+  content: '';
+  position: absolute;
+  top: 1px; left: 9px; right: 7px;
+  height: 10px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(rgba(255,255,255,0.9), rgba(255,255,255,0.2));
+  opacity: 0.7;
+  pointer-events: none;
+}
+.hc-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: linear-gradient(#fff 0%, #ededed 42%, #f9f9f9 100%);
+  border: 1px solid #626262;
+  border-radius: var(--r-md);
+  padding: 6px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+  z-index: 50;
+}
+.hc-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.hc-dropdown-item:hover { background: rgba(0,0,0,0.06); }
+.hc-dropdown-item.active { color: var(--blue); }
+
+/* ── File Dropzone ── */
+.dropzone {
+  border: 1.5px dashed var(--ink-24);
+  border-radius: var(--r-md);
+  background: var(--bg-white);
+  padding: 32px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.dropzone:hover { border-color: var(--ink-40); background: #fafafa; }
+.dropzone.dragover {
+  border-color: var(--blue);
+  background: rgba(15,127,255,0.05);
+}
+.dropzone-icon {
+  width: 48px; height: 48px;
+  margin: 0 auto 12px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.04);
+  color: var(--ink-60);
+}
+
+/* ── Toggles / Checkbox / Radio ── */
+.toggle-track {
+  width: 40px; height: 22px;
+  background: var(--ink-12);
+  border-radius: var(--r-pill);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle-track.active { background: var(--green); }
+.toggle-thumb {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 18px; height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+}
+.toggle-track.active .toggle-thumb { transform: translateX(18px); }
+
+.checkbox {
+  width: 18px; height: 18px;
+  border: 1.5px solid var(--ink-24);
+  border-radius: var(--r-sm);
+  background: var(--bg-white);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.checkbox.checked { background: var(--blue); border-color: var(--blue); }
+
+.radio {
+  width: 18px; height: 18px;
+  border: 1.5px solid var(--ink-24);
+  border-radius: 50%;
+  background: var(--bg-white);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.radio.checked { border-color: var(--blue); }
+.radio.checked::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--blue); }
+
+/* ── Pills & Bubbles (signature) ── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px 1px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: -0.03em;
+  color: var(--ink-60);
+  text-shadow: 0 2px 2px rgba(255,255,255,0.8);
+  background: linear-gradient(#fff 0%, #e7e7e7 42%, #fbfbfb 100%);
+  border: 1px solid rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-md), inset 0 -8px 0 4px rgba(179,179,179,0.4);
+  position: relative;
+  overflow: hidden;
+}
+.pill::before {
+  content: '';
+  position: absolute;
+  top: 2px; left: 10px; right: 10px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(rgba(255,255,255,0.9), rgba(255,255,255,0.2));
+  opacity: 0.7;
+}
+.pill.blue { background: var(--blue-grad); border-color: var(--blue-border); }
+.pill.orange { background: var(--orange-grad); border-color: var(--orange-border); }
+.pill.teal { background: var(--teal-grad); border-color: var(--teal-border); }
+.pill.green { background: linear-gradient(#d6ffe0 0%, #a8e6b8 42%, #d6ffe0 100%); border-color: #158479; color: #0f6b28; }
+.pill.red { background: linear-gradient(#ffd6d6 0%, #ffb3b3 42%, #ffd6d6 100%); border-color: #9a1818; color: #9a1818; }
+.pill.dark { background: linear-gradient(#3a3a3a 0%, #1a1a1a 42%, #2a2a2a 100%); border-color: #000; color: #fff; }
+
+.bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: var(--r-pill);
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  text-transform: lowercase;
+  color: var(--ink);
+  text-shadow: 0 2px 2px rgba(255,255,255,0.8);
+  box-shadow: var(--shadow-lg);
+  position: relative;
+}
+.bubble.blue { background: var(--blue-grad); border: 1px solid var(--blue-border); }
+.bubble.orange { background: var(--orange-grad); border: 1px solid var(--orange-border); }
+.bubble.teal { background: var(--teal-grad); border: 1px solid var(--teal-border); }
+.bubble::before {
+  content: '';
+  position: absolute;
+  top: 3px; left: 16px; right: 16px;
+  height: 12px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(rgba(255,255,255,0.7), rgba(255,255,255,0.1));
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* ── Pricing Cards (signature) ── */
+.pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.pr-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  border-radius: var(--r-md);
+  padding: 8px 4px 4px;
+  position: relative;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.12), inset 0 1px 1px rgba(255,255,255,0.8), inset 0 0 0 1px rgba(255,255,255,0.25);
+}
+.pr-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(#000, rgba(0,0,0,0.1));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.pr-card-pro {
+  background: linear-gradient(rgba(15,127,255,0.6) 0%, rgba(15,127,255,0) 40%), var(--glass-bg);
+}
+.pr-card-bar { display: flex; align-items: center; padding: 0 4px 8px; }
+.pr-card-body { text-align: center; background: linear-gradient(#fff 25%, rgba(255,255,255,0) 100%); border-radius: 4px; }
+.pr-card-head { padding: 24px 24px 16px; }
+.pr-card-title { font-size: 28px; font-weight: 500; letter-spacing: -0.03em; }
+.pr-card-max .pr-card-title { font-weight: 800; }
+.pr-card-tag { padding: 0 24px 16px; }
+.pr-card-tagline { font-size: 20px; font-weight: 400; letter-spacing: -0.03em; }
+.pr-card-subtag { font-size: 12px; color: var(--ink-40); margin-top: 12px; }
+.pr-divider { height: 16px; background-image: linear-gradient(90deg, transparent 50%, rgba(0,0,0,0.1) 50%); background-size: 8px 1px; background-repeat: repeat-x; background-position: center; margin: 0; }
+.pr-price-block { padding: 24px; }
+.pr-price-char { font-size: 56px; font-weight: 500; letter-spacing: -0.03em; text-shadow: 0 3px 3px rgba(255,255,255,0.8); display: inline-block; }
+.pr-price-note { font-size: 14px; color: var(--ink); margin-top: 12px; }
+.pr-badge {
+  position: absolute;
+  top: -11px; left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: lowercase;
+  letter-spacing: -0.03em;
+  padding: 0 10px 1px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--r-pill);
+  background: var(--blue-grad);
+  border: 1px solid var(--blue-border);
+  box-shadow: 0 10px 12px rgba(0,0,0,0.12);
+  z-index: 2;
+}
+.pr-inc { padding: 16px 24px 24px; text-align: left; }
+.pr-inc-label { font-size: 16px; color: var(--ink-60); margin-bottom: 16px; }
+.pr-inc-row { display: flex; align-items: center; margin-top: 16px; gap: 12px; }
+.pr-inc-check {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.pr-inc-text { font-size: 16px; font-weight: 500; letter-spacing: -0.03em; }
+
+/* ── Notes / Manifesto window (signature) ── */
+.manifesto {
+  background: linear-gradient(rgba(254,234,61,0.2), rgba(254,234,61,0.2)) padding-box, var(--win-gradient) padding-box, linear-gradient(#000 0%, rgba(0,0,0,0.1) 100%) border-box;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  width: 100%;
+  max-width: 480px;
+  position: relative;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.manifesto::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.8);
+}
+.manifesto-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  position: relative;
+}
+.manifesto-dots { display: flex; align-items: center; gap: 5px; }
+.manifesto-dot { width: 10px; height: 10px; border-radius: 50%; }
+.manifesto-title {
+  position: absolute;
+  top: 10px; left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-40);
+  letter-spacing: -0.03em;
+}
+.manifesto-title-ico {
+  width: 15px; height: 15px;
+  border-radius: 3.5px;
+  background: linear-gradient(#f7d64b 0%, #f7d64b 30%, #fff 30%, #fff 100%);
+  box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.18), 0 0.5px 1px rgba(0,0,0,0.15);
+  flex-shrink: 0;
+}
+.manifesto-doc {
+  background: #fff;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.manifesto-txt {
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  color: var(--ink-60);
+  text-transform: lowercase;
+  line-height: 1.5;
+}
+.manifesto-txt .ink {
+  color: var(--ink);
+  background: var(--yellow-soft);
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+.manifesto-sign {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-top: 8px;
+}
+.manifesto-who { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+.manifesto-av {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ffd8a8, #ffb380);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-weight: 600;
+  font-size: 16px;
+  box-shadow: 0 6.25px 15px rgba(0,0,0,0.12), inset 0 -9.375px 1.25px -7.5px rgba(255,255,255,0.25);
+}
+.manifesto-name { display: flex; flex-direction: column; gap: 8px; font-size: 16px; font-weight: 400; letter-spacing: -0.03em; text-transform: lowercase; }
+.manifesto-name .a { color: var(--ink); }
+.manifesto-name .b { color: var(--ink-60); }
+.manifesto-mark {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 40px;
+  color: var(--ink-60);
+  letter-spacing: -0.02em;
+}
+
+/* ── Data table ── */
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-40);
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ink-08);
+}
+.data-table td {
+  font-size: 13px;
+  color: var(--ink-60);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ink-08);
+}
+.data-table tr:hover td { background: rgba(0,0,0,0.02); color: var(--ink); }
+
+/* ── Progress ── */
+.progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--ink-08);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--blue);
+  border-radius: var(--r-pill);
+  transition: width 0.3s;
+}
+
+/* ── FAQ Accordion ── */
+.faq-item {
+  background: var(--bg-white);
+  border-radius: var(--r-md);
+  padding: 20px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s;
+}
+.faq-item:hover { box-shadow: var(--shadow-md); }
+.faq-row { display: flex; align-items: flex-start; gap: 16px; }
+.faq-q { font-size: 20px; font-weight: 500; letter-spacing: -0.03em; flex: 1; }
+.faq-icon { width: 20px; height: 20px; flex-shrink: 0; transition: transform 0.25s; }
+.faq-item.open .faq-icon { transform: rotate(45deg); }
+.faq-a-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s, opacity 0.3s;
+  opacity: 0;
+}
+.faq-item.open .faq-a-wrap { grid-template-rows: 1fr; opacity: 1; }
+.faq-a-clip { min-height: 0; overflow: hidden; }
+.faq-a {
+  font-size: 16px;
+  color: var(--ink-60);
+  letter-spacing: -0.03em;
+  line-height: 1.5;
+  margin-top: 8px;
+  max-width: 480px;
+}
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--ink-08); }
+.tab {
+  padding: 10px 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-40);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.15s;
+}
+.tab:hover { color: var(--ink-60); }
+.tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+/* ── Stepper ── */
+.stepper { display: flex; align-items: center; }
+.step { display: flex; align-items: center; gap: 8px; }
+.step-dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink-12);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-40);
+  background: var(--bg-white);
+}
+.step.active .step-dot { border-color: var(--blue); color: var(--blue); background: rgba(15,127,255,0.08); }
+.step.completed .step-dot { border-color: var(--green); background: var(--green); color: #fff; }
+.step-line { width: 32px; height: 1px; background: var(--ink-12); }
+.step-label { font-size: 12px; color: var(--ink-40); letter-spacing: -0.02em; }
+.step.active .step-label { color: var(--blue); font-weight: 500; }
+
+/* ── Alert ── */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--ink-12);
+  background: var(--bg-white);
+  box-shadow: var(--shadow-sm);
+}
+.alert.blue { border-color: rgba(15,127,255,0.3); background: rgba(15,127,255,0.06); }
+.alert.green { border-color: rgba(52,199,89,0.3); background: rgba(52,199,89,0.06); }
+.alert.orange { border-color: rgba(255,102,0,0.3); background: rgba(255,102,0,0.06); }
+.alert.red { border-color: rgba(255,59,48,0.3); background: rgba(255,59,48,0.06); }
+
+/* ── Breadcrumb / Pagination ── */
+.breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.breadcrumb-item { color: var(--ink-40); cursor: pointer; transition: color 0.12s; }
+.breadcrumb-item:hover { color: var(--ink); }
+.breadcrumb-item.active { color: var(--blue); font-weight: 500; }
+.breadcrumb-sep { color: var(--ink-24); }
+
+.pagination { display: flex; gap: 4px; }
+.page-btn {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  color: var(--ink-40);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.page-btn:hover { background: var(--ink-08); color: var(--ink); }
+.page-btn.active { background: var(--blue); color: #fff; }
+
+/* ── Tooltip ── */
+.tooltip-wrap { position: relative; display: inline-block; }
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.85);
+  color: #fff;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.tooltip-wrap:hover .tooltip { opacity: 1; }
+
+/* ── Avatars ── */
+.avatar {
+  width: 40px; height: 40px;
+  border-radius: var(--r-md);
+  background: rgba(0,0,0,0.06);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-60);
+  flex-shrink: 0;
+}
+.avatar.circle { border-radius: 50%; }
+.avatar-sm { width: 28px; height: 28px; font-size: 11px; }
+.avatar-lg { width: 56px; height: 56px; font-size: 18px; }
+.avatar.blue { background: var(--blue-grad); color: var(--blue-border); }
+.avatar.orange { background: var(--orange-grad); color: var(--orange-border); }
+.avatar.teal { background: var(--teal-grad); color: var(--teal-border); }
+
+/* ── Nav dots ── */
+.section-nav {
+  position: fixed;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 100;
+}
+.nav-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--ink-12);
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+.nav-dot:hover { background: var(--ink-40); }
+.nav-dot.active { background: var(--blue); transform: scale(1.3); }
+.nav-dot::after {
+  content: attr(data-label);
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-60);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.nav-dot:hover::after { opacity: 1; }
+
+/* ── Swatches ── */
+.swatch {
+  border-radius: var(--r-md);
+  padding: 16px;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid var(--ink-08);
+}
+.swatch-name { font-family: var(--font-mono); font-size: 12px; font-weight: 500; }
+.swatch-value { font-family: var(--font-mono); font-size: 11px; opacity: 0.7; }
+.swatch-role { font-size: 10px; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* ── Code block ── */
+.code-block {
+  background: #1a1a1a;
+  border-radius: var(--r-md);
+  padding: 20px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: #d4d4d4;
+  overflow-x: auto;
+}
+.code-block .kw { color: #569cd6; }
+.code-block .str { color: #ce9178; }
+.code-block .cm { color: #6a9955; }
+.code-block .fn { color: #dcdcaa; }
+.code-block .prop { color: #9cdcfe; }
+
+/* ── Liquid Glass ── */
+.liquid-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  border: var(--glass-border);
+  border-radius: var(--r-md);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.12), inset 0 1px 1px rgba(255,255,255,0.8);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Stat / KPI card ── */
+.stat-card {
+  background: var(--bg-white);
+  border: 1px solid var(--ink-08);
+  border-radius: var(--r-md);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+.stat-value { font-size: 32px; font-weight: 500; letter-spacing: -0.03em; margin: 8px 0 4px; }
+.stat-delta { font-family: var(--font-mono); font-size: 12px; }
+
+/* ── Feature row / waveform ── */
+.waveform { display: flex; align-items: center; gap: 10px; height: 28px; }
+.waveform i {
+  width: 8px;
+  background: var(--ink);
+  border-radius: 24px;
+  animation: wavePulse 1.8s ease-in-out infinite alternate;
+}
+.waveform i:nth-child(odd) { animation-duration: 1.4s; }
+.waveform i:nth-child(3n) { animation-duration: 2.1s; }
+.waveform i:nth-child(4n) { animation-duration: 1.1s; }
+@keyframes wavePulse {
+  0% { transform: scaleY(0.7); }
+  50% { transform: scaleY(1.15); }
+  100% { transform: scaleY(0.85); }
+}
+
+/* ── Nametag ── */
+.nametag {
+  background: #fff;
+  border: 1.4px solid #fff;
+  border-radius: 3px;
+  width: 96px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 0.7px 1.4px rgba(0,0,0,0.25);
+}
+.nametag-hdr {
+  background: #ed1b26;
+  color: #fff;
+  padding: 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5px;
+  line-height: 1;
+  font-size: 5.25px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.nametag-hdr .sm { font-weight: 500; }
+.nametag-body { height: 36px; background: #fff; display: flex; align-items: center; justify-content: center; }
+.nametag-ftr { height: 9px; background: #ed1b26; }
+.nametag.blue .nametag-hdr, .nametag.blue .nametag-ftr { background: #1b49ed; }
+
+/* ── Grid ── */
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.flex-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.flex-col { display: flex; flex-direction: column; gap: 12px; }
+
+/* ── Footer ── */
+.footer-note {
+  text-align: center;
+  padding: 48px 0 24px;
+  border-top: 2px dotted rgba(0,0,0,0.15);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-40);
+  letter-spacing: -0.03em;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .type-display, .page-header h1 { font-size: 36px; }
+  .section-nav { display: none; }
+}
+@media (max-width: 600px) {
+  body { padding: 24px 16px; }
+  .section-title { font-size: 24px; }
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--ink-12); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-24); }
+</style>
+</head>
+<body>
+
+<!-- Section navigation -->
+<nav class="section-nav">
+  <div class="nav-dot active" data-label="Overview" onclick="scrollToSection('overview')"></div>
+  <div class="nav-dot" data-label="Colors" onclick="scrollToSection('colors')"></div>
+  <div class="nav-dot" data-label="Typography" onclick="scrollToSection('typography')"></div>
+  <div class="nav-dot" data-label="Buttons" onclick="scrollToSection('buttons')"></div>
+  <div class="nav-dot" data-label="Inputs" onclick="scrollToSection('inputs')"></div>
+  <div class="nav-dot" data-label="Dropdowns" onclick="scrollToSection('dropdowns')"></div>
+  <div class="nav-dot" data-label="Selection" onclick="scrollToSection('selection')"></div>
+  <div class="nav-dot" data-label="Files" onclick="scrollToSection('files')"></div>
+  <div class="nav-dot" data-label="Windows" onclick="scrollToSection('windows')"></div>
+  <div class="nav-dot" data-label="Pills" onclick="scrollToSection('pills')"></div>
+  <div class="nav-dot" data-label="Pricing" onclick="scrollToSection('pricing')"></div>
+  <div class="nav-dot" data-label="Notes" onclick="scrollToSection('notes')"></div>
+  <div class="nav-dot" data-label="Icons" onclick="scrollToSection('icons')"></div>
+  <div class="nav-dot" data-label="Feedback" onclick="scrollToSection('feedback')"></div>
+  <div class="nav-dot" data-label="Navigation" onclick="scrollToSection('navigation')"></div>
+  <div class="nav-dot" data-label="Glass" onclick="scrollToSection('glass')"></div>
+  <div class="nav-dot" data-label="Layout" onclick="scrollToSection('layout')"></div>
+</nav>
+
+<div class="spec-container">
+
+  <!-- ═══ HEADER ═══ -->
+  <header class="page-header" id="overview">
+    <div class="plabel">Design System · v2.0</div>
+    <h1>heyclicky <span class="accent">design language</span></h1>
+    <p>an ai buddy that lives on your mac. warm cream canvas, playful window chrome, glossy pill buttons, liquid glass, and the signature pricing + notes windows.</p>
+    <div class="badges">
+      <span class="pill">canvas #f5f5f5</span>
+      <span class="pill blue">accent #0f7fff</span>
+      <span class="pill orange">highlight #feea3d</span>
+      <span class="pill teal">Inter · Geist Mono</span>
+    </div>
+  </header>
+
+  <!-- ═══ 01 · COLORS ═══ -->
+  <section class="section" id="colors">
+    <div class="section-header">
+      <span class="section-num">01</span>
+      <h2 class="section-title">Color palette</h2>
+    </div>
+    <div class="grid-auto">
+      <div class="swatch" style="background:#f5f5f5;">
+        <div class="swatch-name">canvas</div>
+        <div><div class="swatch-value">#f5f5f5</div><div class="swatch-role">Master background</div></div>
+      </div>
+      <div class="swatch" style="background:#ffffff;border-color:rgba(0,0,0,0.1);">
+        <div class="swatch-name">white</div>
+        <div><div class="swatch-value">#ffffff</div><div class="swatch-role">Cards / docs</div></div>
+      </div>
+      <div class="swatch" style="background:#000000;">
+        <div class="swatch-name" style="color:#fff;">ink</div>
+        <div><div class="swatch-value" style="color:#a0a0ab;">#000000</div><div class="swatch-role" style="color:#a0a0ab;">Primary text</div></div>
+      </div>
+      <div class="swatch" style="background:#0f7fff;">
+        <div class="swatch-name" style="color:#fff;">accent-blue</div>
+        <div><div class="swatch-value" style="color:rgba(255,255,255,0.8);">#0f7fff</div><div class="swatch-role" style="color:rgba(255,255,255,0.8);">Links / CTAs</div></div>
+      </div>
+      <div class="swatch" style="background:#feea3d;">
+        <div class="swatch-name">highlight</div>
+        <div><div class="swatch-value">#feea3d</div><div class="swatch-role">Text highlight</div></div>
+      </div>
+      <div class="swatch" style="background:#ff6600;">
+        <div class="swatch-name" style="color:#fff;">orange</div>
+        <div><div class="swatch-value" style="color:rgba(255,255,255,0.8);">#ff6600</div><div class="swatch-role">YC badge</div></div>
+      </div>
+      <div class="swatch" style="background:#34c759;">
+        <div class="swatch-name" style="color:#fff;">green</div>
+        <div><div class="swatch-value" style="color:rgba(255,255,255,0.8);">#34c759</div><div class="swatch-role">Success</div></div>
+      </div>
+      <div class="swatch" style="background:#ff3b30;">
+        <div class="swatch-name" style="color:#fff;">red</div>
+        <div><div class="swatch-value" style="color:rgba(255,255,255,0.8);">#ff3b30</div><div class="swatch-role">Error / close</div></div>
+      </div>
+    </div>
+    <div style="margin-top:16px;">
+      <div class="type-label" style="margin-bottom:8px;">Window chrome accents</div>
+      <div class="flex-row">
+        <div style="display:flex;align-items:center;gap:8px;"><span class="win-dot close"></span><span class="type-mono">#ff5f57</span></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span class="win-dot min"></span><span class="type-mono">#febc2e</span></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span class="win-dot zoom"></span><span class="type-mono">#28c840</span></div>
+      </div>
+    </div>
+    <div style="margin-top:16px;">
+      <div class="type-label" style="margin-bottom:8px;">Gradients</div>
+      <div class="grid-3" style="gap:12px;">
+        <div style="height:60px;border-radius:8px;background:var(--blue-grad);border:1px solid var(--blue-border);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px;">blue-grad</div>
+        <div style="height:60px;border-radius:8px;background:var(--orange-grad);border:1px solid var(--orange-border);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px;">orange-grad</div>
+        <div style="height:60px;border-radius:8px;background:var(--teal-grad);border:1px solid var(--teal-border);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px;">teal-grad</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 02 · TYPOGRAPHY ═══ -->
+  <section class="section" id="typography">
+    <div class="section-header">
+      <span class="section-num">02</span>
+      <h2 class="section-title">Typography</h2>
+    </div>
+    <div class="card">
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--ink-08);">
+          <div class="type-display">heyclicky</div>
+          <div class="type-label">display · 56px / 500 / -0.03em</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--ink-08);">
+          <div class="type-heading">The dream</div>
+          <div class="type-label">heading · 32px / 500 / -0.03em</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--ink-08);">
+          <div class="type-subheading">use your screen as context</div>
+          <div class="type-label">subheading · 20px / 500</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--ink-08);">
+          <div class="type-body" style="max-width:420px;">from fl studio to claude code, jump into any tool, ask questions and heyclicky draws on your screen and teaches you.</div>
+          <div class="type-label">body · 16px / 400 / 1.5</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--ink-08);">
+          <div class="type-serif">notes · founder</div>
+          <div class="type-label">serif italic · Instrument Serif</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--ink-08);">
+          <div class="type-mono">&lt; student discount &gt;</div>
+          <div class="type-label">mono · Geist Mono / 14px</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px;">
+          <div class="type-label">pricing · faq · feedback</div>
+          <div class="type-label">label · 12px / mono / uppercase</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 03 · BUTTONS ═══ -->
+  <section class="section" id="buttons">
+    <div class="section-header">
+      <span class="section-num">03</span>
+      <h2 class="section-title">Buttons</h2>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Platform variants</div>
+        <div class="flex-col">
+          <div class="flex-row">
+            <a class="btn mac" href="#" onclick="return false;"><iconify-icon icon="mdi:apple" width="20"></iconify-icon> download for mac</a>
+            <a class="btn win" href="#" onclick="return false;"><iconify-icon icon="mdi:microsoft-windows" width="20"></iconify-icon> windows waitlist</a>
+          </div>
+          <div class="btn-sub">100% free. sonoma 14.2 or higher</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Color variants</div>
+        <div class="flex-row">
+          <button class="btn blue">blue</button>
+          <button class="btn orange">orange</button>
+          <button class="btn teal">teal</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Sizes</div>
+        <div class="flex-row" style="align-items:center;">
+          <button class="btn win btn-sm">small</button>
+          <button class="btn win">default</button>
+          <button class="btn win btn-lg">large</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">With icons</div>
+        <div class="flex-row">
+          <button class="btn mac"><iconify-icon icon="mdi:download" width="20"></iconify-icon> download</button>
+          <button class="btn blue"><iconify-icon icon="mdi:play" width="20"></iconify-icon> play video</button>
+          <button class="btn orange"><iconify-icon icon="mdi:account-plus" width="20"></iconify-icon> join them</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 04 · INPUTS ═══ -->
+  <section class="section" id="inputs">
+    <div class="section-header">
+      <span class="section-num">04</span>
+      <h2 class="section-title">Inputs</h2>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Text inputs</div>
+        <div class="flex-col">
+          <div>
+            <label class="input-label">email address</label>
+            <input class="input-field" type="email" placeholder="you@school.edu">
+          </div>
+          <div>
+            <label class="input-label">full name</label>
+            <input class="input-field" type="text" placeholder="farza">
+          </div>
+          <div>
+            <label class="input-label">message</label>
+            <textarea class="input-field" rows="3" placeholder="tell us what you're building..."></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Input states & variants</div>
+        <div class="flex-col">
+          <div class="input-with-icon">
+            <iconify-icon icon="mdi:magnify" width="18" class="icon"></iconify-icon>
+            <input class="input-field" type="text" placeholder="search features...">
+          </div>
+          <input class="input-field" type="text" value="focused state" style="border-color:#0f7fff;box-shadow:0 0 0 3px rgba(15,127,255,0.12);">
+          <input class="input-field" type="text" placeholder="error state" style="border-color:#ff3b30;">
+          <input class="input-field" type="text" placeholder="disabled" disabled style="opacity:0.5;cursor:not-allowed;background:#fafafa;">
+          <div>
+            <label class="input-label">input with prefix</label>
+            <div style="display:flex;">
+              <span style="display:flex;align-items:center;padding:0 12px;background:#f5f5f5;border:1px solid rgba(0,0,0,0.15);border-right:none;border-radius:3px 0 0 3px;font-family:var(--font-mono);font-size:13px;color:var(--ink-40);">https://</span>
+              <input class="input-field" type="text" placeholder="heyclicky.com" style="border-radius:0 3px 3px 0;">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 05 · DROPDOWNS ═══ -->
+  <section class="section" id="dropdowns">
+    <div class="section-header">
+      <span class="section-num">05</span>
+      <h2 class="section-title">Custom dropdowns & selects</h2>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">heyclicky custom dropdown</div>
+        <div class="hc-dropdown" style="z-index:30;">
+          <div class="hc-dropdown-trigger" onclick="toggleHcDropdown(this)">
+            <span>Free plan</span>
+            <iconify-icon icon="mdi:chevron-down" width="18" style="color:var(--ink-40);"></iconify-icon>
+          </div>
+          <div class="hc-dropdown-menu" style="display:block;">
+            <div class="hc-dropdown-item active">Free plan <iconify-icon icon="mdi:check" style="color:var(--blue);"></iconify-icon></div>
+            <div class="hc-dropdown-item">Pro — $20/mo</div>
+            <div class="hc-dropdown-item">Max — $100/mo</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Native select</div>
+        <select class="input-field" style="appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22><path d=%22M4 6l4 4 4-4%22/></svg>');background-repeat:no-repeat;background-position:right 12px center;padding-right:36px;">
+          <option>United States</option>
+          <option>United Kingdom</option>
+          <option>Pakistan</option>
+          <option>India</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Billing period toggle</div>
+        <div style="display:inline-flex;align-items:center;gap:4px;background:rgba(0,0,0,0.04);padding:4px;border-radius:24px;">
+          <button class="btn blue btn-sm" style="border-radius:999px;">monthly</button>
+          <button class="btn win btn-sm" style="border-radius:999px;background:transparent;border-color:transparent;box-shadow:none;">yearly <span class="pill" style="height:20px;font-size:11px;padding:0 8px;margin-left:4px;">-20%</span></button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Multi-select chips</div>
+        <div class="flex-row">
+          <span class="pill blue" style="text-transform:none;">music <iconify-icon icon="mdi:close-circle" style="cursor:pointer;"></iconify-icon></span>
+          <span class="pill orange" style="text-transform:none;">agents <iconify-icon icon="mdi:close-circle" style="cursor:pointer;"></iconify-icon></span>
+          <span class="pill teal" style="text-transform:none;">screen context <iconify-icon icon="mdi:close-circle" style="cursor:pointer;"></iconify-icon></span>
+          <span class="pill" style="text-transform:none;border-style:dashed;cursor:pointer;">+ add</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 06 · SELECTION ═══ -->
+  <section class="section" id="selection">
+    <div class="section-header">
+      <span class="section-num">06</span>
+      <h2 class="section-title">Selection controls</h2>
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Toggle</div>
+        <div class="flex-col">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="toggle-track active" onclick="this.classList.toggle('active')"><div class="toggle-thumb"></div></div>
+            <span style="font-size:14px;color:var(--ink-60);">Auto-detect context</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="toggle-track" onclick="this.classList.toggle('active')"><div class="toggle-thumb"></div></div>
+            <span style="font-size:14px;color:var(--ink-60);">Sound effects</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Checkbox</div>
+        <div class="flex-col">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="checkbox checked" onclick="toggleCheck(this)"><iconify-icon icon="mdi:check" width="12" style="color:#fff;"></iconify-icon></div>
+            <span style="font-size:14px;color:var(--ink-60);">Remember my preference</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="checkbox" onclick="toggleCheck(this)"></div>
+            <span style="font-size:14px;color:var(--ink-60);">Send me updates</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Radio</div>
+        <div class="flex-col">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="radio checked" onclick="selectRadio(this)"></div>
+            <span style="font-size:14px;color:var(--ink-60);">Monthly</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="radio" onclick="selectRadio(this)"></div>
+            <span style="font-size:14px;color:var(--ink-60);">Yearly <span class="pill" style="height:18px;font-size:10px;padding:0 6px;">save 20%</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 07 · FILES ═══ -->
+  <section class="section" id="files">
+    <div class="section-header">
+      <span class="section-num">07</span>
+      <h2 class="section-title">File drag & drop</h2>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Dropzone</div>
+        <div class="dropzone" id="dropzone">
+          <div class="dropzone-icon">
+            <iconify-icon icon="mdi:cloud-upload-outline" width="24"></iconify-icon>
+          </div>
+          <div style="font-size:16px;font-weight:500;color:var(--ink);margin-bottom:4px;">Drop files here</div>
+          <div style="font-size:13px;color:var(--ink-40);margin-bottom:16px;">or click to browse · png, jpg, mov up to 50MB</div>
+          <button class="btn win btn-sm">browse files</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Uploaded files</div>
+        <div class="flex-col">
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fafafa;border:1px solid var(--ink-08);border-radius:8px;">
+            <iconify-icon icon="mdi:file-image" style="color:var(--blue);" width="20"></iconify-icon>
+            <div style="flex:1;">
+              <div style="font-size:13px;color:var(--ink);">hero-hello-poster.webp</div>
+              <div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-40);">248 KB · complete</div>
+            </div>
+            <span class="pill green" style="height:20px;font-size:10px;">done</span>
+            <iconify-icon icon="mdi:trash-can-outline" style="color:var(--ink-40);cursor:pointer;" width="16"></iconify-icon>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fafafa;border:1px solid var(--ink-08);border-radius:8px;">
+            <iconify-icon icon="mdi:file-video" style="color:var(--blue);" width="20"></iconify-icon>
+            <div style="flex:1;">
+              <div style="font-size:13px;color:var(--ink);">hello.mov</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+                <div class="progress-track" style="flex:1;"><div class="progress-fill" style="width:65%;"></div></div>
+                <span style="font-family:var(--font-mono);font-size:11px;color:var(--ink-40);">65%</span>
+              </div>
+            </div>
+            <iconify-icon icon="mdi:close-circle-outline" style="color:var(--ink-40);cursor:pointer;" width="16"></iconify-icon>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 08 · WINDOWS ═══ -->
+  <section class="section" id="windows">
+    <div class="section-header">
+      <span class="section-num">08</span>
+      <h2 class="section-title">Window chrome (macOS signature)</h2>
+    </div>
+    <div class="grid-3">
+      <div>
+        <div class="win">
+          <div class="win-bar">
+            <div class="win-dots"><span class="win-dot close"></span><span class="win-dot min"></span><span class="win-dot zoom"></span></div>
+          </div>
+          <div class="win-screen" style="height:120px;display:flex;align-items:center;justify-content:center;color:var(--ink-40);font-family:var(--font-mono);font-size:11px;">window content</div>
+        </div>
+        <div class="win-caption">win · default</div>
+      </div>
+      <div>
+        <div class="win">
+          <div class="win-bar">
+            <div class="win-dots"><span class="win-dot close"></span><span class="win-dot min"></span><span class="win-dot zoom"></span></div>
+            <div class="win-title">Notes</div>
+          </div>
+          <div class="win-screen" style="height:120px;display:flex;align-items:center;justify-content:center;color:var(--ink-40);font-family:var(--font-mono);font-size:11px;">with title</div>
+        </div>
+        <div class="win-caption">win · titled</div>
+      </div>
+      <div>
+        <div class="liquid-glass" style="padding:8px 4px 4px;">
+          <div class="win-bar">
+            <div class="win-dots"><span class="win-dot close"></span><span class="win-dot min"></span><span class="win-dot zoom"></span></div>
+          </div>
+          <div style="background:#fff;border-radius:4px;padding:16px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-40);">liquid glass</div>
+        </div>
+        <div class="win-caption">win · liquid glass</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 09 · PILLS & BUBBLES ═══ -->
+  <section class="section" id="pills">
+    <div class="section-header">
+      <span class="section-num">09</span>
+      <h2 class="section-title">Pills, bubbles & waveform</h2>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Pills (labels / badges)</div>
+        <div class="flex-row">
+          <span class="pill">default</span>
+          <span class="pill blue">blue</span>
+          <span class="pill orange">orange</span>
+          <span class="pill teal">teal</span>
+          <span class="pill green">success</span>
+          <span class="pill red">error</span>
+          <span class="pill dark">dark</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Speech bubbles (feature convo)</div>
+        <div class="flex-col">
+          <div class="bubble blue">heyclicky</div>
+          <div class="bubble orange" style="align-self:flex-start;">help me make music on fl studio</div>
+          <div class="bubble teal">spawn agents with your voice</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Waveform (voice indicator)</div>
+        <div class="waveform">
+          <i style="height:50.8%"></i><i style="height:37.4%"></i><i style="height:77.8%"></i><i style="height:44.5%"></i>
+          <i style="height:56.5%"></i><i style="height:35.9%"></i><i style="height:36.1%"></i><i style="height:34.7%"></i>
+          <i style="height:34.4%"></i><i style="height:31.3%"></i><i style="height:63.1%"></i><i style="height:44.2%"></i>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Nametags (stickers)</div>
+        <div class="flex-row" style="gap:20px;">
+          <div class="nametag">
+            <div class="nametag-hdr">
+              <div>Hello</div>
+              <div class="sm">my name is</div>
+            </div>
+            <div class="nametag-body" style="font-size:20px;">😎</div>
+            <div class="nametag-ftr"></div>
+          </div>
+          <div class="nametag blue">
+            <div class="nametag-hdr">
+              <div>Hello</div>
+              <div class="sm">my name is</div>
+            </div>
+            <div class="nametag-body" style="font-size:20px;">🎨</div>
+            <div class="nametag-ftr"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 10 · PRICING CARDS ═══ -->
+  <section class="section" id="pricing">
+    <div class="section-header">
+      <span class="section-num">10</span>
+      <h2 class="section-title">Pricing cards (signature component)</h2>
+    </div>
+    <div class="pricing-grid">
+      <!-- Free -->
+      <div class="pr-card">
+        <div class="pr-card-bar">
+          <div class="win-dots"><span class="win-dot close"></span><span class="win-dot min"></span><span class="win-dot zoom"></span></div>
+        </div>
+        <div class="pr-card-body">
+          <div class="pr-card-head"><div class="pr-card-title">free</div></div>
+          <div class="pr-card-tag">
+            <div class="pr-card-tagline">see what the fuss is about.</div>
+            <div class="pr-card-subtag">best for trying it out</div>
+          </div>
+          <div class="pr-divider"></div>
+          <div class="pr-price-block">
+            <div class="pr-price-char">$0</div>
+            <div class="pr-price-note">free forever, no card needed</div>
+            <button class="btn win" style="justify-content:center;height:40px;margin-top:16px;padding:0 20px 1px;">start free</button>
+          </div>
+          <div class="pr-divider"></div>
+          <div class="pr-inc">
+            <div class="pr-inc-label">includes</div>
+            <div class="pr-inc-row"><span class="pr-inc-check"><iconify-icon icon="mdi:check" width="12"></iconify-icon></span><span class="pr-inc-text">25 talk messages a month</span></div>
+            <div class="pr-inc-row"><span class="pr-inc-check"><iconify-icon icon="mdi:check" width="12"></iconify-icon></span><span class="pr-inc-text">plenty of dictation</span></div>
+            <div class="pr-inc-row"><span class="pr-inc-check"><iconify-icon icon="mdi:check" width="12"></iconify-icon></span><span class="pr-inc-text">25 agent messages a month</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pro (popular) -->
+      <div class="pr-card pr-card-pro">
+        <div class="pr-badge">popular</div>
+        <div class="pr-card-bar">
+          <div class="win-dots"><span class="win-dot close"></span><span class="win-dot min"></span><span class="win-dot zoom"></span></div>
+        </div>
+        <div class="pr-card-body">
+          <div class="pr-card-head"><div class="pr-card-title">pro</div></div>
+          <div class="pr-card-tag">
+            <div class="pr-card-tagline">talk as much as you want.</div>
+            <div class="pr-card-subtag">best for everyday use</div>
+          </div>
+          <div class="pr-divider"></div>
+          <div class="pr-price-block">
+            <div class="pr-price-char">$20</div>
+            <div class="pr-price-note">per month, billed monthly</div>
+            <button class="btn mac" style="justify-content:center;height:40px;margin-top:16px;padding:0 20px 1px;">get pro</button>
+          </div>
+          <div class="pr-divider"></div>
+          <div class="pr-inc">
+            <div class="pr-inc-label">includes</div>
+            <div class="pr-inc-row"><span class="pr-inc-check"><iconify-icon icon="mdi:check" width="12"></iconify-icon></span><span class="pr-inc-text">unlimited talk</span></div>
+            <div class="pr-inc-row"><span class="pr-inc-check"><iconify-icon icon="mdi:check" width="12"></iconify-icon></span><span class="pr-inc-text">unlimited dictation</span></div>
+            <div class="pr-inc-row"><span class="pr-inc-check"><iconify-icon icon="mdi:check" width="12"></iconify-icon></span><span class="pr-inc-text">150 agent messages a month</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Max -->
+      <div class="pr-card pr-card-max">
+        <div class="pr-card-bar">
+          <div class="win-dots"><span class="win-dot close"></span><span class="win-dot min"></span><span class="win-dot zoom"></span></div>
+        </div>
+        <div class="pr-card-body">
+          <div class="pr-card-head"><div class="pr-card-title">max</div></div>
+          <div class="pr-card-tag">
+            <div class="pr-card-tagline">all the hands you need.</div>
+            <div class="pr-card-subtag">best for power users</div>
+          </div>
+          <div class="pr-divider"></div>
+          <div class="pr-price-block">
+            <div class="pr-price-char">$100</div>
+            <div class="pr-price-note">per month, billed monthly</div>
+            <button class="btn win" style="justify-content:center;height:40px;margin-top:16px;padding:0 20px 1px;">get max</button>
+          </div>
+          <div class="pr-divider"></div>
+          <div class="pr-inc">
+            <div class="pr-inc-label">includes</div>
+            <div class="pr-inc-row"><span class="pr-inc-check"><iconify-icon icon="mdi:check" width="12"></iconify-icon></span><span class="pr-inc-text">unlimited talk</span></div>
+            <div class="pr-inc-row"><span class="pr-inc-check"><iconify-icon icon="mdi:check" width="12"></iconify-icon></span><span class="pr-inc-text">unlimited dictation</span></div>
+            <div class="pr-inc-row"><span class="pr-inc-check"><iconify-icon icon="mdi:check" width="12"></iconify-icon></span><span class="pr-inc-text">1,000 agent messages a month</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Billing toggle -->
+    <div style="margin-top:24px;display:flex;justify-content:center;">
+      <div style="display:inline-flex;align-items:center;gap:4px;background:rgba(0,0,0,0.04);padding:4px;border-radius:24px;">
+        <button class="btn blue btn-sm" style="border-radius:999px;">monthly</button>
+        <button class="btn win btn-sm" style="border-radius:999px;background:transparent;border-color:transparent;box-shadow:none;">yearly <span class="pill" style="height:20px;font-size:11px;padding:0 8px;margin-left:4px;">-20%</span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 11 · NOTES / MANIFESTO WINDOW ═══ -->
+  <section class="section" id="notes">
+    <div class="section-header">
+      <span class="section-num">11</span>
+      <h2 class="section-title">Notes / manifesto window (signature)</h2>
+    </div>
+    <div class="grid-2">
+      <div class="manifesto">
+        <div class="manifesto-titlebar">
+          <div class="manifesto-dots">
+            <span class="win-dot close"></span>
+            <span class="win-dot min"></span>
+            <span class="win-dot zoom"></span>
+          </div>
+          <div class="manifesto-title">
+            <span class="manifesto-title-ico"></span>
+            notes
+          </div>
+        </div>
+        <div class="manifesto-doc">
+          <p class="manifesto-txt">we all have access to the same ai models, yet very few of us unlock their full power!</p>
+          <p class="manifesto-txt">we just believe it's an interface problem.</p>
+          <p class="manifesto-txt">we wanna take the same frontier models everyone else is using, and make it so this technology can <span class="ink">break out of uninspired chat interfaces and clunky terminals.</span></p>
+          <p class="manifesto-txt">it's early! try out what we have today and lmk what you think.</p>
+          <div class="manifesto-sign">
+            <a class="manifesto-who" href="#" onclick="return false;">
+              <div class="manifesto-av">F</div>
+              <div class="manifesto-name">
+                <span class="a">farza,</span>
+                <span class="b">founder</span>
+              </div>
+            </a>
+            <span class="manifesto-mark">heyclicky</span>
+          </div>
+        </div>
+      </div>
+      <div class="manifesto" style="background:linear-gradient(rgba(254,234,61,0.2), rgba(254,234,61,0.2)) padding-box, var(--win-gradient) padding-box, linear-gradient(#000 0%, rgba(0,0,0,0.1) 100%) border-box;">
+        <div class="manifesto-titlebar">
+          <div class="manifesto-dots">
+            <span class="win-dot close"></span>
+            <span class="win-dot min"></span>
+            <span class="win-dot zoom"></span>
+          </div>
+          <div class="manifesto-title">
+            <span class="manifesto-title-ico"></span>
+            student-discount
+          </div>
+        </div>
+        <div class="manifesto-doc">
+          <p class="manifesto-txt">&lt; student discount &gt; if you're a student, show us your school email or student id! we'll give you <span class="ink">50% off your first month on pro</span> to help you out.</p>
+          <div class="manifesto-sign">
+            <a class="manifesto-who" href="#" onclick="return false;">
+              <div class="manifesto-av" style="background:linear-gradient(135deg, #9ec5ff, #d2f1f7);color:#221898;">S</div>
+              <div class="manifesto-name">
+                <span class="a">students,</span>
+                <span class="b">reach out</span>
+              </div>
+            </a>
+            <button class="btn win btn-sm">reach out</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 12 · ICONS & BACKGROUND ASSETS ═══ -->
+  <section class="section" id="icons">
+    <div class="section-header">
+      <span class="section-num">12</span>
+      <h2 class="section-title">Icons & background assets</h2>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Icons (iconify / mdi)</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:12px;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px;background:#fafafa;border-radius:8px;">
+            <iconify-icon icon="mdi:apple" width="24"></iconify-icon>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-40);">apple</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px;background:#fafafa;border-radius:8px;">
+            <iconify-icon icon="mdi:microsoft-windows" width="24"></iconify-icon>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-40);">windows</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px;background:#fafafa;border-radius:8px;">
+            <iconify-icon icon="mdi:download" width="24"></iconify-icon>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-40);">download</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px;background:#fafafa;border-radius:8px;">
+            <iconify-icon icon="mdi:play" width="24"></iconify-icon>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-40);">play</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px;background:#fafafa;border-radius:8px;">
+            <iconify-icon icon="mdi:account-plus" width="24"></iconify-icon>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-40);">follow</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px;background:#fafafa;border-radius:8px;">
+            <iconify-icon icon="mdi:cloud-upload-outline" width="24"></iconify-icon>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-40);">upload</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px;background:#fafafa;border-radius:8px;">
+            <iconify-icon icon="mdi:check-circle" width="24"></iconify-icon>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-40);">check</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px;background:#fafafa;border-radius:8px;">
+            <iconify-icon icon="mdi:close-circle" width="24"></iconify-icon>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-40);">close</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px;background:#fafafa;border-radius:8px;">
+            <iconify-icon icon="mdi:magnify" width="24"></iconify-icon>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-40);">search</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px;background:#fafafa;border-radius:8px;">
+            <iconify-icon icon="mdi:chevron-down" width="24"></iconify-icon>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-40);">chevron</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px;background:#fafafa;border-radius:8px;">
+            <iconify-icon icon="mdi:trash-can-outline" width="24"></iconify-icon>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-40);">trash</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px;background:#fafafa;border-radius:8px;">
+            <iconify-icon icon="mdi:file-image" width="24"></iconify-icon>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-40);">image</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Background assets (emoji / stickers)</div>
+        <div class="grid-3" style="gap:12px;">
+          <div style="height:80px;border-radius:8px;background:#fafafa;display:flex;align-items:center;justify-content:center;font-size:32px;">🌊</div>
+          <div style="height:80px;border-radius:8px;background:#fafafa;display:flex;align-items:center;justify-content:center;font-size:32px;">🌸</div>
+          <div style="height:80px;border-radius:8px;background:#fafafa;display:flex;align-items:center;justify-content:center;font-size:32px;">🐱</div>
+          <div style="height:80px;border-radius:8px;background:#fafafa;display:flex;align-items:center;justify-content:center;font-size:32px;">✨</div>
+          <div style="height:80px;border-radius:8px;background:#fafafa;display:flex;align-items:center;justify-content:center;font-size:32px;">🎨</div>
+          <div style="height:80px;border-radius:8px;background:#fafafa;display:flex;align-items:center;justify-content:center;font-size:32px;">🚀</div>
+        </div>
+        <div class="type-label" style="margin:16px 0 8px;">Kaomoji (text stickers)</div>
+        <div class="flex-row" style="gap:20px;">
+          <div style="font-size:24px;letter-spacing:-0.03em;transform:rotate(-8deg);">^ ω ^</div>
+          <div style="font-size:24px;letter-spacing:-0.03em;transform:rotate(7deg);">{ ^-^ }</div>
+          <div style="font-size:16px;letter-spacing:-0.03em;transform:rotate(-7deg);">(¬_¬)</div>
+          <div style="font-size:16px;letter-spacing:-0.03em;transform:rotate(-7deg);">¯\_(ツ)_/¯</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 13 · FEEDBACK ═══ -->
+  <section class="section" id="feedback">
+    <div class="section-header">
+      <span class="section-num">13</span>
+      <h2 class="section-title">Feedback & status</h2>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Alerts</div>
+        <div class="flex-col">
+          <div class="alert blue">
+            <iconify-icon icon="mdi:information-outline" style="color:var(--blue);" width="20"></iconify-icon>
+            <div><div style="font-size:14px;font-weight:500;">Update available</div><div style="font-size:13px;color:var(--ink-60);">heyclicky v2.4 is ready to download.</div></div>
+          </div>
+          <div class="alert green">
+            <iconify-icon icon="mdi:check-circle-outline" style="color:var(--green);" width="20"></iconify-icon>
+            <div><div style="font-size:14px;font-weight:500;">Payment successful</div><div style="font-size:13px;color:var(--ink-60);">Your pro subscription is now active.</div></div>
+          </div>
+          <div class="alert orange">
+            <iconify-icon icon="mdi:alert-outline" style="color:var(--orange);" width="20"></iconify-icon>
+            <div><div style="font-size:14px;font-weight:500;">Agent limit reached</div><div style="font-size:13px;color:var(--ink-60);">Talk keeps working. Agents pause till next cycle.</div></div>
+          </div>
+          <div class="alert red">
+            <iconify-icon icon="mdi:close-circle-outline" style="color:var(--red);" width="20"></iconify-icon>
+            <div><div style="font-size:14px;font-weight:500;">Connection lost</div><div style="font-size:13px;color:var(--ink-60);">Check your internet and try again.</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Tooltip, progress & stats</div>
+        <div class="flex-col">
+          <div class="tooltip-wrap">
+            <button class="btn win btn-sm">hover for tooltip</button>
+            <div class="tooltip">heyclicky is free forever</div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+              <span class="type-mono">talk usage</span>
+              <span class="type-mono" style="color:var(--ink-40);">unlimited</span>
+            </div>
+            <div class="progress-track"><div class="progress-fill" style="width:100%;background:var(--green);"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+              <span class="type-mono">agent messages</span>
+              <span class="type-mono" style="color:var(--ink-40);">87 / 150</span>
+            </div>
+            <div class="progress-track"><div class="progress-fill" style="width:58%;"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-top:24px;">
+      <div class="stat-card">
+        <div class="type-label">active users</div>
+        <div class="stat-value">25,000+</div>
+        <div class="stat-delta" style="color:var(--green);">↑ 12.4%</div>
+      </div>
+      <div class="stat-card">
+        <div class="type-label">agents spawned</div>
+        <div class="stat-value">1.2M</div>
+        <div class="stat-delta" style="color:var(--green);">↑ 8.1%</div>
+      </div>
+      <div class="stat-card">
+        <div class="type-label">avg. rating</div>
+        <div class="stat-value">4.9</div>
+        <div class="stat-delta" style="color:var(--green);">⭐ 2,847 reviews</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 14 · NAVIGATION ═══ -->
+  <section class="section" id="navigation">
+    <div class="section-header">
+      <span class="section-num">14</span>
+      <h2 class="section-title">Navigation</h2>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Tabs</div>
+        <div class="tabs">
+          <div class="tab active" onclick="switchTab(this)">features</div>
+          <div class="tab" onclick="switchTab(this)">pricing</div>
+          <div class="tab" onclick="switchTab(this)">changelog</div>
+          <div class="tab" onclick="switchTab(this)">trust</div>
+        </div>
+        <div style="margin-top:16px;">
+          <div class="type-label" style="margin-bottom:8px;">Breadcrumb</div>
+          <div class="breadcrumb">
+            <span class="breadcrumb-item">home</span>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-item">pricing</span>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-item active">pro plan</span>
+          </div>
+        </div>
+        <div style="margin-top:16px;">
+          <div class="type-label" style="margin-bottom:8px;">Pagination</div>
+          <div class="pagination">
+            <div class="page-btn">‹</div>
+            <div class="page-btn active">1</div>
+            <div class="page-btn">2</div>
+            <div class="page-btn">3</div>
+            <div class="page-btn">›</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Stepper</div>
+        <div class="stepper">
+          <div class="step completed"><div class="step-dot"><iconify-icon icon="mdi:check" width="14"></iconify-icon></div><span class="step-label">download</span></div>
+          <div class="step-line"></div>
+          <div class="step active"><div class="step-dot">2</div><span class="step-label">install</span></div>
+          <div class="step-line"></div>
+          <div class="step"><div class="step-dot">3</div><span class="step-label">talk</span></div>
+        </div>
+        <div style="margin-top:24px;">
+          <div class="type-label" style="margin-bottom:8px;">FAQ accordion</div>
+          <div class="faq-item open" onclick="toggleFaq(this)">
+            <div class="faq-row">
+              <div class="faq-q">what is heyclicky?</div>
+              <iconify-icon icon="mdi:plus" class="faq-icon" style="color:var(--ink);"></iconify-icon>
+            </div>
+            <div class="faq-a-wrap">
+              <div class="faq-a-clip"><div class="faq-a">an ai buddy that lives on your mac. press the hotkey and it sees what you see.</div></div>
+            </div>
+          </div>
+          <div class="faq-item" onclick="toggleFaq(this)">
+            <div class="faq-row">
+              <div class="faq-q">is my data private?</div>
+              <iconify-icon icon="mdi:plus" class="faq-icon" style="color:var(--ink);"></iconify-icon>
+            </div>
+            <div class="faq-a-wrap">
+              <div class="faq-a-clip"><div class="faq-a">yes. we only see your screen when you press the hotkey.</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 15 · LIQUID GLASS ═══ -->
+  <section class="section" id="glass">
+    <div class="section-header">
+      <span class="section-num">15</span>
+      <h2 class="section-title">Liquid glass</h2>
+    </div>
+    <div class="grid-2">
+      <div class="liquid-glass">
+        <div class="type-label" style="margin-bottom:8px;">glass card</div>
+        <div style="font-size:20px;font-weight:500;letter-spacing:-0.03em;">heyclicky, your way</div>
+        <div style="font-size:14px;color:var(--ink-60);margin-top:4px;">three simple plans, cancel anytime.</div>
+      </div>
+      <div class="liquid-glass" style="display:flex;align-items:center;gap:16px;">
+        <div style="width:80px;height:80px;border-radius:16px;background:var(--blue-grad);border:1px solid var(--blue-border);flex-shrink:0;"></div>
+        <div>
+          <span class="pill blue" style="margin-bottom:8px;">popular</span>
+          <div style="font-size:28px;font-weight:500;letter-spacing:-0.03em;margin-top:8px;">$20<span style="font-size:14px;color:var(--ink-40);">/mo</span></div>
+          <div style="font-size:13px;color:var(--ink-60);">per month, billed monthly</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:16px;">
+      <div class="type-label" style="margin-bottom:8px;">Used on: nav pills, pricing cards, modals, toggle switchers</div>
+      <div class="code-block">
+<span class="cm">/* liquid glass recipe */</span>
+<span class="fn">background</span>: <span class="str">linear-gradient(rgba(255,255,255,0.30), rgba(231,231,231,0.30) 42%, rgba(251,251,251,0.30))</span>;
+<span class="fn">backdrop-filter</span>: <span class="str">blur(12px) saturate(1.4)</span>;
+<span class="fn">border</span>: <span class="str">1px solid #626262</span>;
+<span class="fn">box-shadow</span>: <span class="str">0 10px 24px rgba(0,0,0,0.12), inset 0 1px 1px rgba(255,255,255,0.8)</span>;
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 16 · LAYOUT ═══ -->
+  <section class="section" id="layout">
+    <div class="section-header">
+      <span class="section-num">16</span>
+      <h2 class="section-title">Layout, spacing & radii</h2>
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Spacing scale</div>
+        <div class="flex-col">
+          <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#fafafa;border-radius:4px;"><span class="type-mono">4px</span><span class="type-mono" style="color:var(--ink-40);">xs</span></div>
+          <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#fafafa;border-radius:4px;"><span class="type-mono">8px</span><span class="type-mono" style="color:var(--ink-40);">sm</span></div>
+          <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#fafafa;border-radius:4px;"><span class="type-mono">12px</span><span class="type-mono" style="color:var(--ink-40);">md</span></div>
+          <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#fafafa;border-radius:4px;"><span class="type-mono">16px</span><span class="type-mono" style="color:var(--ink-40);">lg</span></div>
+          <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#fafafa;border-radius:4px;"><span class="type-mono">24px</span><span class="type-mono" style="color:var(--ink-40);">xl</span></div>
+          <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#fafafa;border-radius:4px;"><span class="type-mono">32px</span><span class="type-mono" style="color:var(--ink-40);">2xl</span></div>
+          <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--yellow-soft);border-radius:4px;"><span class="type-mono">48px</span><span class="type-mono" style="color:var(--ink-40);">section</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Border radii</div>
+        <div class="flex-row" style="align-items:flex-end;gap:16px;">
+          <div style="text-align:center;"><div style="width:56px;height:56px;background:#fafafa;border:1px solid var(--ink-12);border-radius:3px;"></div><div class="type-mono" style="color:var(--ink-40);margin-top:6px;font-size:11px;">3px</div></div>
+          <div style="text-align:center;"><div style="width:56px;height:56px;background:#fafafa;border:1px solid var(--ink-12);border-radius:8px;"></div><div class="type-mono" style="color:var(--ink-40);margin-top:6px;font-size:11px;">8px</div></div>
+          <div style="text-align:center;"><div style="width:56px;height:56px;background:#fafafa;border:1px solid var(--ink-12);border-radius:12px;"></div><div class="type-mono" style="color:var(--ink-40);margin-top:6px;font-size:11px;">12px</div></div>
+          <div style="text-align:center;"><div style="width:56px;height:56px;background:#fafafa;border:1px solid var(--ink-12);border-radius:16px;"></div><div class="type-mono" style="color:var(--ink-40);margin-top:6px;font-size:11px;">16px</div></div>
+          <div style="text-align:center;"><div style="width:56px;height:56px;background:#fafafa;border:1px solid var(--ink-12);border-radius:50%;"></div><div class="type-mono" style="color:var(--ink-40);margin-top:6px;font-size:11px;">full</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="type-label" style="margin-bottom:16px;">Grid columns</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;">
+          <div style="background:#fafafa;border-radius:4px;padding:16px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-40);">1</div>
+          <div style="background:#fafafa;border-radius:4px;padding:16px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-40);">2</div>
+          <div style="background:#fafafa;border-radius:4px;padding:16px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-40);">3</div>
+          <div style="background:#fafafa;border-radius:4px;padding:16px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-40);">4</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;">
+          <div style="background:#fafafa;border-radius:4px;padding:16px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-40);">1</div>
+          <div style="background:#fafafa;border-radius:4px;padding:16px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-40);">2</div>
+          <div style="background:#fafafa;border-radius:4px;padding:16px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-40);">3</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+          <div style="background:#fafafa;border-radius:4px;padding:16px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-40);">1</div>
+          <div style="background:#fafafa;border-radius:4px;padding:16px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-40);">2</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data table -->
+    <div class="card" style="margin-top:24px;">
+      <div class="type-label" style="margin-bottom:16px;">Data table</div>
+      <table class="data-table">
+        <thead>
+          <tr><th>Plan</th><th>Talk</th><th>Agents</th><th>Price</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Free</td><td>25 / month</td><td>25 / month</td><td>$0</td></tr>
+          <tr><td>Pro</td><td>unlimited</td><td>150 / month</td><td>$20 / mo</td></tr>
+          <tr><td>Max</td><td>unlimited</td><td>1,000 / month</td><td>$100 / mo</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Avatars -->
+    <div class="card" style="margin-top:24px;">
+      <div class="type-label" style="margin-bottom:16px;">Avatars</div>
+      <div class="flex-row">
+        <div class="avatar">F</div>
+        <div class="avatar circle">G</div>
+        <div class="avatar avatar-sm">L</div>
+        <div class="avatar avatar-lg circle">W</div>
+        <div class="avatar blue">B</div>
+        <div class="avatar orange">O</div>
+        <div class="avatar teal">T</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FOOTER ═══ -->
+  <div class="footer-note">
+    heyclicky design system · v2.0 · extracted from clickyhey.html · canvas #f5f5f5 · accent #0f7fff · Inter + Geist Mono + Instrument Serif
+  </div>
+
+</div>
+
+<script>
+// ── Section nav ──
+const sections = ['overview','colors','typography','buttons','inputs','dropdowns','selection','files','windows','pills','pricing','notes','icons','feedback','navigation','glass','layout'];
+const dots = document.querySelectorAll('.nav-dot');
+const labelsMap = {overview:'Overview',colors:'Colors',typography:'Typography',buttons:'Buttons',inputs:'Inputs',dropdowns:'Dropdowns',selection:'Selection',files:'Files',windows:'Windows',pills:'Pills',pricing:'Pricing',notes:'Notes',icons:'Icons',feedback:'Feedback',navigation:'Navigation',glass:'Glass',layout:'Layout'};
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.getBoundingClientRect().top < window.innerHeight / 2) current = id;
+  });
+  dots.forEach(d => d.classList.remove('active'));
+  dots.forEach(d => {
+    if (d.getAttribute('data-label') === labelsMap[current]) d.classList.add('active');
+  });
+});
+function scrollToSection(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── heyclicky custom dropdown ──
+function toggleHcDropdown(trigger) {
+  const menu = trigger.nextElementSibling;
+  if (menu) {
+    const isOpen = menu.style.display !== 'none';
+    document.querySelectorAll('.hc-dropdown-menu').forEach(m => m.style.display = 'none');
+    menu.style.display = isOpen ? 'none' : 'block';
+  }
+}
+document.querySelectorAll('.hc-dropdown-item').forEach(item => {
+  item.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const menu = item.closest('.hc-dropdown-menu');
+    if (menu) {
+      menu.querySelectorAll('.hc-dropdown-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      const trigger = menu.previousElementSibling;
+      if (trigger) trigger.querySelector('span').textContent = item.textContent.trim().replace(/\s+/g, ' ');
+      menu.style.display = 'none';
+    }
+  });
+});
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.hc-dropdown')) {
+    document.querySelectorAll('.hc-dropdown-menu').forEach(m => m.style.display = 'none');
+  }
+});
+
+// ── Toggle / checkbox / radio ──
+function toggleCheck(el) {
+  el.classList.toggle('checked');
+  if (el.classList.contains('checked')) {
+    el.innerHTML = '<iconify-icon icon="mdi:check" width="12" style="color:#fff;"></iconify-icon>';
+  } else {
+    el.innerHTML = '';
+  }
+}
+function selectRadio(el) {
+  document.querySelectorAll('.radio').forEach(r => r.classList.remove('checked'));
+  el.classList.add('checked');
+}
+
+// ── Tabs ──
+function switchTab(tab) {
+  const parent = tab.closest('.tabs');
+  if (parent) {
+    parent.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+  }
+}
+
+// ── FAQ accordion ──
+function toggleFaq(item) {
+  const isOpen = item.classList.contains('open');
+  document.querySelectorAll('.faq-item').forEach(other => {
+    if (other !== item) other.classList.remove('open');
+  });
+  item.classList.toggle('open', !isOpen);
+}
+
+// ── Dropzone drag events ──
+const dz = document.getElementById('dropzone');
+if (dz) {
+  ['dragenter','dragover'].forEach(ev => {
+    dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('dragover'); });
+  });
+  ['dragleave','drop'].forEach(ev => {
+    dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('dragover'); });
+  });
+}
+
+// ── Page dot toggles ──
+document.querySelectorAll('.toggle-track').forEach(t => {
+  t.addEventListener('click', () => t.classList.toggle('active'));
+});
+</script>
+
+</body>
+</html>

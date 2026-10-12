@@ -328,7 +328,7 @@
           <div class="command-input-container" style="margin-top: 6px;">
             <input type="text" class="command-input-field" id="user-input" placeholder="Ask ZEZO or enter command..." onkeydown="if(event.key==='Enter') executeCommand()">
             <button class="command-send-btn" onclick="executeCommand()" title="Send Prompt (Enter)">
-              <iconify-icon icon="solar:arrow-right-linear" style="font-size: 13px;"></iconify-icon>
+              <iconify-icon icon="solar:arrow-up-linear" style="font-size: 14px; font-weight: bold;"></iconify-icon>
             </button>
           </div>
 
@@ -650,36 +650,6 @@
             <span>SKILL HUB</span>
           </button>
 
-        <!-- ── 15. CLI & CODING AGENT PREFERENCES ── -->
-        <div style="border-top: 1px solid var(--border-subtle); margin-top: 6px; padding-top: 10px; display: flex; flex-direction: column; gap: 8px;">
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 5px;">
-              <iconify-icon icon="solar:code-square-bold" style="font-size: 13px; color: var(--accent);"></iconify-icon>
-              <span class="type-label" style="font-size: 8.5px; color: #fff; letter-spacing: 0.12em; margin-bottom: 0;">CLI & CODING ENGINES</span>
-            </div>
-            <span class="badge badge-accent mono" style="font-size: 7.5px;">TASK ROUTING</span>
-          </div>
-
-          <div style="display: flex; flex-direction: column; gap: 6px;">
-            <div style="display: flex; flex-direction: column; gap: 2px;">
-              <label style="font-size: 9.5px; color: var(--text-secondary); font-weight: 500;">Default Creation Engine (Multi-File / New App)</label>
-              <select id="setting-creation-agent-select" class="input-field" onchange="saveAgentPreferences()" style="font-family: var(--font-mono); font-size: 10px; padding: 5px 8px; background: var(--bg-deep); width: 100%;">
-                <option value="opencode">OpenCode CLI (Autonomous Multi-File)</option>
-                <option value="antigravity">Antigravity CLI (Studio Synthesis & UI)</option>
-                <option value="kilo">Kilo Code (Fast Multi-File)</option>
-              </select>
-            </div>
-
-            <div style="display: flex; flex-direction: column; gap: 2px;">
-              <label style="font-size: 9.5px; color: var(--text-secondary); font-weight: 500;">Quick Edit / Refactor Engine (Snippets & Bug Fixes)</label>
-              <select id="setting-edit-agent-select" class="input-field" onchange="saveAgentPreferences()" style="font-family: var(--font-mono); font-size: 10px; padding: 5px 8px; background: var(--bg-deep); width: 100%;">
-                <option value="groq_helper">Fast Code Helper (Groq 70B - ~300ms)</option>
-                <option value="kilo">Kilo Code (Diff & Fast Edits)</option>
-                <option value="opencode">OpenCode CLI (Full Agentic Edit)</option>
-              </select>
-            </div>
-          </div>
-        </div>
 
         <!-- ── 16. FUNCTIONAL UI ACCENT COLOR PICKER (8 Studio Colors) ── -->
         <div style="border-top: 1px solid var(--border-subtle); margin-top: 8px; padding-top: 12px; display: flex; flex-direction: column; gap: 6px;">

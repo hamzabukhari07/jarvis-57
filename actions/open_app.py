@@ -341,6 +341,9 @@ def close_application_by_name(app_name: str) -> bool:
             candidates.append(f"{target}.exe")
         if clean_name == "control panel":
             candidates.append("control.exe")
+        if clean_name in ("calculator", "calc"):
+            candidates.append("CalculatorApp.exe")
+            candidates.append("calc.exe")
 
         for exe_name in candidates:
             try:
@@ -386,25 +389,31 @@ def close_application_by_name(app_name: str) -> bool:
 
 
 def _format_open_confirmation(app_name: str) -> str:
+    clean = app_name.lower().strip()
+    norm = _normalize(app_name).lower().strip()
     try:
         from core.computer import windows_native
         from actions.screen_processor import get_active_window_context
-        # Post-Launch Focus Guard: poll for up to 500ms to ensure the launched app gains focus
-        for _ in range(5):
+        # Post-Launch Focus Guard: poll for up to 1.0s to ensure the launched app gains focus
+        for _ in range(7):
             ctx = get_active_window_context()
-            title = ctx.get("foreground_title", "")
-            proc = ctx.get("foreground_process", "")
+            title = (ctx.get("foreground_title") or "").strip()
+            proc = (ctx.get("foreground_process") or "").strip()
+            title_l = title.lower()
+            proc_l = proc.lower()
             if not windows_native.is_self_or_console_window(ctx.get("hwnd")):
-                if title:
+                if clean in title_l or clean in proc_l or (norm and (norm in title_l or norm in proc_l)):
                     return f"Opened {app_name} (Focused: '{title}' [{proc}])."
-            time.sleep(0.1)
+            time.sleep(0.15)
 
         # If still not focused, attempt explicit focus attachment
         windows_native.focus_window(app_name)
         ctx = get_active_window_context()
-        title = ctx.get("foreground_title", "")
-        proc = ctx.get("foreground_process", "")
-        if title:
+        title = (ctx.get("foreground_title") or "").strip()
+        proc = (ctx.get("foreground_process") or "").strip()
+        title_l = title.lower()
+        proc_l = proc.lower()
+        if clean in title_l or clean in proc_l or (norm and (norm in title_l or norm in proc_l)):
             return f"Opened {app_name} (Focused: '{title}' [{proc}])."
     except Exception:
         pass
@@ -463,7 +472,7 @@ def open_app(
             if player:
                 player.write_log(f"[close_app] {app_name}")
             return f"Closed {app_name}."
-        return f"Could not find or close {app_name}."
+        return f"{app_name} is not running (already closed)."
 
     normalized = _normalize(app_name)
 

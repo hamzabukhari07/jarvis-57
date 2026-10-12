@@ -82,6 +82,7 @@ class ZezoUIServer:
         self.on_text_command: Callable[[str], None] | None = None
         self.on_interrupt: Callable[[], None] | None = None
         self.on_mute_toggle: Callable[[bool], None] | None = None
+        self.on_speaker_mute_toggle: Callable[[bool], None] | None = None
         self.on_sleep_toggle: Callable[[bool], None] | None = None
         self.on_remote_clicked: Callable[[], tuple[str, str] | None] | None = None
         self.on_file_uploaded: Callable[[dict[str, Any]], None] | None = None
@@ -122,22 +123,53 @@ class ZezoUIServer:
         app.router.add_post("/api/fleet/save_agent", self._fleet_save_agent_handler)
         app.router.add_post("/api/fleet/save_soul", self._fleet_save_soul_handler)
         app.router.add_post("/api/fleet/dispatch_task", self._fleet_dispatch_task_handler)
+        app.router.add_post("/api/fleet/chat", self._fleet_chat_handler)
         app.router.add_post("/api/fleet/delete_agent", self._fleet_delete_agent_handler)
         app.router.add_post("/api/fleet/open_folder", self._fleet_open_folder_handler)
         app.router.add_post("/api/fleet/pick_folder", self._fleet_pick_folder_handler)
         app.router.add_post("/api/upload", self._upload_handler)
+        app.router.add_get("/api/config", self._get_config_handler)
+        app.router.add_post("/api/config", self._save_config_handler)
+        app.router.add_get("/api/settings/assistant", self._get_config_handler)
         app.router.add_post("/api/settings/assistant", self._save_assistant_settings_handler)
+        app.router.add_get("/api/settings/agents", self._get_config_handler)
         app.router.add_post("/api/settings/agents", self._save_agents_settings_handler)
+        app.router.add_get("/api/settings/pipeline", self._get_config_handler)
         app.router.add_post("/api/settings/pipeline", self._save_pipeline_settings_handler)
+        app.router.add_get("/api/settings/keys", self._get_config_handler)
         app.router.add_post("/api/settings/keys", self._save_keys_settings_handler)
         app.router.add_get("/api/preview_voice", self._preview_voice_handler)
         app.router.add_get("/api/models", self._models_list_handler)
+        app.router.add_get("/api/audio_devices", self._audio_devices_handler)
         app.router.add_get("/api/skills", self._skills_list_handler)
         app.router.add_post("/api/skills/mode", self._skills_mode_handler)
         app.router.add_post("/api/skills/install", self._skills_install_handler)
         app.router.add_post("/api/skills/save", self._skills_save_handler)
         app.router.add_post("/api/skills/delete", self._skills_delete_handler)
+        app.router.add_get("/api/attachments", self._attachments_list_handler)
+        app.router.add_get("/api/memory/stats", self._memory_stats_handler)
+        app.router.add_get("/api/memory/graph", self._memory_graph_handler)
+        app.router.add_get("/api/memory/notes", self._memory_notes_list_handler)
+        app.router.add_get("/api/memory/note", self._memory_note_detail_handler)
+        app.router.add_post("/api/memory/note", self._memory_save_note_handler)
+        app.router.add_post("/api/memory/add", self._memory_create_note_handler)
+        app.router.add_post("/api/memory/delete", self._memory_delete_note_handler)
+        app.router.add_post("/api/memory/clear", self._memory_clear_handler)
+        app.router.add_post("/api/memory/wipe_all", self._memory_wipe_all_handler)
+        app.router.add_post("/api/memory/optimize", self._memory_optimize_handler)
+        app.router.add_post("/api/workspace/set", self._workspace_set_handler)
+        app.router.add_get("/api/remote", self._remote_gateway_handler)
+        app.router.add_post("/api/remote/new_key", self._remote_new_key_handler)
+        app.router.add_get("/api/backend_logs", self._get_backend_logs_handler)
+        app.router.add_post("/api/backend_logs/clear", self._clear_backend_logs_handler)
+        app.router.add_get("/api/system/status", self._system_status_handler)
+        app.router.add_get("/zezo-avatar.png", self._avatar_handler)
         app.router.add_get("/favicon.ico", self._favicon_handler)
+
+        # Serve compiled React SPA (web/dist) static assets if built, with fallback to frontend
+        web_dist_dir = BASE_DIR / "web" / "dist"
+        if (web_dist_dir / "assets").exists():
+            app.router.add_static("/assets", path=str(web_dist_dir / "assets"), show_index=False)
 
         # Serve frontend static assets
         if self.frontend_dir.exists():
@@ -415,7 +447,7 @@ class ZezoUIServer:
     async def _save_assistant_settings_handler(self, request: web.Request) -> web.Response:
         try:
             data = await request.json()
-            name = str(data.get("assistant_name", "ZEZO")).strip() or "ZEZO"
+            name = "ZEZO"
             voice = str(data.get("voice_name", "Charon")).strip() or "Charon"
             lang = str(data.get("response_language", "auto")).strip() or "auto"
             fallback_voice = data.get("fallback_voice")
@@ -596,6 +628,198 @@ class ZezoUIServer:
             logger.exception("Save pipeline settings error: %s", e)
             return web.json_response({"status": "error", "message": str(e)}, status=500)
 
+    async def _get_config_handler(self, request: web.Request) -> web.Response:
+        try:
+            from memory.config_manager import (
+                get_assistant_name, get_voice, get_response_language,
+                get_autostart_enabled, get_brief_enabled,
+                get_wake_word_enabled, get_push_to_talk_enabled,
+                get_masked_gemini_key, get_masked_groq_key, get_masked_elevenlabs_key, get_masked_tavily_key,
+                is_configured, get_opencode_model, get_kilo_model, get_antigravity_model,
+                get_fallback_voice, FALLBACK_VOICES, get_voice_fallback_mode,
+                get_preferred_creation_agent, get_preferred_edit_agent,
+                CREATION_AGENTS, EDIT_AGENTS,
+                get_pipeline_mode, get_stt_engine, get_llm_engine, get_tts_engine, get_tts_voice,
+                PIPELINE_MODES, STT_ENGINES, LLM_ENGINES, TTS_ENGINES,
+                get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
+                AVAILABLE_LANGUAGES, AVAILABLE_VOICES,
+                get_thinking_enabled, get_proactive_audio_enabled,
+                get_theme, get_accent,
+                get_avatar_settings, save_avatar_settings,
+            )
+            data = {
+                "status": "success",
+                "assistant_name": get_assistant_name(),
+                "voice_name": get_voice(),
+                "response_language": get_response_language(),
+                "theme": get_theme(),
+                "accent": get_accent(),
+                **get_avatar_settings(),
+                "fallback_voice": get_fallback_voice(),
+                "fallback_voices": list(FALLBACK_VOICES),
+                "voice_fallback": get_voice_fallback_mode(),
+                "voice_fallback_enabled": get_voice_fallback_mode() == "auto",
+                "autostart_enabled": get_autostart_enabled(),
+                "morning_brief_enabled": get_brief_enabled(),
+                "wake_word_enabled": get_wake_word_enabled(),
+                "push_to_talk_enabled": get_push_to_talk_enabled(),
+                "thinking_enabled": get_thinking_enabled(),
+                "proactive_audio_enabled": get_proactive_audio_enabled(),
+                "has_gemini_key": is_configured(),
+                "gemini_api_key_masked": get_masked_gemini_key(),
+                "has_groq_key": bool(get_groq_api_key()),
+                "groq_api_key_masked": get_masked_groq_key(),
+                "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
+                "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
+                "has_tavily_key": bool(get_tavily_api_key()),
+                "tavily_api_key_masked": get_masked_tavily_key(),
+                "opencode_model": get_opencode_model(),
+                "kilo_model": get_kilo_model(),
+                "antigravity_model": get_antigravity_model(),
+                "preferred_creation_agent": get_preferred_creation_agent(),
+                "preferred_edit_agent": get_preferred_edit_agent(),
+                "pipeline_mode": get_pipeline_mode(),
+                "stt_engine": get_stt_engine(),
+                "llm_engine": get_llm_engine(),
+                "tts_engine": get_tts_engine(),
+                "tts_voice": get_tts_voice(),
+                "available_languages": list(AVAILABLE_LANGUAGES),
+                "available_voices": list(AVAILABLE_VOICES),
+                **self._collect_audio_state(),
+            }
+            return web.json_response(data)
+        except Exception as e:
+            logger.exception("Get config error: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _save_config_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            from memory.config_manager import (
+                save_assistant_config, save_voice, save_response_language,
+                save_autostart_enabled, save_brief_enabled,
+                save_wake_word_enabled, save_push_to_talk_enabled,
+                save_api_keys_transactional,
+                save_pipeline_mode, save_stt_engine, save_llm_engine,
+                save_tts_engine, save_tts_voice, save_voice_fallback_mode,
+                save_fallback_voice,
+                save_preferred_creation_agent, save_preferred_edit_agent,
+                save_opencode_model, save_kilo_model, save_antigravity_model,
+                save_thinking_enabled, save_proactive_audio_enabled,
+                save_theme, save_accent,
+                save_avatar_settings,
+            )
+
+            # 1. Controls
+            if "autostart_enabled" in data or "autostart" in data:
+                save_autostart_enabled(bool(data.get("autostart_enabled", data.get("autostart"))))
+            if "morning_brief_enabled" in data or "morning_brief" in data:
+                save_brief_enabled(bool(data.get("morning_brief_enabled", data.get("morning_brief"))))
+            if "wake_word_enabled" in data or "wake_word" in data:
+                val = bool(data.get("wake_word_enabled", data.get("wake_word")))
+                save_wake_word_enabled(val)
+                if hasattr(self, "on_wake_toggle") and self.on_wake_toggle:
+                    try:
+                        self.on_wake_toggle(val)
+                    except Exception:
+                        pass
+            if "push_to_talk_enabled" in data or "push_to_talk" in data:
+                val = bool(data.get("push_to_talk_enabled", data.get("push_to_talk")))
+                save_push_to_talk_enabled(val)
+                if hasattr(self, "on_ptt_toggle") and self.on_ptt_toggle:
+                    try:
+                        self.on_ptt_toggle(val)
+                    except Exception:
+                        pass
+            if "thinking_enabled" in data:
+                save_thinking_enabled(bool(data["thinking_enabled"]))
+            if "proactive_audio_enabled" in data:
+                save_proactive_audio_enabled(bool(data["proactive_audio_enabled"]))
+            if "theme" in data and data["theme"]:
+                save_theme(str(data["theme"]))
+            if "accent" in data and data["accent"]:
+                save_accent(str(data["accent"]))
+
+            # Avatar customization persistence
+            save_avatar_settings(data)
+
+            # 2. Assistant & Language (Identity is permanently ZEZO)
+            save_assistant_config("ZEZO", "")
+            voice_name = data.get("voice_name")
+            if voice_name is not None:
+                save_voice(str(voice_name).strip())
+            resp_lang = data.get("response_language")
+            if resp_lang is not None:
+                save_response_language(str(resp_lang).strip())
+
+            # 3. Keys
+            keys_to_save = {}
+            for k in ("gemini_api_key", "groq_api_key", "elevenlabs_api_key", "tavily_api_key",
+                      "gemini_key", "groq_key", "elevenlabs_key", "tavily_key"):
+                val = str(data.get(k) or "").strip()
+                if val and "••••" not in val and "..." not in val:
+                    normalized_k = k if k.endswith("_api_key") else f"{k.replace('_key', '')}_api_key"
+                    keys_to_save[normalized_k] = val
+
+            if keys_to_save:
+                ok, err = save_api_keys_transactional(
+                    gemini_api_key=keys_to_save.get("gemini_api_key"),
+                    groq_api_key=keys_to_save.get("groq_api_key"),
+                    elevenlabs_api_key=keys_to_save.get("elevenlabs_api_key"),
+                    tavily_api_key=keys_to_save.get("tavily_api_key"),
+                    validate=True,
+                )
+                if not ok:
+                    return web.json_response({"status": "error", "message": err}, status=400)
+
+            # 4. Pipeline & Engines
+            if "pipeline_mode" in data:
+                save_pipeline_mode(str(data["pipeline_mode"]))
+            if "stt_engine" in data:
+                save_stt_engine(str(data["stt_engine"]))
+            if "llm_engine" in data:
+                save_llm_engine(str(data["llm_engine"]))
+            if "tts_engine" in data:
+                save_tts_engine(str(data["tts_engine"]))
+            if "tts_voice" in data:
+                save_tts_voice(str(data["tts_voice"]))
+            if "voice_fallback" in data:
+                save_voice_fallback_mode(str(data["voice_fallback"]))
+            if "fallback_voice" in data:
+                save_fallback_voice(str(data["fallback_voice"]))
+
+            # 5. Autonomous Coding Agents & Models
+            if "preferred_creation_agent" in data:
+                save_preferred_creation_agent(str(data["preferred_creation_agent"]))
+            if "preferred_edit_agent" in data:
+                save_preferred_edit_agent(str(data["preferred_edit_agent"]))
+            if "opencode_model" in data:
+                save_opencode_model(str(data["opencode_model"]))
+            if "kilo_model" in data:
+                save_kilo_model(str(data["kilo_model"]))
+            if "antigravity_model" in data:
+                save_antigravity_model(str(data["antigravity_model"]))
+
+            # Notify UI callbacks if relevant
+            if voice_name or resp_lang:
+                if self.on_assistant_settings_changed:
+                    try:
+                        self.on_assistant_settings_changed("ZEZO", voice_name or "Charon", resp_lang or "auto")
+                    except Exception:
+                        pass
+
+            if any(k in data for k in ("pipeline_mode", "stt_engine", "llm_engine", "tts_engine")):
+                if self.on_pipeline_settings_changed:
+                    try:
+                        self.on_pipeline_settings_changed()
+                    except Exception:
+                        pass
+
+            return await self._get_config_handler(request)
+        except Exception as e:
+            logger.exception("Save config error: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
     async def _preview_voice_handler(self, request: web.Request) -> web.Response:
         voice = request.query.get("voice", "Puck").strip().lower()
         mp3_path = self.frontend_dir / "assets" / "voices" / f"{voice}.mp3"
@@ -604,15 +828,47 @@ class ZezoUIServer:
         return web.Response(status=404, text="Voice preview not found")
 
     async def _index_handler(self, request: web.Request) -> web.Response:
+        web_dist_idx = BASE_DIR / "web" / "dist" / "index.html"
+        if web_dist_idx.exists():
+            return web.FileResponse(web_dist_idx)
         idx = self.frontend_dir / "index.html"
         if idx.exists():
             return web.FileResponse(idx)
         return web.Response(text="<h1>ZEZO UI Engine Online</h1><p>Frontend assets initializing...</p>", content_type="text/html")
 
+    async def _attachments_list_handler(self, request: web.Request) -> web.Response:
+        """Fetch all currently registered file and folder attachments."""
+        try:
+            return web.json_response({
+                "status": "success",
+                "attachments": self.list_attachments()
+            })
+        except Exception as e:
+            logger.exception("Error in /api/attachments handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _system_status_handler(self, request: web.Request) -> web.Response:
+        try:
+            import psutil
+            cpu = psutil.cpu_percent(interval=None)
+            mem = psutil.virtual_memory().percent
+            return web.json_response({
+                "status": "success",
+                "cpu": cpu,
+                "mem": mem,
+                "gpu": 0,
+                "net": 0,
+            })
+        except Exception:
+            return web.json_response({"status": "success", "cpu": 0, "mem": 0, "gpu": 0, "net": 0})
+
     async def _office_view_handler(self, request: web.Request) -> web.Response:
         office_prod = self.frontend_dir / "office.html"
         if office_prod.exists():
             return web.FileResponse(office_prod)
+        office_legacy = BASE_DIR / "frontend" / "office.html"
+        if office_legacy.exists():
+            return web.FileResponse(office_legacy)
         office_fallback = BASE_DIR / "prototypes" / "scranton_pixel_office_fleet" / "index.html"
         if office_fallback.exists():
             return web.FileResponse(office_fallback)
@@ -670,6 +926,126 @@ class ZezoUIServer:
             self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
             return web.json_response(res)
         except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _fleet_chat_handler(self, request: web.Request) -> web.Response:
+        """Interactive real-time conversational chat response from a fleet agent."""
+        try:
+            data = await request.json()
+            agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
+            prompt = str(data.get("prompt") or data.get("message") or "").strip()
+            engine_override = (data.get("engine") or "").strip() or None
+            model_override = (data.get("model") or "").strip() or None
+
+            from core.fleet_manager import fleet_manager
+            agent = fleet_manager.get_agent(agent_id) or fleet_manager.resolve_agent_by_mention_or_capability(agent_id)
+            if not agent:
+                if agent_id.lower() in ("zezo", "os", "assistant", ""):
+                    name = "Zezo"
+                    role = "Autonomous Desktop AI Operating System"
+                    soul_prompt = "You are Zezo, an autonomous AI desktop operating system built by Hamza Bukhari."
+                    specialty = "Desktop control, multi-agent coordination, voice directives, coding pipelines"
+                    active_engine = (engine_override or "antigravity_run").strip()
+                    active_model = (model_override or "gemini-3.8-flash-low").strip()
+                else:
+                    return web.json_response({"success": False, "error": f"Agent '{agent_id}' not found."}, status=404)
+            else:
+                name = agent.displayName if hasattr(agent, "displayName") and agent.displayName else agent.name
+                role = agent.role or "Autonomous Specialist"
+                soul_prompt = agent.prompt_prefix or f"You are {name}, {role}."
+                specialty = getattr(agent, "specialty", "") or ""
+                active_engine = (engine_override or agent.default_tool or "antigravity_run").strip()
+                active_model = (model_override or agent.model_id or "").strip()
+
+            sys_prompt = (
+                f"{soul_prompt}\n"
+                f"Your role is {role}. Specialty: {specialty}.\n"
+                f"You are conversing directly with Hamza (the User & Architect). "
+                f"Give concise, intelligent, authentic, and helpful responses matching your persona. "
+                f"If asked to write code or plan architecture, provide clean actionable markdown with snippets."
+            )
+
+            response_text = ""
+
+            # Instant Intelligent Conversational Engine
+            # Chat is conversational — we route directly to high-speed LLM endpoints matching the selected engine/model,
+            # avoiding heavy multi-file CLI cold-start overhead (12-35s) on Windows.
+            if "antigravity" in active_engine.lower() or "gemini" in active_model.lower():
+                try:
+                    from core import gemini
+                    # Call Gemini directly with the agent's persona
+                    full_convo = f"{sys_prompt}\n\nHamza: {prompt}\n\n{name}:"
+                    response_text = gemini.text(
+                        full_convo,
+                        tier=gemini.FAST,
+                        timeout_ms=5000,
+                        allow_groq=True,
+                        default=""
+                    )
+                except Exception as e:
+                    logger.debug("[FleetChat] Direct Gemini chat failed: %s", e)
+
+            elif "opencode" in active_engine.lower() or "kilo" in active_engine.lower():
+                # For OpenCode and Kilo agents, use llm_router with instant streaming/generation
+                try:
+                    from core import llm_router
+                    response_text = llm_router.generate_text(
+                        prompt=prompt,
+                        system=sys_prompt,
+                        tier=llm_router.FAST,
+                        timeout_ms=5000,
+                    )
+                except Exception as e:
+                    logger.debug("[FleetChat] OpenCode/Kilo router failed: %s", e)
+            elif "groq" in active_engine.lower():
+                try:
+                    from core.llm_client import call_groq_text
+                    response_text = call_groq_text(
+                        prompt=prompt,
+                        system=sys_prompt,
+                        model=active_model if (active_model and "groq" not in active_model) else "llama-3.3-70b-versatile",
+                        timeout=15,
+                    )
+                except Exception as e:
+                    logger.debug("[FleetChat] Groq call_groq_text failed: %s", e)
+
+            # Fallback to ultra-fast Gemini/Groq ladder
+            if not response_text:
+                try:
+                    from core import gemini
+                    response_text = gemini.text(
+                        f"{sys_prompt}\n\nHamza: {prompt}\n\n{name}:",
+                        tier=gemini.FAST,
+                        timeout_ms=5000,
+                        allow_groq=True,
+                        default=""
+                    )
+                except Exception as e:
+                    logger.debug("[FleetChat] Fallback Gemini fast call failed: %s", e)
+
+            if not response_text:
+                try:
+                    from core import llm_router
+                    response_text = llm_router.generate_text(
+                        prompt=prompt,
+                        system=sys_prompt,
+                        timeout_ms=4000,
+                    )
+                except Exception as e:
+                    logger.debug("[FleetChat] llm_router fallback failed: %s", e)
+
+            if not response_text:
+                response_text = f"Hello Hamza! I am {name}. I received your message: '{prompt}'. Ready to assist on {role}."
+
+            return web.json_response({
+                "success": True,
+                "agent_id": agent.name,
+                "reply": response_text.strip(),
+                "engine": active_engine,
+                "model": active_model,
+            })
+        except Exception as e:
+            logger.exception("Error in _fleet_chat_handler: %s", e)
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
     async def _fleet_delete_agent_handler(self, request: web.Request) -> web.Response:
@@ -859,6 +1235,14 @@ class ZezoUIServer:
             logger.exception("Error in /api/models handler: %s", e)
             return web.json_response({"status": "error", "message": str(e)}, status=500)
 
+    async def _audio_devices_handler(self, request: web.Request) -> web.Response:
+        """Return real host audio input/output devices and current configuration."""
+        try:
+            return web.json_response(self._collect_audio_state())
+        except Exception as e:
+            logger.exception("Error in /api/audio_devices handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
     async def _skills_mode_handler(self, request: web.Request) -> web.Response:
         """Update toggle mode (pinned, disabled, auto_activate) for a skill."""
         try:
@@ -942,6 +1326,280 @@ class ZezoUIServer:
             logger.exception("Error in /api/skills/delete handler: %s", e)
             return web.json_response({"status": "error", "message": str(e)}, status=500)
 
+    async def _memory_stats_handler(self, request: web.Request) -> web.Response:
+        try:
+            from memory.sqlite_memory import get_db_path
+            from core.repo_context import get_last_repo
+            db_path = get_db_path()
+            size_bytes = db_path.stat().st_size if db_path.exists() else 0
+            turns_count = 0
+            facts_count = 0
+            if db_path.exists():
+                import sqlite3
+                with sqlite3.connect(str(db_path)) as conn:
+                    try:
+                        c = conn.cursor()
+                        c.execute("SELECT COUNT(*) FROM history_turns")
+                        turns_count = c.fetchone()[0]
+                    except Exception:
+                        pass
+                    try:
+                        c.execute("SELECT COUNT(*) FROM facts")
+                        facts_count = c.fetchone()[0]
+                    except Exception:
+                        pass
+            active_ws = get_last_repo() or str(BASE_DIR)
+            return web.json_response({
+                "status": "success",
+                "db_path": str(db_path),
+                "db_size_kb": round(size_bytes / 1024, 1),
+                "turns_count": turns_count,
+                "facts_count": facts_count,
+                "active_workspace": active_ws,
+                "fts5_enabled": True,
+            })
+        except Exception as e:
+            logger.exception("Error in /api/memory/stats: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_graph_handler(self, request: web.Request) -> web.Response:
+        """Fetch compiled knowledge graph topology (nodes + links) from Markdown vault."""
+        try:
+            from memory.vault_engine import vault_engine
+            graph_data = vault_engine.get_graph()
+            return web.json_response(graph_data)
+        except Exception as e:
+            logger.exception("Error in /api/memory/graph: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_notes_list_handler(self, request: web.Request) -> web.Response:
+        """Fetch list of all markdown memory notes in the vault."""
+        try:
+            from memory.vault_engine import vault_engine
+            notes = vault_engine.get_all_notes()
+            return web.json_response({"status": "success", "notes": notes})
+        except Exception as e:
+            logger.exception("Error in /api/memory/notes: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_note_detail_handler(self, request: web.Request) -> web.Response:
+        """Fetch full markdown content and outbound links for a specific note."""
+        try:
+            file_param = request.query.get("file") or request.query.get("id") or ""
+            if not file_param:
+                return web.json_response({"status": "error", "message": "Missing file or id parameter"}, status=400)
+            from memory.vault_engine import vault_engine
+            note = vault_engine.get_note_content(file_param)
+            if not note:
+                return web.json_response({"status": "error", "message": "Note not found"}, status=404)
+            return web.json_response({"status": "success", "note": note})
+        except Exception as e:
+            logger.exception("Error in /api/memory/note: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_save_note_handler(self, request: web.Request) -> web.Response:
+        """Save or edit content of an existing markdown note."""
+        try:
+            data = await request.json()
+            file_name = str(data.get("file") or "").strip()
+            content = str(data.get("content") or "")
+            if not file_name:
+                return web.json_response({"status": "error", "message": "File name required"}, status=400)
+            from memory.vault_engine import vault_engine
+            res = vault_engine.save_note(file_name, content)
+            self.broadcast("memory_updated", {"action": "saved", "file": file_name})
+            return web.json_response(res)
+        except Exception as e:
+            logger.exception("Error in /api/memory/note save: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_create_note_handler(self, request: web.Request) -> web.Response:
+        """Create a new memory note in the vault."""
+        try:
+            data = await request.json()
+            title = str(data.get("title") or "").strip()
+            category = str(data.get("category") or "knowledge").strip()
+            content = str(data.get("content") or "").strip()
+            tags = data.get("tags") if isinstance(data.get("tags"), list) else None
+            if not title:
+                return web.json_response({"status": "error", "message": "Title required"}, status=400)
+            from memory.vault_engine import vault_engine
+            res = vault_engine.create_note(title, category, content, tags)
+            self.broadcast("memory_updated", {"action": "created", "title": title})
+            return web.json_response(res)
+        except Exception as e:
+            logger.exception("Error in /api/memory/add: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_delete_note_handler(self, request: web.Request) -> web.Response:
+        """Delete a memory note from the vault."""
+        try:
+            data = await request.json()
+            file_name = str(data.get("file") or "").strip()
+            if not file_name:
+                return web.json_response({"status": "error", "message": "File name required"}, status=400)
+            from memory.vault_engine import vault_engine
+            res = vault_engine.delete_note(file_name)
+            self.broadcast("memory_updated", {"action": "deleted", "file": file_name})
+            return web.json_response(res)
+        except Exception as e:
+            logger.exception("Error in /api/memory/delete: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_clear_handler(self, request: web.Request) -> web.Response:
+        try:
+            from memory.sqlite_memory import get_db_path
+            db_path = get_db_path()
+            if db_path.exists():
+                import sqlite3
+                with sqlite3.connect(str(db_path)) as conn:
+                    conn.execute("DELETE FROM turns")
+                    try:
+                        conn.execute("DELETE FROM turns_fts")
+                    except Exception:
+                        pass
+                    conn.commit()
+            return web.json_response({"status": "success", "message": "Conversation history cleared"})
+        except Exception as e:
+            logger.exception("Error in /api/memory/clear: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_wipe_all_handler(self, request: web.Request) -> web.Response:
+        """Atomically purge all 4 memory layers: SQLite turns/facts, Vault Markdown notes, and long_term.json."""
+        try:
+            from memory.sqlite_memory import wipe_all_sqlite_memory
+            from memory.vault_engine import vault_engine
+            from memory.memory_manager import wipe_all_long_term_json
+
+            preserve_profile = False
+            try:
+                if request.can_read_body:
+                    body = await request.json()
+                    preserve_profile = bool(body.get("preserve_profile", False))
+            except Exception:
+                preserve_profile = False
+
+            sqlite_counts = wipe_all_sqlite_memory()
+            vault_res = vault_engine.wipe_all_vault_memory(preserve_profile=preserve_profile)
+            wipe_all_long_term_json()
+
+            self.broadcast("memory_updated", {"action": "wiped", "details": sqlite_counts})
+
+            return web.json_response({
+                "status": "success",
+                "message": "All memory layers successfully wiped and reset to clean state",
+                "sqlite_deleted": sqlite_counts,
+                "vault_deleted_conv_files": vault_res.get("deleted_conv_files", 0),
+            })
+        except Exception as e:
+            logger.exception("Error in /api/memory/wipe_all: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_optimize_handler(self, request: web.Request) -> web.Response:
+        try:
+            from memory.sqlite_memory import get_db_path
+            db_path = get_db_path()
+            if db_path.exists():
+                import sqlite3
+                with sqlite3.connect(str(db_path)) as conn:
+                    conn.execute("PRAGMA optimize")
+                    conn.execute("VACUUM")
+            return web.json_response({"status": "success", "message": "Memory database optimized and vacuumed"})
+        except Exception as e:
+            logger.exception("Error in /api/memory/optimize: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _workspace_set_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            ws_path = str(data.get("path") or "").strip()
+            from core.repo_context import remember_repo, forget_repo
+            if ws_path and ws_path.lower() != "reset":
+                remember_repo(ws_path)
+            else:
+                forget_repo()
+            from core.repo_context import get_last_repo
+            active_ws = get_last_repo() or str(BASE_DIR)
+            return web.json_response({"status": "success", "active_workspace": active_ws})
+        except Exception as e:
+            logger.exception("Error in /api/workspace/set: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _get_backend_logs_handler(self, request: web.Request) -> web.Response:
+        try:
+            from core import log_bus
+            min_lvl = request.query.get("min_level", "DEBUG")
+            snapshot = log_bus.snapshot(min_level=min_lvl)
+            return web.json_response({
+                "status": "success",
+                "lines": snapshot[-1200:] if len(snapshot) > 1200 else snapshot,
+                "stats": log_bus.stats(),
+                "sources": log_bus.sources(),
+            })
+        except Exception as e:
+            logger.exception("Error in /api/backend_logs handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _clear_backend_logs_handler(self, request: web.Request) -> web.Response:
+        try:
+            from core import log_bus
+            log_bus.clear()
+            self.broadcast("backend_logs_cleared", {})
+            return web.json_response({"status": "success", "message": "Backend logs cleared"})
+        except Exception as e:
+            logger.exception("Error in /api/backend_logs/clear: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _avatar_handler(self, request: web.Request) -> web.Response:
+        p1 = BASE_DIR / "web" / "dist" / "zezo-avatar.png"
+        if p1.exists():
+            return web.FileResponse(p1)
+        p2 = BASE_DIR / "web" / "public" / "zezo-avatar.png"
+        if p2.exists():
+            return web.FileResponse(p2)
+        return web.Response(status=404)
+
+    def _resolve_remote_details(self) -> tuple[str, str]:
+        url, key = "", ""
+        if self.on_remote_clicked:
+            try:
+                res = self.on_remote_clicked()
+                if res:
+                    url, key = str(res[0]), str(res[1])
+            except Exception as e:
+                logger.warning("on_remote_clicked error: %s", e)
+        if not url:
+            lan_ip = "127.0.0.1"
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                lan_ip = s.getsockname()[0]
+                s.close()
+            except Exception:
+                pass
+            url = f"http://{lan_ip}:8000"
+        if not key:
+            key = "8F3A-9K"
+        return url, key
+
+    async def _remote_gateway_handler(self, request: web.Request) -> web.Response:
+        url, key = self._resolve_remote_details()
+        return web.json_response({
+            "status": "success",
+            "url": url,
+            "key": key,
+            "login_url": f"{url}/auto-login?key={key}",
+        })
+
+    async def _remote_new_key_handler(self, request: web.Request) -> web.Response:
+        url, key = self._resolve_remote_details()
+        return web.json_response({
+            "status": "success",
+            "url": url,
+            "key": key,
+            "login_url": f"{url}/auto-login?key={key}",
+        })
+
     async def _favicon_handler(self, request: web.Request) -> web.Response:
         fav = self.frontend_dir / "favicon.ico"
         if fav.exists():
@@ -980,8 +1638,8 @@ class ZezoUIServer:
     async def _handle_client_message(self, ws: web.WebSocketResponse, payload: dict) -> None:
         msg_type = payload.get("type", "")
 
-        if msg_type == "user_message":
-            text = str(payload.get("text", "")).strip()
+        if msg_type in ("user_message", "text_command"):
+            text = str(payload.get("text") or payload.get("command") or "").strip()
             if text and self.on_text_command:
                 threading.Thread(target=self.on_text_command, args=(text,), daemon=True).start()
 
@@ -993,6 +1651,15 @@ class ZezoUIServer:
             muted = bool(payload.get("muted", False))
             if self.on_mute_toggle:
                 self.on_mute_toggle(muted)
+
+        elif msg_type in ("speaker_mute_toggle", "deafen_toggle"):
+            muted = bool(payload.get("muted") if "muted" in payload else payload.get("deafened", False))
+            if self.on_speaker_mute_toggle:
+                try:
+                    self.on_speaker_mute_toggle(muted)
+                except Exception as e:
+                    logger.warning("Failed on_speaker_mute_toggle: %s", e)
+            self.broadcast("speaker_status", {"muted": muted})
 
         elif msg_type == "confirm_response":
             accepted = bool(payload.get("accepted", False))
@@ -1046,17 +1713,10 @@ class ZezoUIServer:
                 logger.warning("Failed to export log bus: %s", e)
 
         elif msg_type == "get_remote_key":
-            url, key = "http://localhost:8765", "8F3A-9K2L"
-            if self.on_remote_clicked:
-                try:
-                    res = self.on_remote_clicked()
-                    if res:
-                        url, key = res[0], res[1]
-                except Exception:
-                    pass
+            url, key = self._resolve_remote_details()
             await ws.send_str(json.dumps({
                 "type": "remote_key_data",
-                "data": {"url": url, "key": key}
+                "data": {"url": url, "key": key, "login_url": f"{url}/auto-login?key={key}"}
             }))
 
         elif msg_type == "task_cancel":
@@ -1176,13 +1836,8 @@ class ZezoUIServer:
             color = str(payload.get("color", "")).strip().lower()
             if color:
                 try:
-                    cfg_file = BASE_DIR / "config" / "api_keys.json"
-                    if cfg_file.exists():
-                        data = json.loads(cfg_file.read_text(encoding="utf-8"))
-                    else:
-                        data = {}
-                    data["ui_color"] = color
-                    cfg_file.write_text(json.dumps(data, indent=4), encoding="utf-8")
+                    from memory.config_manager import save_accent
+                    save_accent(color)
                     self.broadcast("accent_changed", {"color": color})
                 except Exception as e:
                     logger.warning("Failed to persist accent: %s", e)
@@ -1221,7 +1876,7 @@ class ZezoUIServer:
                 logger.warning("Failed to toggle morning brief: %s", e)
 
         elif msg_type == "save_assistant_settings":
-            name = str(payload.get("assistant_name", "ZEZO")).strip() or "ZEZO"
+            name = "ZEZO"
             voice = str(payload.get("voice_name", "Charon")).strip() or "Charon"
             lang = str(payload.get("response_language", "auto")).strip() or "auto"
             fallback_voice = payload.get("fallback_voice")
@@ -1370,8 +2025,12 @@ class ZezoUIServer:
             state.update({
                 "input_device":    cur_in,
                 "output_device":   cur_out,
+                "current_input":   cur_in,
+                "current_output":  cur_out,
                 "input_devices":   inputs,
                 "output_devices":  outputs,
+                "inputs":          [{"name": d, "is_default": d == default_in} for d in inputs],
+                "outputs":         [{"name": d, "is_default": d == default_out} for d in outputs],
                 "default_input_device":  default_in,
                 "default_output_device": default_out,
                 # Empty string means "system default", which is always valid.

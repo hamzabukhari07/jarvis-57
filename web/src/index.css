@@ -1,0 +1,608 @@
+@import "tailwindcss";
+
+/**
+ * ─────────────────────────────────────────────────────────────
+ * 100% Official ReUI Style Presets Specification (reui.io)
+ * Styles control Spacing Density, Corner Radius, Typography, and Elevation
+ * ─────────────────────────────────────────────────────────────
+ */
+
+
+/* 9. Tweakcn Copper Dark (Warm Clay & Radiant Copper OKLCH) */
+[data-theme="copper"],
+[data-theme="tweakcn"] {
+  --background: oklch(0.2679 0.0036 106.6427);
+  --foreground: oklch(0.9576 0.0027 106.4494);
+  --card: oklch(0.2928 0.0018 106.5092);
+  --card-foreground: oklch(0.9818 0.0054 95.0986);
+  --popover: oklch(0.3085 0.0035 106.6039);
+  --popover-foreground: oklch(0.9211 0.0040 106.4781);
+  --primary: oklch(0.6724 0.1308 38.7559);
+  --primary-foreground: oklch(0.1908 0.0020 106.5859);
+  --secondary: oklch(0.33 0.004 106.6);
+  --secondary-foreground: oklch(0.9576 0.0027 106.4494);
+  --muted: oklch(0.2213 0.0038 106.7070);
+  --muted-foreground: oklch(0.7713 0.0169 99.0657);
+  --accent: oklch(0.6724 0.1308 38.7559);
+  --accent-foreground: oklch(0.1908 0.0020 106.5859);
+  --destructive: oklch(0.6368 0.2078 25.3313);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.3618 0.0101 106.8928);
+  --input: oklch(0.24 0.004 106.6);
+  --ring: oklch(0.6724 0.1308 38.7559);
+  --radius: 0.75rem;
+
+  --frame-gap: 0.625rem;
+  --frame-px: 0.625rem;
+  --frame-py: 0.625rem;
+  --frame-radius: 0.75rem;
+  --frame-panel-bg: oklch(0.2928 0.0018 106.5092 / 0.95);
+  --frame-panel-border-color: oklch(0.3618 0.0101 106.8928);
+  --frame-border-color: oklch(0.42 0.012 106.8);
+
+  --theme-glow: 0 0 20px oklch(0.6724 0.1308 38.7559 / 0.20);
+  --font-family: Outfit, -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+}
+
+/* 10. Tweakcn Copper Light (Crisp Ivory Cream & Warm Terracotta OKLCH) */
+[data-theme="copper-light"],
+[data-theme="light"] {
+  --background: oklch(0.9818 0.0054 95.0986);
+  --foreground: oklch(0.2438 0.0269 95.7226);
+  --card: oklch(0.9565 0.0067 97.3521);
+  --card-foreground: oklch(0.1908 0.0020 106.5859);
+  --popover: oklch(0.9900 0.003 98);
+  --popover-foreground: oklch(0.2671 0.0196 98.9390);
+  --primary: oklch(0.6171 0.1375 39.0427);
+  --primary-foreground: oklch(1.0000 0 0);
+  --secondary: oklch(0.9245 0.0138 92.9892);
+  --secondary-foreground: oklch(0.3334 0.0177 98.6048);
+  --muted: oklch(0.9341 0.0153 90.2390);
+  --muted-foreground: oklch(0.4541 0.0178 97.4503);
+  --accent: oklch(0.6171 0.1375 39.0427);
+  --accent-foreground: oklch(1.0000 0 0);
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.8647 0.0069 97.3627);
+  --input: oklch(0.91 0.01 97);
+  --ring: oklch(0.6171 0.1375 39.0427);
+  --radius: 0.75rem;
+
+  --frame-gap: 0.625rem;
+  --frame-px: 0.625rem;
+  --frame-py: 0.625rem;
+  --frame-radius: 0.75rem;
+  --frame-panel-bg: oklch(0.9565 0.0067 97.3521 / 0.95);
+  --frame-panel-border-color: oklch(0.8647 0.0069 97.3627);
+  --frame-border-color: oklch(0.82 0.01 97);
+
+  --theme-glow: 0 0 20px oklch(0.6171 0.1375 39.0427 / 0.15);
+  --font-family: Outfit, -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+}
+
+/* 11. Emerald Mint Dark (Pitch Black & Electric Neo-Mint OKLCH) */
+[data-theme="emerald"],
+[data-theme="neo-mint"] {
+  --background: oklch(0 0 0);
+  --foreground: oklch(0.9551 0 0);
+  --card: oklch(0.1448 0 0);
+  --card-foreground: oklch(0.9551 0 0);
+  --popover: oklch(0.2210 0.0015 197.0452);
+  --popover-foreground: oklch(0.9551 0 0);
+  --primary: oklch(0.8545 0.1675 159.6564);
+  --primary-foreground: oklch(0 0 0);
+  --secondary: oklch(0.4700 0.0900 160.0079);
+  --secondary-foreground: oklch(0.9551 0 0);
+  --muted: oklch(0.2653 0.0037 286.1465);
+  --muted-foreground: oklch(0.6731 0 0);
+  --accent: oklch(0.8545 0.1675 159.6564);
+  --accent-foreground: oklch(0 0 0);
+  --destructive: oklch(0.7425 0.1696 1.0847);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.2138 0.0019 286.2347);
+  --input: oklch(0.28 0.003 286);
+  --ring: oklch(0.8545 0.1675 159.6564);
+  --radius: 1.25rem;
+
+  --frame-gap: 0.625rem;
+  --frame-px: 0.625rem;
+  --frame-py: 0.625rem;
+  --frame-radius: 1.25rem;
+  --frame-panel-bg: oklch(0.1448 0 0 / 0.95);
+  --frame-panel-border-color: oklch(0.2138 0.0019 286.2347);
+  --frame-border-color: oklch(0.28 0.005 286);
+
+  --theme-glow: 0 0 24px oklch(0.8545 0.1675 159.6564 / 0.22);
+  --font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+}
+
+/* 12. Emerald Mint Light (Crisp Pure White & Electric Emerald OKLCH) */
+[data-theme="emerald-light"],
+[data-theme="neo-mint-light"] {
+  --background: oklch(0.9940 0 0);
+  --foreground: oklch(0 0 0);
+  --card: oklch(0.975 0.002 160);
+  --card-foreground: oklch(0 0 0);
+  --popover: oklch(0.9911 0 0);
+  --popover-foreground: oklch(0 0 0);
+  --primary: oklch(0.8545 0.1675 159.6564);
+  --primary-foreground: oklch(0 0 0);
+  --secondary: oklch(0.94 0.01 160);
+  --secondary-foreground: oklch(0.1344 0 0);
+  --muted: oklch(0.95 0 0);
+  --muted-foreground: oklch(0.4386 0 0);
+  --accent: oklch(0.8545 0.1675 159.6564);
+  --accent-foreground: oklch(0 0 0);
+  --destructive: oklch(0.6665 0.2111 2.8306);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.90 0.005 160);
+  --input: oklch(0.93 0 0);
+  --ring: oklch(0.8545 0.1675 159.6564);
+  --radius: 1.25rem;
+
+  --frame-gap: 0.625rem;
+  --frame-px: 0.625rem;
+  --frame-py: 0.625rem;
+  --frame-radius: 1.25rem;
+  --frame-panel-bg: oklch(0.985 0.002 160 / 0.95);
+  --frame-panel-border-color: oklch(0.90 0.005 160);
+  --frame-border-color: oklch(0.86 0.008 160);
+
+  --theme-glow: 0 0 20px oklch(0.8545 0.1675 159.6564 / 0.15);
+  --font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+}
+
+/* 13. Arctic Teal Dark (Deep Slate Obsidian & Luminous Arctic Teal OKLCH) */
+[data-theme="arctic-teal"],
+[data-theme="nordic-teal"] {
+  --background: oklch(0.1854 0.0182 238.2143);
+  --foreground: oklch(0.9436 0.0051 228.8204);
+  --card: oklch(0.2848 0.0230 235.6578);
+  --card-foreground: oklch(0.9436 0.0051 228.8204);
+  --popover: oklch(0.2848 0.0230 235.6578);
+  --popover-foreground: oklch(0.9436 0.0051 228.8204);
+  --primary: oklch(0.6509 0.1283 170.4258);
+  --primary-foreground: oklch(0.1854 0.0182 238.2143);
+  --secondary: oklch(0.2933 0.0423 172.8195);
+  --secondary-foreground: oklch(0.6509 0.1283 170.4258);
+  --muted: oklch(0.2456 0.0195 239.1061);
+  --muted-foreground: oklch(0.6637 0.0236 235.1968);
+  --accent: oklch(0.7610 0.2015 149.7403);
+  --accent-foreground: oklch(0.1854 0.0182 238.2143);
+  --destructive: oklch(0.6257 0.2058 29.0773);
+  --destructive-foreground: oklch(0.9436 0.0051 228.8204);
+  --border: oklch(0.3351 0.0253 234.8586);
+  --input: oklch(0.25 0.02 238);
+  --ring: oklch(0.6509 0.1283 170.4258);
+  --radius: 1rem;
+
+  --frame-gap: 0.625rem;
+  --frame-px: 0.625rem;
+  --frame-py: 0.625rem;
+  --frame-radius: 1rem;
+  --frame-panel-bg: oklch(0.2848 0.0230 235.6578 / 0.95);
+  --frame-panel-border-color: oklch(0.3351 0.0253 234.8586);
+  --frame-border-color: oklch(0.38 0.025 235);
+
+  --theme-glow: 0 0 22px oklch(0.6509 0.1283 170.4258 / 0.22);
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+}
+
+/* 14. Arctic Teal Light (Frost Slate White & Deep Ocean Teal OKLCH) */
+[data-theme="arctic-teal-light"],
+[data-theme="nordic-teal-light"] {
+  --background: oklch(0.9605 0.0046 258.3248);
+  --foreground: oklch(0.2153 0.0187 235.1251);
+  --card: oklch(1.0000 0 0);
+  --card-foreground: oklch(0.2153 0.0187 235.1251);
+  --popover: oklch(1.0000 0 0);
+  --popover-foreground: oklch(0.2153 0.0187 235.1251);
+  --primary: oklch(0.4335 0.0754 182.2315);
+  --primary-foreground: oklch(1.0000 0 0);
+  --secondary: oklch(0.9644 0.0208 166.1014);
+  --secondary-foreground: oklch(0.4335 0.0754 182.2315);
+  --muted: oklch(0.93 0.005 258);
+  --muted-foreground: oklch(0.48 0.025 233);
+  --accent: oklch(0.4335 0.0754 182.2315);
+  --accent-foreground: oklch(1.0000 0 0);
+  --destructive: oklch(0.6257 0.2058 29.0773);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.89 0.008 228);
+  --input: oklch(0.93 0.006 228);
+  --ring: oklch(0.4335 0.0754 182.2315);
+  --radius: 1rem;
+
+  --frame-gap: 0.625rem;
+  --frame-px: 0.625rem;
+  --frame-py: 0.625rem;
+  --frame-radius: 1rem;
+  --frame-panel-bg: oklch(1.0000 0 0 / 0.95);
+  --frame-panel-border-color: oklch(0.89 0.008 228);
+  --frame-border-color: oklch(0.84 0.01 228);
+
+  --theme-glow: 0 0 20px oklch(0.4335 0.0754 182.2315 / 0.15);
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+}
+
+/* 15. Electric Indigo Dark (Deep Slate Obsidian & Radiant Indigo Violet OKLCH) */
+[data-theme="indigo"],
+[data-theme="electric-indigo"],
+[data-theme="indigo-wave"] {
+  --background: oklch(0.3225 0.0107 278.2517);
+  --foreground: oklch(1.0000 0 0);
+  --card: oklch(0.3502 0.0122 279.2835);
+  --card-foreground: oklch(1.0000 0 0);
+  --popover: oklch(0.3502 0.0122 279.2835);
+  --popover-foreground: oklch(1.0000 0 0);
+  --primary: oklch(0.5774 0.2091 273.8504);
+  --primary-foreground: oklch(1.0000 0 0);
+  --secondary: oklch(0.3779 0.0118 285.8207);
+  --secondary-foreground: oklch(1.0000 0 0);
+  --muted: oklch(0.3066 0.0108 278.2166);
+  --muted-foreground: oklch(0.7230 0.0087 278.5820);
+  --accent: oklch(0.5774 0.2091 273.8504);
+  --accent-foreground: oklch(1.0000 0 0);
+  --destructive: oklch(0.8004 0.1141 23.1850);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.3690 0.0103 278.3345);
+  --input: oklch(0.3066 0.0108 278.2166);
+  --ring: oklch(0.5774 0.2091 273.8504);
+  --radius: 0.625rem;
+
+  --frame-gap: 0.625rem;
+  --frame-px: 0.625rem;
+  --frame-py: 0.625rem;
+  --frame-radius: 0.625rem;
+  --frame-panel-bg: oklch(0.3502 0.0122 279.2835 / 0.95);
+  --frame-panel-border-color: oklch(0.3690 0.0103 278.3345);
+  --frame-border-color: oklch(0.40 0.015 278);
+
+  --theme-glow: 0 0 24px oklch(0.5774 0.2091 273.8504 / 0.25);
+  --font-family: "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+}
+
+/* 16. Electric Indigo Light (Pure Snow & Radiant Indigo Violet OKLCH) */
+[data-theme="indigo-light"],
+[data-theme="electric-indigo-light"],
+[data-theme="indigo-wave-light"] {
+  --background: oklch(0.9881 0 0);
+  --foreground: oklch(0.2789 0.0091 285.7942);
+  --card: oklch(1.0000 0 0);
+  --card-foreground: oklch(0.2789 0.0091 285.7942);
+  --popover: oklch(1.0000 0 0);
+  --popover-foreground: oklch(0.2789 0.0091 285.7942);
+  --primary: oklch(0.5774 0.2091 273.8504);
+  --primary-foreground: oklch(1.0000 0 0);
+  --secondary: oklch(0.9614 0.0013 286.3750);
+  --secondary-foreground: oklch(0.2789 0.0091 285.7942);
+  --muted: oklch(0.9731 0 0);
+  --muted-foreground: oklch(0.5370 0.0140 280.8555);
+  --accent: oklch(0.5774 0.2091 273.8504);
+  --accent-foreground: oklch(1.0000 0 0);
+  --destructive: oklch(0.5156 0.1810 22.5393);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.9042 0.0027 286.3457);
+  --input: oklch(0.9614 0.0013 286.3750);
+  --ring: oklch(0.5774 0.2091 273.8504);
+  --radius: 0.625rem;
+
+  --frame-gap: 0.625rem;
+  --frame-px: 0.625rem;
+  --frame-py: 0.625rem;
+  --frame-radius: 0.625rem;
+  --frame-panel-bg: oklch(1.0000 0 0 / 0.95);
+  --frame-panel-border-color: oklch(0.9042 0.0027 286.3457);
+  --frame-border-color: oklch(0.85 0.004 286);
+
+  --theme-glow: 0 0 20px oklch(0.5774 0.2091 273.8504 / 0.18);
+  --font-family: "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+}
+
+/* 17. Deep Cobalt Azure Dark (theme3.md) */
+[data-theme="cobalt"],
+[data-theme="deep-cobalt"] {
+  --background: oklch(0.1822 0.0051 258.14);
+  --foreground: oklch(0.9848 0 0);
+  --card: oklch(0.2210 0.0070 258.14);
+  --card-foreground: oklch(0.9848 0 0);
+  --popover: oklch(0.2210 0.0070 258.14);
+  --popover-foreground: oklch(0.9848 0 0);
+  --primary: oklch(0.6296 0.1863 258.1459);
+  --primary-foreground: oklch(1.0000 0 0);
+  --secondary: oklch(0.2800 0.0150 258.14);
+  --secondary-foreground: oklch(0.9848 0 0);
+  --muted: oklch(0.2400 0.0080 258.14);
+  --muted-foreground: oklch(0.7000 0.0100 258.14);
+  --accent: oklch(0.6296 0.1863 258.1459);
+  --accent-foreground: oklch(1.0000 0 0);
+  --destructive: oklch(0.5409 0.2143 28.4788);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.3200 0.0100 258.14);
+  --input: oklch(0.2500 0.0080 258.14);
+  --ring: oklch(0.6296 0.1863 258.1459);
+  --radius: 0.5rem;
+
+  --frame-gap: 0.625rem;
+  --frame-px: 0.625rem;
+  --frame-py: 0.625rem;
+  --frame-radius: 0.5rem;
+  --frame-panel-bg: oklch(0.2210 0.0070 258.14 / 0.95);
+  --frame-panel-border-color: oklch(0.3200 0.0100 258.14);
+  --frame-border-color: oklch(0.38 0.012 258);
+
+  --theme-glow: 0 0 22px oklch(0.6296 0.1863 258.1459 / 0.22);
+  --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* 18. Deep Cobalt Azure Light (theme3.md) */
+[data-theme="cobalt-light"],
+[data-theme="deep-cobalt-light"] {
+  --background: oklch(1.0000 0 0);
+  --foreground: oklch(0.2697 0 0);
+  --card: oklch(0.9850 0.0020 258.14);
+  --card-foreground: oklch(0.2697 0 0);
+  --popover: oklch(1.0000 0 0);
+  --popover-foreground: oklch(0.2697 0 0);
+  --primary: oklch(0.5296 0.1863 258.1459);
+  --primary-foreground: oklch(1.0000 0 0);
+  --secondary: oklch(0.9686 0.0035 247.8590);
+  --secondary-foreground: oklch(0.2697 0 0);
+  --muted: oklch(0.9696 0 0);
+  --muted-foreground: oklch(0.5547 0 0);
+  --accent: oklch(0.5296 0.1863 258.1459);
+  --accent-foreground: oklch(1.0000 0 0);
+  --destructive: oklch(0.5409 0.2143 28.4788);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.8610 0 0);
+  --input: oklch(0.9234 0 0);
+  --ring: oklch(0.5296 0.1863 258.1459);
+  --radius: 0.5rem;
+
+  --frame-gap: 0.625rem;
+  --frame-px: 0.625rem;
+  --frame-py: 0.625rem;
+  --frame-radius: 0.5rem;
+  --frame-panel-bg: oklch(0.9850 0.0020 258.14 / 0.95);
+  --frame-panel-border-color: oklch(0.8610 0 0);
+  --frame-border-color: oklch(0.80 0 0);
+
+  --theme-glow: 0 0 20px oklch(0.5296 0.1863 258.1459 / 0.15);
+  --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+
+
+
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-2xs: var(--shadow-2xs, 0 1px 2px 0 rgb(0 0 0 / 0.05));
+  --shadow-xs: var(--shadow-xs, 0 1px 2px 0 rgb(0 0 0 / 0.05));
+  --shadow-sm: var(--shadow-sm, 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08));
+  --shadow: var(--shadow, 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08));
+  --shadow-md: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.08));
+  --shadow-lg: var(--shadow-lg, 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.08));
+  --shadow-xl: var(--shadow-xl, 0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.08));
+  --shadow-2xl: var(--shadow-2xl, 0 25px 50px -12px rgb(0 0 0 / 0.20));
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: rgba(226, 216, 202, 0.25);
+  color: #e4e0d8;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif);
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Neural Orb & Screen Containers from frontend */
+.vortex-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.vortex-gif {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.screens-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.screen.active {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Theme Surface & Component Dynamic Bindings
+ * Connects CSS Variables directly to Settings & Modal Layouts
+ * ───────────────────────────────────────────────────────────── */
+
+/* Full Modal Container */
+.zezo-theme-modal {
+  background-color: var(--card) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
+  box-shadow: none !important;
+  border-radius: var(--radius, 1rem) !important;
+}
+
+/* Modal Sidebar */
+.zezo-theme-sidebar {
+  background-color: var(--background) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
+}
+
+/* Modal Main Content Canvas */
+.zezo-theme-main {
+  background-color: var(--card) !important;
+  color: var(--foreground) !important;
+}
+
+/* Modal Top Header Bar */
+.zezo-theme-header {
+  background-color: var(--background) !important;
+  border-color: var(--border) !important;
+}
+
+/* Modal Surface Classes */
+.zezo-theme-card {
+  background-color: var(--card) !important;
+  border-color: var(--border) !important;
+}
+
+.zezo-theme-input {
+  background-color: var(--input) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Live Prototype Streaming & Equalizer Keyframes
+ * ───────────────────────────────────────────────────────────── */
+@keyframes soundwave-bounce {
+  0%, 100% {
+    height: 4px;
+    opacity: 0.4;
+  }
+  50% {
+    height: 18px;
+    opacity: 1;
+  }
+}
+
+.animate-soundwave-1 {
+  animation: soundwave-bounce 0.8s ease-in-out infinite;
+}
+.animate-soundwave-2 {
+  animation: soundwave-bounce 0.8s ease-in-out infinite 0.15s;
+}
+.animate-soundwave-3 {
+  animation: soundwave-bounce 0.8s ease-in-out infinite 0.3s;
+}
+.animate-soundwave-4 {
+  animation: soundwave-bounce 0.8s ease-in-out infinite 0.45s;
+}
+.animate-soundwave-5 {
+  animation: soundwave-bounce 0.8s ease-in-out infinite 0.2s;
+}
+.animate-soundwave-6 {
+  animation: soundwave-bounce 0.8s ease-in-out infinite 0.35s;
+}
+
+@keyframes live-cursor-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.animate-cursor-blink {
+  animation: live-cursor-blink 0.8s steps(2, start) infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(var(--primary-rgb, 234, 88, 12), 0.5);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(var(--primary-rgb, 234, 88, 12), 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(var(--primary-rgb, 234, 88, 12), 0);
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

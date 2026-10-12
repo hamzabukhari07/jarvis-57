@@ -2,14 +2,14 @@
   "fleet": {
     "MICHAEL": {
       "name": "MICHAEL",
-      "role": "Regional Manager & Master Orchestrator",
-      "specialty": "Task decomposition, multi-agent delegation, and status synthesis",
+      "role": "Lead Software Architect & Tech Lead",
+      "specialty": "High-level architecture design, code review, and structural planning",
       "color": "#a855f7",
       "avatar_pixel": "michael_pixel.png",
-      "default_tool": "opencode_run",
+      "default_tool": "groq",
       "risk_tier": "L1_MUTATION",
-      "prompt_prefix": "You are Michael Scott, Regional Manager of the Autonomous Coding Fleet.",
-      "model_id": "opencode/space-bunny-free",
+      "prompt_prefix": "You are MICHAEL, Lead Software Architect & Tech Lead.",
+      "model_id": "llama-3.3-70b-versatile",
       "desk_x": 180,
       "desk_y": 160,
       "worktree": "C:/Users/Hamza Bukhari/Desktop",
@@ -32,15 +32,15 @@
         "multi_agent_delegation"
       ]
     },
-    "ALI": {
-      "name": "Ali",
+    "VERVE": {
+      "name": "Verve",
       "role": "Frontend & UI Design Specialist",
       "specialty": "Responsive web apps, Tailwind/CSS layouts, animations, and studio-grade interfaces",
       "color": "#ec4899",
       "avatar_pixel": "pam_pixel.png",
       "default_tool": "antigravity_run",
       "risk_tier": "L1_MUTATION",
-      "prompt_prefix": "You are Ali, Senior Frontend and UI Architecture Specialist. Build pixel-perfect, modern, accessible, and responsive user interfaces using Antigravity and studio design tokens.",
+      "prompt_prefix": "You are Verve, Senior Frontend and UI Architecture Specialist. Build pixel-perfect, modern, accessible, and responsive user interfaces using Antigravity and studio design tokens.",
       "model_id": "gemini-3.7-flash-medium",
       "desk_x": 320,
       "desk_y": 160,
@@ -67,20 +67,20 @@
         "animations"
       ]
     },
-    "HAIDER": {
-      "name": "Haider",
+    "FLUX": {
+      "name": "Flux",
       "role": "Frontend Specialist & Overflow Developer",
       "specialty": "Modern web applications, component architecture, responsive styling, and fast UI synthesis",
       "color": "#f43f5e",
       "avatar_pixel": "jim_pixel.png",
       "default_tool": "antigravity_run",
       "risk_tier": "L1_MUTATION",
-      "prompt_prefix": "You are Haider, Frontend Specialist and UI Developer. You work closely with Ali to build clean, responsive, aesthetic user interfaces and handle frontend workloads with Antigravity.",
-      "model_id": "gemini-3.7-flash-medium",
+      "prompt_prefix": "You are Flux, Frontend Specialist and UI Developer. You work closely with Verve and the frontend team to build clean, responsive, aesthetic user interfaces and handle frontend workloads with Antigravity.",
+      "model_id": "gemini-3.8-flash-low",
       "desk_x": 320,
       "desk_y": 280,
-      "worktree": null,
-      "active_worktree": null,
+      "worktree": "None",
+      "active_worktree": "None",
       "allowed_tools": [
         "antigravity_run",
         "extract_design_system",
@@ -104,7 +104,7 @@
       ]
     },
     "AHMAD": {
-      "name": "Ahmad",
+      "name": "Nexus",
       "role": "Full-Stack & Backend Specialist",
       "specialty": "FastAPI, PostgreSQL, microservices, complex business logic, and database schemas",
       "color": "#06b6d4",
@@ -267,6 +267,70 @@
         "web_research",
         "media_extraction",
         "content_analysis"
+      ]
+    },
+    "DEVDYNAMO": {
+      "name": "DevDynamo",
+      "role": "Full-Stack Developer & Autonomous Engineer",
+      "specialty": "Full-stack development, modern web engineering, and autonomous task execution",
+      "color": "#3b82f6",
+      "avatar_pixel": "devdynamo_pixel.png",
+      "default_tool": "opencode_run",
+      "risk_tier": "L1_MUTATION",
+      "prompt_prefix": "You are DevDynamo, an autonomous fleet specialist focusing on Full-stack development, modern web engineering, and autonomous task execution.",
+      "model_id": "",
+      "desk_x": 180,
+      "desk_y": 280,
+      "worktree": null,
+      "active_worktree": null,
+      "allowed_tools": [
+        "agent_reach",
+        "web_search",
+        "web_read_page",
+        "web_reader",
+        "file_processor"
+      ],
+      "allowed_skills": [
+        "web_scraper",
+        "social_research",
+        "web_research_pipeline"
+      ],
+      "capabilities": [
+        "web_research",
+        "media_extraction",
+        "content_analysis"
+      ]
+    },
+    "DATAEINSTEIN": {
+      "name": "InsightAI",
+      "role": "Data Scientist & AI Specialist",
+      "specialty": "Machine Learning, Data Analysis, Predictive Modeling",
+      "color": "#3b82f6",
+      "avatar_pixel": "dataeinstein_pixel.png",
+      "default_tool": "antigravity_run",
+      "risk_tier": "L1_MUTATION",
+      "prompt_prefix": "You are Dataeinstein, an autonomous fleet specialist focusing on Machine Learning, Data Analysis, Predictive Modeling.",
+      "model_id": "gemini-3.8-flash-low",
+      "desk_x": 180,
+      "desk_y": 400,
+      "worktree": "None",
+      "active_worktree": "None",
+      "allowed_tools": [
+        "opencode_run",
+        "quick_snippet",
+        "file_processor",
+        "file_controller"
+      ],
+      "allowed_skills": [
+        "opencode",
+        "multi_agent_collaboration",
+        "make_plan",
+        "git_workflow"
+      ],
+      "capabilities": [
+        "backend_architecture",
+        "api_development",
+        "database_design"
       ]
     }
   }
