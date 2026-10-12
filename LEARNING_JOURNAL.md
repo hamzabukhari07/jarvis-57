@@ -1,3 +1,36 @@
+## [2026-10-12] — Task Cancellation Integrity & Fleet Dispatch Debounce Fix
+- **What was diagnosed & fixed:**
+  - **1. Duplicate Task Creation on Rapid Speech Turns (`actions/fleet_control.py`):**
+    - When the user continued speaking or Gemini emitted back-to-back dispatch calls within a few seconds (e.g., at 13:43:46 and 13:43:50), two identical parallel synthesis tasks were spawned on the same agent (`VERVE`).
+    - **Fix:** Added a 12-second in-flight debouncing and similarity cache (`_RECENT_DISPATCHES`) in `actions/fleet_control.py`. If a task with identical or matching prompt is dispatched to the same agent within 12 seconds, it returns the active in-flight task ID and suppresses duplicate execution.
+  - **2. Cancelled Tasks Reporting "Completed successfully" with 100% Progress (`actions/antigravity_agent.py`, `core/fleet_manager.py`, `core/task_manager.py`, `web/src/App.tsx`, `web/src/components/tasks/TaskManagerModal.tsx`):**
+    - When a task was cancelled via `task_status(action="cancel")`, `task_manager.cancel()` marked `s.status = TaskStatus.CANCELLED`. However:
+      1. In `actions/antigravity_agent.py`, the CLI process was terminated, but the worker thread proceeded to fallback inspection, logged "CLI exited without deliverables", fell back to direct Gemini REST generation, and called `on_complete()`.
+      2. In `core/fleet_manager.py`, `_worker_fn` did not check `task_ctx.cancelled()` after action execution or before calling `complete_task()`, and unconditionally called `_reporting_wrapper(100, "Completed successfully")` and broadcast `task_done`.
+      3. In `core/task_manager.py`, `_report()` did not ignore incoming progress calls if a task was already in `CANCELLED` status or had its `cancel_event` set.
+      4. In `web/src/App.tsx`, task cards did not have distinct styling or badges for `CANCELLED` status and defaulted to showing "completed" text.
+    - **Fix:**
+      - Added rigorous cancellation checkpoints (`ctx.cancelled()`) in `actions/antigravity_agent.py` before deliverable checks, before fallback planning, and before browser preview launch.
+      - In `core/fleet_manager.py`, `_reporting_wrapper` and `_worker_fn` explicitly check `task_ctx.cancelled()` and discard late updates or broadcasts when a task is cancelled, broadcasting `task_cancelled` instead of `task_done`.
+      - In `core/task_manager.py`, `cancel()` sets `s.message = "Cancelled by user"`, appends a cancellation log, and `_report()` ignores updates for cancelled tasks.
+      - In `web/src/App.tsx` and `TaskManagerModal.tsx`, properly render `CANCELLED` badge, red styling, display task titles/messages accurately, and prevent progress bars from defaulting to 100%.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile actions/antigravity_agent.py core/task_manager.py core/fleet_manager.py actions/fleet_control.py` passed with 0 errors. Action registry discovery verified 29 active tools. Modern React production build (`npm run build`) succeeded with 0 errors in 3.42s.
+  - Layer 2 (Runtime): Tested runtime debounce: rapid duplicate dispatch was cleanly intercepted with `"Task already dispatched to Verve and in progress."`. Tested runtime async cancellation: cancelled task immediately reported `CANCELLED`, progress remained 0%, message showed `"Cancelled by user"`, and no subsequent "Completed successfully" was emitted.
+  - Layer 3 (Regression): `pytest tests/test_fleet_control_suite.py tests/test_ui_and_task_suite.py` passed 13/13 tests cleanly.
+- **Key files touched:**
+  - `actions/antigravity_agent.py`
+  - `core/fleet_manager.py`
+  - `core/task_manager.py`
+  - `actions/fleet_control.py`
+  - `web/src/App.tsx`
+  - `web/src/components/tasks/TaskManagerModal.tsx`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - In async worker pipelines that feature multiple fallback tiers, always check `ctx.cancelled()` at each stage boundary to prevent a cancelled primary tool from triggering a secondary fallback pipeline.
+
+---
+
 ## [2026-10-12] — Ghost Agent "Ali" Elimination, Live Dynamic Fleet Roster & Worktree Directory Creation Fix
 - **What was diagnosed & fixed:**
   - **1. Ghost Agent Delegation to "Ali" (`actions/fleet_control.py`, `core/prompt.txt`, `core/fleet_manager.py`, `main.py`):**

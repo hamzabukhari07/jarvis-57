@@ -53,6 +53,7 @@ import {
   CheckCircle2,
   Clock,
   GitBranch,
+  AlertCircle,
 } from 'lucide-react'
 
 export default function App() {
@@ -745,12 +746,18 @@ export default function App() {
                         const status = (t.status || 'QUEUED').toUpperCase()
                         const isRunning = status === 'IN_PROGRESS' || status === 'RUNNING'
                         const isDone = status === 'COMPLETED' || status === 'SUCCESS' || status === 'DONE'
+                        const isCancelled = status === 'CANCELLED'
+                        const isFailed = status === 'FAILED'
 
                         const badgeVariant = isRunning
                           ? 'running'
                           : isDone
                             ? 'success'
-                            : 'queued'
+                            : isCancelled || isFailed
+                              ? 'destructive'
+                              : 'queued'
+
+                        const displayTitle = t.prompt || t.group_title || t.params?.taskTitle || t.params?.task || t.message || t.id
 
                         return (
                           <div
@@ -759,8 +766,13 @@ export default function App() {
                           >
                             {/* Task Description */}
                             <div className="font-medium text-[var(--foreground)] text-xs leading-snug break-words">
-                              {t.message || t.id}
+                              {displayTitle}
                             </div>
+                            {t.message && t.message !== displayTitle && (
+                              <div className="text-[11px] text-[var(--muted-foreground)] font-mono leading-tight truncate">
+                                {t.message}
+                              </div>
+                            )}
 
                             {/* Status Tag Badge + Progress Details */}
                             <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/40">
@@ -769,11 +781,18 @@ export default function App() {
                                   variant={badgeVariant}
                                   size="xs"
                                   radius="default"
-                                  className={`gap-1 font-semibold ${isDone ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : ''}`}
+                                  className={`gap-1 font-semibold ${
+                                    isDone
+                                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                                      : isCancelled || isFailed
+                                        ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                                        : ''
+                                  }`}
                                 >
                                   {isRunning && <Loader2 className="w-2.5 h-2.5 animate-spin text-[var(--primary)]" />}
                                   {isDone && <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />}
-                                  {!isRunning && !isDone && <Clock className="w-2.5 h-2.5 text-[var(--muted-foreground)]" />}
+                                  {(isCancelled || isFailed) && <AlertCircle className="w-2.5 h-2.5 text-red-400" />}
+                                  {!isRunning && !isDone && !isCancelled && !isFailed && <Clock className="w-2.5 h-2.5 text-[var(--muted-foreground)]" />}
                                   <span>{isRunning ? 'RUNNING' : status}</span>
                                 </Badge>
                                 <span className="text-[9px] font-mono text-[var(--muted-foreground)] uppercase">
@@ -792,7 +811,9 @@ export default function App() {
                                         ? 'bg-[var(--primary)]'
                                         : isDone
                                           ? 'bg-emerald-500'
-                                          : 'bg-[var(--muted)]'
+                                          : isCancelled || isFailed
+                                            ? 'bg-red-500/60'
+                                            : 'bg-[var(--muted)]'
                                     }`}
                                     style={{ width: `${t.progress}%` }}
                                   />

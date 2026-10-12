@@ -28,6 +28,11 @@ def _broadcast_ui(event: str, data: Dict[str, Any]) -> None:
         logger.debug("Failed broadcasting fleet UI event %s: %s", event, e)
 
 
+import time
+
+_RECENT_DISPATCHES: Dict[str, tuple[float, str, str]] = {}  # agent_id -> (timestamp, task_text, task_id)
+
+
 def _handle_dispatch(params: Dict[str, Any]) -> str:
     agent_id = str(params.get("agent_id") or "").strip()
     task = str(params.get("task") or "").strip()
@@ -36,6 +41,24 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
         return "Error: agent_id is required to dispatch a task. Available agents can be queried with action='list_agents'."
     if not task:
         return "Error: task instruction is required to dispatch work to an agent."
+
+    # Debounce / deduplication check (12 seconds window for same agent and similar prompt)
+    now = time.time()
+    agent_key = agent_id.upper()
+    if agent_key in _RECENT_DISPATCHES:
+        last_time, last_task, existing_task_id = _RECENT_DISPATCHES[agent_key]
+        if (now - last_time) < 12.0:
+            # Check prompt similarity: identical, substring, or close length
+            t1, t2 = task.lower().strip(), last_task.lower().strip()
+            if t1 == t2 or t1 in t2 or t2 in t1:
+                logger.info(
+                    "[FleetControl] Debounced duplicate dispatch to %s within %.1fs (existing task %s)",
+                    agent_key,
+                    now - last_time,
+                    existing_task_id,
+                )
+                agent_name = (fleet_manager.get_agent(agent_id) or type("Agent", (), {"name": agent_id})).name
+                return f"Task already dispatched to {agent_name} and in progress. Task ID: {existing_task_id}."
 
     res = fleet_manager.dispatch_task(agent_id=agent_id, prompt=task, model_override=model_id)
     if not res.get("success"):
@@ -50,6 +73,9 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
     agent_name = res.get("agent_name", agent_id)
     tool = res.get("tool", "agent")
     worktree = res.get("worktree")
+
+    if task_id:
+        _RECENT_DISPATCHES[agent_key] = (now, task, task_id)
 
     _broadcast_ui("agent_task_started", {
         "task_id": task_id,

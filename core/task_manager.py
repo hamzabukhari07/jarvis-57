@@ -452,7 +452,12 @@ class TaskManager:
                     item[4].message = f"queued (position #{idx})"
             s.cancel_event.set()
             s.status = TaskStatus.CANCELLED
+            s.message = "Cancelled by user"
             s.finished_at = time.time()
+            ts = time.strftime("%H:%M:%S")
+            s.logs.append({"time": ts, "text": "Task cancelled by user", "progress": s.progress})
+            if len(s.logs) > 60:
+                s.logs = s.logs[-60:]
             self._terminate_pid(s.pid)
             self._dequeue_next_coding_task()
             return True
@@ -552,7 +557,7 @@ class TaskManager:
     def _report(self, task_id: str, progress: int, message: str = "") -> None:
         with self._lock:
             s = self._tasks.get(task_id)
-            if not s:
+            if not s or s.status in (TaskStatus.CANCELLED, TaskStatus.FAILED) or s.cancel_event.is_set():
                 return
             if progress is not None and progress >= 0:
                 s.progress = max(0, min(100, progress))

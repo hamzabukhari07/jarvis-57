@@ -3,7 +3,7 @@ version: "3.0"
 name: "Autonomus"
 theme: "dark"
 source: "C:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57/skills/hamza_taste/references/html/autonomus.html"
-extracted_at: "2026-10-11T20:34:43.304359+00:00"
+extracted_at: "2026-10-12T08:57:26.474423+00:00"
 description: "High-precision studio design system extracted deterministically from Autonomus. Features deep #050505 void canvas, high-contrast #f5f5f7 typography, vibrant #f24e1e accents, and glassy elevation."
 colors:
   primary: "#f24e1e"

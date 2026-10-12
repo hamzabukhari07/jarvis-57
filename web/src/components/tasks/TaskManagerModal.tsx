@@ -269,8 +269,10 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
               ) : (
                 <div className="space-y-2.5">
                   {filteredTasks.map((t) => {
-                    const isRunning = (t.status || '').toLowerCase() === 'running'
-                    const progressVal = t.progress !== undefined ? t.progress : isRunning ? 50 : 100
+                    const st = (t.status || '').toLowerCase()
+                    const isRunning = st === 'running'
+                    const isDone = st === 'done' || st === 'completed'
+                    const progressVal = t.progress !== undefined ? t.progress : isDone ? 100 : isRunning ? 50 : 0
 
                     return (
                       <div

@@ -651,6 +651,8 @@ class FleetManager:
                 orig_report = getattr(task_ctx, "report", None)
 
                 def _reporting_wrapper(prog: int, msg: str = "") -> None:
+                    if hasattr(task_ctx, "cancelled") and task_ctx.cancelled():
+                        return
                     if orig_report:
                         try:
                             orig_report(prog, msg)
@@ -710,6 +712,22 @@ class FleetManager:
 
                 res = reg.run(effective_tool, call_params)
 
+                # Check if task was cancelled during action execution
+                if hasattr(task_ctx, "cancelled") and task_ctx.cancelled():
+                    self.complete_task(agent.id, submitted_id)
+                    self._broadcast_event("task_cancelled", {
+                        "task_id": submitted_id,
+                        "agent_id": agent.id,
+                        "agent": agent.name,
+                    })
+                    self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
+                    if worktree_path:
+                        try:
+                            git_sandbox.safe_teardown(f"{agent.id.lower()}_{task_id}")
+                        except Exception:
+                            pass
+                    return {"status": "cancelled"}
+
                 # Inspect result for explicit errors, missing parameters, or failures
                 is_error = False
                 err_msg = ""
@@ -717,6 +735,20 @@ class FleetManager:
                     if res.get("status") in ("error", "failed") or res.get("success") is False:
                         is_error = True
                         err_msg = str(res.get("error") or res.get("message") or "Task execution failed")
+                    elif res.get("status") == "cancelled":
+                        self.complete_task(agent.id, submitted_id)
+                        self._broadcast_event("task_cancelled", {
+                            "task_id": submitted_id,
+                            "agent_id": agent.id,
+                            "agent": agent.name,
+                        })
+                        self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
+                        if worktree_path:
+                            try:
+                                git_sandbox.safe_teardown(f"{agent.id.lower()}_{task_id}")
+                            except Exception:
+                                pass
+                        return {"status": "cancelled"}
                 elif isinstance(res, str):
                     low_res = res.lower().strip()
                     if low_res.startswith("error:") or low_res.startswith("failed:") or low_res.startswith("please provide"):

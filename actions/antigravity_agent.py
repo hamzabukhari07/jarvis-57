@@ -687,6 +687,10 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
                 except Exception:
                     pass
 
+        # Check if task was cancelled before checking deliverables or falling back
+        if ctx.cancelled():
+            return {"status": "cancelled", "repo": str(repo)}
+
         # Inspect generated files in repo
         created_list = []
         entry_point = "index.html" if (repo / "index.html").exists() else "main.py"
@@ -725,6 +729,8 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
         has_entry = (repo / "index.html").exists() or (repo / "main.py").exists() or (repo / "src").exists()
 
         if not real_files or not has_entry:
+            if ctx.cancelled():
+                return {"status": "cancelled", "repo": str(repo)}
             logger.warning(
                 "[Antigravity] CLI exited without creating valid project deliverables in %s (found: %s). Falling back to direct Gemini REST pipeline...",
                 repo.name,
@@ -778,6 +784,9 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
             return result_payload
 
     # 3. Fallback: Python Gemini REST Generation
+    if ctx.cancelled():
+        return {"status": "cancelled", "repo": str(repo)}
+
     try:
         plan = plan_antigravity_project(task, repo, design_context=design_context)
     except Exception as e:
@@ -847,6 +856,9 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
             remember("active_file", first_file, category="projects")
     except Exception as e:
         logger.debug("Antigravity undo registration failed: %s", e)
+
+    if ctx.cancelled():
+        return {"status": "cancelled", "repo": str(repo)}
 
     # Automatically launch live preview in the user's default browser if index.html exists
     if (repo / "index.html").exists():
