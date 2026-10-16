@@ -1,3 +1,28 @@
+## [2026-10-16] — Clean Unified Frontend Architecture (100% React & Remote Gateway)
+- **What was built & reorganized:**
+  - Deleted obsolete HTML/CSS/JS prototype folder (`frontend/`).
+  - Promoted and renamed modern React 19 Desktop OS Workstation & HUD from `web/` to `frontend/`.
+  - Renamed `dashboard/` to `remote/` (dedicated Mobile Remote Control Gateway & Phone Audio Streamer).
+  - Updated `core/ui_server.py` to route exclusively to `frontend/dist/index.html` and `frontend/dist/assets/`, eliminating legacy HTML fallbacks.
+  - Updated `_preview_voice_handler` and `_favicon_handler` to serve from `frontend/dist` and `frontend/public`.
+  - Updated `main.py` to auto-trigger `npm install && npm run build` on fresh PCs when `node_modules` is missing, guaranteeing zero-config React startup out-of-the-box.
+  - Updated `AGENTS.md` system context to reflect the clean monolithic layout.
+- **Why this approach was chosen:**
+  - Eliminates developer confusion between duplicate `web` and `frontend` folders, adheres to industry-standard desktop agent architecture, and prevents Python backend logic from colliding with React frontend code.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile core/ui_server.py main.py remote/server.py ui.py` passed with 0 errors. Action registry discovered 29 tools.
+  - Layer 2 (Runtime): `npm run build` in `frontend/` succeeded with 0 errors in 9.33s. Python test server confirmed `GET /` returns status 200 with `<div id="root">`, and `/api/preview_voice?voice=fenrir` returns 200 `audio/mpeg`.
+  - Layer 3 (Regression): Confirmed existing action discovery and PyQt container bindings remain intact.
+- **Key files touched:**
+  - `core/ui_server.py`
+  - `main.py`
+  - `ui.py`
+  - `remote/server.py`
+  - `AGENTS.md`
+  - `LEARNING_JOURNAL.md`
+
+---
+
 ## [2026-10-12] — ZEZO Waitlist Cosmic Horizon Aesthetic & Live Free Google Sheets Backend
 - **What was built:**
   - Complete visual overhaul of `zezo-waitlist/` to mirror the user-provided cosmic inspiration reference (`Waitlister AI STOCK` aesthetic).

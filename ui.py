@@ -1,6 +1,6 @@
 """
 ZEZO OS — Desktop Window Container & Web Engine Host.
-Integrates the Autonomous Traffic Vectors HTML5/CSS/JS frontend with the Python backend.
+Integrates the modern React 19 Desktop OS Workstation & HUD with the Python backend.
 """
 from __future__ import annotations
 
@@ -149,7 +149,7 @@ def apply_ui_accent(hex_color: str) -> bool:
 
 
 class MainWindow(QMainWindow):
-    """Main desktop container window hosting the HTML5/CSS/JS frontend via QWebEngineView."""
+    """Main desktop container window hosting the React 19 Desktop OS Workstation via QWebEngineView."""
 
     _log_sig = pyqtSignal(str)
     _stream_sig = pyqtSignal(str, str, bool)

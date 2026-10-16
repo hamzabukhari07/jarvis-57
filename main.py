@@ -2649,9 +2649,9 @@ class ZezoLive:
             except Exception as _e:
                 print(f"[Audio] {_kind} device auto-detect skipped: {_e}")
 
-        # Start dashboard (optional — needs: pip install fastapi "uvicorn[standard]" cryptography)
+        # Start mobile remote gateway (optional — needs: pip install fastapi "uvicorn[standard]" cryptography)
         try:
-            from dashboard.server import DashboardServer
+            from remote.server import DashboardServer
             self._dashboard = DashboardServer()
             self._dashboard.set_connect_callback(self._on_phone_connected)
             self._dashboard.set_file_callback(self._on_dashboard_file_uploaded)
@@ -2660,7 +2660,7 @@ class ZezoLive:
             # Runs for the whole lifetime, not just inside an active session
             asyncio.create_task(self._process_dashboard_commands())
         except Exception as e:
-            print(f"[Dashboard] Disabled: {e}")
+            print(f"[Remote] Disabled: {e}")
             self._dashboard = None
 
         while True:
@@ -2924,13 +2924,18 @@ def main():
             if ensure_requirements(_log):
                 ensure_playwright_browsers(_log)
             # Guarantee single-terminal: build modern React frontend if dist is missing
-            react_dist = Path(__file__).resolve().parent / "web" / "dist"
-            web_dir = Path(__file__).resolve().parent / "web"
-            if not react_dist.exists() and (web_dir / "package.json").exists():
+            react_dist = Path(__file__).resolve().parent / "frontend" / "dist"
+            frontend_dir = Path(__file__).resolve().parent / "frontend"
+            if not react_dist.exists() and (frontend_dir / "package.json").exists():
                 _log("[Frontend] Compiling modern React UI in background (single-terminal mode)...")
                 try:
                     import subprocess
-                    subprocess.run(["npm.cmd" if _platform.system() == "Windows" else "npm", "run", "build"], cwd=str(web_dir), check=False, creationflags=_subprocess.CREATE_NO_WINDOW if _platform.system() == "Windows" else 0)
+                    npm_cmd = "npm.cmd" if _platform.system() == "Windows" else "npm"
+                    flags = _subprocess.CREATE_NO_WINDOW if _platform.system() == "Windows" else 0
+                    if not (frontend_dir / "node_modules").exists():
+                        _log("[Frontend] Installing node_modules for React UI...")
+                        subprocess.run([npm_cmd, "install"], cwd=str(frontend_dir), check=False, creationflags=flags)
+                    subprocess.run([npm_cmd, "run", "build"], cwd=str(frontend_dir), check=False, creationflags=flags)
                     _log("[Frontend] Modern React UI compiled successfully.")
                 except Exception as b_err:
                     _log(f"[Frontend] Background build notice: {b_err}")

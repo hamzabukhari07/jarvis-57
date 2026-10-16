@@ -166,14 +166,15 @@ class ZezoUIServer:
         app.router.add_get("/zezo-avatar.png", self._avatar_handler)
         app.router.add_get("/favicon.ico", self._favicon_handler)
 
-        # Serve compiled React SPA (web/dist) static assets if built, with fallback to frontend
-        web_dist_dir = BASE_DIR / "web" / "dist"
-        if (web_dist_dir / "assets").exists():
-            app.router.add_static("/assets", path=str(web_dist_dir / "assets"), show_index=False)
+        # Serve compiled React SPA (frontend/dist) static assets
+        frontend_dist = self.frontend_dir / "dist"
+        if (frontend_dist / "assets").exists():
+            app.router.add_static("/assets", path=str(frontend_dist / "assets"), show_index=False)
 
-        # Serve frontend static assets
-        if self.frontend_dir.exists():
-            app.router.add_static("/", path=str(self.frontend_dir), show_index=False)
+        # Serve frontend public static assets (avatar, icons, audio)
+        frontend_public = self.frontend_dir / "public"
+        if frontend_public.exists():
+            app.router.add_static("/public", path=str(frontend_public), show_index=False)
 
         self._runner = web.AppRunner(app)
         await self._runner.setup()
@@ -822,19 +823,23 @@ class ZezoUIServer:
 
     async def _preview_voice_handler(self, request: web.Request) -> web.Response:
         voice = request.query.get("voice", "Puck").strip().lower()
-        mp3_path = self.frontend_dir / "assets" / "voices" / f"{voice}.mp3"
+        # Check dist assets first, then public assets
+        mp3_path = self.frontend_dir / "dist" / "assets" / "voices" / f"{voice}.mp3"
+        if not mp3_path.exists():
+            mp3_path = self.frontend_dir / "public" / "assets" / "voices" / f"{voice}.mp3"
         if mp3_path.exists():
             return web.FileResponse(mp3_path)
         return web.Response(status=404, text="Voice preview not found")
 
     async def _index_handler(self, request: web.Request) -> web.Response:
-        web_dist_idx = BASE_DIR / "web" / "dist" / "index.html"
-        if web_dist_idx.exists():
-            return web.FileResponse(web_dist_idx)
-        idx = self.frontend_dir / "index.html"
-        if idx.exists():
-            return web.FileResponse(idx)
-        return web.Response(text="<h1>ZEZO UI Engine Online</h1><p>Frontend assets initializing...</p>", content_type="text/html")
+        frontend_dist_idx = self.frontend_dir / "dist" / "index.html"
+        if frontend_dist_idx.exists():
+            return web.FileResponse(frontend_dist_idx)
+        return web.Response(
+            text="<h1>ZEZO React Workstation Initializing...</h1><p>Please compile the frontend using: <code>cd frontend && npm run build</code></p>",
+            content_type="text/html",
+            status=503
+        )
 
     async def _attachments_list_handler(self, request: web.Request) -> web.Response:
         """Fetch all currently registered file and folder attachments."""
@@ -863,16 +868,10 @@ class ZezoUIServer:
             return web.json_response({"status": "success", "cpu": 0, "mem": 0, "gpu": 0, "net": 0})
 
     async def _office_view_handler(self, request: web.Request) -> web.Response:
-        office_prod = self.frontend_dir / "office.html"
-        if office_prod.exists():
-            return web.FileResponse(office_prod)
-        office_legacy = BASE_DIR / "frontend" / "office.html"
-        if office_legacy.exists():
-            return web.FileResponse(office_legacy)
-        office_fallback = BASE_DIR / "prototypes" / "scranton_pixel_office_fleet" / "index.html"
-        if office_fallback.exists():
-            return web.FileResponse(office_fallback)
-        return web.Response(text="<h1>Scranton Office Deck</h1><p>Deck layout file not found.</p>", content_type="text/html")
+        frontend_dist_idx = self.frontend_dir / "dist" / "index.html"
+        if frontend_dist_idx.exists():
+            return web.FileResponse(frontend_dist_idx)
+        return web.Response(text="<h1>Scranton Office Deck</h1><p>Open via ZEZO React Desktop Workstation.</p>", content_type="text/html")
 
     async def _fleet_state_handler(self, request: web.Request) -> web.Response:
         try:
@@ -1601,9 +1600,9 @@ class ZezoUIServer:
         })
 
     async def _favicon_handler(self, request: web.Request) -> web.Response:
-        fav = self.frontend_dir / "favicon.ico"
-        if fav.exists():
-            return web.FileResponse(fav)
+        for p in [self.frontend_dir / "dist" / "favicon.ico", self.frontend_dir / "public" / "favicon.ico"]:
+            if p.exists():
+                return web.FileResponse(p)
         return web.Response(status=204)
 
     async def _ws_handler(self, request: web.Request) -> web.WebSocketResponse:

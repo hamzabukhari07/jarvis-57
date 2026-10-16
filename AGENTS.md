@@ -87,11 +87,15 @@ zezo version 2/
 │   ├── config_manager.py       # Thread-safe read/write for user config & API keys
 │   └── repo_context.json       # Persisted active repository path
 │
-├── web/                        # 🖥️ React 19 Desktop OS Workstation & HUD (Port 8765)
+├── frontend/                   # 🖥️ React 19 Desktop OS Workstation & HUD (Port 8765)
 │   ├── src/components/memory/  # Obsidian 2D Canvas force-graph & Markdown Inspector drawer
 │   ├── src/components/settings/# Full-Screen Native OS Settings Screen
 │   ├── src/components/office/  # Scranton Autonomous Pixel Office Screen
 │   └── dist/                   # Production build served by core/ui_server.py
+│
+├── remote/                     # 📱 Dedicated Mobile Remote Gateway (FastAPI + WebSockets)
+│   ├── server.py               # Mobile phone audio/command relay & AES encrypted socket
+│   └── static/                 # Mobile web client assets
 │
 ├── skills/                     # 📚 Declarative Multi-Step Skill Packages (10 Skills)
 │   ├── hamza_taste/            # Studio UI aesthetic, anti-slop rules & design presets
