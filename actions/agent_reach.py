@@ -63,6 +63,8 @@ def _transcribe_video_audio(url: str, max_duration_sec: int = 0, include_timesta
             }
             if max_duration_sec and max_duration_sec > 0:
                 ydl_opts["postprocessor_args"] = ["-t", str(max_duration_sec)]
+            else:
+                ydl_opts["postprocessor_args"] = ["-t", "1200"]
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
@@ -73,23 +75,50 @@ def _transcribe_video_audio(url: str, max_duration_sec: int = 0, include_timesta
 
             audio_path = files[0]
             try:
+                import gc
                 from faster_whisper import WhisperModel
-                threads = min(6, os.cpu_count() or 4)
-                model = WhisperModel("base", device="cpu", compute_type="int8", cpu_threads=threads)
-                segments, info = model.transcribe(audio_path, beam_size=1, vad_filter=True)
-                if include_timestamps:
-                    transcribed_lines = []
-                    for s in segments:
-                        txt = s.text.strip()
-                        if txt:
-                            mins, secs = divmod(int(s.start), 60)
-                            transcribed_lines.append(f"[{mins:02d}:{secs:02d}] {txt}")
-                    if transcribed_lines:
-                        return "\n".join(transcribed_lines)
-                else:
-                    transcribed_lines = [s.text.strip() for s in segments if s.text.strip()]
-                    if transcribed_lines:
-                        return " ".join(transcribed_lines)
+                # Cap threads to 2 to prevent 100% CPU starvation and WebSocket keepalive drops
+                threads = min(2, max(1, (os.cpu_count() or 4) // 2))
+
+                orig_prio = None
+                try:
+                    import psutil
+                    proc = psutil.Process()
+                    orig_prio = proc.nice()
+                    if hasattr(psutil, "BELOW_NORMAL_PRIORITY_CLASS"):
+                        proc.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+                except Exception:
+                    pass
+
+                model = None
+                try:
+                    model = WhisperModel("base", device="cpu", compute_type="int8", cpu_threads=threads)
+                    segments, info = model.transcribe(audio_path, beam_size=1, vad_filter=True)
+                    if include_timestamps:
+                        transcribed_lines = []
+                        for s in segments:
+                            txt = s.text.strip()
+                            if txt:
+                                mins, secs = divmod(int(s.start), 60)
+                                transcribed_lines.append(f"[{mins:02d}:{secs:02d}] {txt}")
+                        if transcribed_lines:
+                            return "\n".join(transcribed_lines)
+                    else:
+                        transcribed_lines = [s.text.strip() for s in segments if s.text.strip()]
+                        if transcribed_lines:
+                            return " ".join(transcribed_lines)
+                finally:
+                    if orig_prio is not None:
+                        try:
+                            proc.nice(orig_prio)
+                        except Exception:
+                            pass
+                    if model is not None:
+                        try:
+                            del model
+                            gc.collect()
+                        except Exception:
+                            pass
             except Exception as fe:
                 logger.debug(f"faster-whisper transcription fallback: {fe}")
                 try:
@@ -1293,13 +1322,15 @@ def agent_reach_action(parameters: dict, player=None, speak=None) -> str:
                     "YouTube transcripts and GitHub READMEs) and included a per-source analysis plus an executive summary."
                 )
 
-            return {
+            final_result = {
                 "output": res,
                 "summary": summary_msg,
                 "result": res,
                 "full_content": res,
                 "subtasks": subtasks_list or [],
             }
+            ctx.on_complete(final_result)
+            return final_result
 
         task_id = tm.submit(f"agent_reach:{platform}", _worker, parameters)
         return f"Searching {platform} for '{target}'. Task ID: {task_id}. Results will appear in HUD Live Display Canvas."

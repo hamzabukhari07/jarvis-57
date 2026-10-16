@@ -1,3 +1,68 @@
+## [2026-10-12] — ZEZO Waitlist Cosmic Horizon Aesthetic & Live Free Google Sheets Backend
+- **What was built:**
+  - Complete visual overhaul of `zezo-waitlist/` to mirror the user-provided cosmic inspiration reference (`Waitlister AI STOCK` aesthetic).
+  - Deep pitch-black cosmic canvas (`#000000`) with subtle scattered pinprick stars.
+  - Atmospheric blue horizon haze and sweeping planet curve arc with glowing radiant crest line at the bottom.
+  - Headline layout with hybrid sans-serif and elegant italic serif emphasis (`Playfair Display`): *"The wait is part of the journey."*
+  - Unified capsule input bar with integrated `"Your email address"` field and solid white `"Get Notified"` CTA button.
+  - Smooth inline transition to green checkmark confirmation upon submission.
+  - Connected and verified live Google Apps Script webhook integration (`https://script.google.com/macros/s/AKfycb.../exec`), successfully receiving and appending test submissions directly into user's Google Sheet in real-time with $0 server cost.
+- **Why this approach was chosen:**
+  - Matched the exact visual mood, typography hierarchy, and celestial curvature requested by Hamza Bukhari while providing an automated, zero-cost Google Sheet lead capture pipeline.
+- **Key files updated:**
+  - `zezo-waitlist/src/App.tsx`
+  - `zezo-waitlist/src/config.ts`
+  - `zezo-waitlist/src/index.css`
+  - `zezo-waitlist/index.html`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-12] — Left Task Card Cut-Off, Completed Task Status Leaks & Task Matrix Modal Sync Fix
+- **What was diagnosed & fixed:**
+  - **1. Left Sidebar Task Card Cut-Off Issue (`web/src/App.tsx`):**
+    - The task card in the tactical dashboard left panel was getting clipped along the right boundary of the container.
+    - Long unbroken text (such as raw URLs like `https://www.youtube.com/watch?v=...`) lacked `break-all` and `min-w-0`, and the bottom badge + progress row had tight margins that pushed content outside the viewport.
+    - **Fix:** Added `min-w-0`, `w-full`, `overflow-hidden`, and `break-all` on task description and title containers. Made the ID tag `truncate` and badge row `shrink-0` with tabular numbers and responsive padding (`p-2.5`).
+  - **2. Completed Tasks Remaining in RUNNING Status (`actions/agent_reach.py`):**
+    - The async `agent_reach` worker finished extracting YouTube transcripts/descriptions and displayed the content on the HUD canvas, but did not invoke `ctx.on_complete(final_result)` before exiting the thread.
+    - **Fix:** Explicitly called `ctx.on_complete(final_result)` upon successful completion, ensuring the task status immediately transitions to `DONE` and sets progress to 100% in `TaskManager`.
+  - **3. Task Matrix & Registry Modal Empty ("No tasks in registry") (`web/src/App.tsx`, `web/src/components/tasks/TaskManagerModal.tsx`):**
+    - `TaskManagerModal` maintained its own isolated state that polled `/api/tasks` without receiving the live `tasks` list from `useZezoSocket()`. If the modal was opened while an active session was streaming via WebSocket, the modal's state stayed empty or lagged behind.
+    - Moreover, its search filter only matched `t.prompt` and `t.description`, ignoring `group_title`, `params.target`, and `params.taskTitle`.
+    - **Fix:** Passed `tasks={tasks}` from `App.tsx` to `TaskManagerModal`. In `TaskManagerModal.tsx`, synchronized state with the parent prop, updated fallback fetching, and expanded the search query filter to match `t.group_title`, `t.params?.target`, and `t.params?.taskTitle`.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile actions/agent_reach.py core/ui_server.py core/task_manager.py` passed with 0 errors. `npm --prefix web run build` succeeded with 0 errors in 2.94s. `ActionRegistry` discovery confirmed 29 tools active.
+  - Layer 2 (Runtime): Tested `agent_reach` worker completion lifecycle with `ctx.on_complete`: task immediately reported status `done`, `progress: 100`, and `finished_at` recorded.
+  - Layer 3 (Regression): `python -m unittest tests/test_config_endpoints.py` passed (Ran 1 test in 5.075s, OK).
+- **Key files touched:**
+  - `web/src/App.tsx`
+  - `web/src/components/tasks/TaskManagerModal.tsx`
+  - `actions/agent_reach.py`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-12] — Pure Raw HTML Reference Resolution in Website Creation Pipeline
+- **What was updated & configured:**
+  - **1. Website Creation Pipeline Bypass of Automatic MD Extraction (`core/design_resolver.py`):**
+    - Previously, whenever the user asked to build a website/landing page, `design_resolver.py` called `extract_design_system_from_html()` to parse the reference HTML and generate a `*-DESIGN.md` summary inside `skills/hamza_taste/references/design md/`.
+    - Updated `_load_or_extract_reference()` so that for autonomous website builds, it **directly resolves and provides pure raw HTML** (`DESIGN_BLUEPRINT.html`) to the agent without triggering intermediate Markdown file generation.
+    - Result: No cluttered `*-DESIGN.md` file creation during website builds, 0ms extraction delay, and the coding agent receives the exact original HTML template with authentic CSS keyframe animations, typography, and layout components.
+  - **2. Preserved Dedicated URL/File Design Extraction Tool (`actions/design_extractor.py`):**
+    - The standalone tool `extract_design_system` was strictly preserved.
+    - Whenever the user gives a website URL (e.g., `https://example.com`) or file path and asks Zezo to *"extract design system"*, `actions/design_extractor.py` executes normally, downloads/parses the page, and produces the complete design system token specification.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile core/design_resolver.py actions/design_extractor.py` passed with 0 errors.
+  - Layer 2 (Runtime): Tested website resolution: `resolve_design('build a modern portfolio site')` returned `source_type='reference_raw_html'` with full `raw_html` content and 0 `.md` files created. Tested manual extractor: `extract_design_action({'file_path': 'https://example.com'})` successfully extracted and saved `Example-DESIGN.md`.
+  - Layer 3 (Regression): `pytest tests/test_design_system_suite.py` passed 11/11 tests.
+- **Key files touched:**
+  - `core/design_resolver.py`
+  - `actions/design_extractor.py`
+  - `LEARNING_JOURNAL.md`
+
+---
+
 ## [2026-10-12] — Task Cancellation Integrity & Fleet Dispatch Debounce Fix
 - **What was diagnosed & fixed:**
   - **1. Duplicate Task Creation on Rapid Speech Turns (`actions/fleet_control.py`):**
@@ -4064,6 +4129,61 @@ Test all three scenarios.
   - `fleet_manager.get_fleet_deck_state()` returns all 8 named specialist personas with worktrees.
   - Standalone `/office` route and `/api/fleet/state` route verified.
 - **Layer 3 (Regression Check):** All 24 core actions discovered and active.
+
+---
+
+## [2026-10-12] — Fix: YouTube Task Deduplication, Whisper CPU Throttling & HUD Canvas Voice Reporting
+
+### What was built / fixed:
+1. **Target & URL Active Task Deduplication:** Enhanced `core/task_manager.py`'s `submit()` method to check for active (`RUNNING` or `QUEUED`) tasks matching the same target URL. If a duplicate submission arrives while a transcription or research extraction is ongoing, it returns the existing `task_id` rather than spawning duplicate parallel tasks.
+2. **Faster-Whisper CPU Throttling & Priority Isolation:** In `actions/agent_reach.py`, throttled Whisper CPU threads from a greedy 6 down to a capped 2 (`min(2, max(1, (os.cpu_count() or 4) // 2))`), lowered Windows thread priority to `BELOW_NORMAL_PRIORITY_CLASS` during transcription, and added an audio duration cap of 1200 seconds (20 mins) to prevent multi-hour hangs.
+3. **Synchronous Tool Unification:** Updated `actions/youtube_video.py`'s `_handle_summarize()` and `_handle_get_info()` to delegate to `agent_reach_action({"platform": "youtube", "target": url})` as an asynchronous background task rather than blocking the live WebSocket event loop for 5+ minutes.
+4. **HUD Canvas Voice Reporting Clarity:** Updated `core/prompt.txt` so that ZEZO clearly states that results are displayed on the HUD **Canvas panel** rather than referring to it as an unspecified or text file.
+5. **Windows Unicode Emoji Print Sanitization:** Sanitized print statements in `actions/youtube_video.py` to prevent Windows cp1252 charmap encoding errors.
+
+### Why this approach was chosen:
+- Deduplicating at the `TaskManager` layer provides a single source of truth across all tools and prevents double speech outputs.
+- Throttling Whisper threads to 2 prevents 100% CPU spikes, avoiding `1011 keepalive ping timeout` drops on the Gemini Live connection.
+- Explicit "Canvas panel" terminology eliminates user confusion regarding text files vs. HUD live displays.
+
+### Key files touched:
+- `core/task_manager.py`
+- `actions/agent_reach.py`
+- `actions/youtube_video.py`
+- `core/prompt.txt`
+- `LEARNING_JOURNAL.md`
+
+### 3-Layer Verification:
+- **Layer 1 (Static Check):** `py_compile` on `core/task_manager.py`, `actions/agent_reach.py`, `actions/youtube_video.py` passed with code 0. Action discovery confirmed 29 active tools.
+- **Layer 2 (Runtime Evidence):** `scratch/test_youtube_dedup_and_delegation.py` verified identical Task IDs returned on repeated URL submissions and successful delegation from `youtube_video` to `agent_reach`.
+- **Layer 3 (Regression Check):** Ran 15 pytest suites across `test_dispatcher.py`, `test_concurrency_guard_suite.py`, `test_governance_deny_branch_suite.py`, and `test_tavily_search_suite.py` with 100% passing results.
+
+---
+
+## [2026-10-12] — Fix: Bare URL Confirmation Protocol & Safe Browser Tab Closing Isolation
+
+### What was built / fixed:
+1. **Bare URL Confirmation Protocol:** Updated `core/prompt.txt` so that whenever a user sends or pastes a standalone URL (including YouTube videos, YouTube Shorts, or web domains) without an explicit command verb, ZEZO does NOT trigger heavy background tools or transcription automatically. Instead, ZEZO prompts the user in 1 concise question: *"YouTube link mil gaya hai, sir. Kya aap isko browser mein play karna chahte hain, ya iska summary/analysis chahiye?"*
+2. **Elimination of Notepad/Non-Browser Close Fallback:** In `core/computer/windows_native.py`, fixed `focus_browser_or_app_window()` where a generic fallback previously selected any open top-level window (such as Notepad or text editors) when an exact browser title wasn't matched. Now, it strictly validates browser window titles and suffixes (`- Google Chrome`, `- Microsoft Edge`, etc.).
+3. **Guard in `_safe_close_tab()`:** In `actions/computer_control.py`, `_safe_close_tab()` now verifies that a genuine browser window was focused before sending `Ctrl+W`. If no browser is present, it safely returns `"No active browser window was found to close tab"` and avoids sending keystrokes to unintended applications.
+4. **YouTube Window Recognition:** Added `"youtube"` to `is_browser_query` in `core/computer/windows_native.py` so that browser windows hosting YouTube or Shorts titles are properly recognized rather than skipped by the browser suffix filter.
+
+### Why this approach was chosen:
+- Prevents accidental `Ctrl+W` tab/window destruction of active desktop apps (Notepad, Word, IDEs) when closing web media.
+- Provides a clean user experience where pasting a link prompts for intent rather than blindly running expensive background pipelines.
+
+### Key files touched:
+- `core/prompt.txt`
+- `core/computer/windows_native.py`
+- `actions/computer_control.py`
+- `LEARNING_JOURNAL.md`
+
+### 3-Layer Verification:
+- **Layer 1 (Static Check):** `py_compile` on `core/computer/windows_native.py` and `actions/computer_control.py` passed with code 0. Action discovery confirmed 29 active tools.
+- **Layer 2 (Runtime Evidence):** Verified `_safe_close_tab()` safely aborts with `"No active browser window was found to close tab"` when no browser is open, never dispatching `Ctrl+W` to background non-browser windows.
+- **Layer 3 (Regression Check):** 9 pytest suites across `test_dispatcher.py`, `test_concurrency_guard_suite.py`, and `test_governance_deny_branch_suite.py` passed with 100% success rate.
+
+
 
 
 

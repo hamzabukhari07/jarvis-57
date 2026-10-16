@@ -774,7 +774,10 @@ close_window = windows_native.close_window_by_title_or_active
 
 def _safe_close_tab(app_hint: str = "") -> str:
     try:
-        windows_native.focus_browser_or_app_window()
+        ok = windows_native.focus_browser_or_app_window()
+        if not ok:
+            return "No active browser window was found to close tab."
+        time.sleep(0.08)
         input_driver.hotkey("ctrl", "w")
         return "Closed active tab."
     except Exception as e:

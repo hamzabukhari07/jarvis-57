@@ -167,38 +167,27 @@ def _load_or_extract_reference(html_file: Optional[Path], md_file: Optional[Path
         except Exception as e:
             logger.warning("Failed reading raw html %s: %s", html_file, e)
 
-    # 1. Check cached MD
-    if md_file and md_file.exists():
-        html_is_newer = False
-        if html_file and html_file.exists():
-            try:
-                html_is_newer = html_file.stat().st_mtime > md_file.stat().st_mtime
-            except Exception:
-                html_is_newer = False
-
-        if not html_is_newer:
-            try:
-                spec = md_file.read_text(encoding="utf-8", errors="ignore")
-                if spec.strip() or raw_html:
-                    clean_stem = re.sub(r"[-_\s]+", "-", md_file.stem).title()
-                    return clean_stem, "reference_cached", spec, raw_html
-            except Exception as e:
-                logger.warning("Failed reading cached design md %s: %s", md_file, e)
-
-    # 2. Extract from HTML
-    if html_file and html_file.exists():
-        clean_stem = re.sub(r"[-_\s]+", "-", html_file.stem).title()
-        target_md_path = md_dir / f"{clean_stem}-DESIGN.md"
-        try:
-            spec = extract_design_system_from_html(html_file, output_path=target_md_path)
-            if spec.strip() or raw_html:
-                return clean_stem, "reference_extracted", spec, raw_html
-        except Exception as e:
-            logger.warning("Failed extracting design from %s: %s", html_file, e)
-
+    # Prioritize raw HTML reference directly — no intermediate markdown extraction during website builds
     if raw_html and html_file:
         clean_stem = re.sub(r"[-_\s]+", "-", html_file.stem).title()
-        return clean_stem, "reference_raw_html", "", raw_html
+        # If an existing cached MD already exists, optionally read spec, but DO NOT generate new MD
+        spec = ""
+        if md_file and md_file.exists():
+            try:
+                spec = md_file.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                spec = ""
+        return clean_stem, "reference_raw_html", spec, raw_html
+
+    # Fallback to cached MD only if raw HTML is not available
+    if md_file and md_file.exists():
+        try:
+            spec = md_file.read_text(encoding="utf-8", errors="ignore")
+            if spec.strip():
+                clean_stem = re.sub(r"[-_\s]+", "-", md_file.stem).title()
+                return clean_stem, "reference_cached", spec, ""
+        except Exception as e:
+            logger.warning("Failed reading cached design md %s: %s", md_file, e)
 
     return None
 

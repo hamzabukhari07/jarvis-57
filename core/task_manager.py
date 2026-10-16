@@ -250,6 +250,19 @@ class TaskManager:
             )
             ctx = TaskContext(task_id, self)
 
+            # Active task deduplication for URL/target research and extractions
+            req_target = str((params or {}).get("target") or (params or {}).get("url") or "").strip()
+            if req_target and len(req_target) > 8:
+                for existing in self._tasks.values():
+                    if existing.status in (TaskStatus.RUNNING, TaskStatus.QUEUED) and not existing.finished_at:
+                        ex_target = str((existing.params or {}).get("target") or (existing.params or {}).get("url") or "").strip()
+                        if ex_target and ex_target.lower() == req_target.lower():
+                            logger.info(
+                                "Deduplicated active task for '%s' (returning active task %s [%s])",
+                                req_target, existing.id, existing.tool
+                            )
+                            return existing.id
+
             # Rapid duplicate submission debounce (prevents double-invocations from live voice stream)
             if tool_name in CODING_TOOLS:
                 repo_target = (params or {}).get("repo") or (params or {}).get("project_path")

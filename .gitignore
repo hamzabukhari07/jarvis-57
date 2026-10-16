@@ -5,6 +5,8 @@ __pycache__/
 # Config
 /config/api_keys.json
 /config/.deps_stamp
+# Local Chromium profile (cookies, history, session storage — never upload)
+/config/web_profile/
 
 # Test secrets
 /tests/test_secret_redaction_suite.py

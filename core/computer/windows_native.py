@@ -232,11 +232,11 @@ class WindowsNativeDriver:
 
                 browser_suffixes = (
                     " - google chrome", " - microsoft edge", " - brave",
-                    " - mozilla firefox", " - firefox", " - opera",
+                    " - mozilla firefox", " - firefox", " - opera", " - vivaldi", " - arc",
                 )
                 is_browser_query = cleaned in (
                     "chrome", "google chrome", "edge", "msedge",
-                    "firefox", "brave", "opera", "browser",
+                    "firefox", "brave", "opera", "browser", "youtube",
                 )
 
                 APP_ALIASES_MAP = {
@@ -380,13 +380,20 @@ class WindowsNativeDriver:
                 target_hwnd: Optional[int] = None
                 target_title: str = ""
 
+                browser_suffixes = (
+                    " - google chrome", " - microsoft edge", " - brave",
+                    " - mozilla firefox", " - firefox", " - opera", " - vivaldi", " - arc",
+                )
+
                 WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 
                 def _enum_cb(hwnd: int, lparam: int) -> bool:
                     nonlocal target_hwnd, target_title
                     if self.is_real_top_level_window(hwnd) and not self.is_self_or_console_window(hwnd):
                         t = self.get_window_title(hwnd).strip()
-                        if t and t not in ("Program Manager", "Settings", "Default IME", "MSCTFIME UI"):
+                        t_lower = t.lower()
+                        # Strictly require an actual browser window title to prevent closing non-browser apps like Notepad
+                        if any(t_lower.endswith(s) for s in browser_suffixes) or any(k in t_lower for k in ("chrome", "edge", "firefox", "brave", "opera", "youtube")):
                             target_hwnd = hwnd
                             target_title = t
                             return False

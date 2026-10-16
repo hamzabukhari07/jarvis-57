@@ -741,7 +741,7 @@ export default function App() {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-2 pr-1">
+                    <div className="space-y-2 pr-1.5 min-w-0">
                       {tasks.map((t, idx) => {
                         const status = (t.status || 'QUEUED').toUpperCase()
                         const isRunning = status === 'IN_PROGRESS' || status === 'RUNNING'
@@ -757,31 +757,31 @@ export default function App() {
                               ? 'destructive'
                               : 'queued'
 
-                        const displayTitle = t.prompt || t.group_title || t.params?.taskTitle || t.params?.task || t.message || t.id
+                        const displayTitle = t.prompt || t.group_title || t.params?.taskTitle || t.params?.task || t.params?.target || t.message || t.id
 
                         return (
                           <div
                             key={idx}
-                            className="p-3 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] bg-[var(--input)]/60 border border-[var(--border)] hover:border-[var(--primary)] transition-all flex flex-col gap-2 shadow-2xs"
+                            className="p-2.5 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] bg-[var(--input)]/60 border border-[var(--border)] hover:border-[var(--primary)] transition-all flex flex-col gap-1.5 shadow-2xs min-w-0 w-full overflow-hidden"
                           >
                             {/* Task Description */}
-                            <div className="font-medium text-[var(--foreground)] text-xs leading-snug break-words">
+                            <div className="font-medium text-[var(--foreground)] text-xs leading-snug break-all min-w-0">
                               {displayTitle}
                             </div>
                             {t.message && t.message !== displayTitle && (
-                              <div className="text-[11px] text-[var(--muted-foreground)] font-mono leading-tight truncate">
+                              <div className="text-[11px] text-[var(--muted-foreground)] font-mono leading-tight truncate min-w-0">
                                 {t.message}
                               </div>
                             )}
 
                             {/* Status Tag Badge + Progress Details */}
-                            <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--border)]/40">
-                              <div className="flex items-center gap-1.5">
+                            <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-[var(--border)]/40 min-w-0">
+                              <div className="flex items-center gap-1.5 min-w-0 shrink">
                                 <Badge
                                   variant={badgeVariant}
                                   size="xs"
                                   radius="default"
-                                  className={`gap-1 font-semibold ${
+                                  className={`gap-1 font-semibold shrink-0 ${
                                     isDone
                                       ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
                                       : isCancelled || isFailed
@@ -795,16 +795,16 @@ export default function App() {
                                   {!isRunning && !isDone && !isCancelled && !isFailed && <Clock className="w-2.5 h-2.5 text-[var(--muted-foreground)]" />}
                                   <span>{isRunning ? 'RUNNING' : status}</span>
                                 </Badge>
-                                <span className="text-[9px] font-mono text-[var(--muted-foreground)] uppercase">
+                                <span className="text-[9px] font-mono text-[var(--muted-foreground)] uppercase truncate">
                                   {t.id}
                                 </span>
                               </div>
 
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-mono font-semibold text-[var(--foreground)]">
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-[10px] font-mono font-semibold text-[var(--foreground)] tabular-nums">
                                   {t.progress}%
                                 </span>
-                                <div className="w-12 h-1.5 bg-[var(--card)] rounded-full overflow-hidden border border-[var(--border)]/30">
+                                <div className="w-10 h-1.5 bg-[var(--card)] rounded-full overflow-hidden border border-[var(--border)]/30 shrink-0">
                                   <div
                                     className={`h-full transition-all duration-300 ${
                                       isRunning
@@ -1226,6 +1226,7 @@ export default function App() {
         isOpen={isTaskModalOpen}
         onClose={() => setIsTaskModalOpen(false)}
         onCancelTask={cancelTask}
+        tasks={tasks}
       />
 
       {/* 100% Official ReUI Mobile Remote Gateway & QR Pairing Modal */}

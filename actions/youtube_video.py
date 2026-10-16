@@ -195,19 +195,19 @@ def _handle_play(parameters: dict, player) -> str:
     #    NOT go through yt-dlp search — "ytsearch1:<url>" treats the URL as a
     #    search term and returns the wrong video (or a search page).
     if _is_valid_youtube_url(query):
-        print(f"[YouTube] ▶️ Opening URL directly: {query}")
+        print(f"[YouTube] Opening URL directly: {query}")
         _open_url(query)
         return f"Opened in your browser: {query}"
 
     # 2. A search term: resolve the top video and open it, else the search page.
-    print(f"[YouTube] 🔍 Searching via yt-dlp for: {query}")
+    print(f"[YouTube] Searching via yt-dlp for: {query}")
     video_url = _find_video_url(query)
     if video_url:
-        print(f"[YouTube] ▶️ Opening: {video_url}")
+        print(f"[YouTube] Opening: {video_url}")
         _open_url(video_url)
         return f"Opened '{query}' in your browser: {video_url}"
 
-    print(f"[YouTube] ⚠️ Search failed, opening filtered search page")
+    print(f"[YouTube] Search failed, opening filtered search page")
     fallback_url = (
         f"https://www.youtube.com/results"
         f"?search_query={quote_plus(query)}"
@@ -238,32 +238,14 @@ def _handle_summarize(parameters: dict, player=None, speak=None) -> str:
         return f"That doesn't appear to be a valid YouTube URL: '{url}', sir."
 
     if player:
-        player.write_log(f"[YouTube] Summarizing: {url}")
-    if speak:
-        speak(f"Fetching transcript for video, sir.")
+        player.write_log(f"[YouTube] Summarizing via background agent: {url}")
 
-    from actions.agent_reach import fetch_youtube_transcript
-    full_content = fetch_youtube_transcript(url)
-
-    if not full_content or "Unable to fetch transcript" in full_content:
-        return f"I couldn't retrieve transcript or details for that video ({url}), sir."
-
-    try:
-        summary = _summarize_with_gemini(full_content, url)
-    except Exception as e:
-        return f"Summary generation failed for {url}, sir: {e}"
-
-    if speak:
-        speak(summary)
-
-    if parameters.get("save", True):
-        saved_path = _save_summary(summary, url)
-        return f"Summary complete and saved to Desktop: {saved_path}\n\nSummary:\n{summary}"
-
-    return summary
+    # Delegate to asynchronous agent_reach tool to prevent blocking the live WebSocket audio loop
+    from actions.agent_reach import agent_reach_action
+    return agent_reach_action({"platform": "youtube", "target": url}, player=player, speak=speak)
 
 
-def _handle_get_info(parameters: dict, player, speak) -> str:
+def _handle_get_info(parameters: dict, player=None, speak=None) -> str:
     url = parameters.get("url", "").strip()
     if not url:
         url = _ask_for_url("Please paste the YouTube video URL:")
@@ -271,17 +253,10 @@ def _handle_get_info(parameters: dict, player, speak) -> str:
         return "Please provide a valid YouTube URL, sir."
 
     if player:
-        player.write_log(f"[YouTube] Getting info: {url}")
+        player.write_log(f"[YouTube] Getting info via background agent: {url}")
 
-    from actions.agent_reach import fetch_youtube_transcript
-    info_str = fetch_youtube_transcript(url)
-    if not info_str or "Unable to fetch transcript" in info_str:
-        return "Could not retrieve video information, sir."
-
-    if speak:
-        speak("Here's the video info, sir.")
-
-    return info_str
+    from actions.agent_reach import agent_reach_action
+    return agent_reach_action({"platform": "youtube", "target": url}, player=player, speak=speak)
 
 
 def _handle_trending(parameters: dict, player, speak) -> str:
@@ -366,7 +341,7 @@ def youtube_video(
 
     if player:
         player.write_log(f"[YouTube] Action: {action}")
-    print(f"[YouTube] ▶️  Action: {action}  Params: {params}")
+    print(f"[YouTube] >> Action: {action}  Params: {params}")
 
     handler = _ACTION_MAP.get(action)
     if handler is None:
@@ -380,14 +355,14 @@ def youtube_video(
             return handler(params, player) or "Done."
         return handler(params, player, speak) or "Done."
     except Exception as e:
-        print(f"[YouTube] ❌ Error in {action}: {e}")
+        print(f"[YouTube] Error in {action}: {e}")
         return f"YouTube {action} failed, sir: {e}"
 
 
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "youtube_video",
-    "description": "Controls YouTube playback and videos. Actions: play (open a YouTube URL directly, or the top result for a search term, in the default browser), stop / pause (stop video playback), close (close YouTube tab), summarize, get_info, trending.",
+    "description": "Controls YouTube playback and videos in browser. Actions: play (open a YouTube URL directly, or the top result for a search term, in the default browser), stop / pause (stop video playback), close (close YouTube tab), summarize (delegates to background video summarizer), get_info, trending.",
     "risk": "local_mutation",
     "enabled": True,
     "parameters": {

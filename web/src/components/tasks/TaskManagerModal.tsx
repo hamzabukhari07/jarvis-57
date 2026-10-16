@@ -31,14 +31,16 @@ interface TaskManagerModalProps {
   isOpen: boolean
   onClose: () => void
   onCancelTask?: (taskId: string) => void
+  tasks?: any[]
 }
 
 export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
   isOpen,
   onClose,
   onCancelTask,
+  tasks: initialTasks,
 }) => {
-  const [tasks, setTasks] = useState<any[]>([])
+  const [tasks, setTasks] = useState<any[]>(initialTasks || [])
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'RUNNING' | 'QUEUED' | 'DONE' | 'FAILED'>('ALL')
@@ -46,12 +48,21 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
+  // Keep tasks synced with live tasks passed from parent socket
+  useEffect(() => {
+    if (initialTasks && Array.isArray(initialTasks) && initialTasks.length > 0) {
+      setTasks(initialTasks)
+    }
+  }, [initialTasks])
+
   const fetchTasks = async () => {
     setIsLoading(true)
     try {
       const list = await api.getTasks()
-      if (Array.isArray(list)) {
+      if (Array.isArray(list) && list.length > 0) {
         setTasks(list)
+      } else if (!initialTasks || initialTasks.length === 0) {
+        setTasks(list || [])
       }
     } catch {
       // Offline fallback
@@ -98,7 +109,17 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase()
-        const matchTitle = (t.prompt || t.description || t.message || '').toLowerCase().includes(q)
+        const matchTitle = (
+          t.prompt ||
+          t.description ||
+          t.message ||
+          t.group_title ||
+          t.params?.taskTitle ||
+          t.params?.task ||
+          t.params?.target ||
+          t.params?.query ||
+          ''
+        ).toLowerCase().includes(q)
         const matchId = (t.id || '').toLowerCase().includes(q)
         const matchTool = (t.tool || t.engine || '').toLowerCase().includes(q)
         return matchTitle || matchId || matchTool
@@ -306,8 +327,8 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
                         </div>
 
                         {/* Title */}
-                        <div className="text-xs font-semibold text-[var(--foreground)] line-clamp-2">
-                          {t.prompt || t.description || t.message || 'Executing agentic synthesis'}
+                        <div className="text-xs font-semibold text-[var(--foreground)] line-clamp-2 break-all">
+                          {t.prompt || t.group_title || t.params?.taskTitle || t.params?.task || t.params?.target || t.description || t.message || 'Executing agentic synthesis'}
                         </div>
 
                         {/* Progress Bar */}
