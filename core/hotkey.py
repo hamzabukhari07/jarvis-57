@@ -36,9 +36,9 @@ from typing import Callable
 
 _OS = platform.system()
 
-# The default chord. Ctrl+Space is free in most desktop environments and is the
-# same finger shape on every keyboard layout, which matters for a worldwide app.
-DEFAULT_CHORD = ("ctrl", "space")
+# The default chord. Ctrl+Alt is free in desktop environments, avoids Windows IME
+# and spacebar conflicts, and provides superior one-handed thumb/pinky ergonomics.
+DEFAULT_CHORD = ("ctrl", "alt")
 
 # Windows virtual-key codes for the names we accept.
 _VK = {

@@ -377,9 +377,28 @@ def is_configured() -> bool:
     return bool(key and len(key) > 15)
 
 
+DEFAULT_ASSISTANT_NAME = "Zezo"
+
+
 def get_assistant_name() -> str:
-    """Return the fixed operating system assistant identity 'ZEZO'."""
-    return "ZEZO"
+    """Return the configured assistant identity (defaults to 'Zezo').
+
+    One name drives BOTH the assistant's self-identity and its wake phrase
+    ("Hey <name>"); see core.wake_word.model_for_name. Values are canonicalised
+    against the preset list so a legacy "ZEZO" reads back as "Zezo".
+    """
+    name = str(load_api_keys().get("assistant_name", DEFAULT_ASSISTANT_NAME) or "").strip()
+    if not name:
+        return DEFAULT_ASSISTANT_NAME
+    try:
+        from core.wake_word import WAKE_PRESETS
+        low = name.lower()
+        for p in WAKE_PRESETS:
+            if p["name"].lower() == low or p["id"] == low:
+                return p["name"]
+    except Exception:
+        pass
+    return name
 
 
 def get_user_name() -> str:
@@ -387,11 +406,11 @@ def get_user_name() -> str:
     return load_api_keys().get("user_name", "")
 
 
-def save_assistant_config(assistant_name: str = "ZEZO", user_name: str = "") -> None:
-    """Persist user name to config (assistant identity is permanently ZEZO)."""
+def save_assistant_config(assistant_name: str = DEFAULT_ASSISTANT_NAME, user_name: str = "") -> None:
+    """Persist the assistant identity + user name to config."""
     ensure_config_dir()
     data: dict = load_api_keys()
-    data["assistant_name"] = "ZEZO"
+    data["assistant_name"] = str(assistant_name or "").strip() or DEFAULT_ASSISTANT_NAME
     if user_name is not None:
         data["user_name"] = str(user_name).strip()
     _atomic_write_config(data)
@@ -451,7 +470,7 @@ def save_response_language(lang: str) -> None:
 
 
 def get_wake_word_enabled() -> bool:
-    """Whether local wake-word gating is on (assistant sleeps until 'Hey Jarvis')."""
+    """Whether local wake-word gating is on (assistant sleeps until its wake phrase)."""
     return load_api_keys().get("wake_word_enabled", False)
 
 

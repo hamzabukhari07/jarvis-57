@@ -20,6 +20,7 @@ import { Separator } from './components/ui/separator'
 // Official Assistant-UI Components & Runtime
 import { AssistantRuntimeProvider, useExternalStoreRuntime } from '@assistant-ui/react'
 import { ZezoChatThread } from './components/assistant-ui/ZezoChatThread'
+import { cn } from './lib/utils'
 
 import {
   Settings,
@@ -105,6 +106,7 @@ export default function App() {
   const [isSleeping, setIsSleeping] = useState(false)
   const [canvasHeight, setCanvasHeight] = useState<number>(170)
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false)
+  const dragStartRef = useRef<{ startY: number; startHeight: number } | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; size: string; type: string; path?: string }>>([])
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -198,18 +200,11 @@ export default function App() {
     setChatMessages((prev) => {
       const last = prev[prev.length - 1]
 
-      // Deduplication guard: ignore redundant user transcription echoes for already rendered messages
-      if (speaker === 'user' && last && last.role === 'user') {
-        if (last.text.trim().toLowerCase() === text.trim().toLowerCase() || last.id.startsWith('user-')) {
-          return prev
-        }
-      }
-
       // If the last message is from the same speaker and was in-progress, update it
       if (last && last.role === speaker && last.id.startsWith(`live-${speaker}`)) {
         let updatedText = text
-        // If incoming text is a partial word/delta that doesn't start with last.text, accumulate it
-        if (last.text && !text.startsWith(last.text) && !last.text.startsWith(text)) {
+        // If incoming text is a partial delta chunk that doesn't start with or include last.text, append it
+        if (last.text && !text.startsWith(last.text) && !last.text.includes(text)) {
           updatedText = `${last.text} ${text}`.trim()
         }
         return [
@@ -223,7 +218,14 @@ export default function App() {
         ]
       }
 
-      // Start a new turn
+      // Deduplication guard: only ignore if this is an exact echo of an already finalized message
+      if (speaker === 'user' && last && last.role === 'user' && !last.id.startsWith(`live-${speaker}`)) {
+        if (last.text.trim().toLowerCase() === text.trim().toLowerCase()) {
+          return prev
+        }
+      }
+
+      // Start a new live turn
       return [
         ...prev,
         {
@@ -327,26 +329,34 @@ export default function App() {
     onNew: handleNewAssistantMessage,
   })
 
-  // Drag-to-resize canvas height
+  // Drag-to-resize canvas height (Buttery-smooth 60-120fps with absolute coordinate deltas)
   useEffect(() => {
     if (!isDraggingCanvas) return
 
+    // Prevent text selection and lock cursor during rapid drag sweeps
+    const originalUserSelect = document.body.style.userSelect
+    const originalCursor = document.body.style.cursor
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'row-resize'
+
     const handleMouseMove = (e: MouseEvent) => {
-      // As mouse moves up (smaller Y), canvas height increases
-      // Let's calculate delta from window or use current clientY
-      setCanvasHeight((prev) => {
-        const newHeight = prev - e.movementY
-        return Math.min(600, Math.max(120, newHeight))
-      })
+      if (!dragStartRef.current) return
+      // As mouse moves up (smaller clientY), canvas height increases
+      const deltaY = dragStartRef.current.startY - e.clientY
+      const targetHeight = dragStartRef.current.startHeight + deltaY
+      setCanvasHeight(Math.min(600, Math.max(120, targetHeight)))
     }
 
     const handleMouseUp = () => {
       setIsDraggingCanvas(false)
+      dragStartRef.current = null
     }
 
-    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mousemove', handleMouseMove, { passive: true })
     window.addEventListener('mouseup', handleMouseUp)
     return () => {
+      document.body.style.userSelect = originalUserSelect
+      document.body.style.cursor = originalCursor
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
@@ -943,6 +953,10 @@ export default function App() {
             <div
               onMouseDown={(e) => {
                 e.preventDefault()
+                dragStartRef.current = {
+                  startY: e.clientY,
+                  startHeight: canvasHeight,
+                }
                 setIsDraggingCanvas(true)
               }}
               title="Drag to resize Inspector panel / Double click to reset"
@@ -962,7 +976,10 @@ export default function App() {
             <Frame
               spacing="xs"
               style={{ height: `${canvasHeight}px` }}
-              className="shrink-0 overflow-hidden flex flex-col transition-all duration-75 mt-0.5"
+              className={cn(
+                "shrink-0 overflow-hidden flex flex-col mt-0.5",
+                !isDraggingCanvas && "transition-[height] duration-150 ease-out"
+              )}
             >
               <FramePanel className="p-2.5 flex flex-col h-full min-h-0 overflow-hidden">
                 <FrameHeader className="p-0 pb-1.5 shrink-0">

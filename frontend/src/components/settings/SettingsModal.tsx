@@ -33,6 +33,8 @@ import {
   Copy,
   Volume2,
   Mic,
+  Radio,
+  Keyboard,
   Plus,
   Trash2,
   Loader2,
@@ -55,6 +57,7 @@ interface SettingsModalProps {
   onSaveAudioDevices?: (inputDev: string, outputDev: string) => void
 }
 
+export type InteractionMode = 'always_listening' | 'wake_word' | 'push_to_talk'
 
 type SectionId =
   | 'general'
@@ -308,8 +311,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // ── 1. Controls & Toggles ──
   const [autostart, setAutostart] = useState(false)
   const [morningBrief, setMorningBrief] = useState(true)
-  const [wakeWord, setWakeWord] = useState(true)
+  const [wakeWord, setWakeWord] = useState(false)
+  const [assistantName, setAssistantName] = useState('Zezo')
+  const [availableAssistantNames, setAvailableAssistantNames] = useState<string[]>(['Zezo', 'Nova', 'Jarvis'])
   const [pushToTalk, setPushToTalk] = useState(true)
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>('push_to_talk')
   const [activeTheme, setActiveTheme] = useState<string>(() => {
     return localStorage.getItem('zezo_theme') || 'copper'
   })
@@ -469,6 +475,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
 
   const isLoadedRef = useRef(false)
+  const hydratedRef = useRef(false)
 
   const handlePreviewVoice = (vName: string) => {
     try {
@@ -537,6 +544,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     api.saveConfig({ [key]: value }).catch((err) => console.warn(`Failed to immediately save ${key}:`, err))
   }
 
+  const handleInteractionModeSelect = (mode: InteractionMode) => {
+    setInteractionMode(mode)
+    const isWake = mode === 'wake_word'
+    const isPtt = mode === 'push_to_talk'
+    setWakeWord(isWake)
+    setPushToTalk(isPtt)
+    api.saveConfig({
+      wake_word_enabled: isWake,
+      push_to_talk_enabled: isPtt,
+    }).catch((err) => console.warn('Failed to immediately save interaction mode:', err))
+  }
+
   const handleThemeSelect = (themeId: string) => {
     const isCurrentLight = activeTheme.endsWith('-light') || activeTheme === 'light'
     const targetTheme = isCurrentLight ? `${themeId}-light` : themeId
@@ -594,11 +613,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             if (cfg.morning_brief_enabled !== undefined) setMorningBrief(Boolean(cfg.morning_brief_enabled))
             else if (cfg.morning_brief !== undefined) setMorningBrief(Boolean(cfg.morning_brief))
 
-            if (cfg.wake_word_enabled !== undefined) setWakeWord(Boolean(cfg.wake_word_enabled))
-            else if (cfg.wake_word !== undefined) setWakeWord(Boolean(cfg.wake_word))
+            const isWake = cfg.wake_word_enabled !== undefined ? Boolean(cfg.wake_word_enabled) : Boolean(cfg.wake_word)
+            const isPtt = cfg.push_to_talk_enabled !== undefined ? Boolean(cfg.push_to_talk_enabled) : Boolean(cfg.push_to_talk)
+            setWakeWord(isWake)
+            setPushToTalk(isPtt)
+            if (isPtt) {
+              setInteractionMode('push_to_talk')
+            } else if (isWake) {
+              setInteractionMode('wake_word')
+            } else {
+              setInteractionMode('always_listening')
+            }
 
-            if (cfg.push_to_talk_enabled !== undefined) setPushToTalk(Boolean(cfg.push_to_talk_enabled))
-            else if (cfg.push_to_talk !== undefined) setPushToTalk(Boolean(cfg.push_to_talk))
+            if (cfg.assistant_name) setAssistantName(String(cfg.assistant_name))
+            if (Array.isArray(cfg.available_assistant_names) && cfg.available_assistant_names.length)
+              setAvailableAssistantNames(cfg.available_assistant_names.map(String))
 
             if (cfg.thinking_enabled !== undefined) setThinkingEnabled(Boolean(cfg.thinking_enabled))
             if (cfg.proactive_audio_enabled !== undefined) setProactiveAudioEnabled(Boolean(cfg.proactive_audio_enabled))
@@ -631,6 +660,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               localStorage.setItem('zezo_avatar_lighting', lgt.toString())
             }
           }
+          hydratedRef.current = true
         } catch { } finally {
           isLoadedRef.current = true
         }
@@ -727,7 +757,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             opencode_model: opencodeModel,
             kilo_model: kiloModel,
             antigravity_model: antigravityModel,
-            assistant_name: 'ZEZO',
+            assistant_name: assistantName,
             voice_name: voiceName,
             response_language: responseLanguage,
           })
@@ -737,7 +767,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         try {
           await api.saveAssistantSettings({
-            assistant_name: 'ZEZO',
+            assistant_name: assistantName,
             voice_name: voiceName,
             response_language: responseLanguage,
             avatar_preset: avatarPreset,
@@ -751,6 +781,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         console.warn('Auto-save error:', e)
       }
     }
+
+    // Skip the first run(s) until the initial config load has hydrated state,
+    // otherwise the cleanup flush races the load and re-posts stale values.
+    if (!hydratedRef.current) return
 
     const timer = setTimeout(flushSettings, 300)
 
@@ -770,6 +804,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     autostart,
     morningBrief,
     wakeWord,
+    assistantName,
     pushToTalk,
     thinkingEnabled,
     proactiveAudioEnabled,
@@ -924,31 +959,122 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </p>
                   </div>
 
-                  {/* Section: Interaction Modes */}
+                  {/* Section: Interaction Mode */}
                   <div className="space-y-2">
-                    <h3 className="text-xs font-semibold text-foreground/80 tracking-wide uppercase">Interaction Modes</h3>
-                    <div className="rounded-xl bg-card border border-border overflow-hidden divide-y divide-border shadow-xs">
-                      <div className="flex items-center justify-between p-3.5 hover:bg-muted/30 transition-colors">
-                        <div>
-                          <div className="text-xs font-semibold text-foreground">Wake Word Detection</div>
-                          <div className="text-[11px] text-muted-foreground mt-0.5">Listen continuously for "Hey Jarvis" activation</div>
-                        </div>
-                        <Switch
-                          checked={wakeWord}
-                          onCheckedChange={(val) => handleToggle('wake_word_enabled', val, setWakeWord)}
-                        />
-                      </div>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-semibold text-foreground/80 tracking-wide uppercase">Interaction Mode</h3>
+                      <span className="text-[11px] text-muted-foreground">Select how ZEZO listens & responds</span>
+                    </div>
 
-                      <div className="flex items-center justify-between p-3.5 hover:bg-muted/30 transition-colors">
-                        <div>
-                          <div className="text-xs font-semibold text-foreground">Push-To-Talk (Ctrl+Space)</div>
-                          <div className="text-[11px] text-muted-foreground mt-0.5">Hold hotkey to speak directly to the assistant</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {/* 1. Always Listening */}
+                      <Card
+                        onClick={() => handleInteractionModeSelect('always_listening')}
+                        className={`p-3 cursor-pointer transition-all duration-150 flex flex-col justify-between gap-2.5 group select-none ${
+                          interactionMode === 'always_listening'
+                            ? 'border-primary bg-primary/[0.06] ring-1 ring-primary/40 shadow-xs'
+                            : 'hover:border-primary/40 hover:bg-muted/40 shadow-2xs'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 group-hover:scale-105 transition-transform">
+                              <Radio className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="text-xs font-semibold text-foreground truncate">
+                              Always Listening
+                            </span>
+                          </div>
+                          {interactionMode === 'always_listening' ? (
+                            <Badge variant="default" size="xs" className="shrink-0 gap-1 font-medium bg-primary/15 text-primary border-primary/40">
+                              <Check className="w-2.5 h-2.5" />
+                              ACTIVE
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" size="xs" className="shrink-0 text-muted-foreground group-hover:text-foreground transition-colors">
+                              OPEN MIC
+                            </Badge>
+                          )}
                         </div>
-                        <Switch
-                          checked={pushToTalk}
-                          onCheckedChange={(val) => handleToggle('push_to_talk_enabled', val, setPushToTalk)}
-                        />
-                      </div>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          Continuous open mic. Assistant hears you naturally whenever you speak.
+                        </p>
+                      </Card>
+
+                      {/* 2. Wake Word */}
+                      <Card
+                        onClick={() => handleInteractionModeSelect('wake_word')}
+                        className={`p-3 cursor-pointer transition-all duration-150 flex flex-col justify-between gap-2.5 group select-none ${
+                          interactionMode === 'wake_word'
+                            ? 'border-primary bg-primary/[0.06] ring-1 ring-primary/40 shadow-xs'
+                            : 'hover:border-primary/40 hover:bg-muted/40 shadow-2xs'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 group-hover:scale-105 transition-transform">
+                              <Sparkles className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="text-xs font-semibold text-foreground truncate">
+                              Wake Word
+                            </span>
+                          </div>
+                          {interactionMode === 'wake_word' ? (
+                            <Badge variant="default" size="xs" className="shrink-0 gap-1 font-medium bg-primary/15 text-primary border-primary/40">
+                              <Check className="w-2.5 h-2.5" />
+                              ACTIVE
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" size="xs" className="shrink-0 text-muted-foreground group-hover:text-foreground transition-colors">
+                              HANDS-FREE
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          Say "{`Hey ${assistantName}`}" to wake. Sleeps automatically after 15s.
+                        </p>
+                      </Card>
+
+                      {/* 3. Push-To-Talk */}
+                      <Card
+                        onClick={() => handleInteractionModeSelect('push_to_talk')}
+                        className={`p-3 cursor-pointer transition-all duration-150 flex flex-col justify-between gap-2.5 group select-none ${
+                          interactionMode === 'push_to_talk'
+                            ? 'border-primary bg-primary/[0.06] ring-1 ring-primary/40 shadow-xs'
+                            : 'hover:border-primary/40 hover:bg-muted/40 shadow-2xs'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 border border-amber-500/30 bg-amber-500/10 text-amber-400 group-hover:scale-105 transition-transform">
+                              <Keyboard className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="text-xs font-semibold text-foreground truncate">
+                              Push-To-Talk
+                            </span>
+                          </div>
+                          {interactionMode === 'push_to_talk' ? (
+                            <Badge variant="default" size="xs" className="shrink-0 gap-1 font-medium bg-primary/15 text-primary border-primary/40">
+                              <Check className="w-2.5 h-2.5" />
+                              ACTIVE
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" size="xs" className="shrink-0 text-muted-foreground group-hover:text-foreground transition-colors">
+                              CTRL+ALT
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          Hold <kbd className="px-1 py-0.5 rounded bg-muted/70 text-[10px] font-mono text-foreground/80 border border-border">Ctrl+Alt</kbd> to dictate live; release for instant answer.
+                        </p>
+                      </Card>
+                    </div>
+                  </div>
+
+                  {/* Section: Quick Controls */}
+                  <div className="space-y-2 mt-4">
+                    <h3 className="text-xs font-semibold text-foreground/80 tracking-wide uppercase">Quick Controls</h3>
+                    <div className="rounded-xl bg-card border border-border overflow-hidden divide-y divide-border shadow-xs">
 
                       <div className="flex items-center justify-between p-3.5 hover:bg-muted/30 transition-colors">
                         <div>
@@ -1214,6 +1340,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="space-y-2">
                     <h3 className="text-xs font-semibold text-foreground/80 tracking-wide uppercase">Identity & Profile</h3>
                     <div className="rounded-xl bg-card border border-border overflow-hidden divide-y divide-border shadow-xs">
+                      <div className="flex items-center justify-between p-3.5 hover:bg-muted/30 transition-colors">
+                        <div>
+                          <div className="text-xs font-semibold text-foreground">Assistant Name</div>
+                          <div className="text-[11px] text-muted-foreground mt-0.5">Sets the identity and its wake phrase — say "{`Hey ${assistantName}`}" to wake it</div>
+                        </div>
+                        <div className="w-64 flex items-center gap-1.5">
+                          <Select value={assistantName} onValueChange={setAssistantName}>
+                            <SelectTrigger className="h-8 flex-1 bg-input/60 border-border text-foreground text-xs">
+                              <SelectValue placeholder="Select name" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-popover border-border text-popover-foreground text-xs">
+                              {availableAssistantNames.map((n) => (
+                                <SelectItem key={n} value={n}>{n}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
                       <div className="flex items-center justify-between p-3.5 hover:bg-muted/30 transition-colors">
                         <div>
                           <div className="text-xs font-semibold text-foreground">Live Voice Profile</div>

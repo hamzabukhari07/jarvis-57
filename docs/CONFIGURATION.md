@@ -11,7 +11,7 @@ JARVIS stores all configuration in `config/api_keys.json`. All configuration is 
 ```json
 {
     "gemini_api_key": "...",
-    "assistant_name": "JARVIS",
+    "assistant_name": "Zezo",
     "user_name": "",
     "voice_name": "Charon",
     "wake_word_enabled": false,
@@ -34,6 +34,9 @@ JARVIS stores all configuration in `config/api_keys.json`. All configuration is 
 
 **Git-ignored**: Yes
 **Security**: Plaintext
+
+> `assistant_name` is user-selectable (⚙ → **Assistant Persona**) and drives both
+> the assistant identity and the wake phrase (`"Hey <name>"`). See `docs/WAKE_WORD.md`.
 
 ## Environment Variables
 
@@ -233,7 +236,7 @@ All settings accessed via getter/setter functions:
 - `get_response_language()`, `save_response_language()`
 - `get_wake_word_enabled()`, `save_wake_word_enabled()`
 - `get_push_to_talk_enabled()`, `save_push_to_talk_enabled()`
-- `get_assistant_name()`, `save_assistant_config()`
+- `get_assistant_name()`, `save_assistant_config()` (identity + wake-phrase source)
 - `get_input_device()`, `save_input_device()`
 - `get_plugin_enabled()`, `save_plugin_enabled()`
 - `get_plugin_config()`, `save_plugin_config()`

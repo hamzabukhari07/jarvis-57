@@ -1,185 +1,133 @@
-# JARVIS — Wake Word System
+# ZEZO — Wake Word System
 
 ## Overview
 
-JARVIS supports a **local, offline wake-word detection** system using the phrase **"Hey Jarvis"**. The wake word system is **opt-in** and must be explicitly enabled by the user.
+ZEZO supports **local, offline wake-word detection**. The wake phrase is
+**`"Hey <assistant name>"`** — the assistant name selected in
+⚙ → **Assistant Persona**. The system is **opt-in** and must be enabled in
+⚙ → **General & Controls**.
 
-## Implementation Details
+- Default assistant name: **Zezo** → wake phrase **"Hey Zezo"**.
+- Selecting **Nova** → wake phrase **"Hey Nova"**.
+- Selecting **Jarvis** → wake phrase **"Hey Jarvis"**.
 
-### Wake Word Model
+The assistant name is the **single source of truth**: it drives both the
+conversational identity and the wake phrase.
+
+## Implementation
 
 **File:** `core/wake_word.py`
 
 | Parameter | Value |
 |-----------|-------|
-| Wake phrase | "Hey Jarvis" |
-| Model | `hey_jarvis` (openwakeword ONNX) |
-| Framework | ONNX inference |
-| Library | `openwakeword` |
-| Threshold | 0.5 (score in [0,1]) |
-| Sample rate | 16000 Hz |
-| Input format | int16 mono |
+| Wake phrase | `"Hey " + <assistant name>` |
+| Engine | `openwakeword` (ONNX, offline) |
+| Threshold | 0.6 (score in [0,1]) |
+| Debounce / cooldown | 1.5 s debounce + 1.5 s cooldown after a hit |
+| Sample rate | 16000 Hz, int16 mono |
+| Model source | `config/wakewords/<model>.onnx` first, then packaged openwakeword |
+
+### Preset registry
+
+`WAKE_PRESETS` in `core/wake_word.py` maps assistant names → wake models. One
+list drives **both** the Persona dropdown and the detector:
+
+```python
+WAKE_PRESETS = [
+    {"id": "zezo",   "name": "Zezo",   "model": "hey_zezo"},
+    {"id": "nova",   "name": "Nova",   "model": "hey_nova"},
+    {"id": "jarvis", "name": "Jarvis", "model": "hey_jarvis"},
+]
+```
+
+Helper functions:
+
+| Function | Purpose |
+|----------|---------|
+| `list_wake_presets()` | Presets + any extra `config/wakewords/*.onnx` for the UI |
+| `model_for_name(name)` | Resolve a name → model id (falls back to a resolvable default) |
+| `phrase_for_name(name)` | `"Nova"` → `"Hey Nova"` |
+| `resolve_model(id)` | Local `.onnx` path first, else packaged model |
+| `default_wake_model()` | `hey_zezo` if shipped, else `hey_jarvis` |
+| `is_ready(model_id)` | Model + shared mel/embedding files present |
 
 ### Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│ Mic Callback (real-time audio thread)               │
-│                                                     │
-│ if wake_enabled and not awake:                      │
-│   det.feed(indata)  ← queue push only              │
-│   return  ← nothing goes to Gemini                 │
-│                                                     │
-│ if awake:                                           │
-│   normal streaming to Gemini                       │
-└─────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────┐
-│ WakeWordDetector._loop() (background thread)        │
-│                                                     │
-│   frame = queue.get()  ← blocks until data available│
-│   scores = model.predict(np.int16(frame))           │
-│   if max_score >= 0.5:                              │
-│     _drain()  ← clear queue backlog                │
-│     on_detect()  → wake()                          │
-└─────────────────────────────────────────────────────┘
+Mic callback (real-time audio thread)          core/wake_word.WakeWordDetector
+─────────────────────────────────────          ───────────────────────────────
+if wake_enabled and not awake:                 _loop() (background thread):
+    det.feed(indata)   ← queue push only           frame = queue.get()
+    return             ← nothing to Gemini          scores = model.predict(frame)
+                                                    score = scores[<loaded model>]
+if awake:                                           if score >= 0.6:
+    normal streaming to Gemini                        on_detect() → wake()
 ```
 
-### Key Design Goals
+**Scoring is per-model:** only the loaded model's own key counts. There is no
+cross-model fallback, so a swapped/renamed wake word can never fire on the
+wrong model.
 
-1. **Zero cost when off** — `openwakeword` is imported ONLY inside `start()` and `install()`, never at module load. If the feature is disabled, none of this code runs.
-2. **Zero latency on audio path** — the mic callback only does a cheap queue push (`put_nowait`). The actual model inference runs in a separate background thread.
-3. **Fully local & offline** — audio never leaves the machine. No network call except the one-time model download.
+### Sleep / auto-sleep
 
-### State Machine
+When wake word is enabled the assistant boots **asleep**. It wakes on the wake
+phrase (or push-to-talk / the UI wake button) and enters **LISTENING** with a
+**15-second listen window** (`WAKE_LISTEN_WINDOW`). The window is a rolling
+timer that **resets after each reply** — both when the user speaks
+(`_last_user_speech`) and when ZEZO finishes speaking (`_last_speech_end`, set
+on the real speaking → idle transition in `set_speaking`). This keeps
+conversation mode alive as long as you keep talking back and forth. After
+**15 s of silence** it auto-sleeps (`sleep(reason="no speech for 15s")`). While
+asleep the mic is gated and **nothing is streamed to Gemini**.
 
-```
-ASSUMING ASLEEP (default when wake word enabled)
-    ↓
-User says "Hey Jarvis"
-    ↓
-WakeWordDetector._loop() detects score >= 0.5
-    ↓
-_drain() clears any backlog in queue
-    ↓
-on_detect() → self.wake(reason="wake word")
-    ↓
-WAKE STATE
-    ↓
-self._awake = True
-self._last_user_speech = time.monotonic()
-self.ui.set_state("LISTENING")
-    ↓
-Microphone now streams to Gemini
-    ↓
-Auto-sleep after 120s of silence
-    ↓
-SLEEP STATE (back to start)
-```
+`_run_sleep_watch` polls once per second and compares
+`max(_last_user_speech, _last_speech_end)` against the window, so a reply always
+buys another 15 s.
 
-### UI Integration
+### Detection tuning
 
-**File:** `main.py`, `JarvisLive.__init__()`
+The detector is tuned to reduce false wakes:
+
+- **Threshold `0.6`** (`DEFAULT_THRESHOLD`) — higher confidence required before
+  a hit registers (was `0.5`).
+- **1.5 s debounce** — passed to `Model.predict(..., debounce_time=1.5)`, so the
+  model itself suppresses rapid repeat triggers.
+- **1.5 s cooldown** — after a detection, re-triggers are ignored for 1.5 s
+  (`_cooldown`) to stop a single utterance from firing the wake handler twice.
+
+### Model sourcing
+
+- `hey_jarvis` ships with the `openwakeword` package — works out of the box.
+- `hey_zezo` / `hey_nova` are trained once with the openWakeWord Colab and
+  dropped into `config/wakewords/` (see that folder's README).
+- Any extra `config/wakewords/<name>.onnx` is auto-listed in the dropdown.
+
+### Interaction with the assistant name
+
+`main.py` derives the wake model + phrase from `get_assistant_name()`
+(`memory/config_manager.py`). Changing the name in the Persona tab hot-swaps the
+detector (no app restart) and rebuilds the session prompt:
 
 ```python
-self.ui.wake_is_ready    = wake_is_ready          # () -> bool
-self.ui.wake_get_state   = self._wake_state        # () -> dict
-self.ui.on_wake_toggle   = self._ui_wake_toggle    # (enable: bool) -> str
-self.ui.on_wake_manual   = self._ui_wake_manual    # () -> toggle
-self.ui.on_wake_install  = self._ui_wake_install   # () -> (ok, msg)
+self._wake_model  = model_for_name(name)
+self._wake_phrase = phrase_for_name(name)
 ```
 
-**Wake state dict:**
-```python
-{"enabled": bool, "awake": bool, "ready": bool}
-```
+## Configuration keys
 
-### Ready Check
-
-```python
-def is_ready() -> bool:
-    """Cheap file existence check — NOT model construction."""
-    # Check if openwakeword package exists
-    # Check if model files (.onnx, .tflite) exist in resources/models/
-    # Returns True only if ALL three model files present:
-    #   hey_jarvis*.onnx
-    #   melspectrogram*.onnx
-    #   embedding_model*.onnx
-```
-
-**Why file existence, not model construction?** Constructing a `Model` object is slow and can clash with an already-running detector, causing intermittent failures. The file check is fast and deterministic.
-
-### Installation
-
-```python
-def install_and_download() -> tuple[bool, str]:
-    # 1. pip install openwakeword
-    # 2. openwakeword.utils.download_models(["hey_jarvis"])
-    # 3. Verify is_ready()
-    # Returns (ok, message)
-```
-
-### Sleep/Auto-Sleep
-
-```python
-async def _run_sleep_watch():
-    """Auto-sleep after 2 minutes of silence."""
-    while True:
-        await asyncio.sleep(5)
-        if not self._wake_enabled or not self._awake:
-            continue
-        if self._is_speaking:
-            continue
-        if (time.monotonic() - self._last_user_speech) > 120.0:
-            self.sleep(reason="no speech for 2 minutes")
-```
-
-### Interaction with Push-to-Talk
-
-When push-to-talk is enabled, holding Ctrl+Space also **wakes** the assistant:
-
-```python
-def _on_ptt(self, held: bool) -> None:
-    if held:
-        if self._wake_enabled and not self._awake:
-            self._awake = True  # Wake up!
-            self._last_user_speech = time.monotonic()
-```
-
-This means push-to-talk doubles as a silent alternative to saying the wake word.
-
-### Interaction with Gemini
-
-When sleeping:
-- Audio **never** goes to Gemini
-- Nothing leaves the machine
-- Only the local detector processes audio
-- When the wake word is detected: `wake()` sets `_awake = True`
-
-### What Happens When Asleep
-
-```
-Mic callback fires
-    ↓
-self._wake_enabled and not self._awake → True
-    ↓
-det.feed(indata)  ← queue push (~0ms)
-    ↓
-return  ← nothing streamed to Gemini
-```
-
-**No network traffic, no AI processing, no audio leaves the machine.** The only cost is a numpy array copy and a queue push.
+| Key (`config/api_keys.json`) | Meaning |
+|------------------------------|---------|
+| `wake_word_enabled` | Master on/off for wake gating |
+| `assistant_name` | Identity + wake phrase source (`"Zezo"`, `"Nova"`, …) |
 
 ## Summary
 
 ```
-Wake word: "Hey Jarvis"
-Model: openwakeword (hey_jarvis ONNX)
-Detection: Local, offline, ONNX inference
-Threshold: 0.5
-Auto-sleep: 120 seconds of silence
-Opt-in: Requires explicit enable in settings
-Push-to-talk integration: Holding Ctrl+Space also wakes
-Cost when off: Zero
-Cost when on: Queue push only in audio thread; model inference in background thread
+Wake phrase:  "Hey <assistant name>"      (default "Hey Zezo")
+Engine:       openwakeword (local, offline, ONNX)
+Selection:    Assistant Persona dropdown  → auto-sets the wake word
+Threshold:    0.6   (1.5 s debounce + 1.5 s cooldown)
+Auto-sleep:   15 s listen window of silence, reset after each reply
+Opt-in:       Requires explicit enable in ⚙ → General & Controls
+Cost when off: Zero.  Cost when on: a queue push per frame; inference in its own thread.
 ```

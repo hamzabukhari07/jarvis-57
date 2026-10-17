@@ -193,13 +193,14 @@ JARVIS/
 
 **Called by**: `main.py` (audio callback)
 
-### core/wake_word.py (211 lines)
+### core/wake_word.py
 
-**Purpose**: Local "Hey Jarvis" detection using openwakeword.
+**Purpose**: Local "Hey &lt;assistant name&gt;" detection using openwakeword (selectable name).
 
-**Key classes**: `WakeWordDetector`
-**Key functions**: `is_ready()`, `install_and_download()`, `feed()`
-**Key constant**: `WAKE_MODEL = "hey_jarvis"`
+**Key classes**: `WakeWordDetector(model_id=…)`
+**Key functions**: `list_wake_presets()`, `model_for_name()`, `phrase_for_name()`, `resolve_model()`, `default_wake_model()`, `is_ready(model_id)`, `install_and_download(model_id)`, `feed()`
+**Key constants**: `WAKE_PRESETS` (name → wake model), `DEFAULT_PRESET_ID`, `DEFAULT_ASSISTANT_NAME`
+**Models folder**: `config/wakewords/*.onnx`
 
 **Called by**: `main.py` (audio callback when sleeping)
 

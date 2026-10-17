@@ -23,7 +23,7 @@ class TestAssistantCustomiseSuite(unittest.TestCase):
 
         try:
             save_assistant_config("ZEZO", orig_user)
-            self.assertEqual(get_assistant_name(), "ZEZO")
+            self.assertEqual(get_assistant_name(), "Zezo")
 
             save_voice("Fenrir")
             self.assertEqual(get_voice(), "Fenrir")

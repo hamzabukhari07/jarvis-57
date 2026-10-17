@@ -86,7 +86,7 @@ from memory.config_manager     import (
     get_brief_enabled, get_media_resolution, get_proactive_audio_enabled,
     get_push_to_talk_enabled, get_thinking_enabled, get_turn_tuning, get_voice,
     get_wake_word_enabled, save_wake_word_enabled,    get_input_device, get_output_device,
-    save_input_device, save_output_device, get_fallback_voice,
+    save_input_device, save_output_device, get_fallback_voice, get_assistant_name,
 )
 from core.plugin_loader        import discover_plugins
 from core                      import undo as undo_stack
@@ -100,12 +100,13 @@ from core.echo                 import EchoGuard
 from core.viseme               import VisemeStream
 from core.wake_word            import (
     WakeWordDetector, is_ready as wake_is_ready, install_and_download as wake_install,
+    model_for_name, phrase_for_name, default_wake_model,
 )
 from core.models               import GEMINI_LIVE_MODEL
 
 # How long the assistant stays awake with no user speech before it auto-sleeps
 # again (wake-word mode only).
-WAKE_SLEEP_TIMEOUT = 120.0   # seconds (2 minutes)
+WAKE_LISTEN_WINDOW = 15.0   # seconds of silence after waking before auto-sleep (wake-word mode)
 
 def get_base_dir():
     if getattr(sys, "frozen", False):
@@ -556,7 +557,7 @@ def _keep_context_of(exc: BaseException) -> bool:
 class ZezoLive:
     def __init__(self, ui: ZezoUI):
         self.ui             = ui
-        self._asst_name     = "ZEZO"   # updated each session from config
+        self._asst_name     = get_assistant_name()   # identity; refreshed each session from config
         self.session              = None
         self.audio_in_queue       = None
         self.out_queue            = None
@@ -577,6 +578,7 @@ class ZezoLive:
         # Push-to-talk
         self._ptt_enabled          = False
         self._ptt_held             = False
+        self._ptt_release_time     = 0.0     # monotonic time when chord was released
         self._ptt                  = None    # core.hotkey.PushToTalk
         self._out_level            = 0.0     # level of the audio being played right now
         self._echo                 = EchoGuard()
@@ -627,6 +629,7 @@ class ZezoLive:
         self._sys_monitor      = SystemMonitor()  # persistent cooldown state
         self._proactive        = ProactiveEngine()
         self._last_user_speech = time.monotonic()  # updated on every user utterance
+        self._last_speech_end = 0.0  # when ZEZO last finished speaking (wake listen window)
         self._last_user_in_logged = ""             # deduplication for user text/voice input
         self._last_user_text_ts: float = 0.0       # timestamp of last typed command for debounce
         self._session_log: list[str] = []          # conversation turns for end-of-session summary
@@ -678,7 +681,16 @@ class ZezoLive:
         self._wake_enabled     = get_wake_word_enabled()
         self._awake            = not self._wake_enabled
         self._wake_detector: WakeWordDetector | None = None
-        self._wake_sleep_timeout = WAKE_SLEEP_TIMEOUT
+        self._wake_sleep_timeout = WAKE_LISTEN_WINDOW
+        # The assistant name is the single source of truth: it drives both the
+        # identity and the wake phrase ("Hey <name>"). The wake model is derived.
+        self._wake_model       = model_for_name(self._asst_name)
+        self._wake_phrase      = phrase_for_name(self._asst_name)
+        if self._wake_enabled:
+            try:
+                self._ensure_wake_detector()
+            except Exception as e:
+                print(f"[Zezo] ⚠ Wake detector startup error: {e}")
 
         # Restore the saved push-to-talk preference. Doing it here rather than
         # in __init__ means the hotkey thread only exists once there is a
@@ -689,25 +701,31 @@ class ZezoLive:
             except Exception as e:
                 print(f"[Zezo] ⚠ Push-to-talk unavailable: {e}")
         # UI control surface for the Wake Word settings section.
-        self.ui.wake_is_ready    = wake_is_ready          # () -> bool
+        self.ui.wake_is_ready    = lambda: wake_is_ready(self._wake_model)  # () -> bool
         self.ui.wake_get_state   = self._wake_state       # () -> dict
         self.ui.on_wake_toggle   = self._ui_wake_toggle   # (enable: bool) -> str
         self.ui.on_wake_manual   = self._ui_wake_manual   # () -> toggle awake/asleep
         self.ui.on_wake_install  = self._ui_wake_install  # () -> (ok, msg)
+        self.ui.on_assistant_name_change = self._on_assistant_name_changed  # (name: str) -> None
 
     # ── Wake word: state machine ─────────────────────────────────────────────
 
     def _wake_state(self) -> dict:
         # A loaded, running detector is definitively ready; otherwise fall back
         # to the cheap on-disk model-file check (no Model construction).
-        ready = bool(self._wake_detector and self._wake_detector.ready) or wake_is_ready()
-        return {"enabled": self._wake_enabled, "awake": self._awake, "ready": ready}
+        ready = bool(self._wake_detector and self._wake_detector.ready) or wake_is_ready(self._wake_model)
+        return {
+            "enabled": self._wake_enabled, "awake": self._awake, "ready": ready,
+            "phrase": self._wake_phrase, "model": self._wake_model,
+        }
 
     def _ensure_wake_detector(self) -> bool:
         """Load the detector once (model loads on first start). Idempotent."""
         if self._wake_detector is None:
             self._wake_detector = WakeWordDetector(
                 on_detect=self._on_wake_detected,
+                model_id=self._wake_model,
+                phrase=self._wake_phrase,
                 logger=lambda m: print(f"[Wake] {m}"),
                 notify=lambda m: self.ui.write_log(f"SYS: {m}"),
             )
@@ -716,8 +734,44 @@ class ZezoLive:
         return True
 
     def _on_wake_detected(self) -> None:
-        """Called from the detector thread when 'Hey Zezo' is heard."""
+        """Called from the detector thread when the wake phrase is heard."""
         self.wake(reason="wake word")
+
+    def _on_assistant_name_changed(self, name: str) -> None:
+        """Assistant renamed in the Persona tab: rebind identity + wake word.
+
+        Hot-swaps the detector (no app restart) and rebuilds the prompt by
+        requesting a session reconnect."""
+        name = (name or "").strip() or self._asst_name
+        if name == self._asst_name:
+            return
+        self._asst_name   = name
+        self._wake_model  = model_for_name(name)
+        self._wake_phrase = phrase_for_name(name)
+        # Drop the old model and re-arm with the new one.
+        if self._wake_detector is not None:
+            try:
+                self._wake_detector.stop()
+            except Exception:
+                pass
+            self._wake_detector = None
+        if self._wake_enabled:
+            self._ensure_wake_detector()
+        self.ui.write_log(
+            f'SYS: Assistant renamed to "{name}". Say "{self._wake_phrase}" to wake me.'
+        )
+        # The prompt embeds the assistant name, so rebuild the session.
+        self.request_reconnect(reason="assistant renamed")
+
+    def _get_resting_state(self) -> str:
+        """When push-to-talk is active or wake-word is armed in sleep/standby, stay in IDLE."""
+        if getattr(self, "_awaiting_speech_reply", False):
+            return "THINKING"
+        if getattr(self, "_ptt_enabled", False) and not getattr(self, "_ptt_held", False):
+            return "IDLE"
+        if getattr(self, "_wake_enabled", False) and not getattr(self, "_awake", True):
+            return "IDLE"
+        return "LISTENING"
 
     def wake(self, reason: str = "wake word") -> None:
         if self._awake:
@@ -733,8 +787,8 @@ class ZezoLive:
             return
         self._awake = False
         self.set_speaking(False)
-        self.ui.set_state("SLEEPING")
-        self.ui.write_log(f"SYS: Sleeping — {reason}. Say 'Hey Zezo' to wake me.")
+        self.ui.set_state("IDLE")
+        self.ui.write_log(f"SYS: Standby (IDLE) — {reason}. Say '{getattr(self, '_wake_phrase', 'Hey Zezo')}' to wake me.")
 
     def _on_ui_sleep_toggle(self, sleeping: bool) -> None:
         if sleeping:
@@ -743,17 +797,18 @@ class ZezoLive:
             self.wake(reason="wake button clicked")
 
     async def _run_sleep_watch(self) -> None:
-        """Auto-sleep after the configured silence window (wake-word mode only)."""
+        """Auto-sleep after the listen window with no activity (wake-word mode)."""
         while True:
-            await asyncio.sleep(5)
+            await asyncio.sleep(1)
             if not self._wake_enabled or not self._awake:
                 continue
             with self._speaking_lock:
                 speaking = self._is_speaking
             if speaking:
                 continue
-            if (time.monotonic() - self._last_user_speech) > self._wake_sleep_timeout:
-                self.sleep(reason="no speech for 2 minutes")
+            last_activity = max(self._last_user_speech, getattr(self, "_last_speech_end", 0.0))
+            if (time.monotonic() - last_activity) > self._wake_sleep_timeout:
+                self.sleep(reason="no speech for 15s")
 
     # ── Wake word: UI callbacks (called from the Qt thread) ──────────────────
 
@@ -761,7 +816,7 @@ class ZezoLive:
         """Enable/disable wake word from the settings UI. Returns a status token:
         'enabled' | 'disabled' | 'need_download'."""
         if enable:
-            if not wake_is_ready():
+            if not wake_is_ready(self._wake_model):
                 return "need_download"
             self._wake_enabled = True
             save_wake_word_enabled(True)
@@ -788,7 +843,8 @@ class ZezoLive:
         # Triggered by the user pressing the button, so its progress is exactly
         # what they are waiting to see.
         return wake_install(logger=lambda m: print(f"[Wake] {m}"),
-                            notify=lambda m: self.ui.write_log(f"SYS: {m}"))
+                            notify=lambda m: self.ui.write_log(f"SYS: {m}"),
+                            model_id=self._wake_model)
 
     def plugin_say(self, instruction: str) -> None:
         """
@@ -924,6 +980,7 @@ class ZezoLive:
         if value:
             self._tail_until = 0.0
         elif was_speaking:
+            self._last_speech_end = time.monotonic()
             # Arm the echo tail ONLY on a real speaking -> idle transition. The
             # idle playback loop calls set_speaking(False) every ~200 ms; arming
             # on every one of those polls made the tail (latency + margin ≈
@@ -932,7 +989,8 @@ class ZezoLive:
             # voice" guard and dropped the user's quieter speech — only the
             # loudest phonemes escaped, which is why a spoken turn was never
             # understood. Arm once, on the transition.
-            self._tail_until = time.monotonic() + self._out_latency + _TAIL_MARGIN
+            out_lat = getattr(self, "_out_latency", 0.20)
+            self._tail_until = time.monotonic() + out_lat + _TAIL_MARGIN
         if not value:
             # The echo history is deliberately NOT cleared here: the tail above
             # still needs it to recognise our own voice. It is dropped when the
@@ -943,7 +1001,7 @@ class ZezoLive:
             self.ui.set_state("SPEAKING")
         elif not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
             if not getattr(self, "_tool_busy", False) and not getattr(self, "_awaiting_tool_reply", False):
-                self.ui.set_state("LISTENING")
+                self.ui.set_state(self._get_resting_state())
             else:
                 self.ui.set_state("THINKING")
 
@@ -957,11 +1015,17 @@ class ZezoLive:
             if self._ptt is not None:
                 self._ptt.stop()
                 self._ptt = None
+            if not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
+                self.ui.set_state("LISTENING")
             return "off"
 
         if self._ptt is None:
             self._ptt = PushToTalk(self._on_ptt)
         scope = self._ptt.start()
+        # Immediately set resting state to IDLE when PTT is activated
+        if not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
+            self.ui.set_state("IDLE")
+
         # A window-scoped chord is a real limitation, not a detail — say it once
         # in the log so nobody wonders why it does nothing while another app is
         # focused. Reporting it must never be able to undo the thing it reports.
@@ -978,6 +1042,21 @@ class ZezoLive:
         """Chord pressed or released — may arrive on the hotkey thread."""
         self._ptt_held = held
         if held:
+            self._awaiting_speech_reply = False
+            # Immediate barge-in: If ZEZO is currently speaking or audio is queued, cut it off now
+            with self._speaking_lock:
+                speaking = self._is_speaking
+            if speaking:
+                self.interrupt()
+            # Clear interrupted flag for this new turn so incoming replies won't be discarded
+            self._interrupted = False
+
+            # Drain any stale audio from outgoing queues so we begin completely clean
+            while not self.out_queue.empty():
+                try:
+                    self.out_queue.get_nowait()
+                except Exception:
+                    break
             # Holding the key wakes it and opens the mic
             if self._wake_enabled and not self._awake:
                 self._awake = True
@@ -987,10 +1066,26 @@ class ZezoLive:
             except Exception:
                 pass
         else:
-            # On release: keep awake, move to THINKING so the answer can generate & speak
+            # On release: keep awake, mark release time so audio tail escapes cleanly
+            self._ptt_release_time = time.monotonic()
             self._last_user_speech = time.monotonic()
+            self._awaiting_speech_reply = True
+
+            def _schedule_release_signals():
+                # Enqueue ~150ms of trailing silence PCM to cleanly close phonemes before stream end
+                silence_frame = b"\x00" * int(SEND_SAMPLE_RATE * 2 * 0.05)  # 50ms per slice
+                for _ in range(3):
+                    self._enqueue_out_audio({"data": silence_frame, "mime_type": f"audio/pcm;rate={SEND_SAMPLE_RATE}"})
+                # Signal Google Gemini Live that user audio stream has ended (triggers turn commit)
+                self._enqueue_out_audio({"audio_stream_end": True})
+
+            if self._loop and self._loop.is_running():
+                self._loop.call_soon_threadsafe(_schedule_release_signals)
+            else:
+                _schedule_release_signals()
+
             try:
-                if not getattr(self.ui, "muted", False):
+                if not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
                     self.ui.set_state("THINKING")
             except Exception:
                 pass
@@ -998,6 +1093,7 @@ class ZezoLive:
     def interrupt(self) -> None:
         """Stop ZEZO mid-speech: drain queued audio and open mic immediately."""
         self._cancel_silence_watchdog()
+        self._awaiting_speech_reply = False
         self._interrupted = True
         q = self.audio_in_queue
         if q:
@@ -1076,8 +1172,11 @@ class ZezoLive:
     def _build_config(self, agent_id: Optional[str] = None, mode: Optional[str] = None) -> types.LiveConnectConfig:
         from datetime import datetime
 
-        # System identity is permanently ZEZO
-        self._asst_name = "ZEZO"
+        # System identity is user-selectable (see the Persona tab)
+        self._asst_name = get_assistant_name()
+        # keep the wake phrase derived from the same name for log/hint strings
+        self._wake_model  = model_for_name(self._asst_name)
+        self._wake_phrase = phrase_for_name(self._asst_name)
         try:
             _cfg = json.loads(open(API_CONFIG_PATH, encoding="utf-8").read())
             _user_name = (_cfg.get("user_name") or "").strip()
@@ -1564,6 +1663,15 @@ class ZezoLive:
             if not self.session:
                 await asyncio.sleep(0.02)
                 continue
+            if msg.get("audio_stream_end"):
+                try:
+                    await self.session.send_realtime_input(audio_stream_end=True)
+                    if log_bus is not None:
+                        log_bus.emit("INFO", "audio.mic", "Sent audio_stream_end to Gemini Live (PTT release)")
+                except Exception as e:
+                    if log_bus is not None:
+                        log_bus.emit("ERROR", "audio.live", f"Mic stream error during audio_stream_end: {e}")
+                continue
             try:
                 # Standardize to clean PCM blob format with explicit sample rate for Gemini Live
                 await self.session.send_realtime_input(
@@ -1669,9 +1777,9 @@ class ZezoLive:
                 self._echo.reset()
 
             # ── Push-to-talk ─────────────────────────────────────────────────
-            # When it is on the microphone is closed by default and the chord
-            # opens it, which is the whole point: nothing leaves the machine
-            # unless you are holding the key.
+            # When push-to-talk is active, microphone only streams while the chord is held.
+            # Trailing phoneme flush (150ms silence) and audio_stream_end are handled by
+            # _on_ptt, so no further live mic chunks should be enqueued once the chord is released.
             if self._ptt_enabled and not self._ptt_held:
                 return
 
@@ -1754,6 +1862,7 @@ class ZezoLive:
                             self._resume_handle = _sru.new_handle
 
                     if response.data:
+                        self._awaiting_speech_reply = False
                         self._awaiting_tool_reply = False
                         self._cancel_silence_watchdog()
                         if self._interrupted:
@@ -1772,6 +1881,7 @@ class ZezoLive:
                         sc = response.server_content
 
                         if sc.output_transcription and sc.output_transcription.text:
+                            self._awaiting_speech_reply = False
                             self._awaiting_tool_reply = False
                             self._cancel_silence_watchdog()
                             txt = _clean_transcript(sc.output_transcription.text)
@@ -1813,6 +1923,8 @@ class ZezoLive:
                                 is_recent_typed = (time.monotonic() - getattr(self, "_last_user_text_ts", 0)) < 5.0
                                 if not is_recent_typed:
                                     self.ui.stream_transcript("user", accumulated_in, done=False)
+                                    if log_bus is not None:
+                                        log_bus.emit("DEBUG", "audio.input_transcript", f"Live user dictation: {accumulated_in}")
                                 in_logged = False
                                 self._arm_silence_watchdog(accumulated_in)
 
@@ -1825,6 +1937,7 @@ class ZezoLive:
                             self._cancel_silence_watchdog()
 
                         if sc.turn_complete:
+                            self._awaiting_speech_reply = False
                             self._cancel_silence_watchdog()
                             if self._turn_done_event:
                                 self._turn_done_event.set()
@@ -1913,7 +2026,7 @@ class ZezoLive:
                                 asyncio.create_task(_cam_close())
 
                             if not self._is_speaking and not getattr(self, "_tool_busy", False) and not getattr(self, "_awaiting_tool_reply", False) and not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
-                                self.ui.set_state("LISTENING")
+                                self.ui.set_state(self._get_resting_state())
 
                     if response.tool_call:
                         self._tool_busy = True
@@ -2028,6 +2141,14 @@ class ZezoLive:
                             self._turn_done_event.clear()
                     continue
 
+                # Gate assistant speech playback while user is still holding PTT chord
+                while getattr(self, "_ptt_enabled", False) and getattr(self, "_ptt_held", False):
+                    await asyncio.sleep(0.05)
+
+                if self._interrupted:
+                    continue
+
+                self._awaiting_speech_reply = False
                 self.set_speaking(True)
 
                 # Batch all immediately-available chunks into one write to reduce
@@ -2714,16 +2835,19 @@ class ZezoLive:
                         self.ui.write_log("SYS: Reconnected — conversation restored.")
 
                     # Wake word: if enabled, come up ASLEEP (mic gated, silent)
-                    # until the user says "Hey Zezo" or taps wake in the UI.
+                    # until the user says the wake phrase or taps wake in the UI.
                     if self._wake_enabled:
                         self._ensure_wake_detector()
                         self._awake = False
                         self.ui.set_state("SLEEPING")
-                        self.ui.write_log("SYS: ZEZO online — sleeping. Say 'Hey Zezo' to wake me.")
+                        self.ui.write_log(
+                            f"SYS: {self._asst_name} online — sleeping. "
+                            f"Say '{self._wake_phrase}' to wake me."
+                        )
                     else:
                         self._awake = True
-                        self.ui.set_state("LISTENING")
-                        self.ui.write_log("SYS: ZEZO online.")
+                        self.ui.set_state(self._get_resting_state())
+                        self.ui.write_log(f"SYS: {self._asst_name} online.")
 
                     if self._dashboard:
                         await self._dashboard.broadcast({"type": "status", "state": "active"})

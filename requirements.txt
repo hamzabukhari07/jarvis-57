@@ -46,7 +46,7 @@ pynvml                        # NVIDIA GPU telemetry & metrics
 
 # ── Local Speech & Wake Word ──────────────────────────────────────────────────
 faster-whisper>=1.0,<2        # actions/agent_reach.py — local video transcription (CTranslate2)
-openwakeword>=0.6,<1          # core/wake_word.py — local "Hey Jarvis" detection
+openwakeword>=0.6,<1          # core/wake_word.py — local "Hey <name>" wake-word detection
 
 # ── Remote Mobile Dashboard ───────────────────────────────────────────────────
 fastapi>=0.110,<1

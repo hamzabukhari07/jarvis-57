@@ -115,8 +115,8 @@
       "model_id": "opencode/nemotron-3-ultra-free",
       "desk_x": 460,
       "desk_y": 160,
-      "worktree": null,
-      "active_worktree": null,
+      "worktree": "None",
+      "active_worktree": "None",
       "allowed_tools": [
         "opencode_run",
         "quick_snippet",
@@ -186,8 +186,8 @@
       "model_id": "",
       "desk_x": 320,
       "desk_y": 280,
-      "worktree": null,
-      "active_worktree": null,
+      "worktree": "None",
+      "active_worktree": "None",
       "allowed_tools": [
         "extract_design_system",
         "file_processor",
@@ -217,8 +217,8 @@
       "model_id": "",
       "desk_x": 600,
       "desk_y": 160,
-      "worktree": null,
-      "active_worktree": null,
+      "worktree": "None",
+      "active_worktree": "None",
       "allowed_tools": [
         "agent_reach",
         "web_search",
@@ -281,8 +281,8 @@
       "model_id": "",
       "desk_x": 180,
       "desk_y": 280,
-      "worktree": null,
-      "active_worktree": null,
+      "worktree": "None",
+      "active_worktree": "None",
       "allowed_tools": [
         "agent_reach",
         "web_search",

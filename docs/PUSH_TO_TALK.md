@@ -1,167 +1,144 @@
-# JARVIS — Push-to-Talk
+# ZEZO — Seamless Push-to-Talk Live Dictation & Instant Response Architecture
 
 ## Overview
 
-Push-to-talk allows the user to hold a key chord to open the microphone, instead of using the wake word. It is **opt-in** and can be toggled in the settings.
+Push-to-talk allows the user to hold a key chord to open the microphone, stream speech continuously to Google Gemini Live, see live dictation appear in the chat thread in real-time, and receive an instant spoken response on key release without any trailing hang. It is **opt-in** and can be toggled in settings.
+
+---
 
 ## Keyboard Shortcut
 
-- **Default chord**: `Ctrl+Space`
-- **Why Ctrl+Space**: Free in most desktop environments, same finger shape on every keyboard layout (worldwide app)
+- **Default chord**: `Ctrl+Alt`
+- **Why Ctrl+Alt**: Free in modern desktop environments (Windows, macOS, Linux), eliminates spacebar and IME conflicts, and provides comfortable thumb/pinky ergonomics.
 
-## Implementation
+---
 
-**File:** `core/hotkey.py` — `PushToTalk` class
+## Architecture & Data Flow
 
-### Platform-Specific Behavior
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User (Hamza)
+    participant Hotkey as core/hotkey.py (PushToTalk)
+    participant Main as main.py (ZezoLive)
+    participant UI as frontend (React Workstation)
+    participant Gemini as Google Gemini Live WebSocket
+
+    Note over User,Gemini: User presses and holds Ctrl + Alt
+    User->>Hotkey: Key Down (Ctrl + Alt)
+    Hotkey->>Main: _on_ptt(held=True)
+    Main->>UI: set_state("LISTENING")
+    Main->>Main: Drain stale queues & interrupt any active speech
+    User->>Main: Speaks ("Hello, what time is it?")
+    Main->>Gemini: Stream PCM audio chunks (16kHz 16-bit mono)
+    Gemini-->>Main: sc.input_transcription ("Hello, what time is it?")
+    Main-->>UI: stream_transcript("user", text, done=False)
+    UI-->>User: Live dictation text appears in chat thread
+
+    Note over User,Gemini: User releases Ctrl + Alt
+    User->>Hotkey: Key Up (Release)
+    Hotkey->>Main: _on_ptt(held=False)
+    Main->>UI: set_state("THINKING")
+    Main->>Gemini: Stream 150ms trailing silence PCM
+    Main->>Gemini: send_realtime_input(audio_stream_end=True)
+    Note over Gemini: VAD detects stream end -> commits turn instantly
+    Gemini-->>Main: sc.turn_complete + response.data (Audio)
+    Main->>UI: set_state("SPEAKING")
+    Main-->>UI: stream_transcript("zezo", text, done=False)
+    Main->>User: Playback assistant voice response
+    Note over Main,UI: Audio playback finishes
+    Main->>UI: set_state("IDLE")
+```
+
+---
+
+## Implementation Details
+
+**Files:**
+- `core/hotkey.py` — `PushToTalk` class
+- `main.py` — `ZezoLive` orchestrator (`_on_ptt`, `_send_realtime`, `_play_audio`, `_get_resting_state`)
+
+### 1. Platform-Specific Hook (`core/hotkey.py`)
 
 #### Windows: Global Push-to-Talk
+- Uses `ctypes.windll.user32.GetAsyncKeyState` to poll virtual-key codes (`VK_CONTROL = 0x11`, `VK_MENU = 0x12`).
+- Polling rate: 30 Hz (~33ms period).
+- Debounce: 60ms on press (stops accidental brush of chord), **0ms delay on release** (immediate release reporting).
+- **Truly global**: Works while games, IDEs, browsers, or terminal windows have foreground focus.
+- **Zero extra dependencies**: Native Win32 API.
 
-```python
-class PushToTalk:
-    def start(self) -> str:
-        if _OS == "Windows" and self._can_poll():
-            self._scope = "global"
-            self._thread = threading.Thread(
-                target=self._poll_loop, name="push-to-talk", daemon=True)
-```
+#### macOS / Linux: Window-Scoped Fallback
+- Bound via Qt key sequence shortcut.
+- Reports `scope == "window"` honestly in the UI logs so the user knows window focus is required.
 
-**How it works:**
-- Uses `ctypes.windll.user32.GetAsyncKeyState` — polls two virtual-key codes
-- Polling rate: 30 Hz (every ~33ms)
-- Debounce: 60ms (key must be held for 60ms before registering)
-- **No message loop, no new dependency**
-- **Truly global**: works while any other application has focus
-- Virtual key codes: `VK_CTRL = 0x11`, `VK_SPACE = 0x20`
+---
 
-```python
-def _poll_loop(self) -> None:
-    import ctypes
-    user32 = ctypes.windll.user32
-    codes = [_VK[k] for k in self._chord]
-    period = 1.0 / _POLL_HZ  # 0.033s
-    while not self._stop.is_set():
-        down = all(user32.GetAsyncKeyState(c) & 0x8000 for c in codes)
-        if down:
-            if now - down_since >= _DEBOUNCE_S:  # 0.06s
-                self._set_held(True)
-        else:
-            down_since = 0.0
-            self._set_held(False)
-        self._stop.wait(period)
-```
+### 2. Audio Stream End Protocol & Trailing Acoustic Flush (`main.py`)
 
-#### macOS / Linux: Window-Scoped Push-to-Talk
+#### Problem Solved
+Previously, cutting off the microphone abruptly upon key release caused two distinct failure modes:
+1. Google Gemini Live's server VAD waited for prolonged silence timeouts (hangs) before finalizing the user turn.
+2. Trailing syllables were clipped if the mic shut down too quickly, or background room noise leaked into the subsequent turn if a grace period was left open.
 
-```python
-def start(self) -> str:
-    # No portable way to read global key state without a new package
-    # or accessibility permissions
-    self._scope = "window"
-    # Qt shortcut handles the key press/release
-```
+#### The Solution
+1. **Trailing Flush**: On release (`held=False`), `_on_ptt` enqueues 150ms of clean silence PCM frames (`b"\x00" * 1600` at 16kHz) to gracefully close trailing phonemes without acoustic clipping.
+2. **Sentinel Dispatch**: Immediately following the silence frames, an `{"audio_stream_end": True}` packet is placed into `out_queue`.
+3. **Ordered Transmission in `_send_realtime`**:
+   ```python
+   if msg.get("audio_stream_end"):
+       await self.session.send_realtime_input(audio_stream_end=True)
+       continue
+   ```
+   Because `out_queue` is strictly FIFO, all user speech chunks and trailing silence frames are guaranteed to be transmitted *before* `audio_stream_end=True` reaches the WebSocket.
+4. **Instant Server Turn Commit**: Google Gemini Live receives the explicit stream-end signal, commits the user's turn immediately, and begins streaming the response without delay.
 
-**Limitation**: The chord only works while the assistant's window has focus. The app **honestly reports this** in the log.
+---
 
-### Scope Reporting
+### 3. Live Dictation & Assistant Output Suppression
 
-```python
-def start(self) -> str:
-    if _OS == "Windows" and self._can_poll():
-        self._scope = "global"
-    else:
-        self._scope = "window"
-    return self._scope
-```
+1. **Real-time Chat Transcription**:
+   - As speech chunks reach Gemini Live, server content delivers `sc.input_transcription`.
+   - `main.py` dispatches `self.ui.stream_transcript("user", accumulated_in, done=False)` to the frontend.
+   - User speech renders live in the chat thread like real-time dictation.
+2. **Speaker Suppression During Key Hold**:
+   - In `_play_audio`:
+     ```python
+     while getattr(self, "_ptt_enabled", False) and getattr(self, "_ptt_held", False):
+         await asyncio.sleep(0.05)
+     ```
+   - If the user pauses for breath while holding `Ctrl+Alt`, audio playback is deferred until the chord is released. The assistant never speaks over the user.
+3. **Instant Barge-in**:
+   - If the assistant is speaking and the user holds `Ctrl+Alt`, `_on_ptt(held=True)` invokes `interrupt()` immediately, stopping speaker audio, draining queues, and switching to `LISTENING`.
 
-The scope is reported to the user via the log.
+---
 
-### State Transitions
+### 4. Resting State Management
 
-```
-Chord released
-    ↓
-_push_held = False
-    ↓
-ui.set_state("SLEEPING")  (if wake word is on)
-```
+| Condition | State |
+|-----------|-------|
+| Chord held down | `LISTENING` |
+| Chord released, awaiting reply | `THINKING` |
+| Assistant replying with audio | `SPEAKING` |
+| Turn complete & playback finished | `IDLE` |
 
-```
-Chord pressed (held for 60ms)
-    ↓
-_push_held = True
-    ↓
-ui.set_state("LISTENING")
-    ↓
-If wake word is on and assistant was asleep:
-    self._awake = True  (wake up)
-```
+---
 
-### Integration with Main Loop
+### 5. Unified Interaction Modes (UI Selector)
 
-**File:** `main.py`, `JarvisLive` class
+In the Settings UI (`General & Quick Controls`), interaction modes are organized into a single ReUI-compliant 3-Card Segmented Selector:
 
-```python
-def set_push_to_talk(self, enabled: bool) -> str:
-    """Turn hold-to-talk on or off."""
-    self._ptt_enabled = bool(enabled)
-    self._ptt_held = False
-    if enabled:
-        self._ptt = PushToTalk(self._on_ptt)
-        scope = self._ptt.start()
-    else:
-        self._ptt.stop()
-        self._ptt = None
-    return scope
+| Mode | Visual Tag | Behavior & Resting State | Underlying Backend Flags |
+| :--- | :--- | :--- | :--- |
+| **Always Listening** | `OPEN MIC` | Continuous open mic. Mic is always active; Gemini Live server VAD handles back-and-forth turns. | `wake_word_enabled: false`, `push_to_talk_enabled: false` |
+| **Wake Word** | `HANDS-FREE` | Standby (`IDLE`). Saying *"Hey Zezo"* wakes mic for 15s active window, then returns to sleep. | `wake_word_enabled: true`, `push_to_talk_enabled: false` |
+| **Push-To-Talk** | `CTRL+ALT` | Standby (`IDLE`). Key-held dictation via `Ctrl + Alt`. Instant reply upon release. | `wake_word_enabled: false`, `push_to_talk_enabled: true` |
 
-def _on_ptt(self, held: bool) -> None:
-    """Called when chord pressed/released."""
-    self._ptt_held = held
-    if held and self._wake_enabled and not self._awake:
-        self._awake = True  # also wakes from sleep
-```
+---
 
-### Audio Gate Behavior
-
-When push-to-talk is active:
-
-```python
-def callback(indata, frames, time_info, status):
-    if self._ptt_enabled and not self._ptt_held:
-        return  # BLOCK: audio never reaches Gemini
-    # ... rest of processing
-```
-
-**The microphone is completely closed** when the chord is not held. Nothing leaves the machine.
-
-### Configuration
+### 6. Configuration
 
 | Setting | Key | Default | Source |
 |---------|-----|---------|--------|
-| Enabled | `push_to_talk_enabled` | `False` | `config/api_keys.json` |
-| Scope | Reported at runtime | `"global"` or `"window"` | `PushToTalk.start()` |
-
-### Thread Safety
-
-The `_on_ptt` callback **may arrive on the hotkey thread** (Windows) or the Qt thread (macOS/Linux). The state is set atomically:
-
-```python
-def _set_held(self, held: bool) -> None:
-    if held == self._held:
-        return
-    self._held = held
-    try:
-        self._on_change(held)
-    except Exception:
-        pass  # a listener fault must never kill the watcher
-```
-
-### Summary
-
-```
-Windows: Global, GetAsyncKeyState polling, 30Hz, no dependencies
-macOS/Linux: Window-scoped, Qt shortcut, honest limitation reporting
-Chord: Ctrl+Space (default), debounced at 60ms
-Effect: Microphone opens only while held; also wakes from sleep
-Thread: Dedicated polling thread (Windows), Qt thread (macOS/Linux)
-```
+| Push-to-Talk Enabled | `push_to_talk_enabled` | `False` | `config/settings.json` / `config/api_keys.json` |
+| Wake Word Enabled | `wake_word_enabled` | `False` | `config/settings.json` / `config/api_keys.json` |
+| Scope | Dynamic | `"global"` or `"window"` | `PushToTalk.start()` |

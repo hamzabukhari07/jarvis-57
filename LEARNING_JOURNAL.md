@@ -1,3 +1,169 @@
+## [2026-10-17] — Unified 3-Option Interaction Modes Architecture (Always Listening, Wake Word, Push-To-Talk)
+- **What was built:**
+  - **ReUI 3-Card Interaction Mode Selector (`SettingsModal.tsx`):**
+    - Replaced the two separate/conflicting toggle switches (`Wake Word Detection` and `Push-To-Talk`) with a unified 3-Option ReUI interactive card grid:
+      1. `Always Listening` (`OPEN MIC`): Continuous open mic; Google Gemini Live server VAD handles conversational flow naturally.
+      2. `Wake Word` (`HANDS-FREE`): Assistant rests in `IDLE`. Saying *"Hey Zezo"* wakes the mic for 15s before returning to standby.
+      3. `Push-To-Talk` (`CTRL+ALT`): Microphone sits in `IDLE`. Holding `Ctrl + Alt` streams live dictation; releasing commits with instant voice reply.
+    - Added clean visual hierarchy with individual colored icon badges (Cyan for Open Mic, Emerald for Wake Word, Amber for Push-To-Talk), `ACTIVE` state badge with checkmark, and primary border glow.
+  - **Backward-Compatible Backend Contract:**
+    - Seamlessly mapped selection to `wake_word_enabled` and `push_to_talk_enabled` flags:
+      - Always Listening: `wake_word_enabled = False, push_to_talk_enabled = False`
+      - Wake Word: `wake_word_enabled = True, push_to_talk_enabled = False`
+      - Push-To-Talk: `wake_word_enabled = False, push_to_talk_enabled = True`
+    - Preserved 100% compatibility with `core/ui_server.py`, `main.py`, and `config/settings.json`.
+- **Why this approach was chosen:**
+  - Eliminates user ambiguity ("should I turn both on or one?"), stops state collisions between wake-word listening window and PTT chord holds, while preserving the original continuous open-mic feature.
+- **Key files touched:**
+  - `frontend/src/components/settings/SettingsModal.tsx`
+  - `frontend/dist/*` (Compiled production bundle)
+  - `docs/PUSH_TO_TALK.md`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - When consolidating multi-state radio modes, maintain the underlying boolean flags to preserve REST/WebSocket API backwards compatibility.
+
+---
+
+## [2026-10-17] — Push-to-Talk Stream-End Signaling (`audio_stream_end`) & Live Dictation Flow
+- **What was built & fixed:**
+  - **Instant Turn Commit on Release (`main.py`):**
+    - Root cause: On hotkey release (`Ctrl+Alt`), the microphone callback abruptly stopped sending audio frames. Because no silence frames or turn-complete signal was sent, Google Gemini Live's server-side VAD was left hanging waiting for input. The turn only completed when the user pressed the hotkey a *second* time, causing the previous message ("Hello") to be answered on the next turn.
+    - Fix: In `_on_ptt(held=False)`, scheduled 150ms of trailing PCM silence frames followed immediately by an `audio_stream_end: True` sentinel through `out_queue`.
+    - In `_send_realtime`, when receiving `audio_stream_end: True`, calls `await self.session.send_realtime_input(audio_stream_end=True)`. Gemini Live detects the stream closure, commits the turn immediately, and outputs speech without needing a second key press.
+  - **Speaker Suppression While Key Held (`main.py` `_play_audio`):**
+    - Added a gate in `_play_audio`: while `self._ptt_enabled and self._ptt_held`, speaker playback sleeps in 50ms intervals until the user releases the chord, guaranteeing the assistant never speaks over the user while holding.
+  - **State Transitions (`main.py`):**
+    - Added `self._awaiting_speech_reply` flag. On release, UI transitions directly to `THINKING` and remains in `THINKING` until the model's audio chunks arrive, transitioning to `SPEAKING` during voice playback, and cleanly resting in `IDLE` once finished.
+  - **Live Dictation in Chat:**
+    - Live user transcriptions (`input_transcription`) continue streaming in real-time to the chat box via `stream_transcript('user', ..., done=False)` during the key hold.
+- **Why this approach was chosen:**
+  - Uses Google GenAI SDK's native `send_realtime_input(audio_stream_end=True)` designed specifically for Push-to-Talk audio streams, eliminating race conditions and preserving 100% order of preceding speech packets.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile main.py core/hotkey.py` passed with 0 errors. Action registry discovered 29/29 active tools.
+  - Layer 2 (Runtime): Unit test `tests/test_push_to_talk_stream_end.py` passed 100%, verifying `held=True` -> `LISTENING`, `held=False` -> `THINKING`, trailing silence injection, `audio_stream_end` queueing, and AsyncMock session execution.
+  - Layer 3 (Regression): `test_config_endpoints.py` and `test_voice_silence_diagnostics_suite.py` passed (5/5 tests passed).
+- **Key files touched:**
+  - `main.py`
+  - `docs/PUSH_TO_TALK.md`
+  - `tests/test_push_to_talk_stream_end.py`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-17] — Seamless Push-to-Talk Live Dictation & Instant Response Architecture
+- **What was built:**
+  - **Audio Stream End Protocol & Trailing Acoustic Flush (`main.py`):**
+    - Integrated Google Gemini Live's native `session.send_realtime_input(audio_stream_end=True)` protocol.
+    - When the user releases the chord (`Ctrl+Alt`), `_on_ptt(held=False)` injects 150ms of clean silence PCM frames (`b'\x00' * 1600` at 16kHz) to close trailing phonemes without clipping.
+    - Immediately following the silence frames, enqueues `{"audio_stream_end": True}` into `out_queue`.
+    - `_send_realtime` processes all speech and silence frames in strict FIFO order before sending `audio_stream_end=True` over WebSocket, triggering instant server-side VAD turn commit with 0ms hang.
+  - **Mic Callback Hard Cutoff (`main.py`):**
+    - Eliminated the 250ms post-release mic leakage in the PortAudio callback. Once `_ptt_held` is False, live mic audio stops enqueuing immediately, preventing late room-noise frames from corrupting or delaying the committed turn.
+  - **Speaker Suppression & Gating (`main.py` `_play_audio`):**
+    - Gated assistant playback while `_ptt_enabled and _ptt_held`, preventing premature speech if the user pauses briefly while still holding the chord.
+    - Added interrupt check before un-gated playback so fresh barge-ins discard stale buffered audio.
+  - **Comprehensive Verification:**
+    - Added unit test suite in `tests/test_push_to_talk_stream_end.py` verifying state transitions (`LISTENING` -> `THINKING` -> `SPEAKING` -> `IDLE`), FIFO queue order, trailing silence flush, and `audio_stream_end` transmission.
+- **Why this approach was chosen:**
+  - Gemini Live's WebSocket API natively supports `audio_stream_end=True`, which bypasses arbitrary silence timeout delays and commits turns immediately upon user release.
+- **What alternatives were considered:**
+  - Relying solely on client-side energy silence threshold (VAD) was discarded because background room noise and variable microphone gain caused trailing silence timeouts and inconsistent turn triggers.
+- **Key files touched:**
+  - `main.py`
+  - `core/hotkey.py`
+  - `docs/PUSH_TO_TALK.md`
+  - `tests/test_push_to_talk_stream_end.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - `out_queue` is FIFO: any control sentinel (such as `audio_stream_end`) MUST be queued behind pending speech frames to prevent premature turn termination.
+  - Never allow raw mic callbacks to append audio frames after a stream-end signal has been enqueued.
+
+---
+
+## [2026-10-16] — Native Windows Dynamic Grammar Wake Word ("Hey Zezo", "Hey Nova") & 15s Sleep Window
+- **What was built:**
+  - **Native Windows Dynamic Grammar Engine (`core/wake_word.py`):**
+    - Integrated Bigfoot-style Windows SAPI Inproc Speech Recognition (`SAPI.SpInprocRecognizer`).
+    - Generates dynamic XML grammar rules at runtime based on the selected assistant name:
+      `"hey " + name`, `"hi " + name`, `"okay " + name`, and bare `name`.
+    - Eliminates the need for 20-minute Colab training or missing `.onnx` models (`hey_zezo.onnx`, `hey_nova.onnx`). Any custom name works immediately out of the box with 0 extra files and ~0.1% CPU consumption.
+    - Updated `is_ready()` and `list_wake_presets()` so all assistant names (Zezo, Nova, Jarvis) report as available on Windows.
+  - **Critical SAPI In-Process Recognizer Fixes:**
+    - **Physical Microphone Token Binding:** Fixed `AudioInputStream = SpMMAudioIn` leaving the audio stream in `SPAS_CLOSED` (0). Bound `reco.AudioInput` directly to `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\AudioInput` default `SpObjectToken`, successfully capturing hardware microphone input without opening the OS Speech UX setup wizard.
+    - **`PyIDispatch` Result Wrapping:** Wrapped `Result` in `win32com.client.Dispatch(Result)` inside `OnRecognition`. SAPI COM event sinks in pythoncom provide raw `PyIDispatch` handles which threw `AttributeError: 'PyIDispatch' object has no attribute 'PhraseInfo'`; wrapping it enables direct access to `Result.PhraseInfo.GetText()`.
+    - **Acoustic & Phonetic Aliasing:** Expanded XML dynamic grammar to include common acoustic variations (`"hey noba"`, `"noba"`, `"hey hova"`, `"hova"`, `"hey zizo"`, `"zizo"`), ensuring high recall across various microphone types and accents.
+  - **Strict IDLE Standby & 15-Second Active Listen Window (`main.py`):**
+    - When Wake Word is enabled, the assistant rests strictly in **`IDLE`** (Standby) — the microphone does not stream room noise to Gemini Live until awakened.
+    - When user says *"Hey Nova"* or *"Hey Zezo"*, the native grammar engine detects it and transitions ZEZO immediately to **`LISTENING`**.
+    - If the user does not speak any query within **15 seconds** (`WAKE_LISTEN_WINDOW = 15.0s`), ZEZO automatically transitions cleanly back to **`IDLE`**.
+    - After Gemini finishes answering a question, the 15-second activity timer restarts, allowing natural follow-up conversation before returning to standby.
+- **Why this approach was chosen:**
+  - Bigfoot native grammar architecture provides instantaneous, zero-download, offline wake-word recognition for any name without training external neural nets.
+- **Key files touched:**
+  - `core/wake_word.py`
+  - `main.py`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-16] — Push-To-Talk: Instant Barge-In & Live Dictation Streaming Fix (Ctrl+Alt)
+- **What was built & fixed:**
+  - **Live User Dictation Streaming in Chat (`App.tsx` & `main.py`):**
+    - Root cause: In `frontend/src/App.tsx`, the `transcriptStream` effect had a deduplication check (`if (speaker === 'user' && last && last.role === 'user')`) placed before the active live turn check (`if (last.id.startsWith('live-user'))`). Whenever partial speech chunks arrived while holding `Ctrl+Alt`, it treated consecutive updates as duplicate messages and dropped them.
+    - Fix: Refactored the order of evaluation in `App.tsx`. Active `live-user` messages now receive streaming updates seamlessly (supporting both cumulative sentences and delta additions) so spoken words appear instantly in real-time in the chat panel like a live dictation while holding `Ctrl+Alt`.
+    - Added real-time log bus debug tracing in `main.py` `_receive_audio` whenever `sc.input_transcription` is received from Google Gemini Live.
+  - **PTT Audio Playback Fix (`main.py` `_receive_audio`):**
+    - Root cause: In `_receive_audio`, the check `if self._ptt_enabled and self._ptt_held: pass` was erroneously dropping incoming response audio chunks from Gemini Live if user was still holding or released near turn turn boundary. Because the model's audio was discarded, ZEZO fell silent and went to `IDLE` without answering until the next user interaction re-triggered the old query context.
+    - Fix: Removed the drop check from `_receive_audio`. Gemini Live WebSocket audio chunks now flow naturally into `audio_in_queue` and play immediately after the user finishes speaking.
+  - **Instant Speech Barge-In on `Ctrl+Alt` Press:**
+    - Root cause: If ZEZO was currently speaking and the user held `Ctrl+Alt` to ask a new question or interrupt, ZEZO did not stop talking because `interrupt()` was never triggered on keypress, and the mic callback was discarding input frames due to `zezo_speaking == True`.
+    - Fix: In `_on_ptt(held=True)`, added an immediate check for `self._is_speaking`. If true, `self.interrupt()` is called immediately:
+      1. Outgoing mic queue & incoming playback queue are drained.
+      2. `_is_speaking` drops to `False` within ~50ms.
+      3. UI switches directly to `LISTENING`.
+      4. `_interrupted` flag is reset to `False` so the new response audio is accepted and played.
+  - **Canvas Splitter Resizing (Lag & Jitter Elimination):**
+    - Eliminated `transition-all duration-75` from the `<Frame>` container in `frontend/src/App.tsx`, which was fighting continuous live drag updates.
+    - Added conditional `transition: none` during active drag (`!isDraggingCanvas && "transition-[height] duration-150 ease-out"`), ensuring instant 1:1 hardware refresh tracking (60–120Hz).
+    - Replaced unstable `prev - e.movementY` calculations with absolute coordinate delta anchoring (`startY` + `startHeight` stored in `dragStartRef`).
+    - Added global `user-select: none` and `cursor: row-resize` on `document.body` during drag.
+- **Why this approach was chosen:**
+  - Streaming partial user speech to the chat thread gives immediate visual feedback (dictation mode) while holding `Ctrl+Alt`, confirming the microphone and model are actively tracking input.
+- **Key files touched:**
+  - `frontend/src/App.tsx`
+  - `main.py`
+  - `core/hotkey.py`
+  - `frontend/src/components/settings/SettingsModal.tsx`
+  - `LEARNING_JOURNAL.md`
+- **Key files touched:**
+  - `main.py`
+  - `core/hotkey.py`
+  - `frontend/src/App.tsx`
+  - `frontend/src/components/settings/SettingsModal.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-16] — Dynamic Holographic Qivi Companion in Chat & Compact Message Spacing
+- **What was built:**
+  - Integrated the live dynamic Holographic Qivi Companion (`ChatAvatarIcon.tsx` backed by `qivi-react`) into the chat assistant messages and chat empty state view (`ThreadPrimitive.Empty`) in `frontend/src/components/assistant-ui/ZezoChatThread.tsx`.
+  - Replaced the static, broken `/zezo-avatar.png` image with `<ChatAvatarIcon size={26} expression={isRunning ? 'thinking' : 'happy'} state={isRunning ? 'talking' : 'idle'} />`.
+  - Replaced the static placeholder in the empty state screen with `<ChatAvatarIcon size={44} expression="happy" state="idle" />`.
+  - The chat avatar now dynamically tracks character preset selections (Qivi, Spark, Diplomat, Ember/Chaos, Sage, Atlas/Guardian) and OS theme palette shifts via `zezo_avatar_settings_changed` and `zezo_theme_changed` events without requiring a page reload.
+  - Compacted the message layout: eliminated wide bottom rows (`pl-10.5 mt-1`) that created excess empty space under assistant responses, tightened vertical padding (`py-1`), and integrated the timestamp and copy/regenerate action bar directly as an inline footer beneath message speech text.
+  - Hardened `_avatar_handler` in `core/ui_server.py` to check `frontend/dist` and `frontend/public` paths before fallback, preventing legacy 404 errors.
+- **Why this approach was chosen:**
+  - Provides a unified holographic companion experience across the workstation HUD, settings modal, and chat stream while eliminating awkward whitespace beneath single-line voice dialogue.
+- **Key files touched:**
+  - `frontend/src/components/assistant-ui/ZezoChatThread.tsx`
+  - `core/ui_server.py`
+  - `LEARNING_JOURNAL.md`
+- **What to remember for future work:**
+  - `qivi-react` uses `"talking"` (not `"speaking"`) in its `QiviState` union type (`"idle" | "listening" | "thinking" | "searching" | "analyzing" | "found" | "answering" | "talking" | "success" | "warning" | "error" | "dissolving"`).
+  - Always clean up unused imports from `@/components/prompt-kit/message` (e.g. `MessageAvatar as PKMessageAvatar`) when swapping custom avatar wrappers to satisfy strict TypeScript builds.
+
+---
+
 ## [2026-10-16] — Clean Unified Frontend Architecture (100% React & Remote Gateway)
 - **What was built & reorganized:**
   - Deleted obsolete HTML/CSS/JS prototype folder (`frontend/`).

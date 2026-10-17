@@ -448,17 +448,17 @@ class ZezoUIServer:
     async def _save_assistant_settings_handler(self, request: web.Request) -> web.Response:
         try:
             data = await request.json()
-            name = "ZEZO"
             voice = str(data.get("voice_name", "Charon")).strip() or "Charon"
             lang = str(data.get("response_language", "auto")).strip() or "auto"
             fallback_voice = data.get("fallback_voice")
 
             from memory.config_manager import (
-                save_assistant_config, save_voice, save_response_language,
+                save_assistant_config, save_voice, save_response_language, get_assistant_name,
                 save_api_keys_transactional, is_configured, get_masked_gemini_key, get_masked_groq_key,
                 get_masked_elevenlabs_key, get_masked_tavily_key, save_fallback_voice, get_fallback_voice,
                 save_voice_fallback_mode, get_voice_fallback_mode, get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
             )
+            name = str(data.get("assistant_name") or "").strip() or get_assistant_name()
 
             gemini_key = data.get("gemini_api_key")
             groq_key = data.get("groq_api_key")
@@ -648,9 +648,16 @@ class ZezoUIServer:
                 get_theme, get_accent,
                 get_avatar_settings, save_avatar_settings,
             )
+            try:
+                from core.wake_word import list_wake_presets
+                _assistant_names = [p["name"] for p in list_wake_presets()]
+            except Exception:
+                _assistant_names = []
             data = {
                 "status": "success",
                 "assistant_name": get_assistant_name(),
+                "available_assistant_names": _assistant_names,
+                "wake_phrase": f"Hey {get_assistant_name()}",
                 "voice_name": get_voice(),
                 "response_language": get_response_language(),
                 "theme": get_theme(),
@@ -698,8 +705,10 @@ class ZezoUIServer:
             data = await request.json()
             from memory.config_manager import (
                 save_assistant_config, save_voice, save_response_language,
+                get_assistant_name,
                 save_autostart_enabled, save_brief_enabled,
-                save_wake_word_enabled, save_push_to_talk_enabled,
+                save_wake_word_enabled, get_wake_word_enabled,
+                save_push_to_talk_enabled,
                 save_api_keys_transactional,
                 save_pipeline_mode, save_stt_engine, save_llm_engine,
                 save_tts_engine, save_tts_voice, save_voice_fallback_mode,
@@ -718,8 +727,11 @@ class ZezoUIServer:
                 save_brief_enabled(bool(data.get("morning_brief_enabled", data.get("morning_brief"))))
             if "wake_word_enabled" in data or "wake_word" in data:
                 val = bool(data.get("wake_word_enabled", data.get("wake_word")))
+                changed = (val != get_wake_word_enabled())
                 save_wake_word_enabled(val)
-                if hasattr(self, "on_wake_toggle") and self.on_wake_toggle:
+                # Only act on a REAL change — autosave re-sends the same value and
+                # must not cause spurious sleep/wake + session reconnects.
+                if changed and hasattr(self, "on_wake_toggle") and self.on_wake_toggle:
                     try:
                         self.on_wake_toggle(val)
                     except Exception:
@@ -744,8 +756,9 @@ class ZezoUIServer:
             # Avatar customization persistence
             save_avatar_settings(data)
 
-            # 2. Assistant & Language (Identity is permanently ZEZO)
-            save_assistant_config("ZEZO", "")
+            # 2. Assistant & Language (identity is user-selectable — see Persona tab)
+            _posted_name = str(data.get("assistant_name") or "").strip()
+            save_assistant_config(_posted_name or get_assistant_name(), "")
             voice_name = data.get("voice_name")
             if voice_name is not None:
                 save_voice(str(voice_name).strip())
@@ -802,10 +815,10 @@ class ZezoUIServer:
                 save_antigravity_model(str(data["antigravity_model"]))
 
             # Notify UI callbacks if relevant
-            if voice_name or resp_lang:
+            if voice_name or resp_lang or _posted_name:
                 if self.on_assistant_settings_changed:
                     try:
-                        self.on_assistant_settings_changed("ZEZO", voice_name or "Charon", resp_lang or "auto")
+                        self.on_assistant_settings_changed(get_assistant_name(), voice_name or "Charon", resp_lang or "auto")
                     except Exception:
                         pass
 
@@ -1550,12 +1563,15 @@ class ZezoUIServer:
             return web.json_response({"status": "error", "message": str(e)}, status=500)
 
     async def _avatar_handler(self, request: web.Request) -> web.Response:
-        p1 = BASE_DIR / "web" / "dist" / "zezo-avatar.png"
-        if p1.exists():
-            return web.FileResponse(p1)
-        p2 = BASE_DIR / "web" / "public" / "zezo-avatar.png"
-        if p2.exists():
-            return web.FileResponse(p2)
+        for p in (
+            self.frontend_dir / "dist" / "zezo-avatar.png",
+            self.frontend_dir / "public" / "zezo-avatar.png",
+            BASE_DIR / "frontend" / "public" / "zezo-avatar.png",
+            BASE_DIR / "web" / "dist" / "zezo-avatar.png",
+            BASE_DIR / "web" / "public" / "zezo-avatar.png",
+        ):
+            if p.exists():
+                return web.FileResponse(p)
         return web.Response(status=404)
 
     def _resolve_remote_details(self) -> tuple[str, str]:
@@ -1875,15 +1891,16 @@ class ZezoUIServer:
                 logger.warning("Failed to toggle morning brief: %s", e)
 
         elif msg_type == "save_assistant_settings":
-            name = "ZEZO"
+            name = str(payload.get("assistant_name") or "").strip()
             voice = str(payload.get("voice_name", "Charon")).strip() or "Charon"
             lang = str(payload.get("response_language", "auto")).strip() or "auto"
             fallback_voice = payload.get("fallback_voice")
             try:
                 from memory.config_manager import (
                     save_assistant_config, save_voice, save_response_language,
-                    get_user_name, save_fallback_voice, get_fallback_voice,
+                    get_user_name, save_fallback_voice, get_fallback_voice, get_assistant_name,
                 )
+                name = name or get_assistant_name()
                 user = get_user_name()
                 save_assistant_config(name, user)
                 save_voice(voice)
@@ -2070,11 +2087,18 @@ class ZezoUIServer:
             PIPELINE_MODES, STT_ENGINES, LLM_ENGINES, TTS_ENGINES,
             get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
         )
+        try:
+            from core.wake_word import list_wake_presets
+            _assistant_names = [p["name"] for p in list_wake_presets()]
+        except Exception:
+            _assistant_names = []
         return {
             "state": "OFFLINE",
             "muted": False,
             "sleeping": False,
             "assistant_name": get_assistant_name(),
+            "available_assistant_names": _assistant_names,
+            "wake_phrase": f"Hey {get_assistant_name()}",
             "voice_name": get_voice(),
             "response_language": get_response_language(),
             "fallback_voice": get_fallback_voice(),

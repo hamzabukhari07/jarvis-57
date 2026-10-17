@@ -10,7 +10,6 @@ import {
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
 import {
   Message as PKMessage,
-  MessageAvatar as PKMessageAvatar,
   MessageContent as PKMessageContent,
 } from "@/components/prompt-kit/message";
 import {
@@ -22,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
+import { ChatAvatarIcon } from "../avatar/ChatAvatarIcon";
 
 function formatMessageTime(date?: Date | string | number): string {
   if (!date) return "";
@@ -38,15 +38,15 @@ export const UserMessage: FC = () => {
   return (
     <MessagePrimitive.Root
       data-slot="aui-user-message"
-      className="w-full max-w-3xl py-1.5 mx-auto group"
+      className="w-full max-w-3xl py-1 mx-auto group"
     >
-      <PKMessage className="justify-end">
+      <PKMessage className="justify-end py-1">
         <PKMessageContent className="rounded-2xl rounded-tr-xs px-3.5 py-2 bg-primary text-primary-foreground font-normal text-xs leading-relaxed shadow-xs max-w-xl break-words">
           <MessagePrimitive.Parts />
         </PKMessageContent>
       </PKMessage>
 
-      <div className="flex items-center justify-end gap-1.5 pr-1 mt-1">
+      <div className="flex items-center justify-end gap-1.5 pr-1 mt-0.5">
         {timeStr && (
           <span className="text-[10px] text-[var(--muted-foreground)] font-mono select-none">
             {timeStr}
@@ -79,21 +79,17 @@ export const AssistantMessage: FC = () => {
   return (
     <MessagePrimitive.Root
       data-slot="aui-assistant-message"
-      className="w-full max-w-3xl py-1.5 mx-auto group"
+      className="w-full max-w-3xl py-1 mx-auto group"
     >
-      <PKMessage className="justify-start items-start gap-2.5">
-        {/* Official Zezo Cosmic Avatar Badge */}
-        <PKMessageAvatar
-          fallback="ZZ"
-          alt="ZEZO"
-          className="shrink-0 w-8 h-8 rounded-full border border-[var(--border)] bg-[#090d16] overflow-hidden shadow-xs flex items-center justify-center p-0.5"
-        >
-          <img
-            src="/zezo-avatar.png"
-            alt="ZEZO"
-            className="w-full h-full object-contain transform scale-105"
+      <PKMessage className="justify-start items-start gap-2.5 py-1">
+        {/* Dynamic Holographic Qivi Companion Avatar Badge */}
+        <div className="shrink-0 w-8 h-8 rounded-full border border-[var(--border)] bg-[#090d16]/90 overflow-hidden shadow-xs flex items-center justify-center p-0.5">
+          <ChatAvatarIcon
+            size={26}
+            expression={isRunning ? 'thinking' : 'happy'}
+            state={isRunning ? 'talking' : 'idle'}
           />
-        </PKMessageAvatar>
+        </div>
 
         {/* Live Speech Dialogue & Real-time Transcription Stream */}
         <PKMessageContent markdown className="flex-1 min-w-0 bg-transparent p-0 text-xs text-[var(--foreground)] leading-relaxed">
@@ -115,47 +111,47 @@ export const AssistantMessage: FC = () => {
                 <span>transcribing speech...</span>
               </span>
             )}
+
+            {/* Assistant Action Bar & Timestamp - compact inline footer */}
+            <div className="flex items-center gap-2 mt-1">
+              {timeStr && (
+                <span className="text-[10px] text-[var(--muted-foreground)] font-mono select-none">
+                  {timeStr}
+                </span>
+              )}
+              <ActionBarPrimitive.Root
+                hideWhenRunning
+                className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <ActionBarPrimitive.Copy asChild>
+                  <button
+                    type="button"
+                    className="p-1 hover:text-[var(--foreground)] hover:bg-[var(--secondary)] rounded-md text-[10px] transition-colors cursor-pointer"
+                    title="Copy transcription"
+                  >
+                    <AuiIf condition={(s) => s.message.isCopied}>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    </AuiIf>
+                    <AuiIf condition={(s) => !s.message.isCopied}>
+                      <Copy className="w-3.5 h-3.5" />
+                    </AuiIf>
+                  </button>
+                </ActionBarPrimitive.Copy>
+
+                <ActionBarPrimitive.Reload asChild>
+                  <button
+                    type="button"
+                    className="p-1 hover:text-[var(--foreground)] hover:bg-[var(--secondary)] rounded-md text-[10px] transition-colors cursor-pointer"
+                    title="Regenerate speech"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
+                </ActionBarPrimitive.Reload>
+              </ActionBarPrimitive.Root>
+            </div>
           </div>
         </PKMessageContent>
       </PKMessage>
-
-      {/* Assistant Action Bar & Timestamp */}
-      <div className="flex items-center gap-2 mt-1 pl-10.5">
-        {timeStr && (
-          <span className="text-[10px] text-[var(--muted-foreground)] font-mono select-none">
-            {timeStr}
-          </span>
-        )}
-        <ActionBarPrimitive.Root
-          hideWhenRunning
-          className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <ActionBarPrimitive.Copy asChild>
-            <button
-              type="button"
-              className="p-1 hover:text-[var(--foreground)] hover:bg-[var(--secondary)] rounded-md text-[10px] transition-colors cursor-pointer"
-              title="Copy transcription"
-            >
-              <AuiIf condition={(s) => s.message.isCopied}>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-              </AuiIf>
-              <AuiIf condition={(s) => !s.message.isCopied}>
-                <Copy className="w-3.5 h-3.5" />
-              </AuiIf>
-            </button>
-          </ActionBarPrimitive.Copy>
-
-          <ActionBarPrimitive.Reload asChild>
-            <button
-              type="button"
-              className="p-1 hover:text-[var(--foreground)] hover:bg-[var(--secondary)] rounded-md text-[10px] transition-colors cursor-pointer"
-              title="Regenerate speech"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
-          </ActionBarPrimitive.Reload>
-        </ActionBarPrimitive.Root>
-      </div>
     </MessagePrimitive.Root>
   );
 };
@@ -240,11 +236,11 @@ export const ZezoChatThread: FC<ZezoChatThreadProps> = ({
         <div className="max-w-3xl mx-auto w-full space-y-3">
           <ThreadPrimitive.Empty>
             <div className="flex flex-col items-center justify-center h-full text-center text-[var(--muted-foreground)] py-14">
-              <div className="w-12 h-12 rounded-2xl bg-[#090d16] border border-[var(--border)] flex items-center justify-center mb-3 shadow-sm overflow-hidden p-1">
-                <img
-                  src="/zezo-avatar.png"
-                  alt="ZEZO"
-                  className="w-full h-full object-contain transform scale-105"
+              <div className="w-13 h-13 rounded-2xl bg-[#090d16]/90 border border-[var(--border)] flex items-center justify-center mb-3 shadow-sm overflow-hidden p-1">
+                <ChatAvatarIcon
+                  size={44}
+                  expression="happy"
+                  state="idle"
                 />
               </div>
               <div className="text-sm font-semibold text-[var(--foreground)]">

@@ -31,6 +31,7 @@ class TestConfigEndpoints(AioHTTPTestCase):
         assert "gemini_api_key_masked" in data
         assert "autostart_enabled" in data
         assert "wake_word_enabled" in data
+        assert "available_assistant_names" in data
         assert "theme" in data
         assert "accent" in data
 
@@ -54,7 +55,7 @@ class TestConfigEndpoints(AioHTTPTestCase):
 
         # 3. Assert memory config values updated
         assert config_manager.get_response_language() == "Urdu"
-        assert config_manager.get_assistant_name() == "ZEZO"
+        assert config_manager.get_assistant_name() == "ZEZO-TEST"
         assert config_manager.get_wake_word_enabled() is True
         assert config_manager.get_brief_enabled() is False
         assert config_manager.get_theme() == "emerald"
@@ -66,7 +67,7 @@ class TestConfigEndpoints(AioHTTPTestCase):
 
         # 4. Clean up / restore defaults
         config_manager.save_response_language("auto")
-        config_manager.save_assistant_config("ZEZO", "")
+        config_manager.save_assistant_config("Zezo", "")
         config_manager.save_wake_word_enabled(False)
         config_manager.save_brief_enabled(True)
         config_manager.save_theme("copper")

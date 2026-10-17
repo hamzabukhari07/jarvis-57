@@ -148,6 +148,15 @@ def apply_ui_accent(hex_color: str) -> bool:
     return True
 
 
+def _assistant_name_choices() -> list[str]:
+    """Preset assistant names for the Persona dropdown. Never raises."""
+    try:
+        from core.wake_word import list_wake_presets
+        return [p["name"] for p in list_wake_presets()] or ["Zezo", "Nova", "Jarvis"]
+    except Exception:
+        return ["Zezo", "Nova", "Jarvis"]
+
+
 class MainWindow(QMainWindow):
     """Main desktop container window hosting the React 19 Desktop OS Workstation via QWebEngineView."""
 
@@ -305,6 +314,8 @@ class MainWindow(QMainWindow):
             "state": "OFFLINE",
             "muted": self._muted,
             "assistant_name": self._assistant_name or get_assistant_name(),
+            "available_assistant_names": _assistant_name_choices(),
+            "wake_phrase": f"Hey {self._assistant_name or get_assistant_name()}",
             "voice_name": get_voice(),
             "response_language": get_response_language(),
             "autostart_enabled": get_autostart_enabled(),
@@ -336,6 +347,11 @@ class MainWindow(QMainWindow):
     def _handle_assistant_settings_changed(self, name: str, voice: str, lang: str):
         if name:
             self._assistant_name = name
+            if getattr(self, "on_assistant_name_change", None):
+                try:
+                    self.on_assistant_name_change(name)
+                except Exception as e:
+                    logger.warning("Error in on_assistant_name_change callback: %s", e)
         if self.on_voice_change:
             try:
                 self.on_voice_change()
@@ -455,6 +471,8 @@ class MainWindow(QMainWindow):
             "sleeping": self._sleeping,
             "tasks": tasks,
             "assistant_name": get_assistant_name(),
+            "available_assistant_names": _assistant_name_choices(),
+            "wake_phrase": f"Hey {get_assistant_name()}",
             "voice_name": get_voice(),
             "response_language": get_response_language(),
             "autostart_enabled": get_autostart_enabled(),
