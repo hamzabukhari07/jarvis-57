@@ -86,7 +86,7 @@ _chosen_api: dict = {"input": None, "output": None}
 # DirectSound for the microphone and MME for the speakers — a split that no
 # amount of reasoning would have produced.
 _PREFERRED_APIS = {
-    "Windows": ("directsound", "mme", "wasapi"),
+    "Windows": ("directsound", "mme", "wasapi", "wdm-ks"),
     # macOS has only Core Audio, so there is nothing to disambiguate.
     "Darwin":  ("core audio",),
     # PulseAudio/PipeWire present one clean endpoint per device; raw ALSA
@@ -156,12 +156,22 @@ def _transport_works(idx: int, kind: str, api_key) -> bool:
             def _cb(indata, n, *_a):
                 frames[0] += n
 
-            st = sd.InputStream(samplerate=rate, channels=1, dtype="int16",
-                                blocksize=1024, device=idx, callback=_cb)
+            probe_rate = rate
+            try:
+                st = sd.InputStream(samplerate=rate, channels=1, dtype="int16",
+                                    blocksize=1024, device=idx, callback=_cb)
+            except Exception:
+                info = sd.query_devices(idx)
+                native_sr = int(info.get("default_samplerate") or 48000)
+                native_ch = int(info.get("max_input_channels") or 2)
+                st = sd.InputStream(samplerate=native_sr, channels=native_ch, dtype="int16",
+                                    blocksize=1024, device=idx, callback=_cb)
+                probe_rate = native_sr
+
             st.start()
             time.sleep(secs)
             st.stop(); st.close()
-            ok = frames[0] > rate * secs * 0.3
+            ok = frames[0] > probe_rate * secs * 0.3
             if not ok:
                 print(f"[Audio] input: host API delivered {frames[0]} frames in "
                       f"{secs*1000:.0f} ms — skipping it")
@@ -208,21 +218,23 @@ def configure(input_rate: int, output_rate: int) -> None:
 
 
 def _usable(idx: int, kind: str) -> bool:
-    """Can this device actually be opened at the rate we need?
-
-    Deliberately opens a real stream rather than asking
-    `check_output_settings`, because that function lies: it passed for an MME
-    endpoint that then failed to open with "The specified format is not
-    supported or cannot be translated" [MME error 32]. Opening and immediately
-    closing costs milliseconds and is the only answer that holds."""
+    """Can this device actually be opened at the rate we need?"""
     st = None
     try:
         import sounddevice as sd
         rate = _RATES.get(kind, 16000)
         if kind == "input":
-            st = sd.InputStream(samplerate=rate, channels=1, dtype="int16",
-                                blocksize=1024, device=idx,
-                                callback=lambda *_a: None)
+            try:
+                st = sd.InputStream(samplerate=rate, channels=1, dtype="int16",
+                                    blocksize=1024, device=idx,
+                                    callback=lambda *_a: None)
+            except Exception:
+                info = sd.query_devices(idx)
+                native_sr = int(info.get("default_samplerate") or 48000)
+                native_ch = int(info.get("max_input_channels") or 2)
+                st = sd.InputStream(samplerate=native_sr, channels=native_ch, dtype="int16",
+                                    blocksize=1024, device=idx,
+                                    callback=lambda *_a: None)
         else:
             st = sd.RawOutputStream(samplerate=rate, channels=1, dtype="int16",
                                     blocksize=1024, device=idx)
@@ -236,6 +248,7 @@ def _usable(idx: int, kind: str) -> bool:
                 st.stop(); st.close()
             except Exception:
                 pass
+
 
 # Aliases for "the default device" and internal routing endpoints. Matched
 # case-insensitively as substrings against the device name.
@@ -359,6 +372,18 @@ def resolve(name: str, kind: str):
     a different endpoint than the one on screen."""
     wanted = (name or "").strip()
     if not wanted or wanted == DEFAULT_LABEL:
+        try:
+            import sounddevice as sd
+            def_idx = sd.default.device[0 if kind == "input" else 1]
+            if def_idx is not None and def_idx >= 0:
+                return None
+            # Default device index is -1 (no OS default set). Find any usable device index.
+            for idx, dev in enumerate(sd.query_devices()):
+                chan = dev.get("max_input_channels" if kind == "input" else "max_output_channels", 0)
+                if chan > 0 and _usable(idx, kind):
+                    return idx
+        except Exception:
+            pass
         return None
 
     try:

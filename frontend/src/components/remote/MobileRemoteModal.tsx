@@ -25,7 +25,7 @@ import {
 interface MobileRemoteModalProps {
   isOpen: boolean
   onClose: () => void
-  remoteGateway: { url: string; key: string } | null
+  remoteGateway: { url: string; key: string; tunnel_status?: string; tunnel_available?: boolean; tunnel_error?: string } | null
   onRequestNewKey?: () => void
 }
 
@@ -44,6 +44,8 @@ export const MobileRemoteModal: React.FC<MobileRemoteModalProps> = ({
   const [copiedKey, setCopiedKey] = useState(false)
   const [copiedUrl, setCopiedUrl] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [tunnelStatus, setTunnelStatus] = useState<string>('idle')
+  const [tunnelError, setTunnelError] = useState<string>('')
 
   // Generate fallback 6-char key if offline
   const generateFallbackKey = useCallback(() => {
@@ -69,6 +71,9 @@ export const MobileRemoteModal: React.FC<MobileRemoteModalProps> = ({
       const hostname = window.location.hostname || 'localhost'
       setLocalUrl(`http://${hostname}:8000`)
     }
+
+    if (remoteGateway?.tunnel_status) setTunnelStatus(remoteGateway.tunnel_status)
+    if (remoteGateway?.tunnel_error) setTunnelError(remoteGateway.tunnel_error)
   }, [remoteGateway, generateFallbackKey, localKey])
 
   // Request fresh key on open
@@ -77,6 +82,32 @@ export const MobileRemoteModal: React.FC<MobileRemoteModalProps> = ({
       onRequestNewKey()
     }
   }, [isOpen, onRequestNewKey])
+
+  // Poll tunnel status while open; refresh URL/key once tunnel becomes ready
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/remote')
+        if (!res.ok || cancelled) return
+        const data = await res.json()
+        if (cancelled) return
+        if (data?.tunnel_status) setTunnelStatus(data.tunnel_status)
+        if (data?.tunnel_error) setTunnelError(data.tunnel_error)
+        if (data?.url && data.url !== localUrl) setLocalUrl(data.url)
+        if (data?.key && data.key !== localKey) setLocalKey(data.key)
+      } catch {
+        /* ignore */
+      }
+    }
+    poll()
+    const interval = setInterval(poll, 2000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [isOpen])
 
   // Generate crisp client-side QR Code whenever URL or key updates
   useEffect(() => {
@@ -210,6 +241,21 @@ export const MobileRemoteModal: React.FC<MobileRemoteModalProps> = ({
               <QrCode className="w-3.5 h-3.5 text-primary" />
               <span>Scan with phone camera to auto-connect</span>
             </div>
+          </div>
+
+          {/* Tunnel status (auto Cloudflare tunnel) */}
+          <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs font-mono flex items-center gap-2">
+            {tunnelStatus === 'running' ? (
+              <span className="text-emerald-400">● Tunnel ready — accessible from anywhere</span>
+            ) : tunnelStatus === 'starting' ? (
+              <span className="text-amber-400 animate-pulse">● Connecting tunnel to internet…</span>
+            ) : tunnelStatus === 'not_installed' ? (
+              <span className="text-red-400">● cloudflared not installed — LAN only. Run: winget install Cloudflare.cloudflared</span>
+            ) : tunnelStatus === 'error' ? (
+              <span className="text-red-400">● Tunnel error: {tunnelError || 'unknown'}</span>
+            ) : (
+              <span className="text-muted-foreground">● Tunnel idle — LAN only</span>
+            )}
           </div>
 
           {/* Gateway URL Field */}

@@ -1,3 +1,121 @@
+## [2026-10-19] — Tunnel Reliability Fix (Public-DNS Verification + Retries)
+
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root cause:** Free quick-tunnel hostnames are printed in cloudflared's banner **before** Cloudflare registers the DNS record. The old verifier polled the *local* resolver with a short (~10s) window, and the router/OS negative-caches the first `NXDOMAIN`, so the freshly generated URL often looked "unreachable" → `tunnel_status: error` and the QR modal fell back to the LAN IP.
+- **Fix (`core/tunnel_manager.py`):**
+  - `_verify_url()` now polls **public DNS directly** (`https://dns.google/resolve?name=…&type=A`) for up to ~90s, bypassing the local negative cache entirely.
+  - `_flush_dns_cache()` runs `ipconfig /flushdns` (best-effort, hidden) before each start cycle.
+  - `start()` retries up to 3 attempts; each attempt gets a fresh hostname. After DNS resolves, a 3s origin grace + polled HTTP GET (up to ~15s) confirms the local origin (port 8000) actually answers through the tunnel.
+- **Files touched:** `core/tunnel_manager.py`, `main.py` (wait window 10s→15s in `_make_remote_key`).
+- **Verification (3 layers):** Layer 1 `py_compile` passed; Layer 2 runtime — ZEZO start produced `[Tunnel] Ready: https://aside-talking-gras-grove.trycloudflare.com`, root URL **200** and `/auto-login?key=…` **200**, `/api/remote` returned that URL with `tunnel_status: running`; Layer 3 `test_config_endpoints.py` + `test_api_key_transactional.py` passed (6/6).
+- **UX:** Modal polling (every 2s) auto-upgrades the QR from LAN → public tunnel URL the moment the tunnel verifies, so no restart/re-scan is needed.
+- **Not touched:** audio/voice pipeline.
+
+---
+
+## [2026-10-19] — Auto-Tunnel Refinements (QR shows public URL + less log spam)
+
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What changed:**
+  - `_make_remote_key` now waits up to 10s for the tunnel to be ready before returning, so the PyQt "Remote Control" button / QR code encode the public tunnel URL instead of the LAN IP.
+  - `core/ui_server.py` exposes `tunnel_manager` via `get_ui_server()` (was incorrectly assigned to `self.ui` PyQt object), so `/api/remote` now reports real `tunnel_status`/`tunnel_error`.
+  - Suppressed uvicorn "Invalid HTTP request received" spam on port 8000/8001 by setting `log_level="error"`.
+- **Files touched:** `main.py`, `core/ui_server.py`, `remote/server.py`.
+- **Creator & Lead Architect:** Hamza Bukhari.
+
+---
+
+## [2026-10-19] — Auto-Cloudflare-Tunnel (One-Click Remote for Non-Tech Users)
+
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:**
+  - Made mobile remote a true one-click feature: ZEZO now auto-starts a free Cloudflare quick tunnel in the background, captures the public `https://…trycloudflare.com` URL, and feeds it to the QR code — no terminal, no env vars for the user.
+  - New module `core/tunnel_manager.py`: `TunnelManager` finds cloudflared (PATH + common install locations), spawns `cloudflared tunnel --url http://localhost:8000` with `CREATE_NO_WINDOW`, parses the public URL from output, drains the pipe, reports status (`idle/starting/running/error/not_installed`), and stops cleanly on exit.
+  - `remote/server.py`: added `set_public_url()` + `_public_url_override` (highest precedence in `get_url()`/`get_manual_url()`).
+  - `main.py`: creates `TunnelManager`, exposes it to `ui` as `tunnel_manager`, runs `_start_tunnel()` task, stops tunnel on UI close.
+  - `core/ui_server.py`: `tunnel_manager` attribute on `ZezoUIServer`; `/api/remote` and `/api/remote/new_key` now return `tunnel_status`, `tunnel_available`, `tunnel_error`.
+  - Frontend `MobileRemoteModal.tsx`: polls `/api/remote` every 2s while open, shows tunnel status line (ready/connecting/not-installed/error), refreshes URL/key when tunnel becomes ready. Rebuilt `frontend/dist`.
+  - Installed cloudflared v2026.10.1 (system) + added to user PATH.
+- **Key files touched:** `core/tunnel_manager.py` (new), `remote/server.py`, `main.py`, `core/ui_server.py`, `frontend/src/components/remote/MobileRemoteModal.tsx`, `frontend/dist/*`.
+- **Not touched:** audio/voice pipeline.
+- **Verification:** Layer 1 `py_compile` passed on all touched Python files; Layer 2 runtime-tested `TunnelManager.start()` → captured real `https://office-arbor-level-available.trycloudflare.com` (status running) and clean stop; frontend `npm run build` passed (0 TS errors); Layer 3 `test_config_endpoints.py` + `test_api_key_transactional.py` passed (6/6).
+- **UX:** User clicks "Remote Control" → QR code auto-shows public URL once tunnel ready (5–10s); phone scans → works from anywhere. If cloudflared missing, UI shows install hint.
+- **Creator & Lead Architect:** Hamza Bukhari.
+
+---
+
+## [2026-10-19] — Cloudflare Tunnel Support for Mobile Remote (Public URL Override)
+
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:**
+  - Added a public-URL override path so ZEZO's mobile remote gateway (`remote/server.py`, port 8000) can be reached from anywhere via a free Cloudflare Tunnel (or any tunnel/proxy) instead of only the LAN IP.
+  - `memory/config_manager.py`: new `get_public_url()` / `save_public_url()` (config key `public_url` in `config/api_keys.json`), with `ZEZO_PUBLIC_URL` env var taking precedence.
+  - `remote/server.py`: `DashboardServer.get_url()` and `get_manual_url()` now return the public URL when set, else legacy LAN IP. QR code / "Remote Control" button therefore encode the public hostname.
+  - `core/ui_server.py`: `_resolve_remote_details()` honors the same override in its LAN-IP fallback branch (also fixed a latent `socket` NameError by importing it lazily).
+  - Installed `cloudflared` (v2026.10.1) system-wide and added it to the user PATH.
+  - Plan doc: `planning/CLOUDFLARE_TUNNEL_PLAN.md`.
+- **Key files touched:** `memory/config_manager.py`, `remote/server.py`, `core/ui_server.py`, `planning/CLOUDFLARE_TUNNEL_PLAN.md`.
+- **Not touched:** audio/voice pipeline (`main.py` live loops, `core/audio_devices.py`, `core/wake_word.py`, `core/hotkey.py`).
+- **Verification:** Layer 1 `py_compile` passed on all 3 files; Layer 2 runtime tested env-var override, config persistence, `get_url`/`get_manual_url`, and `_resolve_remote_details()` (all returned the public URL); Layer 3 `test_config_endpoints.py` + `test_api_key_transactional.py` passed (6/6). `test_remote_dashboard_suite.py` could not collect (pre-existing: imports removed `dashboard.server` module) — unrelated to this change.
+- **Usage:** Set `ZEZO_PUBLIC_URL=https://your-tunnel.trycloudflare.com` (or save `public_url` in config) and run `cloudflared tunnel --url http://localhost:8000` while ZEZO is running. Clear the value to revert to LAN behaviour.
+- **Creator & Lead Architect:** Hamza Bukhari.
+
+---
+
+## [2026-10-19] — Official 3D Orbit Graph, Full-Screen Viewport & Toolbar Refinements (`react-force-graph-3d`)
+
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built & integrated:**
+  - **Full-Screen Responsive Viewport Layout (`SettingsModal.tsx` & `MemoryGraphCanvas.tsx`):**
+    - Root Cause of Dead Space: `SettingsModal.tsx` previously wrapped all views inside a `<ScrollArea>` constrained to `max-w-5xl` (~1024px) with fixed canvas height (`h-[560px]`). On maximized desktop windows (1080p/1440p), this left massive unused dead space on the right (~900px) and bottom.
+    - Solution: Unconstrained the `activeSection === 'memory'` container to break out into a full-bleed `flex-1 flex flex-col w-full h-full min-h-0 p-4 md:p-6 gap-3 overflow-hidden`.
+    - `MemoryGraphCanvas` now uses `h-full flex-1 min-h-[420px]` where `ResizeObserver` detects container width/height dynamically and feeds exact dimensions into `<ForceGraph3D width={dimensions.width} height={dimensions.height} />`.
+    - Integrated side-docked `MemoryInspectorDrawer` (`w-96 h-full`) that smoothly splits viewport space with the graph when a node is selected.
+  - **Fixed Duplicate Full-Screen Button & Icon Disambiguation (`MemoryGraphCanvas.tsx`):**
+    - Root Cause: Both "Fit to Screen (Center)" (`handleResetView`) and "Fullscreen Toggle" (`handleToggleFullscreen`) were using the identical `<Maximize2>` icon side-by-side in the toolbar.
+    - Solution: Replaced `handleResetView` icon with `<Focus className="w-3.5 h-3.5" />` (tooltip: *"Fit to Screen (Center)"*). Updated the fullscreen toggle to switch dynamically between `<Maximize2>` and `<Minimize2>` based on `isFullscreen`.
+  - **Toolbar Decluttering (Removed Confusing `Global | Local` Toggle):**
+    - Removed redundant `Global / Local` buttons per user feedback to give the search input clean, prominent space (`w-52 md:w-72`) matching minimalist knowledge graph design.
+  - **Fixed `getNodeColor` Bug & Restored Multi-Color Vault Palette:**
+    - Reordered search highlighting to run *before* category/tag fallback so searches highlight accurately.
+    - Connected `node.color` from the backend Markdown vault engine (which assigns distinct colors: `#a855f7` profile, `#38bdf8` project, `#fb923c` preference, `#facc15` relationship, `#34d399` knowledge). Nodes now render in rich multi-color constellations matching Vasturiano's "Orignal" reference instead of monochrome slate.
+  - **Node Density & Sizing (`nodeVal`):**
+    - Updated `nodeVal={(node) => Math.max(1.5, Math.min(6, 1.5 + Math.sqrt(degree) * 0.8))}` to match the natural density gradient of the original graph.
+  - **Wide 3D Spatial Dispersion:**
+    - Configured D3 charge repulsion (`-160`) and link distance (`55`) so nodes expand into a wide, spherical celestial orbit instead of clumping into a tight ball.
+  - **Zero Particles & Hairline Links:**
+    - Cleaned links with subtle translucent lines (`width={0.5}`, opacity `0.12`) with zero jittery particles.
+- **Verification:**
+  - Layer 1 (Static): `npm run build` (`tsc -b && vite build`) passed with 0 TypeScript and 0 bundler errors in 959ms.
+  - Layer 2 (Runtime): Production bundle successfully generated in `frontend/dist/` (`dist/assets/index-DtHBNwYT.js`).
+  - Layer 3 (Regression): Search filtering, Focus camera centering, Fullscreen expand/collapse, node click inspection, and side drawer work properly.
+- **Key files touched:**
+  - `frontend/src/components/settings/SettingsModal.tsx`
+  - `frontend/src/components/memory/MemoryGraphCanvas.tsx`
+  - `LEARNING_JOURNAL.md`
+
+---
+
+## [2026-10-19] — Round 7/8: CDP Fast Path, Desktop Omnibox UIA Read, Vision Escalation, Live-Loop Ledger & Desktop Chrome Bug Fixes
+
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built / fixed:**
+  - **Phase 0 — CDP brought up:** USE_DEDICATED_CDP_PROFILE = True; dedicated Chrome launched on port 9222; curl /json/version -> 200.
+  - **Phase G — CDP fast path:** _cdp_http, _cdp_pages (1.5s cache), _cdp_active_page, _clip(2500). Used for get_url, get_title, list_tabs, new_tab, close_tab, switch_tab by name. Click reuses _last_snapshot_text for up to 4s. All real CDP tests passed.
+  - **Phase E — desktop omnibox without clipboard:** _uia_omnibox_url reads Chrome address-bar Edit ValuePattern (cached 2s); UIA read 10/10 exact at ~9ms vs clipboard ~93ms. _hosts_equiv tolerates Chrome www-elision. go_to to a new page p50 433.9ms (target <600ms met).
+  - **Phase I — go_to must not say "verified" for a non-loaded page:** _is_error_page / _cdp_page_loaded; desktop UIA URL gated on page load; CDP maps navigation failures to "dispatched, page did not load".
+  - **Phase F — isolated path bugs:** get_title on title-less page returns "Page title: (this page has no title)"; click post-click title check; close_tab succeeds only when tab count drops by exactly one.
+  - **Phase V — vision fallback hook in _act_click:** calls _find_target_element_escalated; clicks coords; post-click check.
+  - **Phase L — Live-loop result ledger (main.py):** _tool_ledger (max 200, 120s TTL); _execute_tool checks ledger by fc.id; shielded run via asyncio.shield; _ledger_store stores before return; delivered flag; _resend_undelivered(). SDK google-genai 2.24.0 supports NON_BLOCKING/scheduling; scheduling wired; NON_BLOCKING not enabled.
+  - **Phase J — hygiene:** strict_verification import fixed; 4 unit tests added; ZEZO_PROFILE-unset run produced STDOUT_LEN=0; 41 passed across 4 core browser test files.
+  - **Round 8 patches (14 patches) in actions/browser_control.py:** fixed scroll (mouse wheel), paste (key combos), click accuracy (UIA retry + title-word/centre sanity), tab matching (clean titles incl. "Memory usage - 285 MB"), close_tab (window title), new_tab (urls=[...], faster), nav history/screenshot/close (no NO_CDP in desktop mode), press dedupe removed, TOOL schema updated.
+- **Key files touched:** actions/browser_control.py, main.py, bench_browser.py, tests/test_browser_control_enhancements.py, tests/test_desktop_chrome_stability_suite.py, tests/test_browser_control_strict_verification.py, LEARNING_JOURNAL.md.
+- **Verification:** Layer 1 py_compile OK; Layer 2 real CDP + desktop calls; Layer 3 41 passed (4 core browser files).
+- **UNVERIFIED:** Phase L real interrupt test, resend-on-next-turn, ledger unit tests; Phase V real no-snapshot click case; Phase G benchmark table.
+- **Creator & Lead Architect:** Hamza Bukhari.
+
+---
+
 ## [2026-10-17] — Unified 3-Option Interaction Modes Architecture (Always Listening, Wake Word, Push-To-Talk)
 - **What was built:**
   - **ReUI 3-Card Interaction Mode Selector (`SettingsModal.tsx`):**
@@ -4394,4 +4512,66 @@ Test all three scenarios.
 
 
 
+
+
+
+## [2026-10-19] Smooth Physics Fix for MemoryGraphCanvas 3D Graph
+
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was fixed:** Jerky/scattered node movement and weird particles caused by overly strong charge (-160) and short link distance (55), plus early cooldown freeze (80 ticks).
+- **Key files touched:** rontend/src/components/memory/MemoryGraphCanvas.tsx`n- **Changes:**
+  - Reduced charge strength to -70, increased link distance to 90.
+  - Added d3.forceCollide collision force sized by node degree.
+  - Increased warmupTicks to 100, cooldownTicks to 200, cooldownTime to 4000, added linkResolution=6.
+  - Added import * as d3 from 'd3-force'.
+- **Verification:** tsc -b && vite build passed.
+
+
+
+## [2026-10-19] MemoryGraphCanvas Performance Optimization for 60fps
+
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was fixed:** Graph lag / non-60fps smoothness caused by full re-renders on hover, unmemoized graphData/accessors, high node resolution, and long simulation.
+- **Key files touched:** rontend/src/components/memory/MemoryGraphCanvas.tsx`n- **Changes:** Throttled onNodeHover to 100ms; memoized graphData, nodeVal, nodeLabel; reduced nodeResolution 16->8 and linkResolution 6->3; tuned warmup/cooldown ticks; cleanup hover timer.
+- **Verification:** tsc -b && vite build passed.
+
+
+
+## [2026-10-19] MemoryGraphCanvas Visual Polish: Full-Circle Nodes, Visible Links, Data-Flow Particles
+
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was changed:** Nodes made solid/full circles (resolution 20, relSize 3, opacity 1); default links made visible (0.45 alpha, width 1); added directional particle animation (2 particles) for data-flow effect along links.
+- **Key files touched:** rontend/src/components/memory/MemoryGraphCanvas.tsx`n- **Verification:** npm run build passed.
+
+
+
+## [2026-10-19] MemoryGraphCanvas Orbit Shape & Auto-Rotate
+
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was changed:** Added d3-force-3d radial force (radius 150) to pull nodes into a spherical orbit; enabled OrbitControls autoRotate (speed 0.6) for slow default rotation.
+- **Key files touched:** rontend/src/components/memory/MemoryGraphCanvas.tsx`n- **Verification:** npm run build passed.
+
+
+
+## [2026-10-19] MemoryGraphCanvas Continuous Motion & Animation Controls
+
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was changed:** Enabled continuous slow node motion (cooldownTicks Infinity, low alpha decay); added animation control panel (auto-rotate speed, particle flow speed, node motion toggle) with SlidersHorizontal button.
+- **Key files touched:** rontend/src/components/memory/MemoryGraphCanvas.tsx`n- **Verification:** npm run build passed.
+
+
+
+## [2026-10-19] MemoryGraphCanvas Fullscreen, Zoom, Jelly Drag, Graph Controls
+
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was changed:** Fixed zoom in/out (scale full camera vector); added pseudo-fullscreen toggle + ESC; jelly spring-back on drag end with velocity + reheat; expanded control panel (charge, link distance, orbit radius, node size, particle count); Global/Local button disabled when no node selected.
+- **Key files touched:** rontend/src/components/memory/MemoryGraphCanvas.tsx`n- **Verification:** npm run build passed.
+
+
+
+## [2026-10-19] MemoryGraphCanvas Selection Highlight & Link Visibility
+
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was changed:** Made links visible by default (0.5 alpha); on node selection, connected links turn amber and thicken (2.0), non-connected dim; added selection spotlight for nodes/neighbors; increased hover/selected widths.
+- **Key files touched:** rontend/src/components/memory/MemoryGraphCanvas.tsx`n- **Verification:** npm run build passed.
 

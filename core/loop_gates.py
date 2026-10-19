@@ -58,8 +58,8 @@ class LoopGatesEngine:
         max_iterations: int = 25,
         max_tool_budget: int = 50,
         similarity_window: int = 4,
-        similarity_threshold: int = 3,
-        watchdog_timeout_sec: float = 300.0,
+        similarity_threshold: int = 1,
+        watchdog_timeout_sec: float = 120.0,
         idle_reset_sec: float = 60.0,
     ):
         self._lock = threading.RLock()
@@ -158,8 +158,8 @@ class LoopGatesEngine:
             if len(recent_matches) >= self.similarity_threshold:
                 # Doom loop triggered: return steering interrupt coaching feedback
                 coaching = (
-                    f"⚠️ [DOOM-LOOP INTERRUPT]: You called '{tool_name}' with identical arguments {len(recent_matches) + 1} times sequentially without progress. "
-                    "Do NOT repeat this identical call. Change strategy: inspect alternative files, try a different action, or report the obstacle."
+                    f"⚠️ [DOOM-LOOP INTERRUPT]: You already called '{tool_name}' with these exact arguments and it succeeded. "
+                    "Do not retry. Use screen_process to verify, or ask the user what they want."
                 )
                 return GateResult(
                     decision=GateDecision.INTERRUPT,

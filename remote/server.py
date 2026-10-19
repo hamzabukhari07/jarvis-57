@@ -477,6 +477,7 @@ class DashboardServer:
 
     def __init__(self):
         self._ip                          = _local_ip()
+        self._public_url_override: str    = ""
         self._tokens: set[str]            = set()
         self._token_keys: dict[str, str]  = {}   # auth_token → session_key
         self._aes_cache:  dict[str, bytes]= {}   # session_key → AES bytes
@@ -508,11 +509,34 @@ class DashboardServer:
         certs = BASE_DIR / "config" / "certs"
         return (certs / "jarvis.key").exists() and (certs / "jarvis.crt").exists()
 
+    def set_public_url(self, url: str) -> None:
+        """Runtime override (e.g. auto-started Cloudflare tunnel URL)."""
+        self._public_url_override = (url or "").strip().rstrip("/")
+
     def get_url(self) -> str:
+        # Runtime override (auto-tunnel) takes precedence, then config/env, then LAN.
+        if self._public_url_override:
+            return self._public_url_override
+        try:
+            from memory.config_manager import get_public_url
+            pu = get_public_url()
+        except Exception:
+            pu = ""
+        if pu:
+            return pu
         return f"http://{self._ip}:{PORT}"
 
     def get_manual_url(self) -> str:
         """URL for manual browser entry."""
+        pu = self._public_url_override
+        if not pu:
+            try:
+                from memory.config_manager import get_public_url
+                pu = get_public_url()
+            except Exception:
+                pu = ""
+        if pu:
+            return pu.removeprefix("https://").removeprefix("http://")
         return f"{self._ip}:{PORT}"
 
     def _aes_key(self, session_key: str) -> bytes:
@@ -923,7 +947,7 @@ class DashboardServer:
         ssl_cert = BASE_DIR / "config" / "certs" / "jarvis.crt"
         asyncio.get_event_loop().run_in_executor(None, _ensure_network_access, PORT + 1)
         cfg = uvicorn.Config(
-            self.app, host="0.0.0.0", port=PORT + 1, log_level="warning",
+            self.app, host="0.0.0.0", port=PORT + 1, log_level="error",
             ssl_keyfile=str(ssl_key), ssl_certfile=str(ssl_cert),
         )
         print(f"[Dashboard] Manual entry:  {self._ip}:{PORT + 1}  (type in browser, accept cert once)")
@@ -950,7 +974,7 @@ class DashboardServer:
             asyncio.create_task(self._serve_alias())
 
         cfg = uvicorn.Config(
-            self.app, host="0.0.0.0", port=PORT, log_level="warning",
+            self.app, host="0.0.0.0", port=PORT, log_level="error",
         )
 
         print(f"[Dashboard] http://{self._ip}:{PORT}")

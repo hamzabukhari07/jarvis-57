@@ -918,6 +918,7 @@ def save_plugin_enabled(plugin_name: str, enabled: bool) -> None:
 # ── OpenCode Zen & Free Models Config ─────────────────────────────────────────
 
 OPENCODE_ZEN_FREE_MODELS = [
+    "opencode/glm-5.3-flash-free",         # Fastest agentic coding model (tested ~8s)
     "opencode/big-pickle",                 # Specialized agentic coding model
     "opencode/nemotron-3-ultra-free",      # NVIDIA Nemotron 3 Ultra (Free)
     "opencode/nemotron-3.5-lightning-free",# High-speed NVIDIA Nemotron (Free)
@@ -929,7 +930,7 @@ OPENCODE_ZEN_FREE_MODELS = [
     "opencode/muse-spark-1.3-contributor-free", # Open-source coding model (Free)
 ]
 
-DEFAULT_OPENCODE_MODEL = "opencode/big-pickle"
+DEFAULT_OPENCODE_MODEL = "opencode/glm-5.3-flash-free"
 DEFAULT_OPENCODE_PROVIDER = "zen"
 
 
@@ -958,6 +959,8 @@ def get_opencode_model() -> str:
             raw = "opencode/big-pickle"
         elif "mimo" in name:
             raw = "opencode/mimo-v2.6-flash-free"
+        elif "glm" in name:
+            raw = "opencode/glm-5.3-flash-free"
         else:
             raw = f"opencode/{name}"
     return raw
@@ -1088,3 +1091,30 @@ def save_groq_config(
     if whisper_model:
         data["groq_whisper_model"] = whisper_model.strip() or DEFAULT_GROQ_WHISPER_MODEL
     _atomic_write_config(data)
+
+
+# ── Mobile remote public URL override (for tunnels like Cloudflare) ────────────
+
+def get_public_url() -> str:
+    """Public base URL for the mobile remote gateway (e.g. https://zezo.example.com).
+
+    Empty string means 'use the detected LAN IP' (default behaviour). Can also be
+    supplied via the ZEZO_PUBLIC_URL environment variable, which takes precedence.
+    """
+    import os
+    env = os.environ.get("ZEZO_PUBLIC_URL", "").strip()
+    if env:
+        return env.rstrip("/")
+    try:
+        return str(load_api_keys().get("public_url", "") or "").strip().rstrip("/")
+    except Exception:
+        return ""
+
+
+def save_public_url(url: str) -> None:
+    """Persist a public URL override for the mobile remote gateway."""
+    ensure_config_dir()
+    with _CONFIG_LOCK:
+        data: dict = load_api_keys()
+        data["public_url"] = str(url or "").strip().rstrip("/")
+        _atomic_write_config(data)

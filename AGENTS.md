@@ -1,445 +1,168 @@
-# 🧠 AGENTS.md — System Context & Non-Negotiable Rules
+# 🧠 AGENTS.md — Non-Negotiable Engineering Rules & Agent Guidelines
 
-> **Project:** ZEZO (Autonomous Desktop AI Operating System v2)  
+> **Project:** ZEZO  
 > **Creator & Lead Architect:** Hamza Bukhari  
 > **Target OS:** Windows (Primary), macOS, Linux  
-> **Language & Framework:** Python 3.11–3.13, PyQt6, Google Gemini Live API (WebSockets)  
 
 ---
 
 ## ⚠️ READ THIS BEFORE MAKING ANY CODE CHANGES
 
-This repository is a **Modular Monolith Agent Operating System**.
-Every capability is isolated into self-describing action modules or skills.
-To maintain system stability, prevent regression, and stop context decay, **all AI coding agents must strictly adhere to the rules below**.
+This file contains **strict operational and coding rules** for all AI coding agents working on this repository.
+It does **not** describe static feature flows or temporary architectures, because features evolve rapidly. Instead, it mandates **how you must discover current code, write modifications safely, protect newly updated features, and verify your work**.
 
 ---
 
-## 📁 1. Real Project Directory Structure
+## 🛡️ 1. Core Operating & Engineering Rules
 
-```
-zezo version 2/
-├── main.py                     # ⚡ Application Orchestrator & Gemini Live WebSockets loop
-├── ui.py                       # 🖥️ PyQt6 GUI & Holographic 3D Avatar (Software Rasterizer)
-│
-├── core/                       # 🧠 Core System Engines
-│   ├── action_loader.py        # Dynamic action scanner (scans actions/*.py for TOOL dict)
-│   ├── plugin_loader.py        # Dynamic user plugin scanner (scans plugins/*.py)
-│   ├── skill_loader.py         # Dynamic declarative skill scanner (scans skills/*/)
-│   ├── design_extractor.py     # Deterministic HTML/CSS design token & component extractor
-│   ├── design_resolver.py      # Reference-first design system token resolver & preset injector
-│   ├── task_manager.py         # Thread-safe background task registry & status tracker
-│   ├── repo_context.py         # 3-tier active repository resolver & memory persistence
-│   ├── prompt.txt              # System prompt injected into Gemini Live session
-│   ├── models.py               # Single source of truth for model ids (Gemini / Antigravity / Groq)
-│   ├── provider_health.py      # Startup provider & model health-check (marks dead models)
-│   ├── gemini.py               # One-shot Gemini client with model fallback ladder
-│   ├── llm_client.py           # Multi-provider LLM interface (Ollama, OpenAI, Groq)
-│   ├── llm_router.py           # Background text router: Groq → Gemini → Ollama (live voice untouched)
-│   ├── ui_server.py            # Fast HTTP/WebSocket backend for Next/React HUD & Autonomous Office
-│   ├── wake_word.py            # Local "Hey Jarvis" detector (openWakeWord)
-│   ├── echo.py                 # Self-echo filter & mic bleed suppression
-│   ├── hotkey.py               # Global hotkey listener (Ctrl+Space Push-to-Talk)
-│   ├── audio_devices.py        # Speaker/Mic discovery & endpoint volume manager
-│   ├── fleet_manager.py        # Multi-agent background fleet life cycle & heartbeat coordinator
-│   ├── mcp_runtime.py          # Model Context Protocol client & tool bridge
-│   ├── circuit_breaker.py      # Error burst protection & provider failover limiter
-│   ├── confirm.py              # Safety gate for destructive/irreversible user actions
-│   ├── undo.py                 # Action history & reversible state undo stack
-│   ├── log_bus.py              # Backend log ring buffer (stdlib logging + stdout/stderr tee)
-│   └── governance.py           # Path validation, dangerous-command DENY patterns, policy matrix
-│
-├── actions/                    # 🛠️ Self-Describing Tools (25 Discovered Actions)
-│   ├── opencode_agent.py       # [opencode_run] Autonomous multi-file coding agent
-│   ├── kilo_agent.py           # [kilo_run] Multi-file refactoring & editing agent
-│   ├── antigravity_agent.py    # [antigravity_run] Studio UI & Antigravity synthesis agent
-│   ├── code_helper.py          # [code_helper] Single function / inline snippet generator
-│   ├── dev_agent.py            # [dev_agent] Read-only codebase exploration & bug hunter
-│   ├── fleet_control.py        # [fleet_control] Autonomous named multi-agent fleet orchestrator
-│   ├── design_extractor.py     # [extract_design_system] HTML/CSS design token extractor
-│   ├── task_status.py          # [task_status] Background task status / progress query
-│   ├── website_cloner.py       # [clone_website] Offline site cloner & asset localizer
-│   ├── browser_control.py      # [browser_control] Browser tab navigation & interactions
-│   ├── open_app.py             # [open_app] Launch / terminate desktop apps & open files
-│   ├── computer_control.py     # [computer_control] Keyboard shortcuts, clicks, hotkeys
-│   ├── computer_settings.py    # [computer_settings] System volume, brightness, power
-│   ├── file_controller.py      # [file_controller] File/folder CRUD, search, organization
-│   ├── file_processor.py       # [file_processor] File reading, parsing, batch edits
-│   ├── screen_processor.py     # [screen_process] Desktop screenshot capture & analysis
-│   ├── web_search.py           # [web_search] Google / DuckDuckGo live search
-│   ├── web_reader.py           # [web_read_page] Deep web scraping & markdown extraction
-│   ├── agent_reach.py          # [agent_reach] Multi-platform intelligence & Whisper transcription
-│   ├── reminder.py             # [reminder] Scheduled alarms, timers, reminders
-│   ├── system_monitor.py       # [system_status] Live CPU, RAM, GPU, battery metrics
-│   ├── background_monitor.py   # [background_monitor] Long-running process surveillance
-│   ├── send_message.py         # [send_message] Telegram / WhatsApp messaging
-│   ├── weather_report.py       # [weather_report] Live weather forecast
-│   ├── flight_finder.py        # [flight_finder] Real-time flight search
-│   ├── youtube_video.py        # [youtube_video] YouTube search and video playback
-│   ├── game_updater.py         # [game_updater] Gaming news and patch notes
-│   └── desktop.py              # [desktop_control] Desktop icons & window positioning
-│
-├── memory/                     # 💾 Persistence & Intelligence Layer
-│   ├── vault_engine.py         # Markdown Memory Vault & Obsidian Knowledge Graph engine
-│   ├── vault/                  # Local-first human-readable Markdown notes (*.md with [[wikilinks]])
-│   ├── sqlite_memory.py        # SQLite FTS5 database (zezo_brain.db) with BM25 search
-│   ├── memory_manager.py       # Memory persistence & session summary extractor
-│   ├── config_manager.py       # Thread-safe read/write for user config & API keys
-│   └── repo_context.json       # Persisted active repository path
-│
-├── frontend/                   # 🖥️ React 19 Desktop OS Workstation & HUD (Port 8765)
-│   ├── src/components/memory/  # Obsidian 2D Canvas force-graph & Markdown Inspector drawer
-│   ├── src/components/settings/# Full-Screen Native OS Settings Screen
-│   ├── src/components/office/  # Scranton Autonomous Pixel Office Screen
-│   └── dist/                   # Production build served by core/ui_server.py
-│
-├── remote/                     # 📱 Dedicated Mobile Remote Gateway (FastAPI + WebSockets)
-│   ├── server.py               # Mobile phone audio/command relay & AES encrypted socket
-│   └── static/                 # Mobile web client assets
-│
-├── skills/                     # 📚 Declarative Multi-Step Skill Packages (10 Skills)
-│   ├── hamza_taste/            # Studio UI aesthetic, anti-slop rules & design presets
-│   ├── opencode/               # Full autonomous coding workflow
-│   ├── kilo_code/              # Free-tier fast refactoring workflow
-│   ├── antigravity_agent/      # Agentic code synthesis workflow
-│   ├── git_workflow/           # Professional Git staging & commit workflow
-│   ├── social_research/        # YouTube, Reddit & GitHub research pipeline
-│   ├── system_diagnostics/     # Hardware telemetry & diagnostic routine
-│   ├── web_scraper/            # Anti-bot web extraction pipeline
-│   ├── web_research_pipeline/  # Query decomposition & deep research
-│   └── test_fastapi_deploy/    # Backend deployment verification
-│
-├── config/                     # 🔒 User Configuration & Secrets
-│   ├── api_keys.json           # API keys, assistant identity, voice configuration
-│   └── settings.json           # User UI and audio preferences
-│
-├── AGENTS.md                   # 🧠 Master AI Agent Context & Rules (This File)
-├── decisions.md                # 🏛️ Architecture Decision Records (ADR Log)
-├── FUTURE_UPGRADES.md          # 🚀 Groq Hybrid & 7-Layer Agent OS Architecture
-└── PROJECT_ARCHITECTURE.md     # 🌐 Standalone Master Architecture Blueprint
-```
+### Rule 1: Live Codebase & Learning Journal Are Ground Truth (No Outdated Assumptions)
+- **Do NOT assume architecture or flows from memory or third-party assumptions.**
+- Before touching ANY file or debugging any problem:
+  1. Inspect the **current implementation in the actual source code**.
+  2. Check the most recent entries in [`LEARNING_JOURNAL.md`](file:///d:/anitgravity/zezo%20work/jarvis-57/LEARNING_JOURNAL.md) to understand what was recently built, fixed, or updated.
+- If existing code differs from what you expected, **the updated code in the repository is intentional**. Understand why it was written before proposing any change.
+
+### Rule 2: Never Overwrite or Degrade Updated Features (Anti-Regression)
+- **Never revert a newly updated feature back to an old pattern.**
+- Never replace an advanced/updated implementation (e.g. multi-tier fallbacks, downsampling, profile resolution, UIA inspection) with a naive or older version.
+- When fixing an issue or adding a capability, **extend and preserve** existing updated features.
+
+### Rule 3: Zero Unrelated Changes — Minimal Blast Radius ("Jo Jitna Kaha Hai Utna Karo")
+- **Touch ONLY the exact files necessary** to complete the user's specific request.
+- **NEVER** edit, refactor, reorganize, or "clean up" unrelated files, directories, or imports.
+- Do not make speculative abstractions or add unsolicited features.
+- If a fix only requires editing `main.py` and `core/audio_devices.py`, do NOT touch actions, UI components, or unrelated configs.
+
+### Rule 4: One File Per Action & Clean Separation
+- Every action tool must reside in its own file inside `actions/`.
+- Every action module must export:
+  1. A module-level `TOOL` dictionary matching the Gemini function declaration schema.
+  2. A callable `handler(parameters: dict, **kwargs)` function.
+- `main.py` only hosts inline tools tied directly to live session state (`screen_process`, `manage_monitor`, `shutdown_zezo`, `system_status`). All general tools belong in `actions/`.
+
+### Rule 5: Non-Blocking Asynchronous Execution
+- **Never block the main PyQt6/GUI thread or the live WebSocket loop.**
+- Heavy operations (CLI runs, long-running agent tasks, subprocesses, heavy scraping) must run asynchronously in background threads or return a `task_id` immediately.
+- On Windows, always hide background subprocess terminal windows using `creationflags=subprocess.CREATE_NO_WINDOW`.
+
+### Rule 6: Audio & Voice Pipeline Integrity (Strict Hands-Off Policy)
+- **STRICT HANDS-OFF POLICY ("Bila-Wajah Touch Mat Karo"):** Audio and voice pipeline files (`main.py` live audio loops `_listen_audio`, `_receive_audio`, `_play_audio`, `_on_ptt`, `core/audio_devices.py`, `core/wake_word.py`, `core/hotkey.py`) are core, finely-calibrated, hardware-dependent systems.
+  - **DO NOT TOUCH** any audio/voice pipeline code or files unless the user's explicit request specifically and exclusively demands a fix or change to audio or voice behavior.
+  - If a task involves browser control, computer automation, actions/tools, UI styling, settings modals, fleet agents, or memory, touching audio/voice pipeline files is **STRICTLY FORBIDDEN**.
+  - Never perform unsolicited refactoring, speculative "cleanup", or casual alterations to audio queues, buffer sizes, sample rates, echo cancellation guards, or hotkey hooks.
+- **Sole Active Voice Pipeline:** The active live voice conversation runs strictly via Google Gemini Live API (`main.py` WebSockets bidirectional audio).
+- **Explicit Sample Rate:** When streaming PCM mic chunks to Gemini Live, always include the explicit sample rate: `types.Blob(data=..., mime_type=f"audio/pcm;rate={SEND_SAMPLE_RATE}")`. Never send bare `audio/pcm`.
+- **Never crash the session on hardware errors:** If a microphone or speaker is missing, unplugged, or permission-denied, gracefully fall back to silent/text/remote mode rather than raising an unhandled exception that terminates the session `TaskGroup`.
+- **Never speak raw code:** Spoken audio must remain high-level conversational summary (1-2 sentences). Code, syntax, diffs, and large JSON payloads must be routed to the HUD content panel or clipboard.
+
+### Rule 7: Strict 3-Layer Verification (Mandatory Before Claiming Done)
+After ANY code change, verify all 3 layers yourself before reporting success:
+- **Layer 1 (Static):** Run `python -m py_compile` on every touched file. Verify syntax and imports.
+- **Layer 2 (Runtime):** Test real execution with concrete evidence (actual test scripts, real log outputs, real device/file returns). Never claim a run you did not perform.
+- **Layer 3 (Regression):** Run relevant existing test suites (`pytest tests/...`) to confirm existing features remain intact.
+- **You may NOT write "FIXED" until all 3 layers pass.** If runtime cannot be run, write "UNVERIFIED" with the specific reason.
+
+### Rule 8: Anti-Slop Code Hygiene
+- Function cyclomatic complexity must stay **< 15**.
+- No massive `if/elif` ladders (use dictionary dispatch).
+- No bloated boilerplate, duplicate helper functions, or obvious echo comments.
+
+### Rule 9: Code Graph (CGC) Pre-Flight Query
+- Before modifying or debugging unfamiliar modules, inspect blast radius and callers via Code Graph MCP tools or CLI (`cgc`).
+- If you see `Could not set lock on file` (KùzuDB single-owner lock held by IDE), fall back immediately to targeted file search without retrying.
+
+### Rule 10: Mandatory Learning Journal Entry
+- After completing any feature, fix, or architectural update, append a clean entry to [`LEARNING_JOURNAL.md`](file:///d:/anitgravity/zezo%20work/jarvis-57/LEARNING_JOURNAL.md) at the repo root.
+- Document:
+  - What was built/fixed and the root cause.
+  - Key files touched.
+  - Crucial architectural context for future agents to prevent regression.
+
+### Rule 11: Creator Attribution
+- Always acknowledge **Hamza Bukhari** as the creator and lead architect.
 
 ---
 
-## 🛡️ 2. Non-Negotiable Engineering Rules
 
-1. **One File Per Action in `actions/`:**
-   - Every action file must export a module-level `TOOL` dictionary and a callable `handler`.
-   - The handler must accept `parameters: dict` and optional keyword arguments (`player`, `speak`, `response`, `session_memory`).
-2. **Never Hardcode Tool Logic in `main.py`:**
-   - `main.py` only hosts inline tools tied directly to the live WebSocket state (`system_status`, `screen_process`, `manage_monitor`, `shutdown_jarvis`). All other tools must reside in `actions/`.
-3. **Never Block the PyQt6 Main GUI Thread:**
-   - All network I/O, heavy subprocesses, and CLI calls must run in background threads (using `core.task_manager` or `QThread`).
-4. **Coding Agents Must Be Asynchronous (`task_id` pattern):**
-   - Heavy agents (`opencode_run`, `kilo_run`) must return a `task_id` immediately so the voice loop remains 100% responsive.
-   - Long-running progress must be queried through `task_status`.
-5. **Never Speak Code or Raw Tool Output:**
-   - Spoken audio must remain high-level conversational summary (1-2 sentences in user's language). Code, syntax, diffs, and large JSON payloads must be routed to the HUD content panel or clipboard.
-6. **Synchronize Tool Descriptions & System Prompt:**
-   - If a tool's purpose, parameters, or behavior changes, update:
-     1. `TOOL["description"]` in the action file.
-     2. `core/prompt.txt` under `[CODING DELEGATION]` or `[EXECUTION]` if routing is affected.
-7. **Creator Attribution:**
-   - Always document and acknowledge **Hamza Bukhari** as the creator and lead architect.
-8. **Strict 3-Layer Verification Rule:**
-   - After ANY code change, verify all 3 layers yourself before reporting success:
-     - **Layer 1 (static):** `python -m py_compile` on every touched file, plus `core/action_loader.py` discovery if `actions/` changed.
-     - **Layer 2 (runtime):** real evidence — actual log lines, real file outputs, real API responses. Never claim a run you did not perform.
-     - **Layer 3 (regression):** confirm 2+ existing features still work.
-   - You may NOT write "FIXED" until all 3 layers pass.
-   - If you cannot run runtime tests, write "UNVERIFIED" with reason — do NOT write "FIXED".
-9. **Mandatory Code Graph (CGC) Pre-Flight Query:**
-   - Before modifying, refactoring, or **debugging** any module, you MUST query the Code Graph first to inspect callers, callees, and dependency blast radius.
-   - The graph is exposed as MCP tools prefixed `codegraph_` (opencode namespace):
-     | Tool | Use for |
-     | :--- | :--- |
-     | `codegraph_find_code` | locate a symbol / search code content |
-     | `codegraph_analyze_code_relationships` | **callers & callees — the main blast-radius tool** |
-     | `codegraph_calculate_cyclomatic_complexity` | complexity of one function |
-     | `codegraph_find_most_complex_functions` | hunt complexity hotspots |
-     | `codegraph_find_dead_code` | find unused code |
-     | `codegraph_execute_cypher_query` | custom Cypher when the above are not enough |
-     | `codegraph_list_indexed_repositories` | confirm the graph actually covers this repo |
-   - **Debugging protocol (follow in order, do not skip to grep):**
-     1. `codegraph_find_code` — find the symbol and confirm the graph is not stale.
-     2. `codegraph_analyze_code_relationships` — enumerate every caller before you edit.
-     3. Read only the files that query points to.
-     4. Edit, then re-run the caller query to confirm you did not miss a call site.
-   - **CLI fallback** (when MCP tools are absent): `cgc -db kuzudb analyze callers <fn>`, `cgc -db kuzudb find name <symbol>`, `cgc -db kuzudb find content "<query>"`, `cgc -db kuzudb analyze complexity`.
-   - **If you see `Could not set lock on file`:** the embedded KùzuDB is single-owner and another process (e.g. an IDE's own CGC server) holds it. Do NOT retry — fall back to `grep`/`glob` immediately and say so in your summary. Only one IDE can hold the KùzuDB graph at a time.
-   - Refresh a stale graph with `cgc -db kuzudb update` (auto-watch is enabled, so this is usually unnecessary).
-
-10. **Anti-Slop Code Hygiene Enforcement:**
-   - All code changes must strictly adhere to `.agents/skills/antislop_code/SKILL.md`:
-     - Function cyclomatic complexity must stay **< 15**.
-     - No massive `if/elif` ladders (use dictionary dispatch).
-     - No bloated boilerplate or obvious echo comments.
-
----
-
-## 🔗 3. Inter-Dependency Matrix
-
-| If You Change / Edit... | You MUST Also Verify / Update... | Why |
-| :--- | :--- | :--- |
-| Any `actions/*.py` | `core/action_loader.py`, `core/prompt.txt`, `docs/TOOLS.md` | Ensure `TOOL` schema is valid, routing rules match, and `docs/TOOLS.md` is synced. |
-| `actions/opencode_agent.py` or `actions/kilo_agent.py` | `core/task_manager.py`, `actions/task_status.py`, `core/repo_context.py` | Task submission, live progress reporting, and directory resolution depend on them. |
-| `actions/open_app.py` | `actions/browser_control.py`, `actions/computer_control.py` | Window and process termination (`close_application_by_name`) is shared. |
-| `memory/config_manager.py` | `actions/opencode_agent.py`, `actions/kilo_agent.py`, `main.py`, `docs/CONFIGURATION.md` | Model names & API key masking config are retrieved here; `docs/CONFIGURATION.md` must stay synced. |
-| Any Core Engine / Feature | `docs/<FILE>.md`, `docs/README.md` | **Mandatory Documentation Sync Rule:** Every feature build/bug fix must update `docs/`. |
-| `core/prompt.txt` | `main.py` (`_build_config`) | Ensure prompt tokens `{assistant_name}`, `{platform}`, `{capabilities}`, `{limits}` remain intact. |
-| `ui.py` / `frontend/index.html` | `main.py`, `core/ui_server.py` | Signal-slot / WebSocket connections between UI, server, and live audio engines. |
-| `core/log_bus.py` | `ui.py` (`LogConsoleOverlay`, `Ctrl+L`), `memory/sqlite_memory.py` (`redact_secrets`) | The console renders the bus ring buffer; `redact_secrets` is the sole scrub source and must stay the only secret-pattern list. |
-| `memory/vault_engine.py` | `core/ui_server.py`, `web/src/components/memory/`, `memory/sqlite_memory.py` | Markdown memory vault and Obsidian knowledge graph parsing depend on this engine for live node extraction. |
-
-
-
-## 📋 6. Known Quirks & Architectural Constraints
-
-- **Windows Subprocess Hiding:** Windows requires `CREATE_NO_WINDOW` (`_WIN_HIDE`) on background child processes to prevent terminal window popups.
-- **PyAutoGUI Fail-Safe:** Set `pyautogui.FAILSAFE = False` for simple key presses to avoid coordinate boundary exceptions.
-- **Action Loader Signature Matching:** Handlers receive kwargs dynamically inspected from their function signature (`parameters`, `player`, `speak`, etc.).
-- **Windows Volume API:** `pycaw` requires `AudioUtilities.GetSpeakers().EndpointVolume` (not deprecated `.Activate()`).
-
----
-
-## 📖 7. Learning Journal Convention
-
-After completing each feature, create or append to `LEARNING_JOURNAL.md` at the repo root.
-
-### Format:
-```markdown
-## [YYYY-MM-DD] — <feature name>
-- What was built
-- Why this approach was chosen
-- What alternatives were considered
-- Key files touched
-- What to remember for future work
-```
-
-Keep it human-readable. Update it as part of the `verify` step.
-
----
-
-## 🚨 8. Regression Rules — DO NOT BREAK
-
-These rules exist because bugs were fixed. Breaking any of them will
-reintroduce a previously-fixed bug.
-
-### Rule 1: No backdrop-filter inside modals
-- `.modal-overlay` may have `backdrop-filter: blur(12px)`.
-- Elements inside the modal (`.modal-panel`, `.modal-panel .frame-inner`,
-  any nested card/badge/button) MUST NOT have `backdrop-filter`.
-- Modal panel backgrounds must be OPAQUE (`#0a0a0a`, not `rgba(...,0.95)`).
-
-### Rule 2: Never use `transition: all`
-- Always list explicit properties:
-  `transition: border-color 0.15s ease, background-color 0.15s ease;`
-- Never write `transition: all ...` in any CSS rule.
-
-### Rule 3: Never remove `_zezoAnimActive` from openModal
-- `window.openModal` in `frontend/js/ui.js` MUST set
-  `window._zezoAnimActive = false;`
-- `function openModal` in the inline `<script>` in `frontend/index.html`
-  MUST set `window._zezoAnimActive = false;`
-- `closeModal` in BOTH files MUST contain:
-  `const anyOpen = document.querySelector('.modal-overlay.open');`
-  `if (!anyOpen) { window._zezoAnimActive = !document.hidden && !window._zezoDragging; }`
-- These lines MUST NEVER be removed during refactoring.
-
-### Rule 4: Hide avatar GIF while modal is open
-- `openModal` MUST set:
-  `document.getElementById('vortex-gif').style.visibility = 'hidden';`
-- `closeModal` MUST set:
-  `document.getElementById('vortex-gif').style.visibility = 'visible';`
-- `id="vortex-gif"` on the avatar MUST NEVER be renamed.
-
-### Rule 5: openModal must not close its own id
-- `openModal(id)` MUST NOT call `closeModal(id)` for the same id.
-- `openModal(id)` MUST NOT call any function that closes the same id.
-
-### Rule 6: Settings is a MODAL, not a drawer
-- The settings panel is `<div class="modal-overlay" id="settings-modal">`.
-- Do NOT reintroduce `.settings-dropdown-drawer` or anchored drawers.
-- Gear button onclick is `openModal('settings-modal')`.
-
-### Rule 7: QtWebEngine does not support `vh` reliably
-- Prefer `position: fixed` with `inset: 0` over `vh`-based heights.
-- If you must use `vh`, add a JS fallback on `window.resize`.
-
-### Rule 8: Gemini Live Audio Streaming Requires Explicit Sample Rate
-- `main.py` streaming mic audio blobs to Google Gemini Live API (`gemini-3.1-flash-live-preview`) MUST always specify the explicit sample rate parameter:
-  `types.Blob(data=..., mime_type=f"audio/pcm;rate={SEND_SAMPLE_RATE}")` (e.g. `audio/pcm;rate=16000`).
-- NEVER send bare `audio/pcm` without `rate=` — omitting it triggers gateway 1011 internal server disconnects.
-- `send_realtime_input()` must use `audio=types.Blob(...)` keyword format.
-- **Sole Active Voice Pipeline:** The active live voice conversation runs strictly via Google Gemini Live API (`main.py` WebSockets bidirectional audio). Offline cascade voice loops (VAD → STT → LLM → TTS) are not yet implemented in `core/` and MUST NOT be exposed as dummy/broken selectors in the UI.
-
-
-
-
----
-
-## 🎨 3. ReUI Design System — NON-NEGOTIABLE UI RULES
-
-The frontend UI must use **ReUI as the primary design system and component source of truth**.
-
-ReUI is not a visual inspiration only. When a suitable ReUI component exists, the implementation MUST use the actual ReUI component rather than recreating an equivalent component with custom HTML/CSS.
-
-### 3.1 ReUI Source of Truth
-
-- ReUI components MUST be sourced from the official ReUI registry.
-- Use the official ReUI MCP/registry when available:
-  - Registry: `https://reui.io/r/{style}/{name}.json`
-  - Documentation: `https://reui.io/docs`
-  - Components: `https://reui.io/components`
-  - Styling: `https://reui.io/docs/styling`
-
-- NEVER invent ReUI component names, props, variants, APIs, installation commands, or registry paths.
-- NEVER assume that a component exists in ReUI without verifying it.
-- Before using a ReUI component:
-  1. Search the ReUI registry/documentation.
-  2. Read the actual component API/example.
-  3. Install the verified component if required.
-  4. Implement using the verified API.
-  5. Validate the implementation.
-
-### 3.2 Component Reuse Rule
-
-Before creating a custom UI component, check whether ReUI already provides an equivalent.
-
-Priority order:
-
-1. Existing ZEZO/ReUI component already installed
-2. Official ReUI component
-3. Standard shadcn component when ReUI does not provide the required component
-4. Custom component only when neither ReUI nor shadcn provides a suitable solution
-
-Examples:
-
-- Buttons → ReUI Button
-- Inputs → ReUI Input
-- Selects → ReUI Select
-- Dialogs → ReUI Dialog
-- Sheets/Drawers → ReUI Sheet
-- Tabs → ReUI Tabs
-- Progress → ReUI Progress
-- Badges → ReUI Badge
-- Tooltips → ReUI Tooltip
-- Scroll containers → ReUI Scroll Area
-- Separators → ReUI Separator
-- Cards/panels → appropriate ReUI component
-- Tables/data-heavy interfaces → ReUI Data Grid when applicable
-
-DO NOT recreate these components using raw `<div>`, `<button>`, `<input>`, or custom CSS when an appropriate ReUI component exists.
-
-### 3.3 ReUI Visual Language
-
-The application must maintain one coherent ReUI visual language.
-
-Do NOT mix unrelated component styles, spacing systems, border treatments, radii, or interaction patterns.
-
-When a ReUI component is introduced:
-
-- Preserve its intended structure.
-- Preserve its design tokens.
-- Preserve its interaction behavior.
-- Use its documented variants.
-- Extend it only when necessary.
-
-Do NOT visually downgrade ReUI components into generic Tailwind elements.
-
-### 3.4 ReUI Theme & Design Tokens
-
-The ReUI theme must be treated as the source of truth for frontend visual tokens.
-
-Use semantic CSS variables/tokens instead of hardcoding colors throughout components.
-
-Examples:
-
-- `--background`
-- `--foreground`
-- `--card`
-- `--card-foreground`
-- `--primary`
-- `--primary-foreground`
-- `--secondary`
-- `--secondary-foreground`
-- `--muted`
-- `--muted-foreground`
-- `--accent`
-- `--accent-foreground`
-- `--border`
-- `--input`
-- `--ring`
-- `--destructive`
-- `--destructive-foreground`
-- `--success`
-- `--success-foreground`
-- `--warning`
-- `--warning-foreground`
-- `--info`
-- `--info-foreground`
-
-Do NOT scatter arbitrary hex colors throughout the UI.
-
-If the ZEZO visual theme changes, update the theme tokens rather than manually recoloring individual components.
-
-### 3.5 ReUI Style Presets
-
-When selecting a ReUI style, use an official ReUI style preset.
-
-Examples include:
-
-- Vega
-- Nova
-- Maia
-- Lyra
-- Mira
-- Luma
-- Sera
-- Rhea
-
-Do NOT create a fake ReUI style name.
-
-The selected ReUI style must remain consistent across the application unless the user explicitly requests a different style.
-
-### 3.6 Color Theme Rule
-
-ReUI visual style and color palette are separate concerns.
-
-- Style controls the component's visual language, spacing, shape, density, etc.
-- Color tokens control the application's palette.
-
-When changing the ZEZO color theme:
-
-1. Select the desired ReUI style.
-2. Define the global semantic color tokens.
-3. Verify contrast.
-4. Ensure ReUI components automatically inherit the tokens.
-5. Do NOT individually recolor every component.
-
-Custom accent colors are allowed only when they are defined through the global theme/token system.
-
-### 3.7 No Fake ReUI
-
-The following is NOT considered ReUI integration:
-
-```tsx
-<div className="rounded-lg border bg-zinc-950 p-4">
-  ...
-</div>
-
-
-
-**Code Graph is available in this project. Use it before making any code changes.**
-
-1. Analyze the Code Graph to trace the relevant functions, dependencies, callers, and affected files.
-2. Use the graph to identify the complete execution flow before modifying anything.
-3. Cross-check graph findings against the actual source code. Do not assume the graph is fully up to date.
-4. Identify potential side effects and regression risks in connected modules.
-5. Make only the changes required for Phase 1. Avoid unrelated refactoring.
-6. After implementation, run relevant tests and report the exact files changed and test results.
-
-Do not skip Code Graph analysis, and do not modify code until you have completed the dependency analysis.
-
-
-
+## ⚡ 3. Strict Scope Control & Fast Execution
+
+### Rule 1: Fix Only What the User Asked For
+- Treat the user's exact request as the complete scope of work.
+- Identify the specific bug, feature, or behavior requested and work only on that.
+- Do NOT fix unrelated bugs, improve adjacent features, refactor surrounding code, or modify other systems without explicit permission.
+- If a browser control or other bug is reported, fix that specific issue only. Do not modify audio, voice, UI, or other systems.
+- **Never touch audio/voice pipeline files** (`main.py` live loops, `core/audio_devices.py`, `core/wake_word.py`, `core/hotkey.py`) unless the user explicitly requested an audio/voice fix. **"Bila-wajah audio/voice pipeline files ko touch karna sakhti se mana hai."**
+- **"Jo kaha hai, sirf wohi karo. Apni taraf se extra kaam mat karo."**
+
+### Rule 2: Fast, Targeted Diagnosis
+- Use the fastest reliable path to identify the root cause.
+- Start with the reported error, relevant logs, the affected function, and its direct callers.
+- Inspect only the necessary source files and dependencies. Expand the investigation only when the evidence requires it.
+- Avoid repeatedly reading the same files, exploring unrelated directories, generating lengthy analysis, or investigating hypothetical problems.
+- Do not perform exhaustive repository-wide analysis for a localized bug.
+- Prefer a small, evidence-based fix over prolonged investigation.
+
+### Rule 3: Minimal Changes, Maximum Preservation
+- Make the smallest change that correctly solves the reported problem.
+- Preserve existing working implementations, APIs, behavior, architecture, UI, and user preferences.
+- Never replace, simplify, rewrite, or remove existing functionality just because a different implementation seems easier.
+- Do not modify unrelated files, dependencies, configurations, or shared components.
+- Before editing shared code, confirm that the change is necessary for the requested task.
+- Never introduce speculative fixes for problems that have not been reported or demonstrated.
+
+### Rule 4: No Unrequested Fixes
+- If you discover an unrelated bug, document it briefly but leave it untouched.
+- Do not expand the task scope without asking the user.
+- If the requested fix reveals a dependency on another module, modify that module only when necessary to complete the requested fix safely.
+- If the root cause is outside the expected module, explain the evidence briefly before making broader changes when the impact is significant.
+
+### Rule 5: Execute Immediately, Avoid Analysis Loops
+- Once the relevant implementation and root cause are sufficiently understood, implement the fix immediately.
+- Do not continue analyzing after enough evidence exists to make a safe change.
+- Do not create unnecessary investigation plans, duplicate diagnostic scripts, speculative TODO lists, or lengthy explanations.
+- Do not ask for confirmation for routine, reversible implementation decisions within the user's explicit scope.
+- Ask one concise question only when a missing detail blocks safe execution or when a potentially destructive or architectural decision requires approval.
+
+### Rule 6: Proportional Verification
+- Verify the specific behavior affected by the change first.
+- Run the smallest relevant tests and checks, then expand testing only when the change's risk or impact requires it.
+- Follow the mandatory three-layer verification policy in Core Operating Rule 7, but keep each layer targeted to the changed code and affected behavior.
+- Never skip required verification just to appear faster.
+- Never claim a test passed unless it was actually executed successfully.
+- If an environment limitation prevents verification, report the exact limitation and mark the result UNVERIFIED.
+
+### Rule 7: Concise Execution Reports
+After completing a task, report only:
+1. **Fixed:** What specific issue was addressed.
+2. **Files changed:** Only the files actually modified.
+3. **Verification:** The checks actually performed and their results.
+4. **Unverified:** Any important check that could not be completed.
+
+Do not provide lengthy implementation explanations unless requested.
+
+### Rule 8: Scope Expansion Requires Permission
+- The user controls task scope and priorities.
+- Never turn a small bug report into a general system improvement project.
+- If a broader change appears necessary, explain why in one or two sentences and request permission before proceeding, unless the user has already explicitly authorized that scope.
+- **Priority order: User's exact request → Minimal safe fix → Targeted verification → Concise report.**
+
+### Rule 9: Speed Without Recklessness
+- Optimize for fast, focused execution, not maximum analysis or maximum code changes.
+- Avoid unnecessary tool calls, repeated searches, redundant file inspections, and unrelated test suites.
+- Reuse existing project knowledge and recent learning journal entries when relevant.
+- Do not sacrifice code correctness, data safety, or mandatory verification for speed.
+
+**Final Principle: Fix the reported problem, preserve everything else, verify the fix, and stop. Do not invent additional work.**
+
+## 🎨 2. Frontend & UI Engineering Rules
+
+### Rule 1: ReUI Design System as Source of Truth
+- The frontend UI uses **ReUI as the primary design system and component source of truth**.
+- When an official ReUI component exists (Button, Input, Select, Dialog, Sheet, Tabs, Progress, Badge, Tooltip, Scroll Area, Separator), use the actual component. Do NOT reinvent it with raw HTML/CSS.
+- Maintain coherent styling tokens: use semantic CSS variables (`--background`, `--foreground`, `--primary`, `--border`, etc.) instead of hardcoded hex values.
+
+### Rule 2: Modal & Window State Invariants
+- **No backdrop-filter inside modals:** `.modal-overlay` may have `backdrop-filter: blur(12px)`. Elements *inside* the modal must NOT have `backdrop-filter`. Modal panel backgrounds must be opaque (`#0a0a0a`).
+- **Never use `transition: all`:** Always list explicit CSS transition properties.
+- **Preserve `_zezoAnimActive`:** Modal opening and closing must manage `window._zezoAnimActive` and hide/show `vortex-gif` avatar so background animations do not waste CPU while modals are open.
+- **Settings is a Modal:** The settings panel is `<div class="modal-overlay" id="settings-modal">`, triggered via `openModal('settings-modal')`.

@@ -28,8 +28,14 @@ try:
 except ImportError:
     pass
 
+# Debug/profiling output is opt-in. With ZEZO_PROFILE unset nothing prints.
+ZEZO_PROFILE = os.environ.get("ZEZO_PROFILE") == "1"
+
 # Win32 Constants
 SW_RESTORE = 9
+SW_MAXIMIZE = 3
+SW_MINIMIZE = 6
+SW_SHOW = 5
 WM_CLOSE = 0x0010
 WM_COMMAND = 0x0111
 IDCANCEL = 2
@@ -37,6 +43,18 @@ GW_OWNER = 4
 GWL_EXSTYLE = -20
 WS_EX_TOOLWINDOW = 0x00000080
 WS_EX_APPWINDOW = 0x00040000
+
+
+def _prof(stage: str, t0: float) -> None:
+    """Emit a single [prof] timing line for a focus-pipeline stage (Step 2 profiling)."""
+    if ZEZO_PROFILE:
+        print(f"[prof] focus :: {stage:38s} {(time.perf_counter() - t0) * 1000:8.2f}ms")
+
+
+# Step 3b: profile-name -> Chrome PIDs cache (per app name, 30s TTL).
+_PROFILE_PIDS_CACHE: Dict[str, Tuple[float, List[int]]] = {}
+_PROFILE_PIDS_TTL = 30.0
+
 
 
 class WindowsNativeDriver:
@@ -71,12 +89,8 @@ class WindowsNativeDriver:
 
             if _PSUTIL:
                 try:
-                    proc = psutil.Process(my_pid)
-                    for parent in proc.parents():
-                        if parent.pid == target_pid:
-                            pname = (parent.name() or "").lower()
-                            if any(k in pname for k in ("powershell", "cmd", "terminal", "python", "code")):
-                                return True
+                    if target_pid in self.console_parent_pids():
+                        return True
                 except Exception:
                     pass
 
@@ -217,8 +231,131 @@ class WindowsNativeDriver:
         self.user32.EnumWindows(WNDENUMPROC(_enum_cb), 0)
         return results
 
-    def focus_window(self, title_or_app: str) -> str:
-        """Bring a target window into foreground with thread attachment."""
+    def show_window_preserving_state(self, hwnd: int) -> bool:
+        """
+        Bring an HWND on-screen WITHOUT destroying its maximize/fullscreen state.
+
+        Unconditionally calling ShowWindow(SW_RESTORE) un-maximizes a maximized
+        browser/window, so Chrome shrank every time a focus/scroll/tab action was
+        triggered. Only minimized windows need SW_RESTORE; maximized windows must
+        stay maximized (SW_MAXIMIZE); normal floating windows just need SW_SHOW.
+        """
+        if not self.is_windows or not self.user32 or not hwnd:
+            return False
+        try:
+            if self.user32.IsIconic(hwnd):
+                self.user32.ShowWindow(hwnd, SW_RESTORE)
+            elif self.user32.IsZoomed(hwnd):
+                self.user32.ShowWindow(hwnd, SW_MAXIMIZE)
+            else:
+                self.user32.ShowWindow(hwnd, SW_SHOW)
+            return True
+        except Exception:
+            try:
+                self.user32.ShowWindow(hwnd, SW_SHOW)
+            except Exception:
+                pass
+            return False
+
+    def _settle_foreground(self, hwnd: int, timeout: float = 0.15) -> bool:
+        """
+        Step 3: early-exit replacement for the fixed `time.sleep(0.15)` on the focus path.
+
+        Returns True the instant `hwnd` is foreground (0ms when the window was already
+        focused or when the foreground change lands immediately) and otherwise waits up
+        to `timeout` — the exact same worst-case budget the old fixed sleep had, but it
+        no longer burns 150ms unconditionally on the success path.
+        """
+        if not self.user32 or not hwnd:
+            return False
+        deadline = time.perf_counter() + timeout
+        while time.perf_counter() < deadline:
+            if self.user32.GetForegroundWindow() == hwnd:
+                return True
+            time.sleep(0.005)
+        return self.user32.GetForegroundWindow() == hwnd
+
+    def console_parent_pids(self) -> set:
+        """
+        PIDs of this process's console/terminal ancestors.
+
+        Step 3: `is_self_or_console_window` walked `psutil` parents for EVERY window
+        inside every enumeration callback (repeated work, ~10ms per window). The
+        ancestor set is constant while enumerating, so it is cached for a short TTL
+        and reused. The public 1-arg shape of `is_self_or_console_window` is kept.
+        """
+        now = time.monotonic()
+        cached = getattr(self, "_console_pids_cache", None)
+        if cached and (now - cached[0]) < 1.0:
+            return cached[1]
+        pids: set = set()
+        if _PSUTIL:
+            try:
+                for parent in psutil.Process(os.getpid()).parents():
+                    pname = (parent.name() or "").lower()
+                    if any(k in pname for k in ("powershell", "cmd", "terminal", "python", "code")):
+                        pids.add(parent.pid)
+            except Exception:
+                pass
+        self._console_pids_cache = (now, pids)
+        return pids
+
+    def _profile_pids_for(self, app_name: str) -> List[int]:
+        """
+        Chrome PIDs running the profile whose display name matches `app_name`.
+
+        Step 3b: the scan costs ~0.5-2s (`psutil.process_iter` over ~276 processes), so
+        the result is cached per app name for 30s. Cached PIDs that no longer exist are
+        dropped, so a Chrome restart cannot pin a stale target.
+        """
+        now = time.monotonic()
+        hit = _PROFILE_PIDS_CACHE.get(app_name)
+        if hit and (now - hit[0]) < _PROFILE_PIDS_TTL:
+            live = [p for p in hit[1] if not _PSUTIL or psutil.pid_exists(p)]
+            if live or not hit[1]:
+                return live
+        pids = self._scan_profile_pids(app_name)
+        _PROFILE_PIDS_CACHE[app_name] = (now, pids)
+        return pids
+
+    def _scan_profile_pids(self, app_name: str) -> List[int]:
+        """Scan the running Chrome processes for the profile directory matching `app_name`."""
+        pids: List[int] = []
+        try:
+            import json
+            local_state_path = os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\User Data\Local State")
+            if not os.path.exists(local_state_path):
+                return pids
+            with open(local_state_path, "r", encoding="utf-8") as f:
+                ls_data = json.load(f)
+            info_cache = ls_data.get("profile", {}).get("info_cache", {})
+            dir_to_name = {k.lower(): (v.get("name") or "").lower().strip() for k, v in info_cache.items()}
+            target_dir = None
+            for p_dir, p_name in dir_to_name.items():
+                if app_name == p_name or (len(app_name) >= 3 and app_name in p_name):
+                    target_dir = p_dir
+                    break
+            if target_dir and _PSUTIL:
+                for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+                    try:
+                        if "chrome" in (proc.info.get("name") or "").lower():
+                            cmd = proc.info.get("cmdline") or []
+                            for arg in cmd:
+                                if f"--profile-directory={target_dir}" in arg.lower():
+                                    pids.append(proc.info["pid"])
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return pids
+
+    def focus_window(self, title_or_app: str, hwnd: Optional[int] = None) -> str:
+        """
+        Bring a target window into foreground with thread attachment.
+
+        Step 3a: when the caller already resolved the target HWND (desktop browser
+        requests), pass it in to skip both the window enumeration and profile_lookup.
+        """
         if not title_or_app:
             return "No title specified."
 
@@ -262,8 +399,16 @@ class WindowsNativeDriver:
                     "telegram": ["telegram"],
                     "terminal": ["terminal", "powershell", "command prompt"],
                 }
-                target_aliases = APP_ALIASES_MAP.get(cleaned, [cleaned])
+                # Profile recognition: map names like 'vina', 'james', 'hamza' to Chrome profile directories
+                # Step 3: skipped entirely when the caller already resolved the HWND, and
+                # the scan result is cached per app name for 30s.
+                _t_prof = time.perf_counter()
+                profile_pids: list[int] = []
+                if not hwnd:
+                    profile_pids = self._profile_pids_for(cleaned)
+                _prof("focus_window:profile_lookup", _t_prof)
 
+                target_aliases = APP_ALIASES_MAP.get(cleaned, [cleaned])
                 WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 
                 def _enum_cb(hwnd: int, lparam: int) -> bool:
@@ -272,6 +417,13 @@ class WindowsNativeDriver:
                         w_title = self.get_window_title(hwnd)
                         w_lower = w_title.lower().strip()
                         if w_lower not in ("program manager", "settings", "default ime", "msctfime ui"):
+                            if profile_pids:
+                                p_id = ctypes.c_ulong()
+                                self.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(p_id))
+                                if p_id.value in profile_pids:
+                                    matched_hwnd = hwnd
+                                    matched_title = w_title
+                                    return False
                             if not is_browser_query and any(w_lower.endswith(s) for s in browser_suffixes):
                                 return True
                             
@@ -286,44 +438,74 @@ class WindowsNativeDriver:
                                 return False
                     return True
 
-                self.user32.EnumWindows(WNDENUMPROC(_enum_cb), 0)
+                _t_prof = time.perf_counter()
+                if hwnd:
+                    # Step 3a: caller-supplied HWND -> no enumeration, no profile scan.
+                    matched_hwnd = hwnd
+                    matched_title = self.get_window_title(hwnd)
+                else:
+                    self.user32.EnumWindows(WNDENUMPROC(_enum_cb), 0)
+                _prof("focus_window:EnumWindows", _t_prof)
 
                 if matched_hwnd:
+                    _t_prof = time.perf_counter()
                     fg_hwnd = self.user32.GetForegroundWindow()
                     fg_thread = self.user32.GetWindowThreadProcessId(fg_hwnd, None) if fg_hwnd else 0
                     my_thread = self.kernel32.GetCurrentThreadId()
                     target_thread = self.user32.GetWindowThreadProcessId(matched_hwnd, None) if matched_hwnd else 0
+                    _prof("focus_window:fg/thread lookup", _t_prof)
 
                     try:
+                        _t_prof = time.perf_counter()
                         self.user32.AllowSetForegroundWindow(-1)
                     except Exception:
                         pass
+                    finally:
+                        _prof("focus_window:AllowSetForegroundWindow", _t_prof)
 
                     try:
+                        _t_prof = time.perf_counter()
                         VK_MENU = 0x12
                         KEYEVENTF_KEYUP = 0x0002
                         self.user32.keybd_event(VK_MENU, 0, 0, 0)
                         self.user32.keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0)
                     except Exception:
                         pass
+                    finally:
+                        _prof("focus_window:keybd_event(alt)", _t_prof)
 
+                    _t_prof = time.perf_counter()
                     attached_fg = False
                     attached_target = False
                     if fg_thread and fg_thread != my_thread:
                         attached_fg = bool(self.user32.AttachThreadInput(my_thread, fg_thread, True))
                     if target_thread and target_thread != my_thread:
                         attached_target = bool(self.user32.AttachThreadInput(my_thread, target_thread, True))
+                    _prof("focus_window:AttachThreadInput(on)", _t_prof)
 
-                    self.user32.ShowWindow(matched_hwnd, SW_RESTORE)
+                    _t_prof = time.perf_counter()
+                    if self.user32.IsIconic(matched_hwnd):
+                        # Step 3: only minimized windows need a ShowWindow(SW_RESTORE).
+                        # A visible/maximized window only needs the foreground calls.
+                        self.show_window_preserving_state(matched_hwnd)
+                    _prof("focus_window:restore-if-minimized", _t_prof)
+                    _t_prof = time.perf_counter()
                     self.user32.SetForegroundWindow(matched_hwnd)
+                    _prof("focus_window:SetForegroundWindow", _t_prof)
+                    _t_prof = time.perf_counter()
                     self.user32.BringWindowToTop(matched_hwnd)
+                    _prof("focus_window:BringWindowToTop", _t_prof)
 
+                    _t_prof = time.perf_counter()
                     if attached_target:
                         self.user32.AttachThreadInput(my_thread, target_thread, False)
                     if attached_fg:
                         self.user32.AttachThreadInput(my_thread, fg_thread, False)
+                    _prof("focus_window:AttachThreadInput(off)", _t_prof)
 
-                    time.sleep(0.15)
+                    _t_prof = time.perf_counter()
+                    self._settle_foreground(matched_hwnd)
+                    _prof("focus_window:settle_foreground", _t_prof)
                     current_fg = self.user32.GetForegroundWindow()
                     is_focused = (
                         current_fg == matched_hwnd
@@ -332,9 +514,11 @@ class WindowsNativeDriver:
                     )
                     if is_focused:
                         return f"Focused window: {matched_title}"
-                    print(f"[WindowsNative] Window '{matched_title}' (HWND {matched_hwnd}) did not gain foreground focus (Current FG HWND: {current_fg}).")
+                    if ZEZO_PROFILE:
+                        print(f"[WindowsNative] Window '{matched_title}' (HWND {matched_hwnd}) did not gain foreground focus (Current FG HWND: {current_fg}).")
             except Exception as e:
-                print(f"[WindowsNative] Focus error: {e}")
+                if ZEZO_PROFILE:
+                    print(f"[WindowsNative] Focus error: {e}")
 
             return f"Could not focus window: {title_or_app}"
 
@@ -367,12 +551,127 @@ class WindowsNativeDriver:
 
         return f"focus_window: unsupported OS '{os_name}'"
 
-    def focus_browser_or_app_window(self) -> bool:
-        """Attempt to bring any open browser or non-self app to the foreground."""
+    def maximize_window(self, title_or_app: str = "chrome") -> bool:
+        """Maximize a window by title or app name (e.g. Chrome)."""
+        if not self.is_windows or not self.user32:
+            return False
+        try:
+            matched_hwnd = None
+            cleaned = (title_or_app or "chrome").strip().lower()
+            APP_ALIASES_MAP = {
+                "chrome": ["google chrome", "chrome"],
+                "edge": ["microsoft edge", "msedge", "edge"],
+                "browser": ["google chrome", "chrome", "edge", "brave", "firefox"],
+            }
+            target_aliases = APP_ALIASES_MAP.get(cleaned, [cleaned])
+
+            WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+            def _enum_cb(hwnd: int, lparam: int) -> bool:
+                nonlocal matched_hwnd
+                if self.is_real_top_level_window(hwnd) and not self.is_self_or_console_window(hwnd):
+                    w_title = self.get_window_title(hwnd).lower().strip()
+                    if any(a in w_title for a in target_aliases):
+                        matched_hwnd = hwnd
+                        return False
+                    # Also check process name if title doesn't contain alias
+                    try:
+                        pid = ctypes.c_ulong()
+                        self.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                        pname = (psutil.Process(pid.value).name() or "").lower()
+                        if any(a in pname for a in target_aliases):
+                            matched_hwnd = hwnd
+                            return False
+                    except Exception:
+                        pass
+                return True
+
+            self.user32.EnumWindows(WNDENUMPROC(_enum_cb), 0)
+            if matched_hwnd:
+                self.user32.ShowWindow(matched_hwnd, SW_MAXIMIZE)
+                self.user32.SetForegroundWindow(matched_hwnd)
+                return True
+        except Exception as e:
+            if ZEZO_PROFILE:
+                print(f"[WindowsNative] Maximize error: {e}")
+        return False
+
+    def minimize_window(self, title_or_app: str = "") -> bool:
+        """Minimize a target window by title/process name, or active foreground window."""
+        if not self.is_windows or not self.user32:
+            return False
+        try:
+            matched_hwnd = None
+            cleaned = (title_or_app or "").strip().lower()
+            if not cleaned:
+                fg_hwnd = self.user32.GetForegroundWindow()
+                if fg_hwnd and not self.is_self_or_console_window(fg_hwnd):
+                    self.user32.ShowWindow(fg_hwnd, SW_MINIMIZE)
+                    return True
+                return False
+
+            APP_ALIASES_MAP = {
+                "chrome": ["google chrome", "chrome"],
+                "edge": ["microsoft edge", "msedge", "edge"],
+                "browser": ["google chrome", "chrome", "edge", "brave", "firefox"],
+            }
+            target_aliases = APP_ALIASES_MAP.get(cleaned, [cleaned])
+
+            WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+            def _enum_cb(hwnd: int, lparam: int) -> bool:
+                nonlocal matched_hwnd
+                if self.is_real_top_level_window(hwnd) and not self.is_self_or_console_window(hwnd):
+                    w_title = self.get_window_title(hwnd).lower().strip()
+                    if any(a in w_title for a in target_aliases):
+                        matched_hwnd = hwnd
+                        return False
+                    try:
+                        pid = ctypes.c_ulong()
+                        self.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                        pname = (psutil.Process(pid.value).name() or "").lower()
+                        if any(a in pname for a in target_aliases):
+                            matched_hwnd = hwnd
+                            return False
+                    except Exception:
+                        pass
+                return True
+
+            self.user32.EnumWindows(WNDENUMPROC(_enum_cb), 0)
+            if matched_hwnd:
+                self.user32.ShowWindow(matched_hwnd, SW_MINIMIZE)
+                return True
+        except Exception as e:
+            if ZEZO_PROFILE:
+                print(f"[WindowsNative] Minimize error: {e}")
+        return False
+
+    def focus_browser_or_app_window(self, hwnd: Optional[int] = None) -> bool:
+        """
+        Attempt to bring any open browser or non-self app to the foreground.
+
+        Step 3a: when the caller already resolved the desktop browser HWND (browser
+        requests), pass it in: that HWND is focused directly and both the keyword loop
+        and the expensive profile_lookup are skipped. The keyword loop stays as the
+        fallback whenever no HWND is known or the direct focus did not take.
+        """
+        _t_all = time.perf_counter()
+
+        if hwnd:
+            _t_prof = time.perf_counter()
+            res = self.focus_window("browser", hwnd=hwnd)
+            _prof("focus_browser_or_app_window:focus_window(hwnd)", _t_prof)
+            if res.startswith("Focused window:"):
+                _prof("focus_browser_or_app_window:TOTAL", _t_all)
+                return True
+
         browser_keywords = ["youtube", "chrome", "edge", "firefox", "brave", "opera", "vivaldi", "arc", "browser"]
         for b in browser_keywords:
+            _t_prof = time.perf_counter()
             res = self.focus_window(b)
+            _prof(f"focus_browser_or_app_window:focus_window({b})", _t_prof)
             if res.startswith("Focused window:"):
+                _prof("focus_browser_or_app_window:TOTAL", _t_all)
                 return True
 
         if self.is_windows and self.user32 and self.kernel32:
@@ -399,25 +698,53 @@ class WindowsNativeDriver:
                             return False
                     return True
 
+                _t_prof = time.perf_counter()
                 self.user32.EnumWindows(WNDENUMPROC(_enum_cb), 0)
+                _prof("focus_browser_or_app_window:EnumWindows", _t_prof)
 
                 if target_hwnd:
+                    _t_prof = time.perf_counter()
                     fg_hwnd = self.user32.GetForegroundWindow()
                     fg_thread = self.user32.GetWindowThreadProcessId(fg_hwnd, None) if fg_hwnd else 0
                     my_thread = self.kernel32.GetCurrentThreadId()
+                    _prof("focus_browser_or_app_window:fg/thread lookup", _t_prof)
+
+                    # Step 3: a non-minimized window needs no ShowWindow(SW_RESTORE).
+                    _needs_restore = bool(self.user32.IsIconic(target_hwnd))
                     if fg_thread and fg_thread != my_thread:
+                        _t_prof = time.perf_counter()
                         self.user32.AttachThreadInput(my_thread, fg_thread, True)
-                        self.user32.ShowWindow(target_hwnd, SW_RESTORE)
+                        _prof("focus_browser_or_app_window:AttachThreadInput(on)", _t_prof)
+                        _t_prof = time.perf_counter()
+                        if _needs_restore:
+                            self.show_window_preserving_state(target_hwnd)
+                        _prof("focus_browser_or_app_window:restore-if-minimized", _t_prof)
+                        _t_prof = time.perf_counter()
                         self.user32.SetForegroundWindow(target_hwnd)
+                        _prof("focus_browser_or_app_window:SetForegroundWindow", _t_prof)
+                        _t_prof = time.perf_counter()
                         self.user32.BringWindowToTop(target_hwnd)
+                        _prof("focus_browser_or_app_window:BringWindowToTop", _t_prof)
+                        _t_prof = time.perf_counter()
                         self.user32.AttachThreadInput(my_thread, fg_thread, False)
+                        _prof("focus_browser_or_app_window:AttachThreadInput(off)", _t_prof)
                     else:
-                        self.user32.ShowWindow(target_hwnd, SW_RESTORE)
+                        _t_prof = time.perf_counter()
+                        if _needs_restore:
+                            self.show_window_preserving_state(target_hwnd)
+                        _prof("focus_browser_or_app_window:restore-if-minimized", _t_prof)
+                        _t_prof = time.perf_counter()
                         self.user32.SetForegroundWindow(target_hwnd)
-                    time.sleep(0.15)
+                        _prof("focus_browser_or_app_window:SetForegroundWindow", _t_prof)
+
+                    _t_prof = time.perf_counter()
+                    self._settle_foreground(target_hwnd)
+                    _prof("focus_browser_or_app_window:settle_foreground", _t_prof)
+                    _prof("focus_browser_or_app_window:TOTAL", _t_all)
                     return True
             except Exception:
                 pass
+        _prof("focus_browser_or_app_window:TOTAL(failed)", _t_all)
         return False
 
     def close_window_by_title_or_active(self, title: str = "") -> str:
@@ -559,3 +886,7 @@ get_window_title = windows_native.get_window_title
 is_self_or_console_window = windows_native.is_self_or_console_window
 close_window_by_title_or_active = windows_native.close_window_by_title_or_active
 enum_top_level_windows = windows_native.enum_top_level_windows
+maximize_window = windows_native.maximize_window
+minimize_window = windows_native.minimize_window
+show_window_preserving_state = windows_native.show_window_preserving_state
+

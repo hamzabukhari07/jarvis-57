@@ -169,10 +169,17 @@ export const QiviAvatarVisualizer: React.FC<QiviAvatarVisualizerProps> = React.m
   }, [activeThemeName])
 
   const characterConfig = useMemo(() => {
-    if (activePreset && activePreset !== 'custom' && (CHARACTERS as any)[activePreset]) {
-      return (CHARACTERS as any)[activePreset]
+    const base = (activePreset && activePreset !== 'custom' && (CHARACTERS as any)[activePreset])
+      ? (CHARACTERS as any)[activePreset]
+      : (CHARACTERS as any).qivi
+
+    return {
+      ...base,
+      behavior: {
+        ...base?.behavior,
+        probe: 0, // Disable idle probe pseudopod to prevent deformed double-blob glitch
+      },
     }
-    return undefined
   }, [activePreset])
 
   return (

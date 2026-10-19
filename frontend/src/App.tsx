@@ -11,6 +11,7 @@ import { AutonomousOfficeScreen } from './components/office/AutonomousOfficeScre
 
 import { Frame, FramePanel, FrameHeader, FrameTitle } from './components/reui/frame'
 import { Badge } from './components/reui/badge'
+import { ConfirmDialog } from './components/reui/confirm-dialog'
 import { Button } from './components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs'
 import { Progress } from './components/ui/progress'
@@ -74,13 +75,17 @@ export default function App() {
     tasks: liveTasks,
     activeAttachments,
     currentView,
+    confirmationState,
     send,
     sendUserMessage,
     sendInterrupt,
     sendMuteToggle,
     sendSleepToggle,
+    sendWakeToggle,
+    sendPttToggle,
     sendPayloadRemove,
     sendPayloadClear,
+    sendConfirmationResolve,
     clearLogs,
     cancelTask,
     saveAudioDevices,
@@ -255,20 +260,68 @@ export default function App() {
   // Sync WebSocket file_ingested events into uploadedFiles
   useEffect(() => {
     if (activeAttachments && activeAttachments.length > 0) {
-      setUploadedFiles(activeAttachments.map((item: any) => ({
+      const formatted = activeAttachments.map((item: any) => ({
         name: item.name || 'File',
         size: typeof item.size === 'number' ? `${(item.size / 1024).toFixed(1)} KB` : (item.size || '0 KB'),
         type: item.is_folder ? 'FOLDER' : (item.file_type || 'FILE').toUpperCase(),
         path: item.path,
-      })))
+      }))
+      setUploadedFiles((prev) => {
+        const existingKeys = new Set(prev.map((f) => (f.path || f.name).toLowerCase()))
+        const unique = formatted.filter((f: any) => !existingKeys.has((f.path || f.name).toLowerCase()))
+        return [...unique, ...prev]
+      })
     }
   }, [activeAttachments])
+
+  // Native folder picker that avoids byte upload & freeze
+  const handleChooseFolderClick = async () => {
+    try {
+      const res = await api.pickWorkspaceFolder()
+      if (res && res.status === 'success' && res.folder) {
+        const item = res.folder
+        const newEntry = {
+          name: item.name,
+          size: typeof item.size === 'number' ? `${(item.size / 1024).toFixed(1)} KB` : (item.size || '0 KB'),
+          type: 'FOLDER' as const,
+          path: item.path,
+        }
+        setUploadedFiles((prev) => {
+          const existingKeys = new Set(prev.map((f) => (f.path || f.name).toLowerCase()))
+          if (existingKeys.has((newEntry.path || newEntry.name).toLowerCase())) return prev
+          return [newEntry, ...prev]
+        })
+        return
+      }
+      if (res && (res.status === 'canceled' || res.cancelled)) {
+        return
+      }
+    } catch (err) {
+      console.warn('Native folder picker fallback to web input:', err)
+    }
+    folderInputRef.current?.click()
+  }
 
   // Real file upload pipeline to ZEZO backend (/api/upload)
   const handleFileUpload = async (files: FileList | File[]) => {
     if (!files || files.length === 0) return
+    const fileArray = Array.from(files)
+    // Filter junk folders to prevent freezing on large directories
+    const filteredFiles = fileArray.filter((f) => {
+      const rel = ((f as any).webkitRelativePath || f.name).replace(/\\/g, '/')
+      return (
+        !rel.includes('/node_modules/') &&
+        !rel.includes('/.git/') &&
+        !rel.includes('/.venv/') &&
+        !rel.includes('/dist/') &&
+        !rel.includes('/.next/') &&
+        !rel.includes('/__pycache__/')
+      )
+    })
+    if (filteredFiles.length === 0) return
     const formData = new FormData()
-    Array.from(files).forEach((f) => {
+    // Cap at 200 files if web drag-and-drop
+    filteredFiles.slice(0, 200).forEach((f) => {
       formData.append('files', f, (f as any).webkitRelativePath || f.name)
     })
     try {
@@ -280,7 +333,11 @@ export default function App() {
           type: item.is_folder ? 'FOLDER' : (item.file_type || 'FILE').toUpperCase(),
           path: item.path,
         }))
-        setUploadedFiles((prev) => [...newEntries, ...prev])
+        setUploadedFiles((prev) => {
+          const existingKeys = new Set(prev.map((f) => (f.path || f.name).toLowerCase()))
+          const unique = newEntries.filter((f: any) => !existingKeys.has((f.path || f.name).toLowerCase()))
+          return [...unique, ...prev]
+        })
       }
     } catch (err) {
       console.error('File upload failed:', err)
@@ -1107,7 +1164,7 @@ export default function App() {
                       variant="outline"
                       size="sm"
                       type="button"
-                      onClick={() => folderInputRef.current?.click()}
+                      onClick={handleChooseFolderClick}
                       className="h-7 px-2 text-[11px] font-medium gap-1 whitespace-nowrap border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--accent)]/15 bg-[var(--input)] w-full justify-center"
                     >
                       <FolderOpen className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
@@ -1226,6 +1283,8 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         audioDevices={audioDevices}
         onSaveAudioDevices={saveAudioDevices}
+        onWakeToggle={sendWakeToggle}
+        onPttToggle={sendPttToggle}
       />
 
       {/* 100% Official ReUI Backend Log Console Modal with Filters & Actions */}
@@ -1252,6 +1311,23 @@ export default function App() {
         onClose={() => setIsMobileRemoteOpen(false)}
         remoteGateway={remoteGateway}
         onRequestNewKey={requestRemoteKey}
+      />
+
+      {/* Official ReUI Strict Confirmation Dialog (Winget & Irreversible Actions) */}
+      <ConfirmDialog
+        open={confirmationState.active}
+        onOpenChange={(open) => {
+          if (!open && confirmationState.active) {
+            sendConfirmationResolve(false)
+          }
+        }}
+        title={confirmationState.title || "Confirmation Required"}
+        description={confirmationState.detail}
+        confirmText="Confirm & Run"
+        cancelText="Cancel"
+        variant={confirmationState.variant || "default"}
+        onConfirm={() => sendConfirmationResolve(true)}
+        onCancel={() => sendConfirmationResolve(false)}
       />
     </div>
   )

@@ -42,6 +42,14 @@ export interface LiveTelemetry {
   tmp?: number
 }
 
+export interface ConfirmationEvent {
+  active: boolean
+  key: string
+  title: string
+  detail: string
+  variant?: 'destructive' | 'warning' | 'default'
+}
+
 export function useZezoSocket() {
   const [isConnected, setIsConnected] = useState(false)
   const [systemState, setSystemState] = useState<'idle' | 'listening' | 'speaking' | 'thinking' | 'sleeping'>('listening')
@@ -61,6 +69,13 @@ export function useZezoSocket() {
   const [tasks, setTasks] = useState<any[]>([])
   const [activeAttachments, setActiveAttachments] = useState<any[]>([])
   const [currentView, setCurrentView] = useState<'home' | 'office' | null>(null)
+  const [confirmationState, setConfirmationState] = useState<ConfirmationEvent>({
+    active: false,
+    key: '',
+    title: '',
+    detail: '',
+    variant: 'default',
+  })
 
   const wsRef = useRef<WebSocket | null>(null)
   const lastAudioLevelRef = useRef<number>(0)
@@ -194,6 +209,21 @@ export function useZezoSocket() {
                   return [item, ...filtered]
                 })
               }
+              break
+
+            case 'confirm_request':
+              setConfirmationState({
+                active: true,
+                key: String(d.key || ''),
+                title: String(d.title || 'Confirmation Required'),
+                detail: String(d.detail || ''),
+                variant: (d.variant || 'default') as any,
+              })
+              break
+
+            case 'confirm_hide':
+            case 'confirmation_closed':
+              setConfirmationState((prev) => ({ ...prev, active: false }))
               break
 
             case 'switch_view':
@@ -399,6 +429,14 @@ export function useZezoSocket() {
     send({ type: 'sleep_toggle', sleeping })
   }, [send])
 
+  const sendWakeToggle = useCallback((enable: boolean) => {
+    send({ type: 'wake_toggle', enable })
+  }, [send])
+
+  const sendPttToggle = useCallback((enable: boolean) => {
+    send({ type: 'ptt_toggle', enable })
+  }, [send])
+
   const sendPayloadRemove = useCallback((path: string, name?: string, isFolder?: boolean) => {
     send({ type: 'payload_remove', path, name, is_folder: isFolder })
   }, [send])
@@ -406,6 +444,11 @@ export function useZezoSocket() {
   const sendPayloadClear = useCallback(() => {
     send({ type: 'payload_clear' })
     setActiveAttachments([])
+  }, [send])
+
+  const sendConfirmationResolve = useCallback((accepted: boolean) => {
+    send({ type: 'resolve_confirmation', accepted })
+    setConfirmationState((prev) => ({ ...prev, active: false }))
   }, [send])
 
   return {
@@ -426,13 +469,17 @@ export function useZezoSocket() {
     activeAttachments,
     setActiveAttachments,
     currentView,
+    confirmationState,
     send,
     sendUserMessage,
     sendInterrupt,
     sendMuteToggle,
     sendSleepToggle,
+    sendWakeToggle,
+    sendPttToggle,
     sendPayloadRemove,
     sendPayloadClear,
+    sendConfirmationResolve,
     clearLogs,
     cancelTask,
     saveAudioDevices,

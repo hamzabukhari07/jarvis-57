@@ -339,6 +339,8 @@ def _is_repeat_chunk(txt: str, buf: list) -> bool:
 def _clean_transcript(text: str) -> str:    
     text = _CTRL_RE.sub("", text)
     text = re.sub(r"[\x00-\x08\x0b-\x1f]", "", text)
+    # Scrub tool-call tokens (complete and streaming fragments) so they are never read aloud
+    text = re.sub(r"(?:start)?call:\w+\{[^}]*\}?", "", text)
     return text.strip()
 
 
@@ -555,6 +557,7 @@ def _keep_context_of(exc: BaseException) -> bool:
 
 
 class ZezoLive:
+
     def __init__(self, ui: ZezoUI):
         self.ui             = ui
         self._asst_name     = get_assistant_name()   # identity; refreshed each session from config
@@ -569,8 +572,12 @@ class ZezoLive:
         self._vision_cam_active    = False   # True if camera was opened for vision → auto-close after response
         self._vision_close_pending = False   # True after vision injected; next turn_complete closes camera
         self._vision_last_time     = 0.0     # monotonic time of last screen_process call (cooldown guard)
-        self._vision_busy          = False   # True while a vision capture/inject cycle is in flight
         self._interrupted          = False   # True while draining audio after user interrupt
+        # Phase L: per-call-id ledger so a tool runs once even if the send is interrupted.
+        self._tool_ledger          = {}      # call_id -> {"status","result","ts","delivered","task"}
+        self._tool_ledger_lock     = threading.Lock()
+        self._tool_ledger_max      = 200
+        self._tool_ledger_ttl      = 120.0
         # Transcript-driven mouth shapes for the avatar. Fed from the receive
         # loop as words arrive, drained by the playback loop against the audio.
         self._visemes              = VisemeStream()
@@ -607,6 +614,7 @@ class ZezoLive:
         self._reconnect_event: asyncio.Event | None = None
         self._reconnect_keep = True   # False → next rebuild drops the resumption handle
         self._silence_watchdog_task: Optional[asyncio.Task] = None
+        self._ptt_watchdog_task: Optional[asyncio.Task] = None
 
         # ── Session resumption ─────────────────────────────────────────
         # The server issues a resumption handle every few seconds and reissues
@@ -779,7 +787,7 @@ class ZezoLive:
         self._awake = True
         self._last_user_speech = time.monotonic()   # start the auto-sleep clock now
         if not self.ui.muted:
-            self.ui.set_state("LISTENING")
+            self.ui.set_state(self._get_resting_state())
         self.ui.write_log(f"SYS: Awake — {reason}.")
 
     def sleep(self, reason: str = "timeout") -> None:
@@ -817,17 +825,35 @@ class ZezoLive:
         'enabled' | 'disabled' | 'need_download'."""
         if enable:
             if not wake_is_ready(self._wake_model):
+                # Do not let the config claim "on": the caller already saved True,
+                # so put it back. Otherwise the UI shows an armed wake word that
+                # can never fire and the user has no idea why it is deaf.
+                save_wake_word_enabled(False)
+                try:
+                    self.ui.write_log(
+                        "SYS: Wake word needs its recognizer installed first — staying off."
+                    )
+                except Exception:
+                    pass
                 return "need_download"
             self._wake_enabled = True
             save_wake_word_enabled(True)
             self._ensure_wake_detector()
             self.sleep(reason="wake word enabled")
             return "enabled"
-        else:
-            self._wake_enabled = False
-            save_wake_word_enabled(False)
-            self.wake(reason="wake word disabled")
-            return "disabled"
+
+        self._wake_enabled = False
+        save_wake_word_enabled(False)
+        # Release the recognizer: it holds an audio endpoint of its own, and
+        # leaving it running competes with the live mic once we move to
+        # push-to-talk or always-listening.
+        if self._wake_detector is not None:
+            try:
+                self._wake_detector.stop()
+            except Exception:
+                pass
+        self.wake(reason="wake word disabled")
+        return "disabled"
 
     def _ui_wake_manual(self) -> None:
         """Manual sleep/wake button in the UI."""
@@ -939,6 +965,17 @@ class ZezoLive:
                 "Run: pip install fastapi \"uvicorn[standard]\" cryptography"
             )
             return None
+        # Wait briefly for the auto-tunnel to be ready so the QR code encodes
+        # the public (anywhere-accessible) URL instead of the LAN IP.
+        if self._tunnel is not None:
+            import time as _t
+            for _ in range(75):
+                if self._tunnel.status == "running" and self._tunnel.url:
+                    self._dashboard.set_public_url(self._tunnel.url)
+                    break
+                if self._tunnel.status in ("not_installed", "error"):
+                    break
+                _t.sleep(0.2)
         key    = self._dashboard.new_key()
         url    = self._dashboard.get_url()
         manual = self._dashboard.get_manual_url()
@@ -1016,7 +1053,7 @@ class ZezoLive:
                 self._ptt.stop()
                 self._ptt = None
             if not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
-                self.ui.set_state("LISTENING")
+                self.ui.set_state(self._get_resting_state())
             return "off"
 
         if self._ptt is None:
@@ -1038,18 +1075,59 @@ class ZezoLive:
             pass
         return scope
 
+    def _defer_playback(self) -> bool:
+        """True while the chord is held: assistant speech must not talk over dictation.
+
+        The server commits a turn on its own VAD as soon as it hears the end of
+        speech — which normally happens *before* the key comes up. So the reply is
+        held back rather than dropped, and is spoken the moment the user releases.
+        """
+        return bool(getattr(self, "_ptt_enabled", False) and getattr(self, "_ptt_held", False))
+
+    def _drop_assistant_audio(self) -> bool:
+        """True while the remnants of an interrupted turn must be discarded.
+
+        Set by interrupt() and cleared by _end_interrupted_turn() at the server's
+        turn boundary — deliberately never by the chord itself, or the *next*
+        turn's reply would be thrown away too and ZEZO would stay silent.
+        """
+        return bool(self._interrupted)
+
+    async def _await_playback_allowed(self) -> bool:
+        """Wait out a chord hold. True = play this chunk, False = drop it.
+
+        Deferred, never discarded: the server commits a turn on its own VAD — a
+        pause mid-sentence is enough — so the reply commonly lands before the key
+        comes up. Only an interrupted turn's remnants are dropped.
+        """
+        while self._defer_playback() and not self._interrupted:
+            await asyncio.sleep(0.05)
+        return not self._drop_assistant_audio()
+
+    def _end_interrupted_turn(self) -> bool:
+        """Close an interrupted turn at its server boundary. Returns True if it was.
+
+        Clearing the flag here (not on key release) stops an interrupted turn's
+        leftovers from playing late while still letting the follow-up turn be heard.
+        """
+        was = self._interrupted
+        self._interrupted = False
+        return was
+
     def _on_ptt(self, held: bool) -> None:
         """Chord pressed or released — may arrive on the hotkey thread."""
         self._ptt_held = held
         if held:
             self._awaiting_speech_reply = False
+
             # Immediate barge-in: If ZEZO is currently speaking or audio is queued, cut it off now
             with self._speaking_lock:
                 speaking = self._is_speaking
-            if speaking:
+            q_has_audio = bool(self.audio_in_queue and not self.audio_in_queue.empty())
+            if speaking or q_has_audio:
                 self.interrupt()
-            # Clear interrupted flag for this new turn so incoming replies won't be discarded
-            self._interrupted = False
+            else:
+                self._interrupted = False
 
             # Drain any stale audio from outgoing queues so we begin completely clean
             while not self.out_queue.empty():
@@ -1057,6 +1135,15 @@ class ZezoLive:
                     self.out_queue.get_nowait()
                 except Exception:
                     break
+
+            # Also actively flush incoming audio queue so no old chunks linger
+            if self.audio_in_queue:
+                while not self.audio_in_queue.empty():
+                    try:
+                        self.audio_in_queue.get_nowait()
+                    except Exception:
+                        break
+
             # Holding the key wakes it and opens the mic
             if self._wake_enabled and not self._awake:
                 self._awake = True
@@ -1070,6 +1157,17 @@ class ZezoLive:
             self._ptt_release_time = time.monotonic()
             self._last_user_speech = time.monotonic()
             self._awaiting_speech_reply = True
+
+            # Final drain of any chunks that arrived while the user was speaking
+            if self.audio_in_queue:
+                while not self.audio_in_queue.empty():
+                    try:
+                        self.audio_in_queue.get_nowait()
+                    except Exception:
+                        break
+
+            # Clear interrupted flag now so the upcoming response for this turn is accepted
+            self._interrupted = False
 
             def _schedule_release_signals():
                 # Enqueue ~150ms of trailing silence PCM to cleanly close phonemes before stream end
@@ -1087,13 +1185,17 @@ class ZezoLive:
             try:
                 if not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
                     self.ui.set_state("THINKING")
+                self._arm_ptt_watchdog()
             except Exception:
                 pass
 
     def interrupt(self) -> None:
         """Stop ZEZO mid-speech: drain queued audio and open mic immediately."""
         self._cancel_silence_watchdog()
+        self._cancel_ptt_watchdog()
         self._awaiting_speech_reply = False
+        self._awaiting_tool_reply = False
+        self._tool_busy = False
         self._interrupted = True
         q = self.audio_in_queue
         if q:
@@ -1112,12 +1214,48 @@ class ZezoLive:
         self._play_cursor = 0.0     # next batch starts a fresh timeline
         if self._turn_done_event:
             self._turn_done_event.clear()
+        if hasattr(self, "ui") and self.ui and not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
+            self.ui.set_state(self._get_resting_state())
         self.ui.write_log("SYS: Interrupted — listening...")
 
     def _cancel_silence_watchdog(self) -> None:
-        if self._silence_watchdog_task and not self._silence_watchdog_task.done():
-            self._silence_watchdog_task.cancel()
+        task = getattr(self, "_silence_watchdog_task", None)
+        if task and not task.done():
+            task.cancel()
         self._silence_watchdog_task = None
+
+    def _cancel_ptt_watchdog(self) -> None:
+        task = getattr(self, "_ptt_watchdog_task", None)
+        if task and not task.done():
+            task.cancel()
+        self._ptt_watchdog_task = None
+
+    def _arm_ptt_watchdog(self) -> None:
+        self._cancel_ptt_watchdog()
+        loop = self._loop
+        if loop and loop.is_running():
+            try:
+                if asyncio.get_running_loop() is loop:
+                    self._ptt_watchdog_task = asyncio.create_task(self._ptt_watchdog())
+                    return
+            except RuntimeError:
+                pass
+            self._ptt_watchdog_task = asyncio.run_coroutine_threadsafe(
+                self._ptt_watchdog(), loop
+            )
+
+    async def _ptt_watchdog(self) -> None:
+        try:
+            # If no model reply arrives within 6.0s after PTT release, un-stick UI state
+            await asyncio.sleep(6.0)
+            self._awaiting_speech_reply = False
+            # Backstop: a turn boundary should already have cleared this, but a
+            # dropped socket must never leave every future reply muted.
+            self._interrupted = False
+            if hasattr(self, "ui") and self.ui and not getattr(self.ui, "muted", False) and not self._is_speaking:
+                self.ui.set_state(self._get_resting_state())
+        except asyncio.CancelledError:
+            pass
 
     def _arm_silence_watchdog(self, user_text: str) -> None:
         self._cancel_silence_watchdog()
@@ -1148,8 +1286,9 @@ class ZezoLive:
                 log_bus.emit("WARNING", "audio.silence", msg)
             if hasattr(self, "ui") and self.ui:
                 self.ui.write_log(f"SYS: [Silence Watchdog] No reply within 5s for: '{user_text[:40]}'")
-                if not getattr(self.ui, "muted", False) and not self._is_speaking:
-                    self.ui.set_state("THINKING")
+            self._awaiting_speech_reply = False
+            if hasattr(self, "ui") and self.ui and not getattr(self.ui, "muted", False) and not self._is_speaking:
+                self.ui.set_state(self._get_resting_state())
         except asyncio.CancelledError:
             pass
 
@@ -1289,7 +1428,20 @@ class ZezoLive:
         except Exception as e:
             logger.debug("[FleetManager] Fleet context formatting skipped: %s", e)
 
+        # Workspace awareness injection
+        from core.repo_context import get_last_repo
+        active_ws = get_last_repo()
+        ws_ctx = ""
+        if active_ws and Path(active_ws).exists():
+            ws_ctx = (
+                f"[ACTIVE WORKSPACE DIRECTORY]\n"
+                f"The user has actively selected workspace folder: '{active_ws}'\n"
+                f"When the user asks which folder is selected or asks to inspect/work on their project, refer to this directory.\n\n"
+            )
+
         parts = [time_ctx, identity_ctx]
+        if ws_ctx:
+            parts.append(ws_ctx)
         if fleet_ctx:
             parts.append(fleet_ctx)
         if mem_str:
@@ -1420,7 +1572,7 @@ class ZezoLive:
                 except Exception:
                     pass
         if not self.ui.muted:
-            self.ui.set_state("LISTENING")
+            self.ui.set_state(self._get_resting_state())
         return types.FunctionResponse(
             id=fc.id, name=name,
             response={"result": "ok", "silent": True}
@@ -1577,9 +1729,47 @@ class ZezoLive:
     async def _execute_tool(self, fc) -> types.FunctionResponse:
         name = fc.name
         args = dict(fc.args or {})
+        call_id = getattr(fc, "id", None) or ("%s:%s" % (name, id(fc)))
+
+        # Phase L: ledger check — a "done" call returns the stored result without re-running.
+        with self._tool_ledger_lock:
+            entry = self._tool_ledger.get(call_id)
+        if entry and entry.get("status") == "done":
+            return entry["result"]
+        if entry and entry.get("status") == "running":
+            # wait for the in-flight run instead of starting a second one
+            task = entry.get("task")
+            if task is not None:
+                try:
+                    await task
+                except Exception:
+                    pass
+            with self._tool_ledger_lock:
+                entry = self._tool_ledger.get(call_id, {})
+            if entry.get("status") == "done":
+                return entry["result"]
+
+        # mark running
+        with self._tool_ledger_lock:
+            self._tool_ledger[call_id] = {"status": "running", "result": None,
+                                          "ts": time.monotonic(), "delivered": False, "task": None}
+            # evict old entries
+            if len(self._tool_ledger) > self._tool_ledger_max:
+                oldest = sorted(self._tool_ledger.items(), key=lambda kv: kv[1].get("ts", 0))[:len(self._tool_ledger) - self._tool_ledger_max]
+                for k, _ in oldest:
+                    self._tool_ledger.pop(k, None)
+            # TTL eviction
+            now = time.monotonic()
+            for k in [k for k, v in self._tool_ledger.items() if (now - v.get("ts", now)) > self._tool_ledger_ttl]:
+                self._tool_ledger.pop(k, None)
 
         print(f"[Zezo] 🔧 {name}  {args}")
         self.ui.set_state("THINKING")
+        # A tool can run 8+ seconds (OCR, screen_process, file I/O). The silence
+        # watchdog measures time since user speech, not tool progress, so it fires
+        # during legitimate work. Cancel it here; turn_complete will re-arm it.
+        self._cancel_silence_watchdog()
+        self._cancel_ptt_watchdog()
 
         loop   = asyncio.get_event_loop()
         result = "Done."
@@ -1591,11 +1781,13 @@ class ZezoLive:
                 print(f"[Security] 🛑 Action '{name}' BLOCKED by governance policy: {reason}")
                 self.ui.write_log(f"ERR: Security Block — {name} ({reason})")
                 if not self.ui.muted:
-                    self.ui.set_state("LISTENING")
-                return types.FunctionResponse(
+                    self.ui.set_state(self._get_resting_state())
+                fr = types.FunctionResponse(
                     id=fc.id, name=name,
                     response={"result": f"Action '{name}' was blocked by security governance: {reason}. Politely inform the user."}
                 )
+                self._ledger_store(call_id, fr)
+                return fr
             elif decision == governance.PolicyDecision.ASK:
                 print(f"[Security] 🛡️ Action '{name}' requires human confirmation: {reason}")
 
@@ -1612,48 +1804,79 @@ class ZezoLive:
                     detail=reason or f"Action '{name}' requires explicit approval.",
                     run=_do_execute_confirmed,
                 )
-                return types.FunctionResponse(
+                fr = types.FunctionResponse(
                     id=fc.id, name=name,
                     response={"result": pending_msg}
                 )
+                self._ledger_store(call_id, fr)
+                return fr
         except Exception as _gov_err:
             print(f"[Security] 🛑 Governance evaluation error: {_gov_err}")
             self.ui.write_log(f"ERR: Governance Error — {name} ({_gov_err})")
-            return types.FunctionResponse(
+            fr = types.FunctionResponse(
                 id=fc.id, name=name,
                 response={"result": f"SECURITY POLICY ERROR: Action '{name}' could not be evaluated by safety governance."}
             )
+            self._ledger_store(call_id, fr)
+            return fr
 
         if name == "save_memory":
-            return await self._dispatch_save_memory(fc, name, args)
+            fr = await self._dispatch_save_memory(fc, name, args)
+            self._ledger_store(call_id, fr)
+            return fr
 
         try:
-            result = await self._run_tool_dispatch(name, args, loop)
+            # Phase L: shielded run so an interrupt cannot cancel the tool mid-flight
+            result = await asyncio.shield(self._run_tool_dispatch(name, args, loop))
         except Exception as e:
             result = f"Tool '{name}' failed: {e}"
             traceback.print_exc()
             self.ui.write_log(f"ERR: {name} — {str(e)[:120]}")
 
         print(f"[Zezo] 📤 {name} → {str(result)[:80]}")
+        self._session_log.append(f"Tool call: {name}({args})")
+        self._session_log.append(f"Tool result: {name} → {str(result)}")
         try:
             sqlite_memory.log_turn("tool", str(result), tool_name=name, tool_args=args, tool_result=str(result))
         except Exception:
             pass
 
-        # A tool that declared itself NON_BLOCKING also says when its answer may
-        # re-enter the conversation. Without this the model finishes whatever it
-        # was saying and then reads the result out on top of it — which, for
-        # something like a phone call already ringing, is exactly the noise the
-        # non-blocking call was meant to avoid. Tools that declared nothing get
-        # the API default and behave as they always have.
         _sched = (self._action_registry.scheduling(name)
                   or self._plugin_registry.scheduling(name))
         _extra = {"scheduling": _sched} if _sched else {}
-        return types.FunctionResponse(
+        fr = types.FunctionResponse(
             id=fc.id, name=name,
             response={"result": result},
             **_extra
         )
+        self._ledger_store(call_id, fr)
+        return fr
+
+    def _ledger_store(self, call_id, fr):
+        with self._tool_ledger_lock:
+            e = self._tool_ledger.get(call_id, {})
+            e["status"] = "done"
+            e["result"] = fr
+            e["ts"] = time.monotonic()
+            e["delivered"] = False
+            self._tool_ledger[call_id] = e
+
+    async def _resend_undelivered(self):
+        """Resend any stored result that was never delivered (e.g. after an interrupt)."""
+        with self._tool_ledger_lock:
+            pending = [(k, v) for k, v in self._tool_ledger.items()
+                       if v.get("status") == "done" and not v.get("delivered")]
+        for call_id, entry in pending:
+            fr = entry.get("result")
+            if fr is None:
+                continue
+            try:
+                await self.session.send_tool_response(function_responses=[fr])
+                with self._tool_ledger_lock:
+                    if call_id in self._tool_ledger:
+                        self._tool_ledger[call_id]["delivered"] = True
+            except Exception as e:
+                print(f"[Zezo] resend failed for {call_id}: {e}")
 
     async def _send_realtime(self):
         _last_mic_log = 0.0
@@ -1666,11 +1889,8 @@ class ZezoLive:
             if msg.get("audio_stream_end"):
                 try:
                     await self.session.send_realtime_input(audio_stream_end=True)
-                    if log_bus is not None:
-                        log_bus.emit("INFO", "audio.mic", "Sent audio_stream_end to Gemini Live (PTT release)")
-                except Exception as e:
-                    if log_bus is not None:
-                        log_bus.emit("ERROR", "audio.live", f"Mic stream error during audio_stream_end: {e}")
+                except Exception:
+                    pass
                 continue
             try:
                 # Standardize to clean PCM blob format with explicit sample rate for Gemini Live
@@ -1735,14 +1955,14 @@ class ZezoLive:
             # ── Wake-word & Sleep gate ───────────────────────────────────────
             # While asleep, the mic audio NEVER goes to Gemini (nothing is
             # streamed, so ZEZO can't respond to speech not addressed to it and
-            # nothing leaves the machine). Frames are instead handed to the local
-            # detector if enabled, which runs its model in ITS OWN thread — the cost
-            # here is only a queue push, so the audio path is never slowed.
-            if not self._awake:
-                if self._wake_enabled:
-                    det = self._wake_detector
-                    if det is not None:
-                        det.feed(indata)
+            # nothing leaves the machine). If wake word is disabled (Always Listening),
+            # assistant is unconditionally awake and listening.
+            if not self._wake_enabled:
+                self._awake = True
+            elif not self._awake:
+                det = self._wake_detector
+                if det is not None:
+                    det.feed(indata)
                 return
             with self._speaking_lock:
                 zezo_speaking = self._is_speaking  # noqa: F841
@@ -1793,14 +2013,36 @@ class ZezoLive:
 
         try:
             def _open_mic(dev):
-                return sd.InputStream(
-                    samplerate=SEND_SAMPLE_RATE,
-                    channels=CHANNELS,
-                    dtype="int16",
-                    blocksize=CHUNK_SIZE,
-                    device=dev,
-                    callback=callback,
-                )
+                try:
+                    return sd.InputStream(
+                        samplerate=SEND_SAMPLE_RATE,
+                        channels=CHANNELS,
+                        dtype="int16",
+                        blocksize=CHUNK_SIZE,
+                        device=dev,
+                        callback=callback,
+                    )
+                except Exception:
+                    # Fallback to device's native rate & channel count (e.g. WDM-KS 48000Hz stereo)
+                    info = sd.query_devices(dev) if dev is not None else {}
+                    native_sr = int(info.get("default_samplerate") or 48000)
+                    native_ch = int(info.get("max_input_channels") or 2)
+                    step = max(1, native_sr // SEND_SAMPLE_RATE)
+
+                    def _resampling_cb(indata, frames, time_info, status):
+                        mono = indata[:, 0] if (indata.ndim > 1 and indata.shape[1] > 1) else indata.reshape(-1)
+                        mono_16k = mono[::step]
+                        callback(mono_16k.reshape(-1, 1), len(mono_16k), time_info, status)
+
+                    return sd.InputStream(
+                        samplerate=native_sr,
+                        channels=native_ch,
+                        dtype="int16",
+                        blocksize=CHUNK_SIZE * step,
+                        device=dev,
+                        callback=_resampling_cb,
+                    )
+
 
             # Which microphone. resolve() returns None for "system default" and
             # for a saved device that is no longer present — so a headset
@@ -1809,21 +2051,36 @@ class ZezoLive:
             _mic_name = get_input_device()
             _mic_dev  = audio_devices.resolve(_mic_name, "input")
             if _mic_dev is not None:
-                print(f"[Zezo] 🎤 Input device: {_mic_name}")
+                print(f"[Zezo] 🎤 Input device: {_mic_name or _mic_dev}")
+
+            _mic_stream = None
             try:
-                _mic_stream = _open_mic(_mic_dev)
+                if _mic_dev is not None:
+                    _mic_stream = _open_mic(_mic_dev)
+                elif getattr(sd.default, "device", [-1])[0] != -1:
+                    _mic_stream = _open_mic(None)
             except Exception as _e:
-                # A device the picker listed but the driver will not open right
-                # now — exclusive mode, a webcam already in use, a virtual mic
-                # whose source went away. Chosen hardware failing must never
-                # mean the assistant cannot hear at all.
-                if _mic_dev is None:
-                    raise
-                print(f"[Zezo] ⚠️  Mic '{_mic_name}' failed: {_e} — using default")
-                self.ui.write_log(
-                    f"SYS: Microphone '{_mic_name}' unavailable — using system default."
-                )
-                _mic_stream = _open_mic(None)
+                print(f"[Zezo] ⚠️  Mic '{_mic_name or _mic_dev}' failed: {_e}")
+
+            # Fallback scan: if still not open, try any queryable input device
+            if _mic_stream is None:
+                try:
+                    for _idx, _d in enumerate(sd.query_devices()):
+                        if _d.get("max_input_channels", 0) > 0:
+                            try:
+                                _mic_stream = _open_mic(_idx)
+                                print(f"[Zezo] 🎤 Mic fell back to device {_idx}: {_d.get('name')}")
+                                break
+                            except Exception:
+                                continue
+                except Exception:
+                    pass
+
+            if _mic_stream is None:
+                print("[Zezo] ⚠️ No working microphone found or permission denied — running in silent/text mode (UI, Text, and Remote ready).")
+                self.ui.write_log("SYS: Microphone unavailable — running in text/remote mode.")
+                while True:
+                    await asyncio.sleep(2.0)
 
             with _mic_stream:
                 print("[Zezo] 🎤 Mic stream open")
@@ -1831,7 +2088,10 @@ class ZezoLive:
                     await asyncio.sleep(0.1)
         except Exception as e:
             print(f"[Zezo] ❌ Mic: {e}")
-            raise
+            # Keep task alive rather than crashing the whole live session TaskGroup
+            while True:
+                await asyncio.sleep(2.0)
+
 
     async def _flush_pending_vision(self) -> bool:
         """No-op: Vision analysis is executed out-of-band via REST in screen_process."""
@@ -1865,7 +2125,8 @@ class ZezoLive:
                         self._awaiting_speech_reply = False
                         self._awaiting_tool_reply = False
                         self._cancel_silence_watchdog()
-                        if self._interrupted:
+                        self._cancel_ptt_watchdog()
+                        if self._drop_assistant_audio():
                             pass  # discard: interrupted
                         else:
                             if self._turn_done_event and self._turn_done_event.is_set():
@@ -1881,9 +2142,12 @@ class ZezoLive:
                         sc = response.server_content
 
                         if sc.output_transcription and sc.output_transcription.text:
+                            if self._drop_assistant_audio():
+                                continue
                             self._awaiting_speech_reply = False
                             self._awaiting_tool_reply = False
                             self._cancel_silence_watchdog()
+                            self._cancel_ptt_watchdog()
                             txt = _clean_transcript(sc.output_transcription.text)
                             # Log user speech immediately as soon as model starts answering
                             if in_buf and not in_logged:
@@ -1928,6 +2192,16 @@ class ZezoLive:
                                 in_logged = False
                                 self._arm_silence_watchdog(accumulated_in)
 
+                                # ── Live Instant Confirmation Resolution ──
+                                if confirm_gate.pending_title():
+                                    norm_live = accumulated_in.lower()
+                                    if re.search(r"\b(yes|yeah|sure|confirm|proceed|install|haan|kardo|kar do|theek hai|bilkul|ok|okay)\b", norm_live):
+                                        print(f"[Confirm] 🎙️ Live speech confirmed: '{accumulated_in}'")
+                                        confirm_gate.resolve(accepted=True)
+                                    elif re.search(r"\b(no|nope|cancel|don't|dont|nah|nahi|mat karna|rehnedo|rehne do|reject)\b", norm_live):
+                                        print(f"[Confirm] 🎙️ Live speech rejected: '{accumulated_in}'")
+                                        confirm_gate.resolve(accepted=False)
+
                         if getattr(sc, "interrupted", False):
                             msg = "[Audio] ⚠️ server_content.interrupted received from Gemini Live (turn interrupted by server)"
                             print(f"[Zezo] {msg}")
@@ -1935,6 +2209,7 @@ class ZezoLive:
                                 log_bus.emit("WARNING", "audio.recv", msg)
                             self._interrupted = True
                             self._cancel_silence_watchdog()
+                            self.interrupt()
 
                         if sc.turn_complete:
                             self._awaiting_speech_reply = False
@@ -1944,14 +2219,25 @@ class ZezoLive:
 
                             # If this turn_complete ends an interrupted response, clear the
                             # flag and skip all further processing for that turn.
-                            if self._interrupted:
-                                self._interrupted = False
+                            if self._end_interrupted_turn():
+                                full_in = " ".join(in_buf).strip()
+                                if full_in and not in_logged:
+                                    self._last_user_in_logged = full_in
+                                    self._session_log.append(f"User: {full_in}")
+                                    try:
+                                        sqlite_memory.log_turn("user", full_in)
+                                    except Exception:
+                                        pass
                                 in_buf  = []
                                 out_buf = []
                                 in_logged = False
                                 self._visemes.reset()
                                 self.ui.stream_transcript("user", "", done=True)
                                 self.ui.stream_transcript("zezo", "", done=True)
+                                self._awaiting_tool_reply = False
+                                self._tool_busy = False
+                                if hasattr(self, "ui") and self.ui and not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
+                                    self.ui.set_state(self._get_resting_state())
                                 continue
 
                             full_in = " ".join(in_buf).strip()
@@ -1978,6 +2264,16 @@ class ZezoLive:
                                         "text": full_in,
                                         "ts": datetime.now().isoformat(),
                                     }))
+
+                                # ── Voice Confirmation Gate Hook ──
+                                if confirm_gate.pending_title():
+                                    norm_in = full_in.lower().strip()
+                                    if re.search(r"\b(yes|yeah|sure|confirm|proceed|install|haan|kardo|kar do|theek hai|bilkul|ok|okay)\b", norm_in):
+                                        print(f"[Confirm] 🎙️ Voice confirmed: '{full_in}'")
+                                        confirm_gate.resolve(accepted=True)
+                                    elif re.search(r"\b(no|nope|cancel|don't|dont|nah|nahi|mat karna|rehnedo|rehne do|reject)\b", norm_in):
+                                        print(f"[Confirm] 🎙️ Voice rejected: '{full_in}'")
+                                        confirm_gate.resolve(accepted=False)
                             else:
                                 self.ui.stream_transcript("user", "", done=True)
                             in_buf = []
@@ -1985,7 +2281,11 @@ class ZezoLive:
 
                             full_out = " ".join(out_buf).strip()
                             if full_out and len(full_out) >= _REPEAT_MIN and self._last_out_logged:
-                                if full_out in self._last_out_logged:
+                                # Reject both directions: new-in-old AND old-in-new.
+                                # The old check only caught the "new is contained in old"
+                                # case, so an identical repeat (old == new) slipped through.
+                                if full_out in self._last_out_logged or self._last_out_logged in full_out:
+                                    print(f"[Zezo] Suppressed duplicate turn: {full_out[:60]!r}")
                                     full_out = ""
                             if full_out:
                                 self._last_out_logged = full_out
@@ -2044,6 +2344,12 @@ class ZezoLive:
                                 print(f"[Zezo] 📞 {fc.name}")
                                 fr = await self._execute_tool(fc)
                                 fn_responses.append(fr)
+                                try:
+                                    cid = getattr(fc, "id", None)
+                                    if cid is not None and cid in self._tool_ledger:
+                                        self._tool_ledger[cid]["delivered"] = True
+                                except Exception:
+                                    pass
                             try:
                                 await self.session.send_tool_response(
                                     function_responses=fn_responses
@@ -2080,8 +2386,12 @@ class ZezoLive:
             raise
         finally:
             self._cancel_silence_watchdog()
+            self._cancel_ptt_watchdog()
+            self._awaiting_speech_reply = False
             self._tool_busy = False
             self._awaiting_tool_reply = False
+            if hasattr(self, "ui") and self.ui and not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
+                self.ui.set_state(self._get_resting_state())
 
     async def _play_audio(self):
         print("[Zezo] 🔊 Play started")
@@ -2096,36 +2406,54 @@ class ZezoLive:
                 samplerate=RECEIVE_SAMPLE_RATE,
                 channels=CHANNELS,
                 dtype="int16",
-                blocksize=CHUNK_SIZE,
+                blocksize=0,
                 device=dev,
             )
             st.start()
             return st
 
+        stream = None
         try:
-            stream = _open_spk(_spk_dev)
+            if _spk_dev is not None:
+                stream = _open_spk(_spk_dev)
+            elif getattr(sd.default, "device", [-1, -1])[1] != -1:
+                stream = _open_spk(None)
         except Exception as _e:
-            # A chosen output that the host API accepts by name but refuses to
-            # open (exclusive mode, wrong sample rate, device asleep) must not
-            # cost the user their voice. Fall back to the default and say so.
-            if _spk_dev is None:
-                raise
-            print(f"[Zezo] ⚠️  Output device '{_spk_name}' failed: {_e} — using default")
-            self.ui.write_log(f"SYS: Speaker '{_spk_name}' unavailable — using system default.")
-            stream = _open_spk(None)
+            print(f"[Zezo] ⚠️  Output device '{_spk_name or _spk_dev}' failed: {_e} — trying default")
+            try:
+                if getattr(sd.default, "device", [-1, -1])[1] != -1:
+                    stream = _open_spk(None)
+            except Exception:
+                pass
 
-        # Ask the device how far behind the speakers actually are, rather than
-        # assuming. This is what the echo tail is sized from, so a machine with a
-        # large audio buffer gets a correspondingly longer guard — and one with a
-        # tiny buffer is not penalised with a delay it does not need.
-        try:
-            lat = float(getattr(stream, "latency", 0.0) or 0.0)
-            if 0.0 < lat < 1.0:
-                self._out_latency = lat
-            print(f"[Zezo] 🔊 Output latency {self._out_latency*1000:.0f} ms "
-                  f"→ echo tail {(self._out_latency + _TAIL_MARGIN)*1000:.0f} ms")
-        except Exception:
-            pass
+        if stream is None:
+            try:
+                for _idx, _d in enumerate(sd.query_devices()):
+                    if _d.get("max_output_channels", 0) > 0:
+                        try:
+                            stream = _open_spk(_idx)
+                            print(f"[Zezo] 🔊 Output fell back to device {_idx}: {_d.get('name')}")
+                            break
+                        except Exception:
+                            continue
+            except Exception:
+                pass
+
+        if stream is None:
+            print("[Zezo] ⚠️ Audio output unavailable — running in visual/text mode")
+            self.ui.write_log("SYS: Speaker unavailable — running in visual/text mode.")
+
+        # Sizing the echo tail from reported stream latency (if available)
+        if stream is not None:
+            try:
+                lat = float(getattr(stream, "latency", 0.0) or 0.0)
+                if 0.0 < lat < 1.0:
+                    self._out_latency = lat
+                print(f"[Zezo] 🔊 Output latency {self._out_latency*1000:.0f} ms "
+                      f"→ echo tail {(self._out_latency + _TAIL_MARGIN)*1000:.0f} ms")
+            except Exception:
+                pass
+
 
         try:
             while True:
@@ -2141,11 +2469,15 @@ class ZezoLive:
                             self._turn_done_event.clear()
                     continue
 
-                # Gate assistant speech playback while user is still holding PTT chord
-                while getattr(self, "_ptt_enabled", False) and getattr(self, "_ptt_held", False):
-                    await asyncio.sleep(0.05)
-
-                if self._interrupted:
+                # Hold the answer back while the chord is down and speak it the
+                # moment the user releases; drop only an interrupted turn's
+                # remnants. See _await_playback_allowed.
+                if not await self._await_playback_allowed():
+                    while not self.audio_in_queue.empty():
+                        try:
+                            self.audio_in_queue.get_nowait()
+                        except Exception:
+                            break
                     continue
 
                 self._awaiting_speech_reply = False
@@ -2214,7 +2546,8 @@ class ZezoLive:
 
                 try:
                     if not getattr(self.ui, "speaker_muted", False):
-                        await asyncio.to_thread(stream.write, bytes(batch))
+                        if stream is not None:
+                            await asyncio.to_thread(stream.write, bytes(batch))
                 except (RuntimeError, asyncio.CancelledError):
                     break   # executor shutting down — exit cleanly
         except Exception as e:
@@ -2222,8 +2555,13 @@ class ZezoLive:
             raise
         finally:
             self.set_speaking(False)
-            stream.stop()
-            stream.close()
+            if stream is not None:
+                try:
+                    stream.stop()
+                    stream.close()
+                except Exception:
+                    pass
+
 
     # ── Morning briefing ────────────────────────────────────────────────────────
 
@@ -2618,6 +2956,29 @@ class ZezoLive:
 
     # ── dashboard command relay ─────────────────────────────────────────────
 
+    async def _start_tunnel(self) -> None:
+        """Auto-start a free Cloudflare tunnel and publish its URL to the dashboard."""
+        try:
+            if self._tunnel is None:
+                return
+            if not self._tunnel.available:
+                print("[Tunnel] cloudflared not installed — remote stays LAN-only.")
+                print("[Tunnel] Install with: winget install Cloudflare.cloudflared")
+                return
+            print("[Tunnel] Starting free Cloudflare tunnel...", flush=True)
+            url = await self._tunnel.start()
+            if url and self._dashboard is not None:
+                self._dashboard.set_public_url(url)
+                print(f"[Tunnel] Ready: {url}", flush=True)
+                try:
+                    await self._dashboard.broadcast({"type": "sys", "text": f"Remote tunnel ready: {url}"})
+                except Exception:
+                    pass
+            else:
+                print(f"[Tunnel] Failed: {self._tunnel.error}")
+        except Exception as e:
+            print(f"[Tunnel] Error: {e}")
+
     async def _process_dashboard_commands(self) -> None:
         while True:
             try:
@@ -2716,6 +3077,31 @@ class ZezoLive:
                 )
             else:
                 self.ui.write_log(f"FILE: {name} ({size:,} bytes) attached. Ask me to read it whenever you want.")
+
+            # Live AI session context injection so ZEZO knows the attached file/folder immediately
+            if self.session and hasattr(self.session, "send_client_content"):
+                try:
+                    if file_info.get("is_folder"):
+                        notice = (
+                            f"[SYSTEM CONTEXT UPDATE]\n"
+                            f"The user has selected workspace folder '{name}' located at '{path}'. "
+                            f"Total files: {file_info.get('files_count', 0)}. "
+                            f"You now have active awareness of this folder. When the user asks about the selected or active folder or project, refer to this."
+                        )
+                    else:
+                        notice = (
+                            f"[SYSTEM CONTEXT UPDATE]\n"
+                            f"The user has attached file '{name}' at '{path}' ({size:,} bytes). "
+                            f"You now have active awareness of this file."
+                        )
+                    asyncio.create_task(
+                        self.session.send_client_content(
+                            turns=[{"role": "user", "parts": [{"text": notice}]}],
+                            turn_complete=False,
+                        )
+                    )
+                except Exception as ex:
+                    print(f"[DesktopUpload] Live context injection error: {ex}")
         except Exception as e:
             print(f"[DesktopUpload] Error handling file upload: {e}")
 
@@ -2771,6 +3157,7 @@ class ZezoLive:
                 print(f"[Audio] {_kind} device auto-detect skipped: {_e}")
 
         # Start mobile remote gateway (optional — needs: pip install fastapi "uvicorn[standard]" cryptography)
+        self._tunnel = None
         try:
             from remote.server import DashboardServer
             self._dashboard = DashboardServer()
@@ -2780,6 +3167,22 @@ class ZezoLive:
             asyncio.create_task(self._dashboard.serve())
             # Runs for the whole lifetime, not just inside an active session
             asyncio.create_task(self._process_dashboard_commands())
+
+            # Auto-start a free Cloudflare tunnel so non-technical users can
+            # scan the QR code and access ZEZO from anywhere without a terminal.
+            try:
+                from core.tunnel_manager import TunnelManager
+                self._tunnel = TunnelManager(local_url=f"http://localhost:8000")
+                # Expose to web UI server for status reporting
+                try:
+                    from core.ui_server import get_ui_server
+                    get_ui_server().tunnel_manager = self._tunnel
+                except Exception as _e:
+                    print(f"[Tunnel] Could not expose to ui_server: {_e}")
+                asyncio.create_task(self._start_tunnel())
+            except Exception as _te:
+                print(f"[Tunnel] Disabled: {_te}")
+                self._tunnel = None
         except Exception as e:
             print(f"[Remote] Disabled: {e}")
             self._dashboard = None
@@ -2977,7 +3380,9 @@ class ZezoLive:
                         "Check your plan or billing in Google AI Studio."
                     )
                     print(f"[Zezo] ⚠️ Quota exceeded — backing off for {_conn_backoff}s...")
+                    await asyncio.sleep(_conn_backoff)
                     continue
+
 
                 # Network / timeout errors — log clearly and back off
                 is_net_err = any(k in err_str for k in (
@@ -3016,6 +3421,13 @@ class ZezoLive:
             print(f"[Zezo] Reconnecting in {delay}s...")
             await asyncio.sleep(delay)
 
+        # Cleanup auto-started tunnel on exit
+        try:
+            if getattr(self, "_tunnel", None) is not None:
+                await self._tunnel.stop()
+        except Exception:
+            pass
+
 def main():
     # ── Single-instance guard ────────────────────────────────────────────────
     # Two copies of ZEZO mean two audio engines, two WebEngine renderers, two
@@ -3043,10 +3455,11 @@ def main():
         Chromium) that are missing, off the GUI thread. A no-op when everything
         is already present, so ordinary launches do nothing here."""
         try:
-            from core.installer import ensure_requirements, ensure_playwright_browsers
+            from core.installer import ensure_requirements, ensure_playwright_browsers, ensure_agent_browser
             _log = lambda m: ui.write_log(m)
             if ensure_requirements(_log):
                 ensure_playwright_browsers(_log)
+            ensure_agent_browser(_log)
             # Guarantee single-terminal: build modern React frontend if dist is missing
             react_dist = Path(__file__).resolve().parent / "frontend" / "dist"
             frontend_dir = Path(__file__).resolve().parent / "frontend"

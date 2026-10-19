@@ -14,8 +14,8 @@ $$\text{L0: Fast Win32 State (1ms)} \longrightarrow \text{L1: Windows UIA (<15ms
 
 | Module | Purpose | Key Capabilities |
 | :--- | :--- | :--- |
-| `windows_native.py` | Win32 OS Integration | Window enumeration, focus switching (`AttachThreadInput`), physical bounds calibration via `DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS=9)`, safe closing (`WM_CLOSE`), DPI awareness initialization (`SetProcessDPIAware`). |
-| `windows_uia.py` | Windows UI Automation (L1 UIA) | Fast accessibility tree inspection (< 15ms, `searchDepth=6`) inside STA COM `ThreadPoolExecutor` worker with strict 0.8s timeout boundaries. Finds native buttons, edits, tabs, and list items. |
+| `windows_native.py` | Win32 OS Integration | Window enumeration, state-preserving focus switching (`AttachThreadInput` + `IsIconic`/`IsZoomed` → `SW_RESTORE`/`SW_MAXIMIZE`/`SW_SHOW`, so maximized windows never shrink), physical bounds calibration via `DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS=9)`, safe closing (`WM_CLOSE`), DPI awareness initialization (`SetProcessDPIAware`). |
+| `windows_uia.py` | Windows UI Automation (L1 UIA) | Fast accessibility tree inspection (< 15ms, `searchDepth=6`) inside STA COM `ThreadPoolExecutor` worker with strict 0.8s timeout boundaries. Finds native buttons, edits, tabs, and list items. Includes real browser tab discovery (`get_browser_tabs`) and switch-by-title (`switch_tab_by_title`) for live desktop Chrome. |
 | `ocr_engine.py` | Multilingual CPU OCR (L1.5 RapidOCR) | Sub-80ms CPU ONNX text detection and spatial bounding box extraction with **0 MB GPU VRAM footprint** (~80MB RAM). Unicode Urdu/Arabic normalization `normalize_urdu()` (tashkeel stripping, yeh/kaf/heh unification) and fuzzy matching (`fuzzy_threshold=0.75`). |
 | `pyautogui_driver.py` | Hardware Input Driver | Mouse/keyboard input with `POST_MOVE_VERIFY`, action aliases (`enter`, `escape`, `space`, `backspace`, `tab`, `delete`), and safe multilingual Unicode typing. |
 

@@ -254,6 +254,16 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)
         self.web_view.setAcceptDrops(True)
 
+        # Grant WebEngine media capture permissions (e.g. microphone testing)
+        self._web_page.featurePermissionRequested.connect(
+            lambda origin, feature: self._web_page.setFeaturePermission(
+                origin, feature, QWebEnginePage.PermissionPolicy.PermissionGrantedByUser
+            )
+        )
+        # Wait briefly for local UI server to start listening
+        if hasattr(self._server, "_ready_event"):
+            self._server._ready_event.wait(timeout=3.0)
+
         # Load local web app from UI server
         server_url = f"http://127.0.0.1:{self._server.port}/"
         self.web_view.load(QUrl(server_url))
@@ -268,6 +278,10 @@ class MainWindow(QMainWindow):
         # Global Hotkeys
         sc_mute = QShortcut(QKeySequence("F4"), self)
         sc_mute.activated.connect(self._toggle_mute)
+        sc_reload = QShortcut(QKeySequence("F5"), self)
+        sc_reload.activated.connect(self.web_view.reload)
+        sc_ctrl_r = QShortcut(QKeySequence("Ctrl+R"), self)
+        sc_ctrl_r.activated.connect(self.web_view.reload)
         sc_full = QShortcut(QKeySequence("F11"), self)
         sc_full.activated.connect(self._toggle_fullscreen)
         sc_intr = QShortcut(QKeySequence("Escape"), self)
@@ -447,14 +461,6 @@ class MainWindow(QMainWindow):
         return f"http://127.0.0.1:{self._server.port}", "8F3A-9K2L"
 
     def _get_initial_state(self) -> dict:
-        state_str = "MUTED" if self._muted else ("SLEEPING" if self._sleeping else "LISTENING")
-        tasks = []
-        try:
-            from core.task_manager import get_task_manager
-            tasks = get_task_manager().list_tasks()
-        except Exception:
-            pass
-
         from memory.config_manager import (
             get_assistant_name, get_voice, get_response_language,
             get_autostart_enabled, get_brief_enabled,
@@ -465,6 +471,25 @@ class MainWindow(QMainWindow):
             get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
             AVAILABLE_LANGUAGES, AVAILABLE_VOICES,
         )
+
+        if self._muted:
+            state_str = "MUTED"
+        elif self._sleeping:
+            state_str = "SLEEPING"
+        elif get_push_to_talk_enabled():
+            state_str = "IDLE"
+        elif get_wake_word_enabled():
+            state_str = "IDLE"
+        else:
+            state_str = "LISTENING"
+
+        tasks = []
+        try:
+            from core.task_manager import get_task_manager
+            tasks = get_task_manager().list_tasks()
+        except Exception:
+            pass
+
         return {
             "state": state_str,
             "muted": self._muted,
@@ -910,11 +935,16 @@ class ZezoUI:
     def hide_quiz(self):
         pass
 
-    def show_confirm(self, title: str, detail: str) -> None:
+    def show_confirm(self, title: str, detail: str, key: str = "", variant: str = "default") -> None:
         if not self.is_alive():
             return
         try:
-            self._win._server.broadcast("confirm_request", {"title": title, "detail": detail})
+            self._win._server.broadcast("confirm_request", {
+                "title": title,
+                "detail": detail,
+                "key": key,
+                "variant": variant,
+            })
         except (RuntimeError, AttributeError):
             pass
 

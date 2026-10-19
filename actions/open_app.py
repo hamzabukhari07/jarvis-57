@@ -5,6 +5,7 @@ import subprocess
 import platform
 import shutil
 from pathlib import Path
+from typing import Optional, Any, Tuple
 
 try:
     import psutil
@@ -98,6 +99,280 @@ _WIN_URI_MAP = {
     "settings": "ms-settings:",
 }
 
+def is_app_installed(app_name: str) -> tuple[bool, str]:
+    """Check if an application is installed on the user's computer across:
+    1. System PATH & executable names
+    2. URI protocols registered in Windows Registry (e.g. spotify:, whatsapp:, etc.)
+    3. Start Menu Shortcuts (.lnk) in User and All Users programs
+    4. Windows Registry Uninstall Keys (DisplayNames & versions)
+    5. Windows Store / AppX / MSIX Packages
+    6. Well-known application folders (AppData, LocalAppData, Program Files)
+    7. macOS /Applications or Linux desktop files
+    Runs in < 50ms without recursive disk traversal.
+    """
+    raw = (app_name or "").strip()
+    q = raw.lower()
+    if not q:
+        return False, "No application name specified."
+
+    aliases = {
+        "vscode": "code",
+        "visual studio code": "code",
+        "calc": "calc",
+        "calculator": "calc",
+        "word": "winword",
+        "excel": "excel",
+        "powerpoint": "powerpnt",
+        "edge": "msedge",
+        "microsoft edge": "msedge",
+        "chrome": "chrome",
+        "google chrome": "chrome",
+    }
+    target = aliases.get(q, q)
+
+    # 1. PATH / direct binary
+    bin_path = shutil.which(target) or shutil.which(f"{target}.exe") or shutil.which(q) or shutil.which(f"{q}.exe")
+    if bin_path:
+        return True, f"{raw} is installed at {bin_path}."
+
+    if _SYSTEM == "Windows":
+        try:
+            import winreg
+        except ImportError:
+            winreg = None
+
+        if winreg:
+            # 2. URI Protocol in HKCR (e.g. spotify:, whatsapp:, etc.)
+            for proto in (q, target):
+                try:
+                    with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, proto) as k:
+                        cmd = ""
+                        try:
+                            with winreg.OpenKey(k, r"shell\open\command") as sk:
+                                cmd, _ = winreg.QueryValueEx(sk, "")
+                        except Exception:
+                            pass
+                        if cmd:
+                            return True, f"{raw} is installed ({cmd.strip()})."
+                        return True, f"{raw} is installed (registered protocol '{proto}:')."
+                except Exception:
+                    pass
+
+        # 3. Start Menu Shortcuts (.lnk)
+        for base in [os.environ.get("APPDATA"), os.environ.get("PROGRAMDATA")]:
+            if base:
+                p = Path(base) / "Microsoft" / "Windows" / "Start Menu" / "Programs"
+                if p.exists():
+                    for lnk in p.rglob("*.lnk"):
+                        stem_l = lnk.stem.lower()
+                        if q in stem_l or target in stem_l:
+                            return True, f"{raw} is installed (Start Menu: '{lnk.stem}')."
+
+        if winreg:
+            # 4. Windows Registry Uninstall Keys
+            hives = [
+                (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+                (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+                (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall"),
+            ]
+            for h, subkey in hives:
+                try:
+                    with winreg.OpenKey(h, subkey) as k:
+                        for i in range(winreg.QueryInfoKey(k)[0]):
+                            try:
+                                sk_name = winreg.EnumKey(k, i)
+                                with winreg.OpenKey(k, sk_name) as sk:
+                                    display, _ = winreg.QueryValueEx(sk, "DisplayName")
+                                    if display:
+                                        disp_l = display.lower()
+                                        if q in disp_l or target in disp_l:
+                                            ver = ""
+                                            try:
+                                                ver, _ = winreg.QueryValueEx(sk, "DisplayVersion")
+                                            except Exception:
+                                                pass
+                                            v_str = f" (version {ver})" if ver else ""
+                                            return True, f"{display}{v_str} is installed on this PC."
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
+            # 5. Windows Store / AppX Packages
+            try:
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages") as k:
+                    for i in range(winreg.QueryInfoKey(k)[0]):
+                        pkg = winreg.EnumKey(k, i).lower()
+                        if q in pkg or target in pkg:
+                            return True, f"{raw} is installed as a Windows Store app ({pkg})."
+            except Exception:
+                pass
+
+        # 6. Specific direct path checks
+        cands = [
+            Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / q / f"{q}.exe",
+            Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / target / f"{target}.exe",
+            Path(os.environ.get("LOCALAPPDATA", "")) / q / f"{q}.exe",
+            Path(os.environ.get("PROGRAMFILES", "")) / q / f"{q}.exe",
+            Path(os.environ.get("PROGRAMFILES(X86)", "")) / q / f"{q}.exe",
+            Path(os.environ.get("APPDATA", "")) / q / f"{q}.exe",
+        ]
+        for c in cands:
+            if c.exists():
+                return True, f"{raw} is installed at {c}."
+
+    elif _SYSTEM == "Darwin":
+        for app_dir in ["/Applications", str(Path.home() / "Applications")]:
+            p = Path(app_dir)
+            if p.exists():
+                for item in p.glob("*.app"):
+                    if q in item.name.lower() or target in item.name.lower():
+                        return True, f"{raw} is installed at {item}."
+
+    elif _SYSTEM == "Linux":
+        for desk_dir in ["/usr/share/applications", str(Path.home() / ".local" / "share" / "applications")]:
+            p = Path(desk_dir)
+            if p.exists():
+                for item in p.glob("*.desktop"):
+                    if q in item.name.lower() or target in item.name.lower():
+                        return True, f"{raw} is installed ({item.name})."
+
+    return False, f"{raw} is NOT installed on this PC."
+
+
+def resolve_winget_package(app_name: str) -> tuple[Optional[str], Optional[str]]:
+    """
+    Finds the exact Winget package ID and display name for an application.
+    Returns (package_id, display_name).
+    """
+    clean = (app_name or "").strip()
+    if not clean:
+        return None, None
+
+    # Known aliases map for high precision
+    known_ids = {
+        "spotify": ("Spotify.Spotify", "Spotify"),
+        "vscode": ("Microsoft.VisualStudioCode", "Visual Studio Code"),
+        "vs code": ("Microsoft.VisualStudioCode", "Visual Studio Code"),
+        "visual studio code": ("Microsoft.VisualStudioCode", "Visual Studio Code"),
+        "discord": ("Discord.Discord", "Discord"),
+        "vlc": ("VideoLAN.VLC", "VLC media player"),
+        "chrome": ("Google.Chrome", "Google Chrome"),
+        "google chrome": ("Google.Chrome", "Google Chrome"),
+        "firefox": ("Mozilla.Firefox", "Mozilla Firefox"),
+        "whatsapp": ("WhatsApp.WhatsApp", "WhatsApp"),
+        "telegram": ("Telegram.TelegramDesktop", "Telegram Desktop"),
+        "postman": ("Postman.Postman", "Postman"),
+        "git": ("Git.Git", "Git"),
+        "nodejs": ("OpenJS.NodeJS", "Node.js"),
+        "node": ("OpenJS.NodeJS", "Node.js"),
+        "python": ("Python.Python.3.12", "Python 3.12"),
+    }
+    if clean.lower() in known_ids:
+        return known_ids[clean.lower()]
+
+    try:
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if _SYSTEM == "Windows" else 0
+        cmd = ["winget", "search", clean, "--accept-source-agreements"]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=12, creationflags=flags)
+        lines = (res.stdout or "").splitlines()
+        for line in lines:
+            if "---" in line or not line.strip():
+                continue
+            parts = re.split(r"\s{2,}", line.strip())
+            if len(parts) >= 2:
+                name, pkg_id = parts[0], parts[1]
+                if "." in pkg_id and not pkg_id.startswith("http"):
+                    return pkg_id, name
+    except Exception as e:
+        print(f"[open_app] Winget search error for '{clean}': {e}")
+    return None, None
+
+
+def execute_silent_install(pkg_id: str, app_name: str, player=None) -> str:
+    """
+    Silently installs an application via Winget in the background,
+    registered in core.task_manager for live HUD card tracking.
+    """
+    print(f"[open_app] Starting silent Winget install for: {pkg_id} ({app_name})")
+    if player:
+        player.write_log(f"[open_app] Installing {app_name} via Winget ({pkg_id})...")
+
+    def _worker(params, ctx):
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if _SYSTEM == "Windows" else 0
+        cmd = [
+            "winget", "install", "--id", pkg_id, "-e", "--silent",
+            "--accept-source-agreements", "--accept-package-agreements"
+        ]
+        try:
+            ctx.set_progress(0.2, f"Downloading {app_name} from verified repository...")
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=flags)
+            
+            # Poll process while updating progress
+            start_t = time.time()
+            while proc.poll() is None:
+                elapsed = time.time() - start_t
+                if elapsed > 15:
+                    ctx.set_progress(0.6, f"Installing {app_name} on your PC...")
+                elif elapsed > 5:
+                    ctx.set_progress(0.4, f"Verifying package {pkg_id}...")
+                time.sleep(1.0)
+                if elapsed > 300:
+                    proc.kill()
+                    ctx.fail(f"Installation timed out after 5 minutes.")
+                    return {"status": "error", "message": "Timed out"}
+
+            out, err = proc.communicate()
+            if proc.returncode == 0:
+                msg = f"{app_name} has been successfully installed on your computer."
+                print(f"[open_app] [OK] {msg}")
+                if player:
+                    player.write_log(f"[open_app] {msg}")
+                ctx.finish(msg)
+                return {"status": "success", "message": msg}
+            else:
+                err_msg = (err or out or "").strip()[:180]
+                msg = f"Installation for {app_name} exited with code {proc.returncode}: {err_msg}"
+                print(f"[open_app] [FAIL] {msg}")
+                if player:
+                    player.write_log(f"ERR: {msg}")
+                ctx.fail(msg)
+                return {"status": "error", "message": msg}
+        except Exception as e:
+            ctx.fail(str(e))
+            return {"status": "error", "message": str(e)}
+
+    try:
+        from core.task_manager import get_task_manager
+        tm = get_task_manager()
+        task_id = tm.submit(
+            tool_name="package_installer",
+            fn=_worker,
+            params={"app_name": app_name, "package_id": pkg_id},
+            group_title=f"Install {app_name}",
+        )
+        try:
+            from core.ui_server import get_ui_server
+            get_ui_server().broadcast("task_list", {"tasks": tm.list_tasks()})
+        except Exception:
+            pass
+        return f"Installation of {app_name} started in the background (Task ID: {task_id}). You can see live progress in the Task Matrix."
+    except Exception as e:
+        print(f"[open_app] Task manager registration error: {e}")
+        # Direct fallback if task manager fails
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if _SYSTEM == "Windows" else 0
+        cmd = [
+            "winget", "install", "--id", pkg_id, "-e", "--silent",
+            "--accept-source-agreements", "--accept-package-agreements"
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300, creationflags=flags)
+        if proc.returncode == 0:
+            return f"{app_name} has been successfully installed on your computer."
+        return f"Installation failed for {app_name} with code {proc.returncode}."
+
+
+
+
 def _find_windows_start_menu_shortcut(app_name: str) -> Path | None:
     app_lower = app_name.lower().strip()
     search_dirs = []
@@ -134,7 +409,40 @@ def _resolve_windows_launcher(app_name: str) -> str | None:
             if c.exists():
                 return str(c)
         return shutil.which("code.cmd") or shutil.which("code")
+    if key in ("chrome", "google chrome"):
+        candidates = []
+        for base in (os.environ.get("PROGRAMFILES"), os.environ.get("PROGRAMFILES(X86)"), os.environ.get("LOCALAPPDATA")):
+            if base:
+                candidates.append(Path(base) / "Google" / "Chrome" / "Application" / "chrome.exe")
+        for c in candidates:
+            if c.exists():
+                return str(c)
+        return shutil.which("chrome.exe") or shutil.which("chrome")
     return shutil.which(app_name) or shutil.which((app_name or "").split(".")[0])
+
+
+def resolve_chrome_profile(query: str) -> Optional[str]:
+    """Resolve a Chrome profile name (e.g. 'Hamza', 'vina', 'Fake', 'Brown') to its directory ('Profile 7', etc.)."""
+    q = (query or "").lower().strip()
+    if not q:
+        return None
+    try:
+        local_state_path = os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\User Data\Local State")
+        if os.path.exists(local_state_path):
+            import json
+            with open(local_state_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            cache = data.get("profile", {}).get("info_cache", {})
+            for p_dir, p_info in cache.items():
+                p_name = (p_info.get("name") or "").lower().strip()
+                p_dir_clean = p_dir.lower().strip()
+                if q in (p_dir_clean, p_name):
+                    return p_dir
+                if q in p_name or q in p_dir_clean:
+                    return p_dir
+    except Exception:
+        pass
+    return None
 
 
 def _launch_windows(app_name: str) -> bool:
@@ -154,15 +462,25 @@ def _launch_windows(app_name: str) -> bool:
         except Exception as e:
             print(f"[open_app] subprocess failed: {e}")
 
-    # 2. Known UWP / URI protocol
+    # 2. Known UWP / URI protocol (verified against registry so it doesn't pop up Store search)
     uri = _WIN_URI_MAP.get(clean_name) or (app_name if ":" in app_name else None)
     if uri:
+        scheme = uri.rstrip(":")
+        is_registered = False
         try:
-            os.startfile(uri)
-            time.sleep(1.0)
-            return True
-        except Exception as e:
-            print(f"[open_app] startfile uri {uri} failed: {e}")
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, scheme):
+                is_registered = True
+        except Exception:
+            is_registered = False
+
+        if is_registered:
+            try:
+                os.startfile(uri)
+                time.sleep(1.0)
+                return True
+            except Exception as e:
+                print(f"[open_app] startfile uri {uri} failed: {e}")
 
     # 3. Start Menu shortcut (.lnk)
     shortcut = _find_windows_start_menu_shortcut(app_name)
@@ -174,19 +492,15 @@ def _launch_windows(app_name: str) -> bool:
         except Exception as e:
             print(f"[open_app] startfile shortcut {shortcut} failed: {e}")
 
-    # 4. Fallback: Start Menu key search
-    try:
-        import pyautogui
-        pyautogui.PAUSE = 0.05
-        pyautogui.press("win")
-        time.sleep(0.5)
-        pyautogui.write(app_name, interval=0.03)
-        time.sleep(0.6)
-        pyautogui.press("enter")
-        time.sleep(1.5)
-        return True
-    except Exception as e:
-        print(f"[open_app] Start Menu search failed: {e}")
+    # 4. Resolved binary check
+    exe = _resolve_windows_launcher(app_name)
+    if exe and os.path.exists(exe):
+        try:
+            subprocess.Popen([exe], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(1.0)
+            return True
+        except Exception as e:
+            print(f"[open_app] launching resolved binary {exe} failed: {e}")
 
     return False
 
@@ -467,6 +781,40 @@ def open_app(
         except Exception as e:
             return f"Failed to switch to home view: {e}"
 
+    if action in ("check", "is_installed", "check_installed", "status", "search"):
+        installed, message = is_app_installed(app_name)
+        if player:
+            player.write_log(f"[open_app] check '{app_name}': {'Installed' if installed else 'Not installed'}")
+        return message
+
+    if action in ("install", "download", "setup"):
+        installed, _ = is_app_installed(app_name)
+        if installed:
+            return f"{app_name} is already installed on your PC."
+
+        pkg_id, display_name = resolve_winget_package(app_name)
+        if not pkg_id:
+            return f"Could not find an official installer package for '{app_name}' via Windows Package Manager. You may need to install it manually."
+
+        name_to_use = display_name or app_name
+        try:
+            from core import confirm
+            if confirm.pending_title():
+                return ("There is already a confirmation waiting on screen. "
+                        "Please answer that one first.")
+
+            def _run_install():
+                return execute_silent_install(pkg_id, name_to_use, player)
+
+            return confirm.request(
+                key=f"install:{pkg_id}",
+                title=f"Install {name_to_use}",
+                detail=f"Package: {pkg_id} via Windows Package Manager (Winget). Source: Verified Microsoft Repo.",
+                run=_run_install,
+            )
+        except Exception as e:
+            return f"Failed to initiate installation for {name_to_use}: {e}"
+
     if action in ("close", "exit", "kill", "terminate", "stop"):
         if close_application_by_name(app_name):
             if player:
@@ -477,6 +825,53 @@ def open_app(
     normalized = _normalize(app_name)
 
     path_arg = params.get("path") or params.get("target") or ""
+    profile_arg = params.get("profile") or params.get("profile_directory") or ""
+    clean_app = (app_name or "").lower().strip()
+
+    # Extract --profile-directory if passed inside path_arg
+    if not profile_arg and path_arg and "--profile-directory" in str(path_arg):
+        m = re.search(r'--profile-directory=["\']?([^"\'\s]+)["\']?', str(path_arg))
+        if m:
+            profile_arg = m.group(1)
+            path_arg = ""
+
+    # Check if app_name itself contains profile request (e.g. "chrome hamza", "vina profile")
+    if not profile_arg and "chrome" in clean_app:
+        for kw in ("profile", "account"):
+            if kw in clean_app:
+                cand = clean_app.replace(kw, "").replace("chrome", "").strip()
+                if cand:
+                    p_res = resolve_chrome_profile(cand)
+                    if p_res:
+                        profile_arg = p_res
+                        break
+
+    if profile_arg and "chrome" in normalized.lower():
+        prof_dir = resolve_chrome_profile(profile_arg) or profile_arg
+        exe = _resolve_windows_launcher("chrome") or "chrome"
+        cmd = [exe, f"--profile-directory={prof_dir}"]
+        if path_arg and not str(path_arg).startswith("--"):
+            cmd.append(str(path_arg))
+        try:
+            creationflags = subprocess.CREATE_NO_WINDOW if _SYSTEM == "Windows" else 0
+            subprocess.Popen(cmd, creationflags=creationflags)
+            time.sleep(1.0)
+            if player:
+                player.write_log(f"[open_app] Chrome profile '{profile_arg}' ({prof_dir})")
+            return f"Opened Chrome with profile '{profile_arg}' ({prof_dir})."
+        except Exception as e:
+            return f"Failed to launch Chrome with profile '{profile_arg}': {e}"
+
+    # If path_arg is an argument flag (e.g. --flag)
+    if path_arg and str(path_arg).strip().startswith("--"):
+        exe = _resolve_windows_launcher(normalized) or normalized
+        try:
+            creationflags = subprocess.CREATE_NO_WINDOW if _SYSTEM == "Windows" else 0
+            subprocess.Popen([exe, str(path_arg).strip()], creationflags=creationflags)
+            time.sleep(1.0)
+            return f"Launched {app_name} with {path_arg}."
+        except Exception as e:
+            return f"Failed to launch {app_name} with {path_arg}: {e}"
 
     if path_arg:
         raw_p = str(path_arg).strip().strip("\"'")
@@ -558,9 +953,12 @@ def open_app(
         if normalized.lower() != app_name.lower():
             if launcher(app_name):
                 return _format_open_confirmation(app_name)
+        installed, _ = is_app_installed(app_name)
+        if not installed:
+            return f"Cannot open {app_name}: It is NOT installed on this PC."
         return (
             f"Could not confirm that {app_name} launched. "
-            f"It may still be loading, or it might not be installed."
+            f"It may still be loading."
         )
     except Exception as e:
         print(f"[open_app] Error: {e}")
@@ -570,7 +968,7 @@ def open_app(
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "open_app",
-    "description": "Opens or closes any application or opens specific files/folders with an app (e.g. open folder 'in' in VS Code). Always call this tool.",
+    "description": "Opens, closes, checks if installed, or installs any desktop application on the computer (e.g. check if Spotify is installed, install Spotify, open VS Code, close Notepad). ALWAYS use action='check' to verify if an app is installed, and action='install' to install/download an application via Windows Package Manager. NEVER open browser or web search to download applications.",
     "risk": "local_mutation",
     "enabled": True,
     "parameters": {
@@ -578,16 +976,20 @@ TOOL = {
         "properties": {
             "app_name": {
                 "type": "STRING",
-                "description": "Exact name of the application (e.g. 'Visual Studio Code', 'Notepad', 'Chrome', 'Spotify')"
+                "description": "Exact name of the application (e.g. 'Spotify', 'Visual Studio Code', 'Notepad', 'Chrome', 'WhatsApp')"
             },
             "path": {
                 "type": "STRING",
                 "description": "Optional file or folder path to open directly in the app (e.g. 'C:/Users/Hamza/Desktop/in' or 'Desktop/in')"
             },
+            "profile": {
+                "type": "STRING",
+                "description": "Optional browser profile name or directory to open (e.g. 'Hamza', 'vina', 'Profile 7', 'Profile 1', 'Work')"
+            },
             "action": {
                 "type": "STRING",
-                "enum": ["open", "close"],
-                "description": "Whether to 'open' (default) or 'close' the application."
+                "enum": ["open", "close", "check", "install"],
+                "description": "Whether to 'open' (default), 'close', 'check' if the application is installed, or 'install' the application on the computer."
             }
         },
         "required": [

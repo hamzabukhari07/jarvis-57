@@ -154,10 +154,15 @@ class PushToTalk:
 
         while not self._stop.is_set():
             try:
-                # The high bit of the return value is "currently down".
+                # The high bit of the return value is "currently down". Only the
+                # configured chord counts — Ctrl+Alt, deliberately not Ctrl+Space,
+                # which Windows IMEs and focused text fields claim for themselves.
+                # VK_CONTROL/VK_MENU are generic codes, so either side (and AltGr)
+                # already reads as down.
                 down = all(user32.GetAsyncKeyState(c) & 0x8000 for c in codes)
             except Exception:
                 break     # driver or session teardown — fall back to windowed
+
             now = time.monotonic()
             if down:
                 if down_since == 0.0:

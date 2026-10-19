@@ -48,6 +48,8 @@ def _resolve_model(model: Optional[str]) -> str:
             return "opencode/nemotron-3-ultra-free"
         if "pickle" in name:
             return "opencode/big-pickle"
+        if "glm" in name:
+            return "opencode/glm-5.3-flash-free"
         if "mimo" in name:
             return "opencode/mimo-v2.6-flash-free"
         return f"opencode/{name}"

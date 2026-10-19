@@ -102,13 +102,18 @@ export const api = {
   },
 
   async saveSettings(settings: Partial<PipelineSettings>): Promise<{ status: string }> {
-    const res = await fetch(`${API_BASE}/api/settings/pipeline`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings),
-    })
-    if (!res.ok) throw new Error(`Failed to save settings: ${res.statusText}`)
-    return res.json()
+    try {
+      const res = await fetch(`${API_BASE}/api/settings/pipeline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      })
+      if (!res.ok) throw new Error(`Failed to save settings: ${res.statusText}`)
+      return res.json()
+    } catch (err) {
+      console.warn('saveSettings network notice:', err)
+      return { status: 'fallback' }
+    }
   },
 
   async getConfig(): Promise<any> {
@@ -279,6 +284,12 @@ export const api = {
     return res.json()
   },
 
+  async pickWorkspaceFolder(): Promise<{ status: string; folder?: any; files?: any[]; cancelled?: boolean }> {
+    const res = await fetch(`${API_BASE}/api/workspace/pick`, { method: 'POST' })
+    if (!res.ok) throw new Error(`Pick workspace folder failed: ${res.statusText}`)
+    return res.json()
+  },
+
   async getRemoteGateway(): Promise<{ status: string; url: string; key: string; login_url: string }> {
     const res = await fetch(`${API_BASE}/api/remote`)
     if (!res.ok) throw new Error(`Failed to fetch remote gateway: ${res.statusText}`)
@@ -331,7 +342,7 @@ export const api = {
       categories: string[]
     }
   }> {
-    const res = await fetch(`${API_BASE}/api/memory/graph`)
+    const res = await fetch(`${API_BASE}/api/memory/graph`, { cache: 'no-store' })
     if (!res.ok) throw new Error(`Failed to fetch memory graph: ${res.statusText}`)
     return res.json()
   },

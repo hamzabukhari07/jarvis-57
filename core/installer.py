@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import os
 import platform
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -269,6 +271,65 @@ def ensure_playwright_browsers(log: Callable | None = None) -> bool:
         log("SYS: Playwright Chromium ready." if r.returncode == 0
             else "ERR: Playwright browser download failed.")
     return r.returncode == 0
+
+
+def ensure_agent_browser(log: Callable | None = None) -> bool:
+    """Ensure agent-browser CLI is installed for desktop browser automation.
+
+    Auto-installs via npm if missing and npm is available on the machine.
+    """
+    if shutil.which("agent-browser"):
+        return True
+
+    if platform.system() == "Windows":
+        appdata = os.environ.get("APPDATA", "")
+        if appdata and (Path(appdata) / "npm" / "agent-browser.cmd").exists():
+            return True
+
+    npm_bin = shutil.which("npm") or shutil.which("npm.cmd")
+    if not npm_bin:
+        if log:
+            log("SYS: agent-browser not found and npm is missing (install Node.js for browser automation).")
+        return False
+
+    if log:
+        log("SYS: Installing agent-browser CLI via npm (one-time)…")
+    try:
+        flags = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+        r = subprocess.run(
+            [npm_bin, "install", "-g", "agent-browser"],
+            capture_output=True,
+            creationflags=flags,
+            timeout=120,
+        )
+        if r.returncode == 0:
+            if log:
+                log("SYS: agent-browser installed. Verifying browser engine…")
+            ab_candidate = shutil.which("agent-browser")
+            if not ab_candidate and platform.system() == "Windows":
+                appdata = os.environ.get("APPDATA", "")
+                p = Path(appdata) / "npm" / "agent-browser.cmd"
+                if p.exists():
+                    ab_candidate = str(p)
+            ab_cmd = ab_candidate or "agent-browser"
+            subprocess.run(
+                [ab_cmd, "install"],
+                capture_output=True,
+                creationflags=flags,
+                timeout=180,
+            )
+            if log:
+                log("SYS: agent-browser engine ready ✓")
+            return True
+        else:
+            if log:
+                err_snippet = r.stderr.decode(errors="replace").strip()[:140]
+                log(f"ERR: agent-browser npm install failed — {err_snippet}")
+            return False
+    except Exception as e:
+        if log:
+            log(f"ERR: agent-browser install error — {e}")
+        return False
 
 
 # ── Public API ────────────────────────────────────────────────────────────

@@ -55,6 +55,8 @@ interface SettingsModalProps {
   onClose: () => void
   audioDevices?: AudioDeviceState
   onSaveAudioDevices?: (inputDev: string, outputDev: string) => void
+  onWakeToggle?: (enable: boolean) => void
+  onPttToggle?: (enable: boolean) => void
 }
 
 export type InteractionMode = 'always_listening' | 'wake_word' | 'push_to_talk'
@@ -303,6 +305,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   audioDevices,
   onSaveAudioDevices,
+  onWakeToggle,
+  onPttToggle,
 }) => {
   // Navigation & Search
   const [activeSection, setActiveSection] = useState<SectionId>('general')
@@ -314,8 +318,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [wakeWord, setWakeWord] = useState(false)
   const [assistantName, setAssistantName] = useState('Zezo')
   const [availableAssistantNames, setAvailableAssistantNames] = useState<string[]>(['Zezo', 'Nova', 'Jarvis'])
-  const [pushToTalk, setPushToTalk] = useState(true)
-  const [interactionMode, setInteractionMode] = useState<InteractionMode>('push_to_talk')
+  const [pushToTalk, setPushToTalk] = useState(false)
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>('always_listening')
   const [activeTheme, setActiveTheme] = useState<string>(() => {
     return localStorage.getItem('zezo_theme') || 'copper'
   })
@@ -435,8 +439,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
       updateMeter()
     } catch (err) {
-      console.warn('Microphone permission or test error:', err)
-      setIsTestingMic(false)
+      console.warn('Browser getUserMedia failed, using backend hardware test endpoint:', err)
+      // Hardware Backend Fallback via sounddevice
+      setIsTestingMic(true)
+      setMicTestLevel(15)
+      try {
+        const res = await fetch('/api/audio/test_mic')
+        if (res.ok) {
+          const data = await res.json()
+          setMicTestLevel(Math.max(25, data.level || 0))
+          setTimeout(() => {
+            setMicTestLevel(Math.max(10, (data.level || 0) + 15))
+          }, 300)
+          setTimeout(() => {
+            setIsTestingMic(false)
+            setMicTestLevel(0)
+          }, 2000)
+        } else {
+          setIsTestingMic(false)
+          setMicTestLevel(0)
+        }
+      } catch (backendErr) {
+        console.error('Backend mic test failed:', backendErr)
+        setIsTestingMic(false)
+        setMicTestLevel(0)
+      }
     }
   }
 
@@ -526,6 +553,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   }, [])
 
+  useEffect(() => {
+    if (isOpen && activeSection === 'memory') {
+      loadMemoryGraph()
+    }
+  }, [isOpen, activeSection, loadMemoryGraph])
+
   const handleSelectConnectedNode = (nodeIdentifier: string) => {
     const target = graphNodes.find(
       (n) =>
@@ -550,6 +583,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const isPtt = mode === 'push_to_talk'
     setWakeWord(isWake)
     setPushToTalk(isPtt)
+    if (onWakeToggle) {
+      try {
+        onWakeToggle(isWake)
+      } catch (err) {
+        console.warn('Failed to dispatch onWakeToggle:', err)
+      }
+    }
+    if (onPttToggle) {
+      try {
+        onPttToggle(isPtt)
+      } catch (err) {
+        console.warn('Failed to dispatch onPttToggle:', err)
+      }
+    }
     api.saveConfig({
       wake_word_enabled: isWake,
       push_to_talk_enabled: isPtt,
@@ -946,11 +993,104 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </aside>
 
         {/* ── RIGHT MAIN CONTENT AREA ── */}
-        <main className="flex-1 flex flex-col min-w-0 zezo-theme-main bg-background">
-          <ScrollArea className="flex-1">
-            <div className="p-6 md:p-10 max-w-5xl w-full min-w-0 space-y-6 pb-16">
-              {/* ──────────────── 1. GENERAL & CONTROLS ──────────────── */}
-              {activeSection === 'general' && (
+        <main className="flex-1 flex flex-col min-w-0 zezo-theme-main bg-background h-full overflow-hidden">
+          {activeSection === 'memory' ? (
+            <div className="flex-1 flex flex-col w-full h-full min-h-0 p-4 md:p-6 gap-3 overflow-hidden">
+              <div className="flex items-center justify-between shrink-0">
+                <div>
+                  <h2 className="text-xl font-bold text-foreground tracking-tight">Memory & Intelligence</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Explore connected knowledge nodes, Markdown vault notes, and SQLite FTS5 persistence.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {memoryToast && (
+                    <span className="text-xs font-mono text-primary bg-primary/10 border border-primary/30 px-2.5 py-1 rounded-md animate-in fade-in">
+                      {memoryToast}
+                    </span>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsWipeConfirmOpen(true)}
+                    disabled={isWipingMemory}
+                    className="h-8 text-xs font-mono px-3 gap-1.5 text-red-400 border-red-500/30 hover:bg-red-500/10 shadow-sm"
+                    title="Permanently wipe all conversation memory, notes, and database history"
+                  >
+                    {isWipingMemory ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    <span>Clear All Memory</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setIsNewMemoryModalOpen(true)}
+                    className="h-8 text-xs font-mono px-3 gap-1.5 shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Memory Node</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* ── 1. Obsidian-Style Knowledge Graph & Inspector Drawer (Takes all remaining width & height!) ── */}
+              <div className="flex-1 w-full min-h-0 relative flex flex-col lg:flex-row gap-4 items-stretch overflow-hidden">
+                <div className="flex-1 min-w-0 h-full relative">
+                  <MemoryGraphCanvas
+                    nodes={graphNodes}
+                    links={graphLinks}
+                    selectedNodeId={selectedGraphNode?.id || null}
+                    onSelectNode={(node) => setSelectedGraphNode(node)}
+                    onRefresh={loadMemoryGraph}
+                    isLoading={isGraphLoading}
+                  />
+                </div>
+
+                {/* Slide-Out Inspector Drawer */}
+                {selectedGraphNode && (
+                  <div className="w-full lg:w-96 shrink-0 h-full rounded-2xl overflow-hidden border border-border shadow-xl">
+                    <MemoryInspectorDrawer
+                      node={selectedGraphNode}
+                      onClose={() => setSelectedGraphNode(null)}
+                      onNodeUpdated={() => {
+                        loadMemoryGraph()
+                      }}
+                      onSelectConnectedNode={handleSelectConnectedNode}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* New Memory Modal */}
+              <NewMemoryModal
+                isOpen={isNewMemoryModalOpen}
+                onClose={() => setIsNewMemoryModalOpen(false)}
+                onCreated={() => {
+                  loadMemoryGraph()
+                  setMemoryToast('New memory node created in vault ✓')
+                  setTimeout(() => setMemoryToast(null), 3000)
+                }}
+              />
+
+              {/* ReUI Confirmation Dialog for Total Memory Wipe */}
+              <ConfirmDialog
+                open={isWipeConfirmOpen}
+                onOpenChange={setIsWipeConfirmOpen}
+                title="Clear All Memory & Intelligence"
+                description="Are you sure you want to permanently wipe all memory?"
+                warningText="This action is irreversible. All conversation notes (conv_*.md), extracted topics, SQLite turns, rules, and facts will be permanently deleted, and your knowledge vault will be reset to a clean slate."
+                confirmText="Wipe Everything"
+                cancelText="Cancel"
+                variant="destructive"
+                isLoading={isWipingMemory}
+                onConfirm={handleExecuteWipeMemory}
+              />
+            </div>
+          ) : (
+            <ScrollArea className="flex-1">
+              <div className="p-6 md:p-10 max-w-5xl w-full min-w-0 space-y-6 pb-16">
+                {/* ──────────────── 1. GENERAL & CONTROLS ──────────────── */}
+                {activeSection === 'general' && (
                 <>
                   <div>
                     <h2 className="text-xl font-bold text-foreground tracking-tight">General & Quick Controls</h2>
@@ -1715,100 +1855,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </>
               )}
 
-              {/* ──────────────── 6. MEMORY & INTELLIGENCE ──────────────── */}
-              {activeSection === 'memory' && (
-                <>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-xl font-bold text-foreground tracking-tight">Memory & Intelligence</h2>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Explore connected knowledge nodes, Markdown vault notes, and SQLite FTS5 persistence.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {memoryToast && (
-                        <span className="text-xs font-mono text-primary bg-primary/10 border border-primary/30 px-2.5 py-1 rounded-md animate-in fade-in">
-                          {memoryToast}
-                        </span>
-                      )}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsWipeConfirmOpen(true)}
-                        disabled={isWipingMemory}
-                        className="h-8 text-xs font-mono px-3 gap-1.5 text-red-400 border-red-500/30 hover:bg-red-500/10 shadow-sm"
-                        title="Permanently wipe all conversation memory, notes, and database history"
-                      >
-                        {isWipingMemory ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                        <span>Clear All Memory</span>
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => setIsNewMemoryModalOpen(true)}
-                        className="h-8 text-xs font-mono px-3 gap-1.5 shadow-sm"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add Memory Node</span>
-                      </Button>
-                    </div>
-                  </div>
 
-                  {/* ── 1. Obsidian-Style Knowledge Graph & Inspector Drawer ── */}
-                  <div className="relative flex flex-col lg:flex-row gap-4 items-stretch">
-                    <div className="flex-1 min-w-0">
-                      <MemoryGraphCanvas
-                        nodes={graphNodes}
-                        links={graphLinks}
-                        selectedNodeId={selectedGraphNode?.id || null}
-                        onSelectNode={(node) => setSelectedGraphNode(node)}
-                        onRefresh={loadMemoryGraph}
-                        isLoading={isGraphLoading}
-                      />
-                    </div>
-
-                    {/* Slide-Out Inspector Drawer */}
-                    {selectedGraphNode && (
-                      <div className="lg:w-96 shrink-0 h-[520px] md:h-[580px] rounded-2xl overflow-hidden border border-border shadow-xl">
-                        <MemoryInspectorDrawer
-                          node={selectedGraphNode}
-                          onClose={() => setSelectedGraphNode(null)}
-                          onNodeUpdated={() => {
-                            loadMemoryGraph()
-                          }}
-                          onSelectConnectedNode={handleSelectConnectedNode}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* New Memory Modal */}
-                  <NewMemoryModal
-                    isOpen={isNewMemoryModalOpen}
-                    onClose={() => setIsNewMemoryModalOpen(false)}
-                    onCreated={() => {
-                      loadMemoryGraph()
-                      setMemoryToast('New memory node created in vault ✓')
-                      setTimeout(() => setMemoryToast(null), 3000)
-                    }}
-                  />
-
-                  {/* ReUI Confirmation Dialog for Total Memory Wipe */}
-                  <ConfirmDialog
-                    open={isWipeConfirmOpen}
-                    onOpenChange={setIsWipeConfirmOpen}
-                    title="Clear All Memory & Intelligence"
-                    description="Are you sure you want to permanently wipe all memory?"
-                    warningText="This action is irreversible. All conversation notes (conv_*.md), extracted topics, SQLite turns, rules, and facts will be permanently deleted, and your knowledge vault will be reset to a clean slate."
-                    confirmText="Wipe Everything"
-                    cancelText="Cancel"
-                    variant="destructive"
-                    isLoading={isWipingMemory}
-                    onConfirm={handleExecuteWipeMemory}
-                  />
-                </>
-              )}
 
               {/* ──────────────── 7. SKILLS & AUTONOMOUS CAPABILITIES ──────────────── */}
               {activeSection === 'skills' && (
@@ -1857,6 +1904,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
             </div>
           </ScrollArea>
+        )}
 
         </main>
     </div>

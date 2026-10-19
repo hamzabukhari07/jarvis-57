@@ -1,9 +1,3 @@
-"""
-actions/computer_control.py - Computer Control & UI Automation for ZEZO OS
-Dispatches mouse, keyboard, window, and screen automation across 4 escalated layers:
-  L1: Windows UIA (10ms) -> L0: Win32 Native (1ms) -> Hardware Input (20ms) -> L2: Gemini Vision (2s)
-Creator: Hamza Bukhari
-"""
 from __future__ import annotations
 
 import io
@@ -27,6 +21,7 @@ from core.computer import (
     InputDriver,
     input_driver,
 )
+from google.genai import types as gtypes
 
 if platform.system() == "Windows":
     _WIN_HIDE: dict = {"creationflags": subprocess.CREATE_NO_WINDOW}
@@ -226,6 +221,15 @@ def _screen_find_vision(description: str) -> Optional[Tuple[int, int]]:
     return None
 
 
+def _browser_content_bbox(hwnd):
+    """Crop out the Chrome tab bar + omnibox (top ~110px) so OCR runs on the page body only."""
+    import ctypes
+    from ctypes import wintypes
+    r = wintypes.RECT()
+    ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(r))
+    return (r.left, r.top + 110, r.right - r.left, r.bottom - r.top - 110)
+
+
 def _find_target_element_escalated(description: str) -> Optional[Tuple[int, int, str]]:
     if not description:
         return None
@@ -238,9 +242,24 @@ def _find_target_element_escalated(description: str) -> Optional[Tuple[int, int,
         ctx = get_active_window_context()
         hwnd = ctx.get("hwnd")
         if hwnd:
+            window_title = (ctx.get("foreground_title") or "")
             for q in candidates:
                 el = windows_uia.find_element(hwnd, q, depth=6, timeout_seconds=0.8)
                 if el and "center_x" in el and "center_y" in el:
+                    ct = (el.get("control_type") or "")
+                    nm = (el.get("name") or "").strip()
+                    _EXCLUDED_CTYPES = {"Window", "TitleBar", "Pane", "Text", "Document", "Group", "Custom"}
+                    _INTERACTIVE_CTYPES = {"Button", "Hyperlink", "Edit", "MenuItem",
+                                           "TabItem", "CheckBox", "RadioButton", "ListItem", "ComboBox"}
+                    if ct in _EXCLUDED_CTYPES:
+                        continue
+                    if ct and ct not in _INTERACTIVE_CTYPES:
+                        continue
+                    if nm and window_title and (nm.lower() == window_title.strip().lower()
+                                                or nm.lower() in window_title.strip().lower()):
+                        continue  # reject window-title matches like 'Google' in 'Spotify - Google Chrome'
+                    if not nm:
+                        continue
                     print(f"[ComputerControl] Found '{q}' via L1 UIA in {el.get('latency_ms')}ms -> ({el['center_x']}, {el['center_y']})")
                     return (el["center_x"], el["center_y"], "l1_uia")
     except Exception as e:
@@ -250,8 +269,13 @@ def _find_target_element_escalated(description: str) -> Optional[Tuple[int, int,
     try:
         from core.computer.ocr_engine import ocr_engine
         if ocr_engine.is_available:
+            _bbox = None
+            try:
+                _bbox = _browser_content_bbox(hwnd)
+            except Exception:
+                _bbox = None
             for q in candidates:
-                ocr_res = ocr_engine.find_text_coordinates(q, fuzzy_threshold=0.75)
+                ocr_res = ocr_engine.find_text_coordinates(q, fuzzy_threshold=0.75, region=_bbox)
                 if ocr_res and "center_x" in ocr_res and "center_y" in ocr_res:
                     print(f"[ComputerControl] Found '{q}' via L1.5 RapidOCR in {ocr_res.get('latency_ms')}ms -> ({ocr_res['center_x']}, {ocr_res['center_y']})")
                     return (ocr_res["center_x"], ocr_res["center_y"], "l1.5_ocr")
@@ -397,6 +421,12 @@ def _handle_window(params: dict, action: str, **_) -> str:
         return windows_native.close_window_by_title_or_active(target_title or "reminder")
     if action in ("focus_window", "bring_to_front", "activate_window"):
         return windows_native.focus_window(str(target_title))
+    if action in ("maximize", "maximize_window", "fullscreen", "fullscreen_window"):
+        ok = windows_native.maximize_window(str(target_title) if target_title else "")
+        return f"Maximized window: {target_title or 'active window'}" if ok else f"Failed to maximize {target_title or 'active window'}"
+    if action in ("minimize", "minimize_window"):
+        ok = windows_native.minimize_window(str(target_title) if target_title else "")
+        return f"Minimized window: {target_title or 'active window'}" if ok else f"Failed to minimize {target_title or 'active window'}"
     return f"Unknown window action: {action}"
 
 
@@ -582,6 +612,12 @@ _ACTION_ROUTER: Dict[str, Callable] = {
     "focus_window": _handle_window,
     "bring_to_front": _handle_window,
     "activate_window": _handle_window,
+    "maximize": _handle_window,
+    "maximize_window": _handle_window,
+    "fullscreen": _handle_window,
+    "fullscreen_window": _handle_window,
+    "minimize": _handle_window,
+    "minimize_window": _handle_window,
     # Filesystem & Launch
     "open_folder": _handle_open_folder,
     "open_path": _handle_open_folder,
@@ -662,7 +698,7 @@ def computer_control(
 # Tool declaration (auto-discovered by core/action_loader.py)
 TOOL = {
     "name": "computer_control",
-    "description": "Direct computer control: type, click, hotkeys, scroll, move mouse, screenshots, find elements on screen, inspect active window.",
+    "description": "Direct computer control: type, click, hotkeys, scroll, maximize windows, move mouse, screenshots, find elements on screen, inspect active window.",
     "risk": "local_mutation",
     "enabled": True,
     "parameters": {
@@ -670,7 +706,7 @@ TOOL = {
         "properties": {
             "action": {
                 "type": "STRING",
-                "description": "type | smart_type | direct_type | set_text | read_window_text | click | double_click | right_click | smart_click | drag | mouse_drag | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | close_window | close_tab | dismiss_dialog | close_popup | screen_find | screen_click | screen_double_click | get_active_window_info | random_data | user_data | batch"
+                "description": "type | smart_type | direct_type | set_text | read_window_text | click | double_click | right_click | smart_click | drag | mouse_drag | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | maximize | maximize_window | minimize | minimize_window | fullscreen | close_window | close_tab | dismiss_dialog | close_popup | screen_find | screen_click | screen_double_click | get_active_window_info | random_data | user_data | batch"
             },
             "sequence": {
                 "type": "ARRAY",

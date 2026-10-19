@@ -217,8 +217,8 @@
       "model_id": "",
       "desk_x": 600,
       "desk_y": 160,
-      "worktree": "None",
-      "active_worktree": "None",
+      "worktree": null,
+      "active_worktree": null,
       "allowed_tools": [
         "agent_reach",
         "web_search",

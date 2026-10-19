@@ -30,8 +30,14 @@ def _norm_token(s: str) -> str:
     return re.sub(r"[\s_\-]+", "", (s or "").lower())
 
 
+_IGNORE_DIRS = {
+    "node_modules", ".git", ".venv", "venv", ".next", "dist", "build",
+    "__pycache__", ".cache", ".idea", ".vscode", "coverage", ".turbo",
+}
+
+
 def _scan_folder(root: Path, cap: int = 5000) -> tuple[list[str], int, bool]:
-    """Bounded recursive scan so a huge dropped folder never blocks the request.
+    """Bounded recursive scan with directory pruning so huge folders never freeze the process.
 
     Returns (relative_paths, total_size_bytes_of_scanned_files, truncated).
     """
@@ -39,7 +45,8 @@ def _scan_folder(root: Path, cap: int = 5000) -> tuple[list[str], int, bool]:
     total = 0
     truncated = False
     try:
-        for dirpath, _dirs, files in os.walk(root):
+        for dirpath, dirs, files in os.walk(root):
+            dirs[:] = [d for d in dirs if d not in _IGNORE_DIRS and not d.startswith(".")]
             for fn in files:
                 if len(rel_paths) >= cap:
                     truncated = True
@@ -66,11 +73,13 @@ class ZezoUIServer:
         self.port = port
         self.frontend_dir = FRONTEND_DIR
         self._clients: set[web.WebSocketResponse] = set()
+        self.tunnel_manager = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
         self._runner: web.AppRunner | None = None
-        self._site: web.TCPSite | None = None
+        self._site = None
         self._stopped = threading.Event()
+        self._ready_event = threading.Event()
 
         # Lazy attachment registry: dropped/uploaded files are registered by
         # path only and NOT read until the user explicitly asks (file_processor
@@ -158,6 +167,7 @@ class ZezoUIServer:
         app.router.add_post("/api/memory/wipe_all", self._memory_wipe_all_handler)
         app.router.add_post("/api/memory/optimize", self._memory_optimize_handler)
         app.router.add_post("/api/workspace/set", self._workspace_set_handler)
+        app.router.add_post("/api/workspace/pick", self._workspace_pick_handler)
         app.router.add_get("/api/remote", self._remote_gateway_handler)
         app.router.add_post("/api/remote/new_key", self._remote_new_key_handler)
         app.router.add_get("/api/backend_logs", self._get_backend_logs_handler)
@@ -165,6 +175,9 @@ class ZezoUIServer:
         app.router.add_get("/api/system/status", self._system_status_handler)
         app.router.add_get("/zezo-avatar.png", self._avatar_handler)
         app.router.add_get("/favicon.ico", self._favicon_handler)
+        app.router.add_get("/favicon.svg", self._dist_file_handler)
+        app.router.add_get("/neural_orb.js", self._dist_file_handler)
+        app.router.add_get("/api/audio/test_mic", self._test_mic_handler)
 
         # Serve compiled React SPA (frontend/dist) static assets
         frontend_dist = self.frontend_dir / "dist"
@@ -184,6 +197,7 @@ class ZezoUIServer:
             try:
                 self._site = web.TCPSite(self._runner, self.host, self.port)
                 await self._site.start()
+                self._ready_event.set()
                 logger.info("Zezo UI Server running at http://%s:%d", self.host, self.port)
                 self._log_bus_task = asyncio.create_task(self._poll_log_bus_loop())
                 break
@@ -844,10 +858,42 @@ class ZezoUIServer:
             return web.FileResponse(mp3_path)
         return web.Response(status=404, text="Voice preview not found")
 
+    async def _dist_file_handler(self, request: web.Request) -> web.Response:
+        filename = request.path.lstrip("/")
+        fp = self.frontend_dir / "dist" / filename
+        if not fp.exists():
+            fp = self.frontend_dir / "public" / filename
+        if fp.exists() and fp.is_file():
+            return web.FileResponse(fp)
+        return web.Response(status=404, text=f"File {filename} not found")
+
+    async def _test_mic_handler(self, request: web.Request) -> web.Response:
+        """Hardware mic sample test: records 1.0s and returns RMS volume and scaled percentage."""
+        try:
+            import numpy as np
+            import sounddevice as sd
+            duration = 1.0
+            fs = 16000
+            rec = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype="float32")
+            sd.wait()
+            rms = float(np.sqrt(np.mean(rec**2)))
+            level = min(100, max(0, int(rms * 450)))
+            return web.json_response({"status": "success", "rms": round(rms, 4), "level": level})
+        except Exception as e:
+            logger.warning("Microphone test error: %s", e)
+            return web.json_response({"status": "error", "message": str(e), "level": 0})
+
     async def _index_handler(self, request: web.Request) -> web.Response:
         frontend_dist_idx = self.frontend_dir / "dist" / "index.html"
         if frontend_dist_idx.exists():
-            return web.FileResponse(frontend_dist_idx)
+            return web.FileResponse(
+                frontend_dist_idx,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                }
+            )
         return web.Response(
             text="<h1>ZEZO React Workstation Initializing...</h1><p>Please compile the frontend using: <code>cd frontend && npm run build</code></p>",
             content_type="text/html",
@@ -1537,6 +1583,116 @@ class ZezoUIServer:
             logger.exception("Error in /api/workspace/set: %s", e)
             return web.json_response({"status": "error", "message": str(e)}, status=500)
 
+    async def _workspace_pick_handler(self, request: web.Request) -> web.Response:
+        """Open native OS folder dialog, attach folder as active workspace, and notify live session."""
+        try:
+            data = await request.json() if request.can_read_body else {}
+        except Exception:
+            data = {}
+        initial_dir = str(data.get("initial_dir") or "").strip()
+        if not initial_dir or not Path(initial_dir).exists():
+            from core.repo_context import get_last_repo
+            initial_dir = get_last_repo() or str(Path.home() / "Desktop" if (Path.home() / "Desktop").exists() else Path.home())
+
+        def _open_native_dialog() -> str:
+            selected_path = ""
+            try:
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()
+                root.attributes("-topmost", True)
+                chosen = filedialog.askdirectory(
+                    initialdir=initial_dir,
+                    title="Select Workspace Folder for ZEZO"
+                )
+                root.destroy()
+                if chosen:
+                    selected_path = str(Path(chosen).resolve()).replace("\\", "/")
+            except Exception as ex:
+                logger.debug("[UI Server] Tkinter dialog fallback: %s", ex)
+
+            if not selected_path:
+                try:
+                    import platform
+                    if platform.system() == "Windows":
+                        ps_script = (
+                            "[System.Reflection.Assembly]::LoadWithPartialName('System.windows.forms') | Out-Null; "
+                            "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
+                            f"$f.SelectedPath = '{initial_dir.replace('/', chr(92))}'; "
+                            "$f.Description = 'Select Workspace Folder for ZEZO'; "
+                            "if ($f.ShowDialog((New-Object System.Windows.Forms.NativeWindow)) -eq [System.Windows.Forms.DialogResult]::OK) { "
+                            "Write-Output $f.SelectedPath }"
+                        )
+                        res = subprocess.run(
+                            ["powershell", "-NoProfile", "-Command", ps_script],
+                            capture_output=True,
+                            text=True,
+                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
+                            timeout=60,
+                        )
+                        out = res.stdout.strip()
+                        if out and Path(out).exists():
+                            selected_path = str(Path(out).resolve()).replace("\\", "/")
+                except Exception as ex:
+                    logger.debug("[UI Server] PowerShell folder dialog fallback error: %s", ex)
+
+            return selected_path
+
+        loop = asyncio.get_running_loop()
+        try:
+            chosen = await loop.run_in_executor(None, _open_native_dialog)
+            if not chosen:
+                return web.json_response({"status": "canceled", "cancelled": True})
+
+            folder_path = Path(chosen).resolve()
+            if not folder_path.exists() or not folder_path.is_dir():
+                return web.json_response({"status": "error", "message": "Invalid directory selected"}, status=400)
+
+            folder_name = folder_path.name
+            from core.repo_context import remember_repo
+            remember_repo(str(folder_path))
+            try:
+                from memory.memory_manager import remember
+                remember("active_project", str(folder_path), category="projects")
+            except Exception:
+                pass
+
+            rel_paths, total_size, truncated = _scan_folder(folder_path, cap=5000)
+
+            folder_info = {
+                "name": folder_name,
+                "path": str(folder_path).replace("\\", "/"),
+                "size": total_size,
+                "file_type": "folder",
+                "is_folder": True,
+                "files_count": len(rel_paths),
+                "text": "",
+                "engine": "attached",
+                "is_truncated": truncated,
+            }
+
+            self.register_attachment(folder_info)
+            self.broadcast("file_ingested", folder_info)
+            self.broadcast("log", {
+                "text": f"[Workspace] Attached local folder '{folder_name}' ({len(rel_paths)} files). Path: {folder_path}"
+            })
+
+            if self.on_file_uploaded:
+                try:
+                    self.on_file_uploaded(folder_info)
+                except Exception as e:
+                    logger.warning("on_file_uploaded callback error: %s", e)
+
+            return web.json_response({
+                "status": "success",
+                "folder": folder_info,
+                "files": [folder_info],
+            })
+        except Exception as e:
+            logger.exception("Error in /api/workspace/pick: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
     async def _get_backend_logs_handler(self, request: web.Request) -> web.Response:
         try:
             from core import log_bus
@@ -1584,35 +1740,58 @@ class ZezoUIServer:
             except Exception as e:
                 logger.warning("on_remote_clicked error: %s", e)
         if not url:
-            lan_ip = "127.0.0.1"
+            # Honor a public URL override (e.g. Cloudflare Tunnel) so the
+            # desktop UI's "Remote Control" button / QR code point at the
+            # internet-reachable endpoint instead of the LAN IP.
             try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                s.connect(("8.8.8.8", 80))
-                lan_ip = s.getsockname()[0]
-                s.close()
+                import os
+                pu = os.environ.get("ZEZO_PUBLIC_URL", "").strip()
+                if not pu:
+                    from memory.config_manager import get_public_url
+                    pu = get_public_url()
+                if pu:
+                    url = pu
             except Exception:
-                pass
-            url = f"http://{lan_ip}:8000"
+                url = ""
+            if not url:
+                import socket
+                lan_ip = "127.0.0.1"
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    s.connect(("8.8.8.8", 80))
+                    lan_ip = s.getsockname()[0]
+                    s.close()
+                except Exception:
+                    pass
+                url = f"http://{lan_ip}:8000"
         if not key:
             key = "8F3A-9K"
         return url, key
 
     async def _remote_gateway_handler(self, request: web.Request) -> web.Response:
         url, key = self._resolve_remote_details()
+        tm = getattr(self, "tunnel_manager", None)
         return web.json_response({
             "status": "success",
             "url": url,
             "key": key,
             "login_url": f"{url}/auto-login?key={key}",
+            "tunnel_status": (tm.status if tm is not None else "unavailable"),
+            "tunnel_available": (tm.available if tm is not None else False),
+            "tunnel_error": (tm.error if tm is not None else ""),
         })
 
     async def _remote_new_key_handler(self, request: web.Request) -> web.Response:
         url, key = self._resolve_remote_details()
+        tm = getattr(self, "tunnel_manager", None)
         return web.json_response({
             "status": "success",
             "url": url,
             "key": key,
             "login_url": f"{url}/auto-login?key={key}",
+            "tunnel_status": (tm.status if tm is not None else "unavailable"),
+            "tunnel_available": (tm.available if tm is not None else False),
+            "tunnel_error": (tm.error if tm is not None else ""),
         })
 
     async def _favicon_handler(self, request: web.Request) -> web.Response:
@@ -1988,6 +2167,14 @@ class ZezoUIServer:
                 }))
             except Exception as e:
                 logger.warning("Failed to send audio devices: %s", e)
+
+        elif msg_type == "resolve_confirmation":
+            accepted = bool(payload.get("accepted", False))
+            try:
+                from core import confirm
+                confirm.resolve(accepted)
+            except Exception as e:
+                logger.warning("Failed to resolve confirmation: %s", e)
 
         elif msg_type == "save_audio_devices":
             in_name  = str(payload.get("input_device", "")  or "").strip()

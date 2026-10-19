@@ -307,6 +307,148 @@ class WindowsUIADriver:
         except Exception:
             return []
 
+    def get_browser_tabs(
+        self,
+        hwnd: int,
+        depth: int = 14,
+        timeout_seconds: float = 2.0,
+    ) -> List[Dict[str, Any]]:
+        """
+        Enumerate the REAL open tabs inside a live desktop browser window via UIA.
+
+        Chrome/Edge/Brave expose each tab as a TabItem control with its page title,
+        so we can read the user's actual session (~30 tabs) instead of the isolated
+        background agent-browser daemon.
+        """
+        if not self.is_available or not hwnd:
+            return []
+
+        def _worker() -> List[Dict[str, Any]]:
+            _init_com_sta()
+            tabs: List[Dict[str, Any]] = []
+            try:
+                app = Application(backend="uia").connect(handle=hwnd, timeout=timeout_seconds)
+                win = app.window(handle=hwnd)
+
+                tab_elements = []
+                try:
+                    tab_elements = win.descendants(control_type="TabItem")
+                except Exception:
+                    pass
+
+                if not tab_elements:
+                    try:
+                        tab_elements = [
+                            el for el in win.descendants(depth=depth)
+                            if (el.friendly_class_name() or "").strip().lower() == "tabitem"
+                        ]
+                    except Exception:
+                        tab_elements = []
+
+                for el in tab_elements:
+                    try:
+                        name = (el.window_text() or "").strip()
+                        if not name:
+                            continue
+                        try:
+                            selected = bool(el.is_selected())
+                        except Exception:
+                            selected = False
+                        rect = el.rectangle()
+                        tabs.append({
+                            "title": name,
+                            "index": len(tabs) + 1,
+                            "selected": selected,
+                            "center_x": rect.left + rect.width() // 2,
+                            "center_y": rect.top + rect.height() // 2,
+                            "source": "l1_uia",
+                        })
+                    except Exception:
+                        continue
+            except Exception:
+                return []
+            return tabs
+
+        future = _UIA_EXECUTOR.submit(_worker)
+        try:
+            return future.result(timeout=timeout_seconds + 0.3)
+        except Exception:
+            return []
+
+    def switch_tab_by_title(
+        self,
+        hwnd: int,
+        query: str,
+        depth: int = 14,
+        timeout_seconds: float = 2.0,
+    ) -> bool:
+        """
+        Switch to a browser tab by (fuzzy) title via UIA SelectPattern/click_input,
+        instead of blind Ctrl+Tab jumping.
+        """
+        if not self.is_available or not hwnd or not query:
+            return False
+
+        cleaned = query.lower().strip()
+
+        def _worker() -> bool:
+            _init_com_sta()
+            try:
+                app = Application(backend="uia").connect(handle=hwnd, timeout=timeout_seconds)
+                win = app.window(handle=hwnd)
+                best_el = None
+                best_score = 0.0
+
+                tab_elements = []
+                try:
+                    tab_elements = win.descendants(control_type="TabItem")
+                except Exception:
+                    pass
+
+                if not tab_elements:
+                    try:
+                        tab_elements = [
+                            el for el in win.descendants(depth=depth)
+                            if (el.friendly_class_name() or "").strip().lower() == "tabitem"
+                        ]
+                    except Exception:
+                        tab_elements = []
+
+                for el in tab_elements:
+                    try:
+                        name = (el.window_text() or "").strip().lower()
+                        if not name:
+                            continue
+                        if cleaned == name:
+                            best_el, best_score = el, 1.0
+                            break
+                        if cleaned in name or name in cleaned:
+                            score = min(len(cleaned), len(name)) / max(len(cleaned), len(name), 1)
+                            if score > best_score:
+                                best_el, best_score = el, score
+                    except Exception:
+                        continue
+
+                if best_el is None:
+                    return False
+                for method in ("select", "click_input", "invoke"):
+                    fn = getattr(best_el, method, None)
+                    if callable(fn):
+                        try:
+                            fn()
+                            return True
+                        except Exception:
+                            continue
+                return False
+            except Exception:
+                return False
+
+        future = _UIA_EXECUTOR.submit(_worker)
+        try:
+            return bool(future.result(timeout=timeout_seconds + 0.3))
+        except Exception:
+            return False
+
 
 # Global singleton instance
 windows_uia = WindowsUIADriver()

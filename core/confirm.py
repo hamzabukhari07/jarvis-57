@@ -98,7 +98,14 @@ def request(key: str, title: str, detail: str, run: Callable[[], str]) -> str:
                             run=run, at=time.monotonic())
 
     try:
-        _show_cb(title, detail)
+        import inspect
+        sig = inspect.signature(_show_cb)
+        if len(sig.parameters) >= 4:
+            _show_cb(title, detail, key, "default")
+        elif len(sig.parameters) >= 3:
+            _show_cb(title, detail, key)
+        else:
+            _show_cb(title, detail)
     except Exception as e:
         with _lock:
             _pending = None

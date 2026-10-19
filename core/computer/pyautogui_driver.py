@@ -116,7 +116,9 @@ class InputDriver:
         """Scroll mouse wheel vertically or horizontally."""
         self._require_pyautogui()
         vertical = direction in ("up", "down")
-        clicks = amount if direction in ("up", "right") else -amount
+        # On Windows, win32 mouse_event expects WHEEL_DELTA (120 units per notch)
+        scale = 120 if platform.system() == "Windows" else 1
+        clicks = (amount * scale) if direction in ("up", "right") else -(amount * scale)
         if vertical:
             pyautogui.scroll(clicks)
         else:

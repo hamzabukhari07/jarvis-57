@@ -12,7 +12,9 @@ Two things it deliberately does NOT install:
   * anything for the avatar â€” the holographic head renders in software on the
     PyQt6 and numpy already listed here. No GPU, no OpenGL, no extra packages.
 """
+import os
 import platform
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -72,6 +74,32 @@ def main() -> None:
         print(f"\n⚠️  Playwright browsers were not installed ({e}).")
         print("    Everything except browser automation works. Retry later with:")
         print(f'    {sys.executable} -m playwright install chromium firefox')
+
+    # ── Ensure agent-browser CLI for native Rust CDP automation ─────────────
+    npm_bin = shutil.which("npm") or shutil.which("npm.cmd")
+    has_ab = bool(shutil.which("agent-browser"))
+    if not has_ab and OS == "Windows":
+        appdata = os.environ.get("APPDATA", "")
+        if appdata and (Path(appdata) / "npm" / "agent-browser.cmd").exists():
+            has_ab = True
+
+    if not has_ab and npm_bin:
+        try:
+            _run("Installing agent-browser CLI for high-speed web automation (Rust CDP)…",
+                 [npm_bin, "install", "-g", "agent-browser"])
+            ab_candidate = shutil.which("agent-browser")
+            if not ab_candidate and OS == "Windows":
+                appdata = os.environ.get("APPDATA", "")
+                p = Path(appdata) / "npm" / "agent-browser.cmd"
+                if p.exists():
+                    ab_candidate = str(p)
+            _run("Ensuring Chrome engine for agent-browser…",
+                 [ab_candidate or "agent-browser", "install"])
+        except Exception as e:
+            print(f"\n⚠️  agent-browser CLI could not be auto-installed ({e}).")
+            print("    You can install it manually anytime with: npm install -g agent-browser")
+    elif not has_ab and not npm_bin:
+        print("\n⚠️  Node.js / npm not found. Install Node.js to enable native agent-browser automation.")
 
     # ── OS-specific post-install notes ────────────────────────────────────────
     if OS == "Windows":

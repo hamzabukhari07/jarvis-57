@@ -8,8 +8,9 @@ Push-to-talk allows the user to hold a key chord to open the microphone, stream 
 
 ## Keyboard Shortcut
 
-- **Default chord**: `Ctrl+Alt`
+- **Chord**: `Ctrl+Alt` — the single, only chord.
 - **Why Ctrl+Alt**: Free in modern desktop environments (Windows, macOS, Linux), eliminates spacebar and IME conflicts, and provides comfortable thumb/pinky ergonomics.
+- **`Ctrl+Space` is deliberately NOT bound**: Windows IMEs and focused text fields claim that chord, so advertising it promised a hotkey that silently did nothing. `core/hotkey.py` polls only the configured chord (`DEFAULT_CHORD`) and the Settings card reads `CTRL+ALT`.
 
 ---
 
@@ -56,7 +57,7 @@ sequenceDiagram
 
 **Files:**
 - `core/hotkey.py` — `PushToTalk` class
-- `main.py` — `ZezoLive` orchestrator (`_on_ptt`, `_send_realtime`, `_play_audio`, `_get_resting_state`)
+- `main.py` — `ZezoLive` orchestrator (`_on_ptt`, `_send_realtime`, `_play_audio`, `_get_resting_state`, `_defer_playback`, `_drop_assistant_audio`, `_end_interrupted_turn`)
 
 ### 1. Platform-Specific Hook (`core/hotkey.py`)
 
@@ -101,12 +102,14 @@ Previously, cutting off the microphone abruptly upon key release caused two dist
    - `main.py` dispatches `self.ui.stream_transcript("user", accumulated_in, done=False)` to the frontend.
    - User speech renders live in the chat thread like real-time dictation.
 2. **Speaker Suppression During Key Hold**:
-   - In `_play_audio`:
+   - While the chord is down, `_play_audio` **defers** playback instead of discarding it:
      ```python
-     while getattr(self, "_ptt_enabled", False) and getattr(self, "_ptt_held", False):
-         await asyncio.sleep(0.05)
+     if self._defer_playback():
+         while self._defer_playback() and not self._interrupted:
+             await asyncio.sleep(0.05)
      ```
-   - If the user pauses for breath while holding `Ctrl+Alt`, audio playback is deferred until the chord is released. The assistant never speaks over the user.
+   - **Defer, never discard.** The server commits your turn from its own VAD as soon as it hears the end of speech — normally *before* the key comes up (a pause mid-sentence is enough). Discarding playback here made ZEZO silently never answer.
+   - Only the **remnants of an interrupted turn** are dropped (`_drop_assistant_audio()` → `_interrupted`), and `_end_interrupted_turn()` clears that flag at the server's turn boundary. It must NOT be cleared on key release and must NOT be pinned for the whole hold, or the follow-up turn's reply is thrown away too.
 3. **Instant Barge-in**:
    - If the assistant is speaking and the user holds `Ctrl+Alt`, `_on_ptt(held=True)` invokes `interrupt()` immediately, stopping speaker audio, draining queues, and switching to `LISTENING`.
 
