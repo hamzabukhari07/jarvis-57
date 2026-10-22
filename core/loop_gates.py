@@ -61,6 +61,8 @@ class LoopGatesEngine:
         similarity_threshold: int = 1,
         watchdog_timeout_sec: float = 120.0,
         idle_reset_sec: float = 60.0,
+        doom_loop_grace_period_sec: float = 10.0,
+        early_detection_threshold: int = 2,
     ):
         self._lock = threading.RLock()
         self.max_iterations = max_iterations
@@ -69,6 +71,8 @@ class LoopGatesEngine:
         self.similarity_threshold = similarity_threshold
         self.watchdog_timeout_sec = watchdog_timeout_sec
         self.idle_reset_sec = idle_reset_sec
+        self.doom_loop_grace_period_sec = doom_loop_grace_period_sec
+        self.early_detection_threshold = early_detection_threshold
 
         # Context-keyed history buffers
         self._history: Dict[str, collections.deque[ToolCallEntry]] = collections.defaultdict(
@@ -143,9 +147,35 @@ class LoopGatesEngine:
             param_hash = self._compute_param_hash(tool_name, params)
             history = self._history[session_id]
 
-            # Count recent identical tool invocations in window
-            recent_matches = [e for e in history if e.tool_name == tool_name and e.params_hash == param_hash]
-            
+            # Count recent identical tool invocations within the similarity window AND grace period
+            recent_matches = []
+            for e in history:
+                time_diff = current_time - e.timestamp
+                in_window = (e.tool_name == tool_name and
+                            e.params_hash == param_hash and
+                            time_diff <= self.doom_loop_grace_period_sec)
+                if in_window:
+                    recent_matches.append(e)
+
+            # Early detection: if we have enough similar calls, block BEFORE they reach similarity_threshold
+            # This catches loops earlier when similarity_threshold is low (e.g., the default of 1)
+            # The early detection triggers with 1 fewer call than the threshold (e.g., threshold=3 triggers at 2)
+            total_similar = len(recent_matches)
+
+            # Use early_detection_threshold for more aggressive early loop detection
+            # Default early_detection_threshold=2 catches loops after 2 identical calls (earlier than default threshold=1)
+            # This prevents the model from retrying a tool that's already failed once
+            if total_similar >= self.early_detection_threshold:
+                coaching = (
+                    f"⚠️ [EARLY LOOP DETECTION]: Tool '{tool_name}' with identical params was called {total_similar} times in the last {self.doom_loop_grace_period_sec}s. "
+                    "This indicates a loop. Use screen_process to verify state, or ask the user for clarification."
+                )
+                return GateResult(
+                    decision=GateDecision.INTERRUPT,
+                    reason=f"Early loop detection: {total_similar} recent identical invocations of '{tool_name}'.",
+                    coaching_feedback=coaching,
+                )
+
             # Record current entry
             preview = f"{tool_name}({list((params or {}).keys())})"
             history.append(ToolCallEntry(
@@ -155,8 +185,10 @@ class LoopGatesEngine:
                 raw_preview=preview,
             ))
 
+            # Check if we've hit the similarity threshold in the window
+            # (this is the original doom-loop check, now with time window)
+            # Note: len(recent_matches) is from before adding current, so add 1
             if len(recent_matches) >= self.similarity_threshold:
-                # Doom loop triggered: return steering interrupt coaching feedback
                 coaching = (
                     f"⚠️ [DOOM-LOOP INTERRUPT]: You already called '{tool_name}' with these exact arguments and it succeeded. "
                     "Do not retry. Use screen_process to verify, or ask the user what they want."

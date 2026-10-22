@@ -58,19 +58,11 @@ ANTIGRAVITY_CLI_MODELS = [
     "gemini-3.8-flash-high",       # Gemini 3.8 Flash (High)
     "gemini-3.8-flash-medium",     # Gemini 3.8 Flash (Medium)
     "gemini-3.8-flash-low",        # Gemini 3.8 Flash (Low)
-    "gemini-3.7-flash-high",       # Gemini 3.7 Flash (High)
-    "gemini-3.7-flash-medium",     # Gemini 3.7 Flash (Medium) - Default
-    "gemini-3.7-flash-low",        # Gemini 3.7 Flash (Low)
-    "gemini-3.6-flash-high",       # Gemini 3.6 Flash (High)
-    "gemini-3.6-flash-medium",     # Gemini 3.6 Flash (Medium)
-    "gemini-3.6-flash-low",        # Gemini 3.6 Flash (Low)
-    "gemini-3.1-pro-high",         # Gemini 3.1 Pro (High)
-    "gemini-3.1-pro-low",          # Gemini 3.1 Pro (Low)
     "claude-sonnet-4-6",           # Claude Sonnet 4.6 (Thinking)
     "claude-opus-4-6-thinking",    # Claude Opus 4.6 (Thinking)
     "gpt-oss-120b-medium",         # GPT-OSS 120B (Medium)
 ]
-DEFAULT_ANTIGRAVITY_MODEL = "gemini-3.7-flash-medium"
+DEFAULT_ANTIGRAVITY_MODEL = "gemini-3.8-flash-medium"
 
 # Friendly aliases → canonical Antigravity model id.
 ANTIGRAVITY_MODEL_ALIASES = {
@@ -79,14 +71,7 @@ ANTIGRAVITY_MODEL_ALIASES = {
     "claude-sonnet": "claude-sonnet-4-6",
     "opus": "claude-opus-4-6-thinking",
     "claude-opus": "claude-opus-4-6-thinking",
-    "3.7": "gemini-3.7-flash-medium",
-    "gemini-3.7": "gemini-3.7-flash-medium",
     "3.8": "gemini-3.8-flash-medium",
-    "gemini-3.8": "gemini-3.8-flash-medium",
-    "3.6": "gemini-3.6-flash-medium",
-    "pro": "gemini-3.1-pro-high",
-    "pro-high": "gemini-3.1-pro-high",
-    "pro-low": "gemini-3.1-pro-low",
     "gpt": "gpt-oss-120b-medium",
     "gpt-oss": "gpt-oss-120b-medium",
 }

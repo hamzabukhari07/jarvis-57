@@ -32,8 +32,10 @@ def _gemini_available() -> bool:
 def _note_gemini_error(exc: Exception) -> None:
     """Trip the breaker when the error is a quota / rate-limit rejection."""
     global _quota_blocked_until
-    msg = str(exc)
-    if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
+    msg = str(exc).lower()
+    # Trip on quota (429) OR on total ladder failure (all models failed / missing).
+    if ("429" in msg or "resource_exhausted" in msg or "resource exhausted" in msg
+            or "every gemini model" in msg or "all backends failed" in msg):
         with _quota_lock:
             already = time.monotonic() < _quota_blocked_until
             _quota_blocked_until = time.monotonic() + _QUOTA_COOLDOWN_SEC
@@ -123,7 +125,7 @@ def _tavily_search(
     search_depth: str = "basic",
     max_results: int = 6,
     topic: str = "general",
-    timeout: float = 3.0,
+    timeout: float = 8.0,
 ) -> list[dict]:
     """Execute low-latency direct query against Tavily AI Search REST API (zero PyPI deps)."""
     from memory.config_manager import get_tavily_api_key
@@ -360,10 +362,11 @@ def _gemini_headlines(n: int = 5) -> tuple[list[str], str]:
 
 def _search(query: str) -> str:
     """Default search: Tier 1 Tavily AI -> Tier 2 Gemini Grounded -> Tier 3 DuckDuckGo."""
-    # Tier 1: Tavily AI Search (<500ms)
+    # Tier 1: Tavily AI Search
     tavily_res = _tavily_search(query, search_depth="basic", max_results=6)
     if tavily_res:
-        return _format_tavily(query, tavily_res)
+        formatted = _format_tavily(query, tavily_res)
+        return _synthesize_with_groq(query, formatted, mode="research")
 
     # Tier 2: Gemini Grounded Search
     try:
@@ -373,7 +376,8 @@ def _search(query: str) -> str:
 
     # Tier 3: DuckDuckGo Fallback
     results = _ddg_search(query)
-    return _format_ddg(query, results)
+    raw_ddg = _format_ddg(query, results)
+    return _synthesize_with_groq(query, raw_ddg, mode="research")
 
 
 def _news(query: str) -> str:
@@ -431,10 +435,11 @@ def _research(query: str) -> str:
 
 def _price(query: str) -> str:
     """Product price lookup: Tier 1 Tavily -> Tier 2 Gemini -> Tier 3 DDG."""
-    price_q = f"current price of {query} cost buy today"
+    price_q = f"current price of {query}"
     tav_res = _tavily_search(price_q, search_depth="basic", max_results=6)
     if tav_res:
-        return _format_tavily(query, tav_res)
+        formatted = _format_tavily(query, tav_res)
+        return _synthesize_with_groq(query, formatted, mode="research")
 
     try:
         return _gemini_search(f"current price of {query} — how much does it cost today")
@@ -442,7 +447,8 @@ def _price(query: str) -> str:
         _log_gemini_failure("Gemini price", e)
 
     results = _ddg_search(f"{query} price buy", max_results=6)
-    return _format_ddg(query, results)
+    raw_ddg = _format_ddg(query, results)
+    return _synthesize_with_groq(query, raw_ddg, mode="research")
 
 
 def _compare(items: list[str], aspect: str) -> str:

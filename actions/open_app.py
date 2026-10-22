@@ -702,7 +702,7 @@ def close_application_by_name(app_name: str) -> bool:
     return False
 
 
-def _format_open_confirmation(app_name: str) -> str:
+def _format_open_confirmation(app_name: str, launch_attempted: bool = True) -> str:
     clean = app_name.lower().strip()
     norm = _normalize(app_name).lower().strip()
     try:
@@ -731,6 +731,10 @@ def _format_open_confirmation(app_name: str) -> str:
             return f"Opened {app_name} (Focused: '{title}' [{proc}])."
     except Exception:
         pass
+    # Bug #15 fix: Distinguish between successful launch (with confirmation) and
+    # launch attempted but unconfirmed, to prevent identical retry messages.
+    if launch_attempted:
+        return f"Opened {app_name} (launch attempted, focus not verified)."
     return f"Opened {app_name}."
 
 
@@ -875,6 +879,22 @@ def open_app(
 
     if path_arg:
         raw_p = str(path_arg).strip().strip("\"'")
+        # If the "path" is actually a URL, open it via OS default handler instead of
+        # treating it as a local file path (which previously produced file:///.../https:/...).
+        if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", raw_p):
+            try:
+                if _SYSTEM == "Windows":
+                    os.startfile(raw_p)
+                elif _SYSTEM == "Darwin":
+                    subprocess.Popen(["open", raw_p])
+                else:
+                    subprocess.Popen(["xdg-open", raw_p])
+                time.sleep(0.5)
+                if player:
+                    player.write_log(f"[open_app] {app_name} -> {raw_p}")
+                return f"Opened {raw_p} in default browser."
+            except Exception as e:
+                return f"Failed to open {raw_p}: {e}"
         norm_p = raw_p.replace("\\", "/")
         parts = [x for x in norm_p.split("/") if x]
 
@@ -949,10 +969,10 @@ def open_app(
 
     try:
         if launcher(normalized):
-            return _format_open_confirmation(app_name)
+            return _format_open_confirmation(app_name, launch_attempted=True)
         if normalized.lower() != app_name.lower():
             if launcher(app_name):
-                return _format_open_confirmation(app_name)
+                return _format_open_confirmation(app_name, launch_attempted=True)
         installed, _ = is_app_installed(app_name)
         if not installed:
             return f"Cannot open {app_name}: It is NOT installed on this PC."

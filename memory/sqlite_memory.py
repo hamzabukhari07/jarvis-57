@@ -17,7 +17,7 @@ import sqlite3
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
@@ -311,10 +311,62 @@ def sync_facts_from_dict(memory_dict: dict) -> None:
             print(f"[SQLite Memory] ⚠️ sync_facts error: {e}")
 
 
-def search_scroll_history(query: str, limit: int = 5, session_id: Optional[str] = None) -> list[dict]:
+def _rerank_by_recency(results: list[dict], weight: float, half_life_days: float) -> list[dict]:
+    """Blend BM25 relevance with recency.
+
+    BM25 alone is time-blind: a perfect keyword match from months ago
+    outranks today's mention of the same thing. Recency is scored with an
+    exponential decay (0.5 ** (age_days / half_life)) and blended with the
+    normalised BM25 relevance as:
+
+        final = (1 - weight) * relevance + weight * recency
+
+    Ties break towards the newer turn (higher turn id).
+    """
+    if not results or weight <= 0:
+        return results
+
+    weight = min(1.0, max(0.0, float(weight)))
+    half_life = max(1.0, float(half_life_days or 30.0))
+
+    ranks = [float(r.get("rank") or 0.0) for r in results]
+    lo, hi = min(ranks), max(ranks)
+    span = (hi - lo) or 1.0
+
+    now = datetime.now()
+    scored = []
+    for res, rk in zip(results, ranks):
+        relevance = (hi - rk) / span  # 1.0 = best BM25 match
+        recency = 0.0
+        ts = (res.get("timestamp") or "").strip()
+        if ts:
+            try:
+                moment = datetime.strptime(ts[:19], "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                moment = None
+            if moment is not None:
+                age_days = max(0.0, (now - moment).total_seconds() / 86400.0)
+                recency = 0.5 ** (age_days / half_life)
+        final = (1.0 - weight) * relevance + weight * recency
+        scored.append((final, int(res.get("id") or 0), res))
+
+    scored.sort(key=lambda item: (-item[0], -item[1]))
+    for final, _tid, res in scored:
+        res["score"] = round(final, 4)
+    return [item[2] for item in scored]
+
+
+def search_scroll_history(query: str, limit: int = 5, session_id: Optional[str] = None,
+                          recency_weight: float = 0.0,
+                          recency_half_life_days: float = 30.0) -> list[dict]:
     """
     Search historical verbatim turns and tool executions via FTS5 BM25 ranking.
     Returns matching snippets, role, timestamp, and tool execution details.
+
+    recency_weight > 0 blends recency into the BM25 ranking: a wider
+    candidate pool is fetched and re-scored by
+    (1 - w) * relevance + w * recency, so today's mention of a topic
+    outranks a months-old exact keyword match. 0.0 keeps pure BM25.
     """
     if not query or not query.strip():
         return []
@@ -329,6 +381,11 @@ def search_scroll_history(query: str, limit: int = 5, session_id: Optional[str] 
     fts_query = " OR ".join(f'"{t}"*' for t in terms if len(t) > 1)
     if not fts_query:
         fts_query = f'"{clean_q}"*'
+
+    # With recency blending we need a wider candidate pool to re-rank from.
+    sql_limit = limit
+    if recency_weight > 0:
+        sql_limit = min(max(limit * 5, limit + 20), 200)
 
     results = []
     with _db_lock:
@@ -346,7 +403,7 @@ def search_scroll_history(query: str, limit: int = 5, session_id: Optional[str] 
                     ORDER BY rank ASC, t.id DESC
                     LIMIT ?
                     """,
-                    (fts_query, session_id, limit),
+                    (fts_query, session_id, sql_limit),
                 )
             else:
                 cursor = conn.execute(
@@ -360,7 +417,7 @@ def search_scroll_history(query: str, limit: int = 5, session_id: Optional[str] 
                     ORDER BY rank ASC, t.id DESC
                     LIMIT ?
                     """,
-                    (fts_query, limit),
+                    (fts_query, sql_limit),
                 )
             for row in cursor.fetchall():
                 results.append({
@@ -389,7 +446,7 @@ def search_scroll_history(query: str, limit: int = 5, session_id: Optional[str] 
                         ORDER BY id DESC
                         LIMIT ?
                         """,
-                        (like_term, like_term, like_term, session_id, limit),
+                        (like_term, like_term, like_term, session_id, sql_limit),
                     )
                 else:
                     cursor = conn.execute(
@@ -400,7 +457,7 @@ def search_scroll_history(query: str, limit: int = 5, session_id: Optional[str] 
                         ORDER BY id DESC
                         LIMIT ?
                         """,
-                        (like_term, like_term, like_term, limit),
+                        (like_term, like_term, like_term, sql_limit),
                     )
                 for row in cursor.fetchall():
                     results.append(dict(row))
@@ -408,7 +465,10 @@ def search_scroll_history(query: str, limit: int = 5, session_id: Optional[str] 
             except Exception as e2:
                 print(f"[SQLite Memory] ⚠️ search_scroll_history error: {e2}")
 
-    return results
+    if recency_weight > 0 and results:
+        results = _rerank_by_recency(results, recency_weight, recency_half_life_days)
+
+    return results[:limit]
 
 
 def expand_turns(lo: int, hi: int, session_id: Optional[str] = None) -> list[dict]:
@@ -456,6 +516,181 @@ def expand_turns(lo: int, hi: int, session_id: Optional[str] = None) -> list[dic
     return results
 
 
+_PERIOD_DAYS = {
+    "today": 1,
+    "yesterday": 1,
+    "last_3_days": 3,
+    "last_7_days": 7,
+    "last_14_days": 14,
+    "last_30_days": 30,
+}
+
+
+def resolve_period(period: Optional[str] = None,
+                   since: Optional[str] = None,
+                   until: Optional[str] = None) -> tuple[Optional[str], Optional[str]]:
+    """Resolve a (since, until) 'YYYY-MM-DD' window from model-friendly inputs.
+
+    'period' is the coarse form the model uses for "kal" / "yesterday" /
+    "last week" style questions. Explicit 'since'/'until' win over it and
+    are used verbatim. Both bounds are INCLUSIVE and are compared against
+    the LOCAL calendar date, because turn timestamps are written with
+    datetime.now() (local time) by log_turn().
+    """
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+
+    s = str(since or "").strip() or None
+    u = str(until or "").strip() or None
+    if s or u:
+        return s, u
+
+    p = str(period or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if p == "yesterday":
+        y = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        return y, y
+    days = _PERIOD_DAYS.get(p)
+    if days:
+        start = (now - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+        return start, today
+    return None, None
+
+
+def _period_clause(since: Optional[str], until: Optional[str], session_id: Optional[str]) -> tuple[str, list]:
+    """Build the shared WHERE fragment for date-window / session queries."""
+    clauses: list[str] = []
+    params: list = []
+    if since:
+        clauses.append("substr(timestamp, 1, 10) >= ?")
+        params.append(since)
+    if until:
+        clauses.append("substr(timestamp, 1, 10) <= ?")
+        params.append(until)
+    if session_id:
+        clauses.append("session_id = ?")
+        params.append(session_id)
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    return where, params
+
+
+def list_sessions(limit: int = 10,
+                  since: Optional[str] = None,
+                  until: Optional[str] = None,
+                  session_id: Optional[str] = None) -> list[dict]:
+    """List conversation sessions ordered by recency (most recent first).
+
+    Each row carries the session id, its start/end timestamps, the turn
+    count and the opening user utterance (the topic hint), so callers can
+    tell *what* each session was about without loading every turn.
+    """
+    limit = max(1, min(int(limit or 10), 50))
+    where, params = _period_clause(since, until, session_id)
+    sessions: list[dict] = []
+    with _db_lock:
+        try:
+            conn = _get_connection()
+            cursor = conn.execute(
+                """
+                SELECT session_id,
+                       MIN(timestamp) AS start_time,
+                       MAX(timestamp) AS end_time,
+                       COUNT(*)       AS turn_count
+                FROM turns
+                """
+                + where
+                + """
+                GROUP BY session_id
+                ORDER BY end_time DESC
+                LIMIT ?
+                """,
+                (*params, limit),
+            )
+            for row in cursor.fetchall():
+                sessions.append(dict(row))
+            conn.close()
+        except Exception as e:
+            print(f"[SQLite Memory] ⚠️ list_sessions error: {e}")
+
+    # Topic hint: first user utterance of each session (cheap, one query each).
+    for sess in sessions:
+        try:
+            head = get_recent_turns(limit=1, session_id=sess["session_id"], newest_first=False)
+            sess["topic"] = (head[0].get("content") or "").strip() if head else ""
+        except Exception:
+            sess["topic"] = ""
+    return sessions
+
+
+def get_recent_turns(limit: int = 30,
+                     since: Optional[str] = None,
+                     until: Optional[str] = None,
+                     session_id: Optional[str] = None,
+                     newest_first: bool = True) -> list[dict]:
+    """Fetch turns ordered by recency, optionally inside a date window.
+
+    Unlike search_scroll_history (which ranks by BM25 relevance) this is a
+    pure time-order view — it answers "what happened yesterday", not "what
+    matches this keyword".
+    """
+    limit = max(1, min(int(limit or 30), 200))
+    where, params = _period_clause(since, until, session_id)
+    order = "timestamp DESC, id DESC" if newest_first else "timestamp ASC, id ASC"
+    results: list[dict] = []
+    with _db_lock:
+        try:
+            conn = _get_connection()
+            cursor = conn.execute(
+                """
+                SELECT id, session_id, role, content, tool_name, tool_args, tool_result, timestamp
+                FROM turns
+                """
+                + where
+                + f" ORDER BY {order} LIMIT ?",
+                (*params, limit),
+            )
+            for row in cursor.fetchall():
+                results.append(dict(row))
+            conn.close()
+        except Exception as e:
+            print(f"[SQLite Memory] ⚠️ get_recent_turns error: {e}")
+    return results
+
+
+def get_session_turn_window(after: Optional[str] = None,
+                             session_id: Optional[str] = None) -> tuple[Optional[str], Optional[str]]:
+    """Return the (first, last) turn timestamps of a session.
+
+    'after' is a watermark: only turns with a timestamp strictly newer than
+    it are considered. This lets a caller ask for "the window of turns that
+    have not been summarised yet" without adding a watermark column to the
+    turns table.
+
+    Returns (None, None) when the session has no matching turns.
+    """
+    sess = session_id or _current_session_id
+    first: Optional[str] = None
+    last: Optional[str] = None
+    with _db_lock:
+        try:
+            conn = _get_connection()
+            cursor = conn.execute(
+                """
+                SELECT MIN(timestamp) AS first_ts, MAX(timestamp) AS last_ts
+                FROM turns
+                WHERE session_id = ? AND (? IS NULL OR timestamp > ?)
+                """,
+                (sess, after, after),
+            )
+            row = cursor.fetchone()
+            if row:
+                first = row["first_ts"]
+                last = row["last_ts"]
+            conn.close()
+        except Exception as e:
+            print(f"[SQLite Memory] ⚠️ get_session_turn_window error: {e}")
+    return first, last
+
+
 def search_unified_memory(query: str, limit: int = 8) -> str:
     """
     Unified recall:
@@ -472,8 +707,16 @@ def search_unified_memory(query: str, limit: int = 8) -> str:
     if not query_str:
         return facts_result
 
-    # 2. Fetch past conversation turns & tool actions via FTS5
-    past_turns = search_scroll_history(query_str, limit=4)
+    # 2. Fetch past conversation turns & tool actions via FTS5.
+    # Recency is blended into the ranking so today's mention of a topic
+    # outranks a months-old exact keyword match, and the history slice now
+    # honours the caller's limit instead of a hardcoded 4.
+    past_turns = search_scroll_history(
+        query_str,
+        limit=max(limit, 8),
+        recency_weight=0.35,
+        recency_half_life_days=14.0,
+    )
     
     sections = []
     if facts_result and not facts_result.startswith("Nothing stored about"):

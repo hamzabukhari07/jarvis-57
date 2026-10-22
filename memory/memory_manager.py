@@ -228,6 +228,65 @@ _CATEGORY_LABELS = {
 _IDENTITY_FIELDS = ["name", "age", "birthday", "city", "job",
                     "language", "school", "nationality"]
 
+# How many past sessions may appear in the system prompt.
+PROMPT_MAX_SESSIONS = 3
+
+
+def _session_rows(memory: dict) -> list[tuple[str, str, str]]:
+    """Flatten memory['sessions'] into (cat, key, value) rows.
+
+    Session summaries are the only condensed record of what a whole
+    conversation was about, so they are exactly what "what did we discuss
+    yesterday" needs. They live in a LIST rather than a category dict, which
+    is why every generic fact walker used to step straight over them — they
+    were write-only: saved by save_session_summary(), deleted by
+    pop_last_session(), and never reachable by recall_memory or the prompt.
+    """
+    rows: list[tuple[str, str, str]] = []
+    sessions = memory.get("sessions") if isinstance(memory, dict) else None
+    if not isinstance(sessions, list):
+        return rows
+    for entry in sessions:
+        if not isinstance(entry, dict):
+            continue
+        summary = str(entry.get("summary") or "").strip()
+        if not summary:
+            continue
+        date = str(entry.get("date") or "").strip() or "undated"
+        # Two sessions can share a date (the app was restarted, or a session
+        # ran across midnight). The start time keeps them distinguishable.
+        started = str(entry.get("started_at") or "").strip()
+        label = f"session {date} {started[11:16]}" if len(started) >= 16 else f"session {date}"
+        rows.append(("sessions", label, summary))
+    return rows
+
+
+def _fact_line(cat: str, key: str, val: str) -> str:
+    """Render one recall result line. Session summaries get their own shape
+    so the model can read them as a dated conversation, not a fact key."""
+    if cat == "sessions":
+        return f"{_pretty(key).capitalize()}: {val}"
+    return f"{cat}/{_pretty(key)}: {val}"
+
+
+def _recent_session_lines(memory: dict, budget: int) -> list[str]:
+    """Render the newest session summaries for the system prompt.
+
+    Newest first (the sessions list is append-only, so the tail is the
+    latest), capped at PROMPT_MAX_SESSIONS and by the remaining character
+    budget so this block can never blow the prompt up.
+    """
+    lines: list[str] = []
+    for _cat, key, summary in reversed(_session_rows(memory)):
+        line = f"  - {_pretty(key).capitalize()}: {summary}"
+        if budget - len(line) - 1 < 0:
+            break
+        lines.append(line)
+        budget -= len(line) + 1
+        if len(lines) >= PROMPT_MAX_SESSIONS:
+            break
+    return lines
+
 
 def format_memory_for_prompt(memory: dict | None) -> str:
     """Build the memory block that goes into the system prompt.
@@ -345,6 +404,21 @@ def format_memory_for_prompt(memory: dict | None) -> str:
             core_lines.append(f"{label}:")
             core_lines.extend(shown[cat])
 
+    # 2b. Recent conversation summaries. Without these the assistant has no
+    # idea that a topic was ever discussed, so it cannot recall it by name —
+    # it can only say "I do not know". This is what makes "what did we do
+    # yesterday" answerable without a tool round trip.
+    session_lines = _recent_session_lines(memory, budget=PROMPT_CORE_CHARS - used)
+    if session_lines:
+        core_lines.append("")
+        core_lines.append(
+            "RECENT CONVERSATIONS (summaries of past sessions — use these to "
+            "recall what was already discussed, and to answer questions about "
+            "previous days without guessing):"
+        )
+        core_lines.extend(session_lines)
+        used += sum(len(l) + 1 for l in session_lines)
+
     if not core_lines and not indexed:
         return ""
 
@@ -405,7 +479,7 @@ def _search_raw_facts(query: str, limit: int = 8) -> str:
     rows: list[tuple[int, str, str, str]] = []
     for cat, items in memory.items():
         if not isinstance(items, dict):
-            continue                     # skip 'sessions', which is a list
+            continue                     # other list-valued keys are not facts
         for key, entry in items.items():
             val = _entry_value(entry)
             if not val:
@@ -414,12 +488,20 @@ def _search_raw_facts(query: str, limit: int = 8) -> str:
             if s > 0:
                 rows.append((s, cat, key, val))
 
+    # Session summaries are stored in a list, so the category walker above
+    # never saw them. They are searchable now — this is the path that lets
+    # recall_memory answer "what did we discuss on <date>".
+    for cat, key, val in _session_rows(memory):
+        s = _score(words, cat, key, val) if words else 1
+        if s > 0:
+            rows.append((s, cat, key, val))
+
     if not rows:
         return (f"Nothing stored about '{query}'." if query
                 else "I have not stored anything about this person yet.")
 
     rows.sort(key=lambda r: (-r[0], r[2]))
-    lines = [f"{cat}/{_pretty(key)}: {val}" for _s, cat, key, val in rows[:max(1, limit)]]
+    lines = [_fact_line(cat, key, val) for _s, cat, key, val in rows[:max(1, limit)]]
     head  = (f"Stored facts matching '{query}':" if query
              else "Everything currently stored:")
     more  = (f"\n(+{len(rows) - len(lines)} more — search with a narrower keyword)"
@@ -485,8 +567,16 @@ forget_memory = forget
 _SESSION_MAX = 3   # safety cap — in practice 0-1 entries after pop
 
 
-def save_session_summary(summary: str, language: str = "") -> None:
-    """Append a 1-2 sentence session summary to long_term.json['sessions']."""
+def save_session_summary(summary: str, language: str = "",
+                         session_date: str = "", started_at: str = "") -> None:
+    """Append a 1-2 sentence session summary to long_term.json['sessions'].
+
+    'session_date' is the date the *conversation* happened (YYYY-MM-DD), not
+    the date the summary was written. A session that started at 23:50 on the
+    21st and was summarised at 00:10 on the 22nd belongs to the 21st — the
+    user remembers it as "last night". Falls back to today when omitted.
+    'started_at' optionally carries the session's start timestamp.
+    """
     summary = (summary or "").strip()
     if not summary:
         return
@@ -494,10 +584,15 @@ def save_session_summary(summary: str, language: str = "") -> None:
     sessions = memory.get("sessions", [])
     if not isinstance(sessions, list):
         sessions = []
+    now = datetime.now()
+    date = (session_date or "").strip()[:10] or now.strftime("%Y-%m-%d")
     entry: dict = {
-        "date":    datetime.now().strftime("%Y-%m-%d"),
+        "date":    date,
         "summary": summary[:280],
+        "saved_at": now.strftime("%Y-%m-%d %H:%M:%S"),
     }
+    if (started_at or "").strip():
+        entry["started_at"] = started_at.strip()[:19]
     if language:
         entry["language"] = language
     sessions.append(entry)

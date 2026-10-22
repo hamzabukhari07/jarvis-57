@@ -408,7 +408,10 @@ def call(contents, tier: str = FAST, config=None,
         return None
 
     cl = None
-    tried = [m for m in ladder if not _cooling(m)] or list(ladder)
+    tried = [m for m in ladder if not _cooling(m)]
+    if not tried:
+        # All rungs cooling — do not retry the full ladder; let caller fall back.
+        tried = []
     for model in tried:
         try:
             if model == LIVE:
@@ -435,12 +438,16 @@ def call(contents, tier: str = FAST, config=None,
             return resp
         except Exception as e:
             msg = str(e)
-            if ("429" in msg or "RESOURCE_EXHAUSTED" in msg
-                    or "503" in msg or "UNAVAILABLE" in msg):
+            if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
                 _cool(model)
-                print(f"[Gemini] {model}: unavailable/out of quota — skipping it for "
+                print(f"[Gemini] {model}: quota exhausted — skipping it for "
+                      f"{_COOLDOWN_SECONDS // 60} minutes")
+            elif "404" in msg or "NOT_FOUND" in msg or "not found" in msg.lower():
+                _cool(model)
+                print(f"[Gemini] {model}: model not found — retiring for "
                       f"{_COOLDOWN_SECONDS // 60} minutes")
             else:
+                # Transient (503/UNAVAILABLE/timeout) — do NOT cool; just log.
                 print(f"[Gemini] {model}: {type(e).__name__}: {msg[:140]}")
     return None
 

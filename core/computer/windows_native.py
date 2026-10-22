@@ -44,6 +44,21 @@ GWL_EXSTYLE = -20
 WS_EX_TOOLWINDOW = 0x00000080
 WS_EX_APPWINDOW = 0x00040000
 
+# ctypes.wintypes has no MONITORINFO, so it is defined here. rcWork is the
+# usable work area (excludes the taskbar); rcMonitor is the full display.
+# HMONITOR/HDC are also not guaranteed in ctypes.wintypes, so they are aliased.
+_HMONITOR = getattr(wintypes, "HMONITOR", ctypes.c_void_p)
+_HDC = getattr(wintypes, "HDC", ctypes.c_void_p)
+
+
+class _MONITORINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("rcMonitor", wintypes.RECT),
+        ("rcWork", wintypes.RECT),
+        ("dwFlags", wintypes.DWORD),
+    ]
+
 
 def _prof(stage: str, t0: float) -> None:
     """Emit a single [prof] timing line for a focus-pipeline stage (Step 2 profiling)."""
@@ -562,6 +577,9 @@ class WindowsNativeDriver:
                 "chrome": ["google chrome", "chrome"],
                 "edge": ["microsoft edge", "msedge", "edge"],
                 "browser": ["google chrome", "chrome", "edge", "brave", "firefox"],
+                "vs code": ["visual studio code", "code"],
+                "vscode": ["visual studio code", "code"],
+                "code": ["visual studio code", "code"],
             }
             target_aliases = APP_ALIASES_MAP.get(cleaned, [cleaned])
 
@@ -569,19 +587,21 @@ class WindowsNativeDriver:
 
             def _enum_cb(hwnd: int, lparam: int) -> bool:
                 nonlocal matched_hwnd
-                if self.is_real_top_level_window(hwnd) and not self.is_self_or_console_window(hwnd):
+                if self.is_real_top_level_window(hwnd):
                     w_title = self.get_window_title(hwnd).lower().strip()
+                    # If target is explicitly VS Code / code, allow matching even if self_or_console (or bypass console check for target apps)
                     if any(a in w_title for a in target_aliases):
-                        matched_hwnd = hwnd
-                        return False
-                    # Also check process name if title doesn't contain alias
+                        if any(k in cleaned for k in ("code", "vs code", "vscode")) or not self.is_self_or_console_window(hwnd):
+                            matched_hwnd = hwnd
+                            return False
                     try:
                         pid = ctypes.c_ulong()
                         self.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
                         pname = (psutil.Process(pid.value).name() or "").lower()
                         if any(a in pname for a in target_aliases):
-                            matched_hwnd = hwnd
-                            return False
+                            if any(k in cleaned for k in ("code", "vs code", "vscode")) or not self.is_self_or_console_window(hwnd):
+                                matched_hwnd = hwnd
+                                return False
                     except Exception:
                         pass
                 return True
@@ -607,13 +627,21 @@ class WindowsNativeDriver:
                 fg_hwnd = self.user32.GetForegroundWindow()
                 if fg_hwnd and not self.is_self_or_console_window(fg_hwnd):
                     self.user32.ShowWindow(fg_hwnd, SW_MINIMIZE)
-                    return True
+                    # Verify the window actually became minimized (IsIconic == True)
+                    time.sleep(0.05)
+                    # Success only if window is now iconic (verified post-condition)
+                    if self.user32.IsIconic(fg_hwnd):
+                        return True
+                    return False
                 return False
 
             APP_ALIASES_MAP = {
                 "chrome": ["google chrome", "chrome"],
                 "edge": ["microsoft edge", "msedge", "edge"],
                 "browser": ["google chrome", "chrome", "edge", "brave", "firefox"],
+                "vs code": ["visual studio code", "code"],
+                "vscode": ["visual studio code", "code"],
+                "code": ["visual studio code", "code"],
             }
             target_aliases = APP_ALIASES_MAP.get(cleaned, [cleaned])
 
@@ -621,18 +649,20 @@ class WindowsNativeDriver:
 
             def _enum_cb(hwnd: int, lparam: int) -> bool:
                 nonlocal matched_hwnd
-                if self.is_real_top_level_window(hwnd) and not self.is_self_or_console_window(hwnd):
+                if self.is_real_top_level_window(hwnd):
                     w_title = self.get_window_title(hwnd).lower().strip()
                     if any(a in w_title for a in target_aliases):
-                        matched_hwnd = hwnd
-                        return False
+                        if any(k in cleaned for k in ("code", "vs code", "vscode")) or not self.is_self_or_console_window(hwnd):
+                            matched_hwnd = hwnd
+                            return False
                     try:
                         pid = ctypes.c_ulong()
                         self.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
                         pname = (psutil.Process(pid.value).name() or "").lower()
                         if any(a in pname for a in target_aliases):
-                            matched_hwnd = hwnd
-                            return False
+                            if any(k in cleaned for k in ("code", "vs code", "vscode")) or not self.is_self_or_console_window(hwnd):
+                                matched_hwnd = hwnd
+                                return False
                     except Exception:
                         pass
                 return True
@@ -640,11 +670,142 @@ class WindowsNativeDriver:
             self.user32.EnumWindows(WNDENUMPROC(_enum_cb), 0)
             if matched_hwnd:
                 self.user32.ShowWindow(matched_hwnd, SW_MINIMIZE)
-                return True
+                time.sleep(0.05)
+                # Only report success if the window actually became minimized
+                return bool(self.user32.IsIconic(matched_hwnd))
         except Exception as e:
             if ZEZO_PROFILE:
                 print(f"[WindowsNative] Minimize error: {e}")
         return False
+
+    def list_monitors(self) -> List[Dict[str, int]]:
+        """Enumerate the connected monitors with their work-area bounds (index 0 = primary)."""
+        if not self.is_windows or not self.user32:
+            return []
+        out: List[Dict[str, int]] = []
+        try:
+            handles: List[int] = []
+            MONITORENUMPROC = ctypes.WINFUNCTYPE(
+                wintypes.BOOL, _HMONITOR, _HDC,
+                ctypes.POINTER(wintypes.RECT), wintypes.LPARAM,
+            )
+
+            def _mcb(hmon, hdc, lprc, data):
+                try:
+                    handles.append(int(hmon))
+                except (TypeError, ValueError):
+                    pass
+                return True
+
+            # Explicit argtypes: without them ctypes passes 32-bit ints and the
+            # 64-bit HMONITOR handle is truncated.
+            self.user32.EnumDisplayMonitors.argtypes = [
+                _HDC, ctypes.c_void_p, MONITORENUMPROC, wintypes.LPARAM,
+            ]
+            self.user32.EnumDisplayMonitors.restype = wintypes.BOOL
+            self.user32.GetMonitorInfoW.argtypes = [
+                _HMONITOR, ctypes.POINTER(_MONITORINFO),
+            ]
+            self.user32.GetMonitorInfoW.restype = wintypes.BOOL
+
+            self.user32.EnumDisplayMonitors(None, None, MONITORENUMPROC(_mcb), 0)
+            for idx, hmon in enumerate(handles):
+                mi = _MONITORINFO()
+                mi.cbSize = ctypes.sizeof(mi)
+                if not self.user32.GetMonitorInfoW(_HMONITOR(hmon), ctypes.byref(mi)):
+                    continue
+                r = mi.rcWork
+                out.append({
+                    "index": idx,
+                    "left": r.left,
+                    "top": r.top,
+                    "width": r.right - r.left,
+                    "height": r.bottom - r.top,
+                })
+            return out
+        except Exception as e:
+            if ZEZO_PROFILE:
+                print(f"[WindowsNative] list_monitors error: {e}")
+            return []
+
+    def move_window_to_monitor(self, title_or_app: str = "", monitor_index: int = 1) -> bool:
+        """
+        Move a window onto the monitor at `monitor_index` (0 = primary).
+
+        Without this, a window can only be opened "wherever the OS puts it"; the
+        caller has no way to honour a request like "open it on my second monitor".
+        """
+        if not self.is_windows or not self.user32:
+            return False
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            matched_hwnd = None
+            cleaned = (title_or_app or "").strip().lower()
+            if not cleaned:
+                matched_hwnd = self.user32.GetForegroundWindow()
+            else:
+                WNDENUMPROC = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+                def _cb(hwnd, lp):
+                    nonlocal matched_hwnd
+                    if self.is_real_top_level_window(hwnd) and not self.is_self_or_console_window(hwnd):
+                        if cleaned in (self.get_window_title(hwnd) or "").lower():
+                            matched_hwnd = hwnd
+                            return False
+                    return True
+
+                self.user32.EnumWindows(WNDENUMPROC(_cb), 0)
+
+            if not matched_hwnd:
+                return False
+
+            monitors = self.list_monitors()
+            if not monitors or monitor_index < 0 or monitor_index >= len(monitors):
+                return False
+            mon = monitors[monitor_index]
+
+            # Explicit argtypes: the default c_int would truncate a 64-bit HWND.
+            self.user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+            self.user32.GetWindowRect.restype = wintypes.BOOL
+
+            r = wintypes.RECT()
+            if not self.user32.GetWindowRect(wintypes.HWND(matched_hwnd), ctypes.byref(r)):
+                return False
+            w = r.right - r.left
+            h = r.bottom - r.top
+            if w <= 0 or h <= 0:
+                return False
+
+            # Bug #7 fix: Only restore if window is maximized. A maximized window
+            # reports a screen-sized rect; restore it first so the moved window
+            # keeps its real size. If not maximized, skip the restore.
+            SW_MAXIMIZE = 3
+            SW_RESTORE = 9
+            if self.user32.IsZoomed(matched_hwnd):
+                self.user32.ShowWindow(matched_hwnd, SW_RESTORE)
+                time.sleep(0.05)
+                self.user32.GetWindowRect(matched_hwnd, ctypes.byref(r))
+                w = r.right - r.left
+                h = r.bottom - r.top
+
+            SWP_SHOWWINDOW = 0x0040
+            # Explicit argtypes: the default c_int would truncate a 64-bit HWND.
+            self.user32.SetWindowPos.argtypes = [
+                wintypes.HWND, wintypes.HWND,
+                ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.UINT,
+            ]
+            self.user32.SetWindowPos.restype = wintypes.BOOL
+            return bool(self.user32.SetWindowPos(
+                wintypes.HWND(matched_hwnd), None,
+                mon["left"] + 40, mon["top"] + 40, w, h,
+                SWP_SHOWWINDOW,
+            ))
+        except Exception as e:
+            if ZEZO_PROFILE:
+                print(f"[WindowsNative] move_window_to_monitor error: {e}")
+            return False
 
     def focus_browser_or_app_window(self, hwnd: Optional[int] = None) -> bool:
         """

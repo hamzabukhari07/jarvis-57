@@ -47,6 +47,12 @@ CATEGORY_COLORS = {
 
 DEFAULT_CATEGORIES = ["profile", "project", "preference", "relationship", "knowledge"]
 
+# How many turns of a conversation end up in its vault node. The opening
+# turns state the topic, the closing turns show what actually happened;
+# the middle of a long session is noise.
+_VAULT_HEAD_TURNS = 8
+_VAULT_TAIL_TURNS = 12
+
 
 class VaultEngine:
     """Manages the local Markdown vault and compiles the interactive knowledge graph."""
@@ -198,21 +204,62 @@ class VaultEngine:
         # Synthesize real conversation memories from SQLite turns
         self.sync_real_conversations_from_db()
 
+    def _is_user_owned(self, path: Path) -> bool:
+        """True when the user has taken ownership of a note.
+
+        Auto-generated conversation nodes carry `auto_generated: true` in their
+        frontmatter. Saving one by hand flips it to `false`, which tells the
+        DB sync to leave the note alone forever. A note we cannot read is
+        treated as user-owned — never clobber something we cannot inspect.
+        """
+        try:
+            meta, _body = self._parse_frontmatter(path.read_text(encoding="utf-8"))
+        except Exception:
+            return True
+        return str(meta.get("auto_generated", "")).strip().lower() == "false"
+
+    def _sample_session_turns(self, cursor, sess_id: str) -> list[tuple]:
+        """Opening + closing turns of a session, merged and in chronological order."""
+        cursor.execute("""
+            SELECT role, content, tool_name, timestamp, id
+            FROM turns
+            WHERE session_id = ?
+            ORDER BY id ASC
+            LIMIT ?
+        """, (sess_id, _VAULT_HEAD_TURNS))
+        head = cursor.fetchall()
+        cursor.execute("""
+            SELECT role, content, tool_name, timestamp, id
+            FROM turns
+            WHERE session_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+        """, (sess_id, _VAULT_TAIL_TURNS))
+        tail = cursor.fetchall()
+        merged = {row[4]: row for row in head}
+        merged.update({row[4]: row for row in tail})
+        return [merged[k] for k in sorted(merged)]
+
     def sync_real_conversations_from_db(self, limit_sessions: int = 25) -> int:
         """
         Dynamically inspect real conversation turns from zezo_brain.db
         and synthesize them into structured Markdown knowledge nodes with [[wikilinks]].
+
+        Existing nodes are REFRESHED, not skipped. A node used to be written
+        once from the first 12 turns of its session and then frozen forever,
+        so a 55-turn conversation stayed a 12-turn stub. A node the user has
+        edited by hand carries `auto_generated: false` and is never touched.
         """
         db_file = BASE_DIR / "memory" / "zezo_brain.db"
         if not db_file.exists():
             return 0
 
-        created_count = 0
+        written_count = 0
         try:
             import sqlite3
             with sqlite3.connect(str(db_file), timeout=5.0) as conn:
                 cursor = conn.cursor()
-                
+
                 # Fetch distinct sessions with their date and sample turns
                 cursor.execute("""
                     SELECT session_id, MIN(timestamp) as start_time, COUNT(*) as turn_count
@@ -228,18 +275,12 @@ class VaultEngine:
                     # Clean identifier
                     slug = f"conv_{sess_id.replace('sess_', '')}"
                     target_file = self.vault_dir / f"{slug}.md"
-                    if target_file.exists():
-                        continue
+                    if target_file.exists() and self._is_user_owned(target_file):
+                        continue  # the user edited this node — never overwrite it
 
-                    # Fetch user and assistant messages for this session
-                    cursor.execute("""
-                        SELECT role, content, tool_name, timestamp
-                        FROM turns
-                        WHERE session_id = ?
-                        ORDER BY id ASC
-                        LIMIT 12
-                    """, (sess_id,))
-                    turns = cursor.fetchall()
+                    # Opening turns state the topic, closing turns show what
+                    # happened; the middle of a long session is noise.
+                    turns = self._sample_session_turns(cursor, sess_id)
                     if not turns:
                         continue
 
@@ -248,7 +289,7 @@ class VaultEngine:
                     highlights = []
                     tools_used = set()
 
-                    for role, content, tool_name, _ in turns:
+                    for role, content, tool_name, _ts, _id in turns:
                         if tool_name:
                             tools_used.add(tool_name)
                         if role == "user" and not primary_topic and content:
@@ -282,7 +323,8 @@ class VaultEngine:
                         f"title: {primary_topic}",
                         "category: knowledge",
                         f"updated: {date_str}",
-                        f"tags: [conversation, {len(turns)}_turns]",
+                        f"tags: [conversation, {turn_count}_turns]",
+                        "auto_generated: true",
                         "---",
                         "",
                         f"# {primary_topic}",
@@ -290,7 +332,7 @@ class VaultEngine:
                         f"Live interaction recorded on **{start_time or date_str}** ({turn_count} total turns).",
                         "",
                         "## Conversation Excerpts",
-                        *highlights[:6],
+                        *highlights[:10],
                         "",
                         "## Connected Context",
                         "- Related Nodes: " + ", ".join(list(dict.fromkeys(detected_links))),
@@ -300,12 +342,12 @@ class VaultEngine:
                         node_content.append(f"- Autonomous Tools Dispatched: {', '.join(sorted(tools_used))}")
 
                     target_file.write_text("\n".join(node_content), encoding="utf-8")
-                    created_count += 1
+                    written_count += 1
 
         except Exception as e:
             print(f"[VaultEngine] Error syncing conversations from db: {e}")
 
-        return created_count
+        return written_count
 
     def _parse_frontmatter(self, text: str) -> tuple[Dict[str, Any], str]:
         """Extract yaml-style frontmatter headers from markdown content."""
@@ -403,13 +445,24 @@ class VaultEngine:
             }
 
     def save_note(self, file_name: str, content: str) -> Dict[str, Any]:
-        """Save or update a markdown note."""
+        """Save or update a markdown note.
+
+        Manually saving an auto-generated conversation node *claims* it: the
+        `auto_generated` flag is flipped to false so the next database sync
+        leaves the user's edits alone instead of regenerating over them.
+        """
         with _vault_lock:
             safe_name = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", file_name.strip())
             if not safe_name.endswith(".md"):
                 safe_name += ".md"
 
             target_path = self.vault_dir / safe_name
+            content = re.sub(
+                r"^auto_generated:\s*true\s*$",
+                "auto_generated: false",
+                content,
+                flags=re.MULTILINE,
+            )
             target_path.write_text(content, encoding="utf-8")
             return {"status": "success", "file": safe_name}
 
@@ -475,6 +528,35 @@ class VaultEngine:
             title_to_node_id[n["file"].replace(".md", "").lower()] = node_id
 
             color = CATEGORY_COLORS.get(n["category"], CATEGORY_COLORS["knowledge"])
+
+            # Extract date & timestamp from conv_YYYYMMDD_HHMMSS slug or updated field
+            node_date = ""
+            node_ts = 0.0
+            slug_match = re.search(r"conv_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})", node_id)
+            if slug_match:
+                y, m, d, h, mi, s = slug_match.groups()
+                node_date = f"{y}-{m}-{d} {h}:{mi}:{s}"
+                try:
+                    import datetime
+                    dt = datetime.datetime(int(y), int(m), int(d), int(h), int(mi), int(s))
+                    node_ts = dt.timestamp()
+                except Exception:
+                    node_ts = float(n.get("updated") if isinstance(n.get("updated"), (int, float)) else 0.0)
+            else:
+                raw_up = n.get("updated")
+                if isinstance(raw_up, (int, float)):
+                    node_ts = float(raw_up)
+                    import datetime
+                    node_date = datetime.datetime.fromtimestamp(node_ts).strftime("%Y-%m-%d %H:%M:%S")
+                elif isinstance(raw_up, str) and raw_up:
+                    node_date = raw_up
+                    try:
+                        import datetime
+                        dt = datetime.datetime.fromisoformat(raw_up)
+                        node_ts = dt.timestamp()
+                    except Exception:
+                        node_ts = 0.0
+
             nodes.append({
                 "id": node_id,
                 "label": n["title"],
@@ -484,6 +566,9 @@ class VaultEngine:
                 "color": color,
                 "size": max(14, min(36, 12 + (n["size"] // 80))),
                 "tags": n.get("tags", []),
+                "updated": n.get("updated", ""),
+                "date": node_date,
+                "timestamp": node_ts,
             })
             node_id_set.add(node_id)
 

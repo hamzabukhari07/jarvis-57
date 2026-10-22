@@ -464,6 +464,53 @@ def _handle_clipboard(params: dict, action: str, **_) -> str:
     return input_driver.set_clipboard(paste_txt)
 
 
+def _handle_move_to_monitor(params: dict, **_) -> str:
+    """Move a window onto a specific monitor (0 = primary, 1 = second, ...)."""
+    target = params.get("title") or params.get("text") or params.get("app") or params.get("app_name") or ""
+    try:
+        idx = int(params.get("monitor_index", params.get("monitor", 1)))
+    except (TypeError, ValueError):
+        idx = 1
+
+    monitors = windows_native.list_monitors()
+    if not monitors:
+        return "No monitors detected."
+    if idx < 0 or idx >= len(monitors):
+        return (f"Monitor index {idx} is out of range — {len(monitors)} monitor(s) connected "
+                f"(valid indices 0-{len(monitors) - 1}).")
+
+    if windows_native.move_window_to_monitor(str(target), idx):
+        m = monitors[idx]
+        return f"Moved {target or 'active window'} to monitor {idx} ({m['width']}x{m['height']})."
+    return f"Failed to move {target or 'active window'} to monitor {idx}."
+
+
+def _handle_list_monitors(**_) -> str:
+    """List the connected monitors and their resolutions."""
+    monitors = windows_native.list_monitors()
+    if not monitors:
+        return "No monitors detected."
+    lines = [f"Monitor {m['index']}: {m['width']}x{m['height']} at ({m['left']}, {m['top']})"
+             for m in monitors]
+    return f"{len(monitors)} monitor(s) connected:\n" + "\n".join(lines)
+
+
+def _handle_calculator_read(**_) -> str:
+    """Read the current value displayed in the Windows Calculator via UIA."""
+    try:
+        from actions.screen_processor import get_active_window_context
+        ctx = get_active_window_context()
+        hwnd = ctx.get("hwnd", 0)
+        if not hwnd:
+            return "No active window to read calculator display from."
+        val = windows_uia.read_calculator_display(hwnd)
+        if val:
+            return f"Calculator display: {val}"
+        return "Could not read calculator display value."
+    except Exception as e:
+        return f"Calculator read failed: {e}"
+
+
 def _handle_active_window_info(**_) -> str:
     from actions.screen_processor import get_active_window_context, get_display_metrics
     ctx = get_active_window_context()
@@ -618,6 +665,10 @@ _ACTION_ROUTER: Dict[str, Callable] = {
     "fullscreen_window": _handle_window,
     "minimize": _handle_window,
     "minimize_window": _handle_window,
+    "move_to_monitor": _handle_move_to_monitor,
+    "move_window_to_monitor": _handle_move_to_monitor,
+    "list_monitors": _handle_list_monitors,
+    "get_monitors": _handle_list_monitors,
     # Filesystem & Launch
     "open_folder": _handle_open_folder,
     "open_path": _handle_open_folder,
@@ -647,6 +698,9 @@ _ACTION_ROUTER: Dict[str, Callable] = {
     "direct_type": _handle_type,
     "read_text": lambda **_: (lambda h: windows_uia.read_window_text(h) if h else "No active window")(_get_active_foreground_hwnd()),
     "read_window_text": lambda **_: (lambda h: windows_uia.read_window_text(h) if h else "No active window")(_get_active_foreground_hwnd()),
+    "read_calculator": _handle_calculator_read,
+    "calculator_read": _handle_calculator_read,
+    "get_calculator_result": _handle_calculator_read,
     # Sleep / Delay
     "wait": lambda params, **_: (lambda s: (time.sleep(s), f"Waited {s}s")[1])(min(float(params.get("seconds", 1.0)), 30.0)),
     # OS State
@@ -706,7 +760,7 @@ TOOL = {
         "properties": {
             "action": {
                 "type": "STRING",
-                "description": "type | smart_type | direct_type | set_text | read_window_text | click | double_click | right_click | smart_click | drag | mouse_drag | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | maximize | maximize_window | minimize | minimize_window | fullscreen | close_window | close_tab | dismiss_dialog | close_popup | screen_find | screen_click | screen_double_click | get_active_window_info | random_data | user_data | batch"
+                "description": "type | smart_type | direct_type | set_text | read_window_text | read_calculator | click | double_click | right_click | smart_click | drag | mouse_drag | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | maximize | maximize_window | minimize | minimize_window | move_to_monitor | list_monitors | fullscreen | close_window | close_tab | dismiss_dialog | close_popup | screen_find | screen_click | screen_double_click | get_active_window_info | random_data | user_data | batch"
             },
             "sequence": {
                 "type": "ARRAY",
@@ -772,6 +826,10 @@ TOOL = {
             "title": {
                 "type": "STRING",
                 "description": "Window title for focus_window or close_window"
+            },
+            "monitor_index": {
+                "type": "INTEGER",
+                "description": "Target monitor index for move_to_monitor (0 = primary, 1 = second monitor)"
             },
             "description": {
                 "type": "STRING",

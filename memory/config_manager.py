@@ -442,15 +442,16 @@ def save_voice(voice_name: str) -> None:
 
 # ── Assistant response language ──────────────────────────────────────────────
 AVAILABLE_LANGUAGES = [
-    "auto",       # Dynamic Language Matching (Matches User's Spoken Language)
-    "English",    # Always English
-    "Urdu",       # Always Urdu
-    "Hindi",      # Always Hindi
-    "Spanish",    # Always Spanish
-    "French",     # Always French
-    "German",     # Always German
-    "Arabic",     # Always Arabic
-    "Turkish",    # Always Turkish
+    "auto",           # Dynamic Language Matching (Matches User's Spoken Language)
+    "English",        # Always English
+    "English Strict", # Always English (Strict enforcement)
+    "Urdu",           # Always Urdu
+    "Hindi",          # Always Hindi
+    "Spanish",        # Always Spanish
+    "French",         # Always French
+    "German",         # Always German
+    "Arabic",         # Always Arabic
+    "Turkish",        # Always Turkish
 ]
 DEFAULT_RESPONSE_LANGUAGE = "auto"
 

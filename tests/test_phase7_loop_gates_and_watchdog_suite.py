@@ -33,15 +33,15 @@ def test_loop_gates_doom_loop_detection():
     session = "test_sess_doom"
     params = {"file": "test.py", "action": "read"}
 
-    # First 3 calls should proceed
-    for _ in range(3):
+    # First 2 calls should proceed (early detection at threshold=2)
+    for _ in range(2):
         res = engine.evaluate("file_processor", params, session_id=session)
         assert res.decision == GateDecision.PROCEED
 
-    # 4th identical call triggers INTERRUPT with coaching feedback
+    # 3rd identical call triggers EARLY LOOP DETECTION (more aggressive)
     res = engine.evaluate("file_processor", params, session_id=session)
     assert res.decision == GateDecision.INTERRUPT
-    assert "⚠️ [DOOM-LOOP INTERRUPT]" in res.coaching_feedback
+    assert "EARLY LOOP DETECTION" in res.coaching_feedback
     assert "file_processor" in res.coaching_feedback
 
 

@@ -19,7 +19,7 @@ It does **not** describe static feature flows or temporary architectures, becaus
 - **Do NOT assume architecture or flows from memory or third-party assumptions.**
 - Before touching ANY file or debugging any problem:
   1. Inspect the **current implementation in the actual source code**.
-  2. Check the most recent entries in [`LEARNING_JOURNAL.md`](file:///d:/anitgravity/zezo%20work/jarvis-57/LEARNING_JOURNAL.md) to understand what was recently built, fixed, or updated.
+  2. Check the most recent entries in [`LEARNING_JOURNAL.md`](file:///d:/anitgravity/zezo%20work/jarvis-57/LEARNING_JOURNAL.md) (active, last 25 entries). For older history, grep [`LEARNING_JOURNAL_ARCHIVE.md`](file:///d:/anitgravity/zezo%20work/jarvis-57/LEARNING_JOURNAL_ARCHIVE.md) by the module/file name you are touching — do NOT read the whole archive.
 - If existing code differs from what you expected, **the updated code in the repository is intentional**. Understand why it was written before proposing any change.
 
 ### Rule 2: Never Overwrite or Degrade Updated Features (Anti-Regression)

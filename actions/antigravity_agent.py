@@ -1,15 +1,3 @@
-"""
-actions/antigravity_agent.py — Google Antigravity Agent for Zezo (Async).
-
-Auto-discovered by core/action_loader.
-Empowers Zezo with deep autonomous agentic coding, multi-file architecture,
-self-healing traceback debugging, and full project scaffolding.
-
-Integrates natively with the official Antigravity CLI ('agy') with hardware-enforced
-Job Object limits and CPU throttling, falling back to Gemini REST SDK when CLI is absent.
-Runs asynchronously via core/task_manager.py and returns immediately with a task_id.
-"""
-
 from __future__ import annotations
 
 import ctypes

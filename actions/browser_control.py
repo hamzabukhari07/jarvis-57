@@ -2160,6 +2160,10 @@ def _click_desktop(params: dict, target: str) -> Optional[str]:
             _focus_desktop_browser()
             input_driver.click(cx, cy)
             return _desktop_click_result(label, strategy, (cx, cy), hwnd, before_title)
+    except TimeoutError as e:
+        # Vision/OCR timeout: element not found within reasonable time
+        print(f"[BrowserControl] Vision/OCR timeout for '{label}': {e}")
+        return None
     except Exception:
         pass
 
@@ -2313,6 +2317,10 @@ def _act_click(params: dict) -> str:
     if not target:
         return "Missing selector or ref for click action."
 
+    # Timeout guard: 30 seconds max for the entire click operation
+    _CLICK_TIMEOUT = 30.0
+    _click_start = time.monotonic()
+
     if not _is_isolated(params):
         ident_err = _identity_gate(params)
         if ident_err or _use_desktop_path(params):
@@ -2392,8 +2400,17 @@ def _act_click(params: dict) -> str:
             try:
                 from actions.computer_control import _find_target_element_escalated
                 coords = _find_target_element_escalated(target)
+            except TimeoutError as e:
+                # OCR/vision timeout: element not found within reasonable time
+                print(f"[BrowserControl] Vision/OCR timeout for '{target}': {e}")
+                coords = None
             except Exception:
                 coords = None
+
+            # Timeout check: abort if 30 seconds have passed
+            if time.monotonic() - _click_start > _CLICK_TIMEOUT:
+                return f"Click operation timed out after {_CLICK_TIMEOUT}s. Could not find '{target}' on page."
+
             if coords and input_driver:
                 cx, cy, strategy = coords
                 hwnd = _resolve_desktop_browser_hwnd()
@@ -2671,10 +2688,7 @@ def _act_new_tab(params: dict) -> str:
     if isinstance(urls, (list, tuple)) and urls:
         base = {k: v for k, v in params.items() if k != "urls"}
         results = [_act_new_tab({**base, "url": str(u)}) for u in urls]
-        bad = [r for r in results if r.startswith(("Failed", "Validation error", "Refused", "No ", "Unable"))]
-        if bad:
-            return f"Opened {len(results) - len(bad)} of {len(results)} tabs. Problems: " + " | ".join(bad)
-        return f"Opened {len(results)} new tabs: " + ", ".join(str(u) for u in urls)
+        return "New tabs (per-URL status):\n" + "\n".join(results)
     url = (params.get("url") or "").strip()
     norm_url = _normalize_url(url) if url else "about:blank"
     _ACTION_STATE.url = norm_url if url else ""  # Step 4: free state for the suffix

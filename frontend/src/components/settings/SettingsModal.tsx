@@ -643,7 +643,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             if (cfg.voice_name) setVoiceName(cfg.voice_name)
             if (cfg.response_language) {
               const langMap: Record<string, string> = {
-                en: 'English',
+                en: 'English Strict',
+                en_strict: 'English Strict',
                 ur: 'Urdu',
                 hi: 'Hindi',
                 es: 'Spanish',
@@ -1543,7 +1544,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             </SelectTrigger>
                             <SelectContent className="bg-popover border-border text-popover-foreground text-xs">
                               <SelectItem value="auto">Auto-Detect (Matches Speech)</SelectItem>
-                              <SelectItem value="English">English (Strict)</SelectItem>
+                              <SelectItem value="English Strict">English (Strict)</SelectItem>
                               <SelectItem value="Urdu">Urdu / Roman Urdu</SelectItem>
                               <SelectItem value="Hindi">Hindi</SelectItem>
                               <SelectItem value="Spanish">Spanish</SelectItem>

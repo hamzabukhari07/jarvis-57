@@ -450,6 +450,93 @@ class WindowsUIADriver:
             return False
 
 
+    # Calculator state tracking - cache for continuation calculations
+    _calculator_cache: Optional[str] = None
+
+    def read_calculator_display(
+        self,
+        hwnd: int,
+        timeout_seconds: float = 0.8,
+    ) -> Optional[str]:
+        """Read the current value shown in the Windows Calculator result display via UIA."""
+        if not self.is_available or not hwnd:
+            return None
+
+        def _worker() -> Optional[str]:
+            _init_com_sta()
+            try:
+                app = Application(backend="uia").connect(handle=hwnd, timeout=timeout_seconds)
+                win = app.window(handle=hwnd)
+
+                # Try multiple fallback patterns for robustness (Bug #8, #9)
+                candidates = []
+
+                # Pattern 1: Standard automation_ids (UWP Calculator)
+                for el in win.descendants(depth=8):
+                    try:
+                        auto_id = str(getattr(el.element_info, "automation_id", "") or "").strip().lower()
+                        name = (el.window_text() or "").strip()
+                        if auto_id in ("calculatorresults", "normaloutput", "resulttext"):
+                            txt = name.strip()
+                            if txt.lower().startswith("display is "):
+                                txt = txt[len("display is "):].strip()
+                            if txt:
+                                candidates.append((1, auto_id, txt))
+                    except Exception:
+                        continue
+
+                # Pattern 2: Look for any Text/Static with numeric content
+                for el in win.descendants(depth=8):
+                    try:
+                        ctrl = (el.friendly_class_name() or "").strip().lower()
+                        if ctrl not in ("text", "static", "edit"):
+                            continue
+                        txt = (el.window_text() or "").strip()
+                        if txt and re.search(r"[\d.+\-*/=]", txt):
+                            candidates.append((2, ctrl, txt))
+                    except Exception:
+                        continue
+
+                # Pattern 3: Try window_text() directly on the window itself
+                try:
+                    win_txt = win.window_text()
+                    if win_txt and re.search(r"[\d.+\-*/=]", win_txt):
+                        candidates.append((3, "window", win_txt))
+                except Exception:
+                    pass
+
+                # Pattern 4: Try to find any element containing calculation results
+                for el in win.descendants(depth=6):
+                    try:
+                        name = (el.window_text() or "").strip()
+                        auto_id = str(getattr(el.element_info, "automation_id", "") or "").strip()
+                        # Check for any element with digits that could be a result
+                        if name and re.search(r"[\d.+\-*/=]", name) and not auto_id:
+                            candidates.append((4, "name_match", name))
+                    except Exception:
+                        continue
+
+                # Return best candidate (highest pattern priority)
+                if candidates:
+                    # Sort by priority (lower pattern number = higher priority)
+                    candidates.sort(key=lambda x: x[0])
+                    best = candidates[0][2]
+                    self._calculator_cache = best
+                    return best
+
+            except Exception:
+                pass
+
+            # Bug #9: Graceful fallback - return None if calculator is not running
+            return None
+
+        future = _UIA_EXECUTOR.submit(_worker)
+        try:
+            return future.result(timeout=timeout_seconds + 0.3)
+        except Exception:
+            return None
+
+
 # Global singleton instance
 windows_uia = WindowsUIADriver()
 

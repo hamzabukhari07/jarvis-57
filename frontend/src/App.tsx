@@ -223,10 +223,19 @@ export default function App() {
         ]
       }
 
-      // Deduplication guard: only ignore if this is an exact echo of an already finalized message
-      if (speaker === 'user' && last && last.role === 'user' && !last.id.startsWith(`live-${speaker}`)) {
-        if (last.text.trim().toLowerCase() === text.trim().toLowerCase()) {
+      // Deduplication guard: ignore an incoming turn that duplicates an existing user bubble
+      if (speaker === 'user' && last && last.role === 'user') {
+        const normLast = last.text.trim().toLowerCase()
+        const normText = text.trim().toLowerCase()
+        if (normLast === normText) {
           return prev
+        }
+        // Partial-dictation overlap: incoming finalized text contains the prior bubble
+        if (normText.length >= normLast.length && normText.includes(normLast) && normLast.length > 0) {
+          return [
+            ...prev.slice(0, -1),
+            { ...last, id: isDone ? `done-${speaker}-${Date.now()}` : last.id, text, createdAt: last.createdAt || new Date() },
+          ]
         }
       }
 

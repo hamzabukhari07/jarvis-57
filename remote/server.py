@@ -583,6 +583,11 @@ class DashboardServer:
     def _build_app(self) -> "FastAPI":
         app = FastAPI(docs_url=None, redoc_url=None)
 
+        @app.on_event("startup")
+        async def on_startup():
+            print(f"[Dashboard] http://{self._ip}:{PORT}")
+            print("[Dashboard] Press 'Remote Control' in JARVIS UI to get the QR code.")
+
         def _auth(req: Request) -> bool:
             tok = req.headers.get("authorization", "").removeprefix("Bearer ").strip()
             return bool(tok) and tok in self._tokens
@@ -977,8 +982,6 @@ class DashboardServer:
             self.app, host="0.0.0.0", port=PORT, log_level="error",
         )
 
-        print(f"[Dashboard] http://{self._ip}:{PORT}")
-        print("[Dashboard] Press 'Remote Control' in JARVIS UI to get the QR code.")
         await uvicorn.Server(cfg).serve()
 
 

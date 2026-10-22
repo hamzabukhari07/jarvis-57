@@ -55,7 +55,7 @@ _QT_NAME = {"ctrl": "Ctrl", "shift": "Shift", "alt": "Alt", "space": "Space",
 _POLL_HZ = 30.0
 # A key has to be down this long before we call it speech. It stops a stray
 # brush of the chord from opening the microphone.
-_DEBOUNCE_S = 0.06
+_DEBOUNCE_S = 0.02
 
 
 def chord_label(chord=DEFAULT_CHORD) -> str:
@@ -82,6 +82,8 @@ class PushToTalk:
         self._stop = threading.Event()
         self._held = False
         self._scope = "window"
+        self._last_press_time = 0.0  # monotonic timestamp of last press
+        self._last_release_time = 0.0  # monotonic timestamp of last release
 
     # ── state ───────────────────────────────────────────────────────────────
 
@@ -97,6 +99,16 @@ class PushToTalk:
     @property
     def label(self) -> str:
         return chord_label(self._chord)
+
+    @property
+    def last_press_time(self) -> float:
+        """Monotonic timestamp of the last chord press."""
+        return self._last_press_time
+
+    @property
+    def last_release_time(self) -> float:
+        """Monotonic timestamp of the last chord release."""
+        return self._last_release_time
 
     # ── lifecycle ───────────────────────────────────────────────────────────
 
@@ -139,6 +151,11 @@ class PushToTalk:
     def _set_held(self, held: bool) -> None:
         if held == self._held:
             return
+        now = time.monotonic()
+        if held:
+            self._last_press_time = now
+        else:
+            self._last_release_time = now
         self._held = held
         try:
             self._on_change(held)
