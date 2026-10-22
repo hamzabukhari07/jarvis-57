@@ -335,6 +335,11 @@ def _validate_and_ensure_focus(target_win: Optional[str]) -> Tuple[bool, int, st
 
 def _handle_type(params: dict, action: str, **_) -> str:
     text = _extract_text_field(params)
+    if not text and action in ("paste", "clipboard", "type_clipboard"):
+        try:
+            text = input_driver.get_clipboard()
+        except Exception:
+            text = ""
     target_win = params.get("title") or params.get("app") or params.get("window")
 
     with _DESKTOP_INPUT_LOCK:

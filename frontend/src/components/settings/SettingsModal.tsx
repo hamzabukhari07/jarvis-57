@@ -49,6 +49,7 @@ import { MemoryGraphCanvas, type GraphNode, type GraphLink } from '../memory/Mem
 import { MemoryInspectorDrawer } from '../memory/MemoryInspectorDrawer'
 import { NewMemoryModal } from '../memory/NewMemoryModal'
 import { ConfirmDialog } from '../reui/confirm-dialog'
+import { Frame, FramePanel } from '../reui/frame'
 
 interface SettingsModalProps {
   isOpen: boolean
@@ -996,11 +997,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* ── RIGHT MAIN CONTENT AREA ── */}
         <main className="flex-1 flex flex-col min-w-0 zezo-theme-main bg-background h-full overflow-hidden">
           {activeSection === 'memory' ? (
-            <div className="flex-1 flex flex-col w-full h-full min-h-0 p-4 md:p-6 gap-3 overflow-hidden">
+            <div className="flex-1 flex flex-col w-full h-full min-h-0 p-4 md:p-6 gap-4 overflow-hidden">
               <div className="flex items-center justify-between shrink-0">
                 <div>
                   <h2 className="text-xl font-bold text-foreground tracking-tight">Memory & Intelligence</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Explore connected knowledge nodes, Markdown vault notes, and SQLite FTS5 persistence.
                   </p>
                 </div>
@@ -1034,33 +1035,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* ── 1. Obsidian-Style Knowledge Graph & Inspector Drawer (Takes all remaining width & height!) ── */}
-              <div className="flex-1 w-full min-h-0 relative flex flex-col lg:flex-row gap-4 items-stretch overflow-hidden">
-                <div className="flex-1 min-w-0 h-full relative">
-                  <MemoryGraphCanvas
-                    nodes={graphNodes}
-                    links={graphLinks}
-                    selectedNodeId={selectedGraphNode?.id || null}
-                    onSelectNode={(node) => setSelectedGraphNode(node)}
-                    onRefresh={loadMemoryGraph}
-                    isLoading={isGraphLoading}
-                  />
-                </div>
+              <Frame spacing="xs" className="flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden">
+                <FramePanel className="flex-1 flex flex-col w-full h-full min-h-0 p-0 overflow-hidden">
+                  {/* ── 1. Obsidian-Style Knowledge Graph & Inspector Drawer (Takes all remaining width & height!) ── */}
+                  <div className="flex-1 w-full min-h-0 relative flex flex-col lg:flex-row gap-4 items-stretch overflow-hidden">
+                    <div className="flex-1 min-w-0 h-full relative">
+                      <MemoryGraphCanvas
+                        nodes={graphNodes}
+                        links={graphLinks}
+                        selectedNodeId={selectedGraphNode?.id || null}
+                        onSelectNode={(node) => setSelectedGraphNode(node)}
+                        onRefresh={loadMemoryGraph}
+                        isLoading={isGraphLoading}
+                      />
+                    </div>
 
-                {/* Slide-Out Inspector Drawer */}
-                {selectedGraphNode && (
-                  <div className="w-full lg:w-96 shrink-0 h-full rounded-2xl overflow-hidden border border-border shadow-xl">
-                    <MemoryInspectorDrawer
-                      node={selectedGraphNode}
-                      onClose={() => setSelectedGraphNode(null)}
-                      onNodeUpdated={() => {
-                        loadMemoryGraph()
-                      }}
-                      onSelectConnectedNode={handleSelectConnectedNode}
-                    />
+                    {/* Slide-Out Inspector Drawer */}
+                    {selectedGraphNode && (
+                      <div className="w-full lg:w-96 shrink-0 h-full rounded-2xl overflow-hidden border border-border shadow-xl">
+                        <MemoryInspectorDrawer
+                          node={selectedGraphNode}
+                          onClose={() => setSelectedGraphNode(null)}
+                          onNodeUpdated={() => {
+                            loadMemoryGraph()
+                          }}
+                          onSelectConnectedNode={handleSelectConnectedNode}
+                        />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </FramePanel>
+              </Frame>
 
               {/* New Memory Modal */}
               <NewMemoryModal

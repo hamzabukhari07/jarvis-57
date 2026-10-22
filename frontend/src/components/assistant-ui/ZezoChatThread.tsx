@@ -17,7 +17,6 @@ import {
   Square,
   Check,
   Copy,
-  RefreshCw,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
@@ -41,7 +40,7 @@ export const UserMessage: FC = () => {
       className="w-full max-w-3xl py-1 mx-auto group"
     >
       <PKMessage className="justify-end py-1">
-        <PKMessageContent className="rounded-2xl rounded-tr-xs px-3.5 py-2 bg-primary text-primary-foreground font-normal text-xs leading-relaxed shadow-xs max-w-xl break-words">
+        <PKMessageContent className="rounded-2xl rounded-tr-xs px-3.5 py-2 bg-primary text-primary-foreground font-normal text-xs leading-relaxed max-w-xl break-words">
           <MessagePrimitive.Parts />
         </PKMessageContent>
       </PKMessage>
@@ -83,7 +82,7 @@ export const AssistantMessage: FC = () => {
     >
       <PKMessage className="justify-start items-start gap-2.5 py-1">
         {/* Dynamic Holographic Qivi Companion Avatar Badge */}
-        <div className="shrink-0 w-8 h-8 rounded-full border border-[var(--border)] bg-[#090d16]/90 overflow-hidden shadow-xs flex items-center justify-center p-0.5">
+        <div className="shrink-0 w-8 h-8 rounded-full border border-[var(--border)] bg-card overflow-hidden flex items-center justify-center p-0.5">
           <ChatAvatarIcon
             size={26}
             expression={isRunning ? 'thinking' : 'happy'}
@@ -137,16 +136,6 @@ export const AssistantMessage: FC = () => {
                     </AuiIf>
                   </button>
                 </ActionBarPrimitive.Copy>
-
-                <ActionBarPrimitive.Reload asChild>
-                  <button
-                    type="button"
-                    className="p-1 hover:text-[var(--foreground)] hover:bg-[var(--secondary)] rounded-md text-[10px] transition-colors cursor-pointer"
-                    title="Regenerate speech"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
-                </ActionBarPrimitive.Reload>
               </ActionBarPrimitive.Root>
             </div>
           </div>
@@ -167,7 +156,7 @@ export const ZezoPillComposer: FC<{ placeholder?: string }> = ({
       <div className="max-w-3xl mx-auto w-full">
         <ComposerPrimitive.Root
           data-slot="aui-composer-root"
-          className="group relative flex items-center w-full rounded-full border border-[var(--border)] bg-[var(--card)]/90 backdrop-blur-xl shadow-xs hover:border-[var(--border)]/80 focus-within:border-[var(--accent)]/80 focus-within:ring-2 focus-within:ring-[var(--accent)]/20 pl-3.5 pr-1.5 py-1 transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          className="group relative flex items-center w-full rounded-full border border-[var(--border)] bg-[var(--card)]/90 backdrop-blur-xl hover:border-[var(--border)]/80 focus-within:border-[var(--accent)]/80 focus-within:ring-2 focus-within:ring-[var(--accent)]/20 pl-3.5 pr-1.5 py-1 transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
         >
           <ComposerPrimitive.Input
             data-slot="aui-composer-input"
@@ -183,7 +172,7 @@ export const ZezoPillComposer: FC<{ placeholder?: string }> = ({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 w-7 p-0 rounded-full border border-[var(--border)] hover:bg-[var(--secondary)] text-[var(--foreground)] shadow-xs transition-all shrink-0 cursor-pointer flex items-center justify-center animate-in zoom-in-95"
+                  className="h-7 w-7 p-0 rounded-full border border-[var(--border)] hover:bg-[var(--secondary)] text-[var(--foreground)] transition-all shrink-0 cursor-pointer flex items-center justify-center animate-in zoom-in-95"
                   title="Stop speaking"
                 >
                   <Square className="w-3.5 h-3.5 fill-current" />
@@ -193,7 +182,7 @@ export const ZezoPillComposer: FC<{ placeholder?: string }> = ({
               <ComposerPrimitive.Send asChild>
                 <Button
                   size="sm"
-                  className="h-7 w-7 p-0 bg-primary hover:opacity-90 text-primary-foreground font-semibold rounded-full shadow-xs transition-all shrink-0 cursor-pointer flex items-center justify-center"
+                  className="h-7 w-7 p-0 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground transition-all shrink-0 cursor-pointer flex items-center justify-center shadow-xs"
                   title="Send directive"
                 >
                   <ArrowUp className="w-3.5 h-3.5" />
@@ -207,74 +196,28 @@ export const ZezoPillComposer: FC<{ placeholder?: string }> = ({
   );
 };
 
-/* ── 4. Dedicated Zezo OS Real-Time Voice Conversation Thread ── */
-export interface ZezoChatThreadProps {
-  className?: string;
+export const ZezoChatThread: FC<{
   placeholder?: string;
-  emptyTitle?: string;
-  emptySubtitle?: string;
-  systemState?: 'idle' | 'listening' | 'speaking' | 'thinking' | 'sleeping';
-}
-
-export const ZezoChatThread: FC<ZezoChatThreadProps> = ({
-  className,
+  className?: string;
+  systemState?: string;
+}> = ({
   placeholder,
-  emptyTitle,
-  emptySubtitle,
-  systemState,
+  className,
 }) => {
   return (
-    <ThreadPrimitive.Root
-      data-slot="aui-thread-root"
-      className={cn("flex flex-col h-full w-full min-h-0 bg-transparent", className)}
-    >
-      {/* Viewport for Live Voice Speech Transcript Turns */}
+    <ThreadPrimitive.Root className={cn("flex flex-col h-full w-full bg-transparent overflow-hidden", className)}>
       <ThreadPrimitive.Viewport
         data-slot="aui-thread-viewport"
-        className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0"
+        className="flex-1 overflow-y-auto px-4 py-3 space-y-4 focus:outline-none scroll-smooth"
       >
-        <div className="max-w-3xl mx-auto w-full space-y-3">
-          <ThreadPrimitive.Empty>
-            <div className="flex flex-col items-center justify-center h-full text-center text-[var(--muted-foreground)] py-14">
-              <div className="w-13 h-13 rounded-2xl bg-[#090d16]/90 border border-[var(--border)] flex items-center justify-center mb-3 shadow-sm overflow-hidden p-1">
-                <ChatAvatarIcon
-                  size={44}
-                  expression="happy"
-                  state="idle"
-                />
-              </div>
-              <div className="text-sm font-semibold text-[var(--foreground)]">
-                {emptyTitle || "Ready to talk with ZEZO"}
-              </div>
-              <div className="text-xs font-mono text-[var(--muted-foreground)] mt-1.5 max-w-[280px] leading-relaxed">
-                {emptySubtitle || "Live voice transcription & directives. Speak into your microphone or enter directives below."}
-              </div>
-            </div>
-          </ThreadPrimitive.Empty>
-
-          <ThreadPrimitive.Messages
-            components={{
-              UserMessage: UserMessage,
-              AssistantMessage: AssistantMessage,
-            }}
-          />
-
-          {/* Real-time Thinking & Task Execution Indicator */}
-          {systemState === 'thinking' && (
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[var(--card)]/80 border border-amber-500/30 text-[var(--foreground)] max-w-xs shadow-xs animate-in fade-in duration-200">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-              </span>
-              <span className="text-[11px] font-mono text-amber-300 font-medium tracking-wide">
-                Thinking & executing task...
-              </span>
-            </div>
-          )}
-        </div>
+        <ThreadPrimitive.Messages
+          components={{
+            UserMessage: UserMessage,
+            AssistantMessage: AssistantMessage,
+          }}
+        />
       </ThreadPrimitive.Viewport>
 
-      {/* Ultra-Clean Single-Row Pill Composer */}
       <ZezoPillComposer placeholder={placeholder} />
     </ThreadPrimitive.Root>
   );

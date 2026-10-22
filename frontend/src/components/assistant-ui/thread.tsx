@@ -29,15 +29,11 @@ import { CodeBlock, CodeBlockCode } from "@/components/prompt-kit/code-block";
 import {
   ArrowUp,
   Square,
-  Sparkles,
   Loader2,
   Check,
   Copy,
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
-  Paperclip,
-  Activity,
   BrainCircuit,
   CheckCircle2,
   Code2,
@@ -70,7 +66,7 @@ export const ActionApprovalToolUI = makeAssistantToolUI({
   render: ({ args, result }) => {
     const isApproved = (result as any)?.approved === true;
     return (
-      <div className="my-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3.5 text-xs text-[var(--foreground)] shadow-xs">
+      <div className="my-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3.5 text-xs text-[var(--foreground)] ">
         <div className="flex items-center gap-2 mb-2 text-amber-400 font-semibold text-xs">
           <span>⚠️</span>
           <span>Autonomous L1 Safety Gate — Approval Required</span>
@@ -87,7 +83,7 @@ export const ActionApprovalToolUI = makeAssistantToolUI({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-[11px] transition-all shadow-xs"
+              className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-[11px] transition-all "
             >
               ✓ Authorize Execution
             </button>
@@ -104,85 +100,36 @@ export const ActionApprovalToolUI = makeAssistantToolUI({
   },
 });
 
-export const SystemStatusToolUI = makeAssistantToolUI({
-  toolName: "system_status",
-  render: ({ args: _args, result, status }) => {
-    const isRunning = status.type === "running";
-    return (
-      <div className="my-2.5 w-full max-w-3xl">
-        <ChainOfThought>
-          <ChainOfThoughtStep defaultOpen={true}>
-            <ChainOfThoughtTrigger
-              leftIcon={<Activity className="size-4 text-[var(--accent)]" />}
-            >
-              <span>System Telemetry & Health Probe</span>
-              <span className="ml-auto flex items-center gap-1 text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-[var(--secondary)] border border-[var(--border)] text-[var(--muted-foreground)]">
-                {isRunning ? (
-                  <>
-                    <Loader2 className="w-2.5 h-2.5 animate-spin text-[var(--accent)]" />
-                    <span>Polling Telemetry</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
-                    <span>Healthy</span>
-                  </>
-                )}
-              </span>
-            </ChainOfThoughtTrigger>
-            <ChainOfThoughtContent>
-              <ChainOfThoughtItem>
-                {isRunning
-                  ? `Gathering live system metrics: CPU, RAM, battery, active background processes...`
-                  : `Telemetry collected successfully across core system monitors.`}
-              </ChainOfThoughtItem>
-              {Boolean(result) && (
-                <ChainOfThoughtItem>
-                  <CodeBlock className="mt-1.5">
-                    <CodeBlockCode
-                      code={typeof result === "object" ? JSON.stringify(result, null, 2) : String(result)}
-                      language="json"
-                    />
-                  </CodeBlock>
-                </ChainOfThoughtItem>
-              )}
-            </ChainOfThoughtContent>
-          </ChainOfThoughtStep>
-        </ChainOfThought>
-      </div>
-    );
-  },
-});
-
-export const OpencodeAgentToolUI = makeAssistantToolUI({
-  toolName: "opencode_agent",
+export const FleetTaskToolUI = makeAssistantToolUI({
+  toolName: "fleet_task",
   render: ({ args, result, status }) => {
     const isRunning = status.type === "running";
-    const action = (args as any)?.action || "execute";
-    const agent = (args as any)?.agent || "Jim";
-    const target = (args as any)?.target || "active repository";
-    const prompt = (args as any)?.prompt || (args as any)?.instruction || "";
+    const agent = (args as any)?.agent || "Agent";
+    const target = (args as any)?.target || (args as any)?.task || "Task";
+    const prompt = (args as any)?.prompt || "";
+    const output = (result as any)?.output || (result as any)?.result || "";
 
     return (
-      <div className="my-2.5 w-full max-w-3xl">
+      <div className="my-2 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 text-xs text-[var(--foreground)] shadow-xs">
         <ChainOfThought>
-          {/* Phase 1: Agent & Target Context Step */}
           <ChainOfThoughtStep defaultOpen={true}>
             <ChainOfThoughtTrigger
-              leftIcon={<BrainCircuit className="size-4 text-[var(--accent)]" />}
+              leftIcon={<BrainCircuit className="size-4 text-[var(--accent)] animate-pulse" />}
             >
-              <span>Autonomous Action: {action} ({agent})</span>
-              <span className="ml-auto flex items-center gap-1 text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-[var(--secondary)] border border-[var(--border)] text-[var(--muted-foreground)]">
+              <span className="font-semibold text-xs">
+                Fleet Agent Dispatch: <strong>{agent}</strong>
+              </span>
+              <span className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--secondary)] text-[var(--muted-foreground)]">
                 {isRunning ? (
-                  <>
-                    <Loader2 className="w-2.5 h-2.5 animate-spin text-[var(--accent)]" />
-                    <span>Executing</span>
-                  </>
+                  <span className="flex items-center gap-1 text-[var(--accent)]">
+                    <Loader2 className="size-2.5 animate-spin" />
+                    Executing...
+                  </span>
                 ) : (
-                  <>
-                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
-                    <span>Completed</span>
-                  </>
+                  <span className="flex items-center gap-1 text-emerald-400">
+                    <CheckCircle2 className="size-2.5" />
+                    Completed
+                  </span>
                 )}
               </span>
             </ChainOfThoughtTrigger>
@@ -209,15 +156,8 @@ export const OpencodeAgentToolUI = makeAssistantToolUI({
                 </ChainOfThoughtItem>
               ) : (
                 <ChainOfThoughtItem>
-                  <CodeBlock className="mt-1">
-                    <CodeBlockCode
-                      code={
-                        result
-                          ? (typeof result === "object" ? JSON.stringify(result, null, 2) : String(result))
-                          : JSON.stringify(args || {}, null, 2)
-                      }
-                      language={typeof result === "object" ? "json" : "bash"}
-                    />
+                  <CodeBlock className="my-1 text-[11px]">
+                    <CodeBlockCode code={output || "Task execution finished successfully."} language="typescript" />
                   </CodeBlock>
                 </ChainOfThoughtItem>
               )}
@@ -229,8 +169,7 @@ export const OpencodeAgentToolUI = makeAssistantToolUI({
   },
 });
 
-/* ── 2. Official Assistant-UI Element Components ── */
-
+/* ── 2. User Message Component ── */
 export const UserMessage: FC = () => {
   return (
     <MessagePrimitive.Root
@@ -238,7 +177,7 @@ export const UserMessage: FC = () => {
       className="w-full max-w-3xl py-2 mx-auto group"
     >
       <PKMessage className="justify-end">
-        <PKMessageContent className="rounded-2xl rounded-tr-xs px-4 py-2.5 bg-primary text-primary-foreground font-normal text-xs leading-relaxed shadow-xs max-w-xl break-words">
+        <PKMessageContent className="rounded-2xl rounded-tr-xs px-3.5 py-2.5 bg-primary text-primary-foreground font-normal text-xs leading-relaxed max-w-xl break-words shadow-xs">
           <MessagePrimitive.Parts />
         </PKMessageContent>
       </PKMessage>
@@ -315,7 +254,7 @@ export const AssistantMessage: FC<{ agentName?: string; avatarName?: string }> =
         <PKMessageAvatar
           fallback={displayName.slice(0, 2).toUpperCase()}
           alt={displayName}
-          className="shrink-0 w-8 h-8 rounded-full border border-[var(--border)] bg-[#090d16] overflow-hidden shadow-xs flex items-center justify-center p-0.5"
+          className="shrink-0 w-8 h-8 rounded-full border border-[var(--border)] bg-card overflow-hidden flex items-center justify-center p-0.5"
         >
           {isZezo ? (
             <img
@@ -381,16 +320,6 @@ export const AssistantMessage: FC<{ agentName?: string; avatarName?: string }> =
               </AuiIf>
             </button>
           </ActionBarPrimitive.Copy>
-
-          <ActionBarPrimitive.Reload asChild>
-            <button
-              type="button"
-              className="p-1.5 hover:text-[var(--foreground)] hover:bg-[var(--secondary)] rounded-md text-[10px] transition-colors"
-              title="Regenerate"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
-          </ActionBarPrimitive.Reload>
         </ActionBarPrimitive.Root>
       </div>
     </MessagePrimitive.Root>
@@ -420,186 +349,80 @@ export const BranchPicker: FC = () => {
   );
 };
 
-export const Composer: FC<{ placeholder?: string; agentModel?: string; showUpload?: boolean }> = ({
+/* ── 3. ZezoChatThread Main Export Component ── */
+export const ZezoChatThread: FC<{
+  placeholder?: string;
+  agentName?: string;
+  avatarName?: string;
+  className?: string;
+  emptyTitle?: string;
+  emptySubtitle?: string;
+  showUpload?: boolean;
+}> = ({
   placeholder,
-  showUpload = false,
+  agentName,
+  avatarName,
+  className,
 }) => {
-  const isRunning = useAuiState((s) => s.thread.isRunning);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-
   return (
-    <div className="p-3 pb-4 shrink-0 bg-transparent relative z-10">
-      <div className="max-w-3xl mx-auto w-full">
-        {/* Hossain Jahed Signature AI Chat Input Container */}
-        <ComposerPrimitive.Root
-          data-slot="aui-composer-root"
-          className="group relative flex flex-col w-full rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 backdrop-blur-xl shadow-lg hover:border-[var(--border)]/80 focus-within:border-[var(--accent)]/80 focus-within:ring-2 focus-within:ring-[var(--accent)]/20 p-2.5 transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
-        >
-          {/* File Attachment Pill Badge */}
-          {showUpload && selectedFile && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 mb-1.5 rounded-lg bg-[var(--secondary)]/70 text-xs text-[var(--foreground)] w-fit border border-[var(--border)] animate-in fade-in slide-in-from-bottom-1">
-              <Paperclip className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
-              <span className="truncate max-w-[240px] font-mono text-[11px]">{selectedFile}</span>
-              <button
-                type="button"
-                onClick={() => setSelectedFile(null)}
-                className="ml-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] p-0.5 rounded cursor-pointer leading-none"
-              >
-                ×
-              </button>
-            </div>
-          )}
+    <ThreadPrimitive.Root className={cn("flex flex-col h-full w-full bg-transparent overflow-hidden", className)}>
+      <ThreadPrimitive.Viewport
+        data-slot="aui-thread-viewport"
+        className="flex-1 overflow-y-auto px-4 py-3 space-y-4 focus:outline-none scroll-smooth"
+      >
+        <ThreadPrimitive.Messages
+          components={{
+            UserMessage: UserMessage,
+            AssistantMessage: () => <AssistantMessage agentName={agentName} avatarName={avatarName} />,
+          }}
+        />
+      </ThreadPrimitive.Viewport>
 
-          {/* Dynamic Auto-resizing Input Field */}
-          <div className="w-full">
+      <div className="p-3 pb-3 shrink-0 bg-transparent relative z-10">
+        <div className="max-w-3xl mx-auto w-full">
+          <ComposerPrimitive.Root
+            data-slot="aui-composer-root"
+            className="group relative flex items-center w-full rounded-full border border-[var(--border)] bg-[var(--card)]/90 backdrop-blur-xl hover:border-[var(--border)]/80 focus-within:border-[var(--accent)]/80 focus-within:ring-2 focus-within:ring-[var(--accent)]/20 pl-3.5 pr-1.5 py-1 transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          >
             <ComposerPrimitive.Input
               data-slot="aui-composer-input"
               placeholder={placeholder || "Ask or enter directive..."}
-              className="w-full bg-transparent border-0 px-2 py-1 text-xs sm:text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none resize-none min-h-[42px] max-h-[180px] leading-relaxed transition-[height] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
+              className="flex-1 bg-transparent border-0 px-1 py-1 text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none resize-none leading-normal min-h-[28px] max-h-[80px]"
               rows={1}
               autoFocus={false}
             />
-          </div>
 
-          {/* Bottom Control Bar */}
-          <div className={cn("flex items-center pt-1.5 mt-1 border-t border-[var(--border)]/40 px-1", showUpload ? "justify-between" : "justify-end")}>
-            {/* Left Action Toolbar: File Upload (Only when showUpload is explicitly enabled) */}
-            {showUpload && (
-              <div className="flex items-center">
-                <label
-                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer text-xs"
-                  title="Attach file or context"
-                >
-                  <Paperclip className="w-3.5 h-3.5" />
-                  <span className="font-normal text-xs">Upload file</span>
-                  <input
-                    type="file"
-                    className="hidden"
-                    onChange={(e) => {
-                      const files = e.target.files;
-                      if (files && files.length > 0) {
-                        setSelectedFile(files[0].name);
-                      }
-                    }}
-                  />
-                </label>
-              </div>
-            )}
-
-            {/* Right Action: Dynamic Send / Stop Toggle Button with Jahed pill styling */}
-            <div className="flex items-center">
-              {isRunning ? (
+            <div className="flex items-center shrink-0 ml-1.5">
+              <AuiIf condition={(s) => s.thread.isRunning}>
                 <ComposerPrimitive.Cancel asChild>
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-7 w-7 p-0 rounded-xl border border-[var(--border)] hover:bg-[var(--secondary)] text-[var(--foreground)] shadow-xs transition-all shrink-0 cursor-pointer flex items-center justify-center animate-in zoom-in-95"
-                    title="Stop generation"
+                    className="h-7 w-7 p-0 rounded-full border border-[var(--border)] hover:bg-[var(--secondary)] text-[var(--foreground)] transition-all shrink-0 cursor-pointer flex items-center justify-center animate-in zoom-in-95"
+                    title="Stop speaking"
                   >
                     <Square className="w-3.5 h-3.5 fill-current" />
                   </Button>
                 </ComposerPrimitive.Cancel>
-              ) : (
+              </AuiIf>
+              <AuiIf condition={(s) => !s.thread.isRunning}>
                 <ComposerPrimitive.Send asChild>
                   <Button
                     size="sm"
-                    className="h-7 w-7 p-0 bg-primary hover:opacity-90 text-primary-foreground font-semibold rounded-xl shadow-xs transition-all shrink-0 cursor-pointer flex items-center justify-center"
-                    title="Send message"
+                    className="h-7 w-7 p-0 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground transition-all shrink-0 cursor-pointer flex items-center justify-center shadow-xs"
+                    title="Send directive"
                   >
                     <ArrowUp className="w-3.5 h-3.5" />
                   </Button>
                 </ComposerPrimitive.Send>
-              )}
+              </AuiIf>
             </div>
-          </div>
-        </ComposerPrimitive.Root>
-      </div>
-    </div>
-  );
-};
-
-/* ── 3. Official Thread Root ── */
-export interface AssistantUIThreadProps {
-  className?: string;
-  agentName?: string;
-  avatarName?: string;
-  placeholder?: string;
-  emptyTitle?: string;
-  emptySubtitle?: string;
-  showUpload?: boolean;
-}
-
-export const AssistantUIThread: FC<AssistantUIThreadProps> = ({
-  className,
-  agentName,
-  avatarName,
-  placeholder,
-  emptyTitle,
-  emptySubtitle,
-  showUpload = false,
-}) => {
-  const isZezo =
-    (!agentName || ["zezo", "jarvis", "ai"].includes(agentName.toLowerCase())) &&
-    (!avatarName || ["zezo", "jarvis", "ai"].includes(avatarName.toLowerCase()));
-
-  return (
-    <ThreadPrimitive.Root
-      data-slot="aui-thread-root"
-      className={cn("flex flex-col h-full w-full min-h-0 bg-transparent", className)}
-    >
-      {/* Official Tool Calling UIs */}
-      <WebSearchToolUI />
-      <ActionApprovalToolUI />
-      <SystemStatusToolUI />
-      <OpencodeAgentToolUI />
-
-      {/* Official Viewport Element */}
-      <ThreadPrimitive.Viewport
-        data-slot="aui-thread-viewport"
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0"
-      >
-        <div className="max-w-3xl mx-auto w-full space-y-4">
-          <ThreadPrimitive.Empty>
-            <div className="flex flex-col items-center justify-center h-full text-center text-[var(--muted-foreground)] py-16">
-              <div className="w-12 h-12 rounded-2xl bg-[#090d16] border border-[var(--border)] flex items-center justify-center mb-3 shadow-sm overflow-hidden p-1">
-                {isZezo ? (
-                  <img
-                    src="/zezo-avatar.png"
-                    alt="ZEZO"
-                    className="w-full h-full object-contain transform scale-105"
-                  />
-                ) : avatarName || agentName ? (
-                  <Blobatar name={(avatarName || agentName) ?? 'Jarvis'} size={48} animate="always" className="w-full h-full object-contain" />
-                ) : (
-                  <Sparkles className="w-5 h-5 text-[var(--accent)]" />
-                )}
-              </div>
-              <div className="text-sm font-semibold text-[var(--foreground)]">
-                {emptyTitle || (agentName ? `Start Conversation with ${agentName}` : "Start Conversation with ZEZO")}
-              </div>
-              <div className="text-xs font-mono text-[var(--muted-foreground)] mt-1.5 max-w-[280px] leading-relaxed">
-                {emptySubtitle || (agentName ? `Autonomous agent session with ${agentName}. Multi-agent tools and reasoning active.` : "Forma OS Autonomous assistant thread. Real-time reasoning and multi-agent tools active.")}
-              </div>
-            </div>
-          </ThreadPrimitive.Empty>
-
-          <ThreadPrimitive.Messages
-            components={{
-              UserMessage: UserMessage,
-              AssistantMessage: (props: any) => (
-                <AssistantMessage
-                  {...props}
-                  agentName={agentName || "Jarvis"}
-                  avatarName={avatarName || agentName || "Jarvis"}
-                />
-              ),
-            }}
-          />
+          </ComposerPrimitive.Root>
         </div>
-      </ThreadPrimitive.Viewport>
-
-      {/* Official Floating Composer Element without Upload File by default */}
-      <Composer placeholder={placeholder} agentModel={agentName ? `${agentName} Agent` : undefined} showUpload={showUpload} />
+      </div>
     </ThreadPrimitive.Root>
   );
 };
+
+export const AssistantUIThread = ZezoChatThread;
+

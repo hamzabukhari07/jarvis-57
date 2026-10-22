@@ -199,6 +199,11 @@ class ZezoUIServer:
                 await self._site.start()
                 self._ready_event.set()
                 logger.info("Zezo UI Server running at http://%s:%d", self.host, self.port)
+                from core.clipboard_watcher import ClipboardWatcher
+                self.clipboard_watcher = ClipboardWatcher(
+                    callback=lambda payload: self.broadcast("clipboard_update", payload)
+                )
+                self.clipboard_watcher.start()
                 self._log_bus_task = asyncio.create_task(self._poll_log_bus_loop())
                 break
             except OSError:
@@ -1863,7 +1868,17 @@ class ZezoUIServer:
             except Exception as e:
                 logger.warning("Failed resolving confirmation: %s", e)
 
-        elif msg_type == "sleep_toggle":
+        elif msg_type == "open_browser":
+            url = str(payload.get("url") or "").strip()
+            if url:
+                if not url.startswith(("http://", "https://")):
+                    url = "https://" + url
+                try:
+                    import webbrowser
+                    webbrowser.open(url)
+                    logger.info("Opened URL in system browser: %s", url)
+                except Exception as e:
+                    logger.warning("Failed to open browser for %s: %s", url, e)
             sleeping = bool(payload.get("sleeping", False))
             if self.on_sleep_toggle:
                 try:
@@ -2344,12 +2359,16 @@ class ZezoUIServer:
     def stop(self) -> None:
         """Stop the UI server."""
         self._stopped.set()
+        if hasattr(self, "clipboard_watcher") and self.clipboard_watcher:
+            self.clipboard_watcher.stop()
         if self._loop and self._loop.is_running():
             self._loop.call_soon_threadsafe(self._loop.stop)
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=2.0)
 
     async def _cleanup(self) -> None:
+        if hasattr(self, "clipboard_watcher") and self.clipboard_watcher:
+            self.clipboard_watcher.stop()
         for ws in list(self._clients):
             await ws.close()
         self._clients.clear()

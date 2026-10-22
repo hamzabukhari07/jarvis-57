@@ -8,6 +8,7 @@ import { TaskManagerModal } from './components/tasks/TaskManagerModal'
 import { MobileRemoteModal } from './components/remote/MobileRemoteModal'
 import { QiviAvatarVisualizer } from './components/canvas/QiviAvatarVisualizer'
 import { AutonomousOfficeScreen } from './components/office/AutonomousOfficeScreen'
+import { ClipPeekOverlay } from './components/clipboard/ClipPeekOverlay'
 
 import { Frame, FramePanel, FrameHeader, FrameTitle } from './components/reui/frame'
 import { Badge } from './components/reui/badge'
@@ -99,8 +100,6 @@ export default function App() {
   })
   const [tasks, setTasks] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'tactical' | 'office' | 'workflow'>('tactical')
-  const [currentTime, setCurrentTime] = useState('')
-  const [currentDate, setCurrentDate] = useState('')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isLogModalOpen, setIsLogModalOpen] = useState(false)
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
@@ -428,24 +427,7 @@ export default function App() {
     }
   }, [isDraggingCanvas])
 
-  // Real-time Clock
-  useEffect(() => {
-    const updateClock = () => {
-      const now = new Date()
-      setCurrentTime(now.toTimeString().split(' ')[0])
-      setCurrentDate(
-        now.toLocaleDateString('en-US', {
-          weekday: 'short',
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-        }).toUpperCase()
-      )
-    }
-    updateClock()
-    const timer = setInterval(updateClock, 1000)
-    return () => clearInterval(timer)
-  }, [])
+  // Real-time Clock removed per user request
 
   const [currentTheme, setCurrentTheme] = useState(() => localStorage.getItem('zezo_theme') || 'copper')
   const isLightMode = currentTheme.endsWith('-light') || currentTheme === 'light'
@@ -587,7 +569,7 @@ export default function App() {
   return (
     <div className="flex flex-col w-screen h-screen bg-[var(--background)] text-[var(--foreground)] overflow-hidden font-sans select-none antialiased">
       {/* ── 1. ReUI Top Application Shell Bar ── */}
-      <header className="h-12 border-b border-[var(--border)] bg-[var(--card)]/90 backdrop-blur-md px-2 sm:px-4 flex items-center justify-between z-40 shrink-0 select-none shadow-sm gap-1 sm:gap-2">
+      <header className="h-12 border-b border-[var(--border)] bg-[var(--card)]/90 backdrop-blur-md px-2 sm:px-4 flex items-center justify-between z-40 shrink-0 select-none gap-1 sm:gap-2">
         {/* Left: Section Actions */}
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           <Button
@@ -665,37 +647,38 @@ export default function App() {
           </Tabs>
         </div>
 
-        {/* Center: Branding Title */}
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="font-bold tracking-widest text-xs sm:text-sm text-[var(--foreground)]">ZEZO</span>
-        </div>
 
         {/* Right: Quick Light/Dark Toggle & Real-time Telemetry & Clock */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleToggleThemeMode}
-            title={isLightMode ? "Switch to Dark Mode" : "Switch to Light Mode"}
-            className="h-8 px-2 sm:px-2.5 flex items-center gap-1.5 text-xs text-[var(--foreground)] hover:bg-[var(--input)]/60 transition-colors"
-          >
-            {isLightMode ? (
-              <>
-                <Sun className="w-3.5 h-3.5 text-amber-500" />
-                <span className="text-xs font-medium hidden md:inline">Light</span>
-              </>
-            ) : (
-              <>
-                <Moon className="w-3.5 h-3.5 text-primary" />
-                <span className="text-xs font-medium hidden md:inline">Dark</span>
-              </>
-            )}
-          </Button>
-
-          <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-xs px-1 select-none">
-            <span className="text-[var(--foreground)] font-semibold text-xs tracking-tight">{currentTime || '12:00:00'}</span>
-            <span className="text-[var(--muted-foreground)] opacity-40 hidden md:inline">|</span>
-            <span className="text-[var(--muted-foreground)] text-xs uppercase tracking-wide hidden md:inline">{currentDate || 'REUI OS'}</span>
+          <div className="flex items-center bg-[var(--input)] border border-[var(--border)] rounded-xl p-0.5">
+            <button
+              type="button"
+              onClick={handleToggleThemeMode}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer",
+                isLightMode
+                  ? "bg-[var(--card)] text-[var(--foreground)] font-semibold"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              )}
+              title="Light Mode"
+            >
+              <Sun className="w-3.5 h-3.5 text-[var(--foreground)]" />
+              <span className="hidden sm:inline">Light</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleThemeMode}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer",
+                !isLightMode
+                  ? "bg-[var(--card)] text-[var(--foreground)] font-semibold"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              )}
+              title="Dark Mode"
+            >
+              <Moon className="w-3.5 h-3.5 text-[var(--foreground)]" />
+              <span className="hidden sm:inline">Dark</span>
+            </button>
           </div>
         </div>
       </header>
@@ -1050,7 +1033,7 @@ export default function App() {
               <FramePanel className="p-2.5 flex flex-col h-full min-h-0 overflow-hidden">
                 <FrameHeader className="p-0 pb-1.5 shrink-0">
                   <div className="flex items-center justify-between">
-                    <FrameTitle className="text-[11px] font-semibold text-[var(--foreground)]">Canvas</FrameTitle>
+                    <FrameTitle className="text-[11px] font-semibold text-[var(--foreground)]">Live Output</FrameTitle>
                     <div className="flex items-center gap-1.5">
                       <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(canvasContent)} className="h-7 text-[11px] gap-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
                         <Copy className="w-3 h-3" />
@@ -1072,9 +1055,9 @@ export default function App() {
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full text-center text-[var(--muted-foreground)] py-8">
                       <Sparkles className="w-8 h-8 text-[var(--accent)] opacity-50 mb-2" />
-                      <div className="text-xs font-semibold text-[var(--foreground)]">Autonomous Execution Engine Ready</div>
+                      <div className="text-xs font-semibold text-[var(--foreground)]">Ready</div>
                       <div className="text-[10px] font-mono text-[var(--muted-foreground)] mt-1 max-w-sm leading-relaxed">
-                        Multi-agent workflows (Coding, Web Extraction, File Intelligence) stream live output here during execution.
+                        Live execution output streams here.
                       </div>
                     </div>
                   )}
@@ -1147,8 +1130,8 @@ export default function App() {
                     }`}
                 >
                   <div className="flex items-center justify-center gap-2 mb-1.5">
-                    <FileUp className={`w-5 h-5 transition-colors ${isDraggingOver ? 'text-[var(--accent)]' : 'text-[var(--muted-foreground)]'}`} />
-                    <FolderOpen className={`w-5 h-5 transition-colors ${isDraggingOver ? 'text-[var(--accent)]' : 'text-[var(--muted-foreground)]'}`} />
+                    <FileUp className={`w-5 h-5 transition-colors ${isDraggingOver ? 'text-[var(--primary)]' : 'text-[var(--primary)]'}`} />
+                    <FolderOpen className={`w-5 h-5 transition-colors ${isDraggingOver ? 'text-[var(--primary)]' : 'text-[var(--primary)]'}`} />
                   </div>
 
                   <div className="text-xs font-medium text-[var(--foreground)]">
@@ -1164,9 +1147,9 @@ export default function App() {
                       size="sm"
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="h-7 px-2 text-[11px] font-medium gap-1 whitespace-nowrap bg-[var(--input)] border-[var(--border)] hover:bg-[var(--accent)]/15 text-[var(--foreground)] w-full justify-center"
+                      className="h-7 px-2 text-[11px] font-medium gap-1 whitespace-nowrap bg-[var(--input)] border-[var(--border)] hover:bg-[var(--primary)]/15 text-[var(--foreground)] w-full justify-center"
                     >
-                      <FileUp className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                      <FileUp className="w-3.5 h-3.5 text-[var(--primary)] shrink-0" />
                       <span className="truncate">Choose Files</span>
                     </Button>
                     <Button
@@ -1174,9 +1157,9 @@ export default function App() {
                       size="sm"
                       type="button"
                       onClick={handleChooseFolderClick}
-                      className="h-7 px-2 text-[11px] font-medium gap-1 whitespace-nowrap border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--accent)]/15 bg-[var(--input)] w-full justify-center"
+                      className="h-7 px-2 text-[11px] font-medium gap-1 whitespace-nowrap border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--primary)]/15 bg-[var(--input)] w-full justify-center"
                     >
-                      <FolderOpen className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                      <FolderOpen className="w-3.5 h-3.5 text-[var(--primary)] shrink-0" />
                       <span className="truncate">Choose Folder</span>
                     </Button>
                   </div>
@@ -1338,6 +1321,9 @@ export default function App() {
         onConfirm={() => sendConfirmationResolve(true)}
         onCancel={() => sendConfirmationResolve(false)}
       />
+
+      {/* Zezo ClipPeek Smart Clipboard Companion Overlay */}
+      <ClipPeekOverlay />
     </div>
   )
 }

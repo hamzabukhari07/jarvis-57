@@ -165,9 +165,10 @@ class InputDriver:
         is_unicode = not text.isascii()
         is_multiline = "\n" in text
         is_long = len(text) > 30
+        is_url = text.startswith("http://") or text.startswith("https://") or text.startswith("www.")
 
-        # If text is Unicode, multiline, or long, use safe clipboard paste
-        if (is_unicode or is_multiline or is_long) and _PYPERCLIP:
+        # If text is Unicode, multiline, long, or a URL, use safe clipboard paste
+        if (is_unicode or is_multiline or is_long or is_url) and _PYPERCLIP:
             old_clip: Optional[str] = None
             if do_restore:
                 try:

@@ -332,6 +332,42 @@
         "api_development",
         "database_design"
       ]
+    },
+    "RECON": {
+      "name": "Recon",
+      "role": "Autonomous Deep Researcher & Intelligence Agent",
+      "specialty": "Multi-source web research, Tavily search, agent_reach multi-platform extraction, and executive synthesis",
+      "color": "#00f5ff",
+      "avatar_pixel": "recon_pixel.png",
+      "default_tool": "agent_reach",
+      "risk_tier": "L0_READ_ONLY",
+      "prompt_prefix": "You are RECON, ZEZO's elite Deep Research & Intelligence Agent. You extract deep information from the web, GitHub, Reddit, YouTube, and multi-source endpoints to synthesize comprehensive executive reports.",
+      "model_id": "gemini-3.7-flash-medium",
+      "desk_x": 600,
+      "desk_y": 400,
+      "worktree": "None",
+      "active_worktree": "None",
+      "allowed_tools": [
+        "agent_reach",
+        "web_search",
+        "web_read_page",
+        "web_reader",
+        "file_processor",
+        "fleet_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "social_research",
+        "web_scraper",
+        "web_research_pipeline",
+        "multi_agent_collaboration"
+      ],
+      "capabilities": [
+        "deep_web_research",
+        "multi_platform_extraction",
+        "content_synthesis",
+        "executive_reporting"
+      ]
     }
   }
 }

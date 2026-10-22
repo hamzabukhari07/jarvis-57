@@ -3,85 +3,105 @@ import { QiviIcon, CHARACTERS } from 'qivi-react'
 import type { QiviPersonality, QiviThemeName, QiviExpression, QiviState } from 'qivi-react'
 
 export interface ChatAvatarIconProps {
-  size?: number
-  className?: string
-  expression?: QiviExpression
-  state?: QiviState
+ size?: number
+ className?: string
+ expression?: QiviExpression
+ state?: QiviState
 }
 
 const PRESET_PERSONALITY_MAP: Record<string, QiviPersonality> = {
-  qivi: 'core',
-  female: 'spark',
-  male: 'diplomat',
-  ember: 'chaos',
-  sage: 'sage',
-  atlas: 'guardian',
+ qivi: 'core',
+ female: 'spark',
+ male: 'diplomat',
+ ember: 'chaos',
+ sage: 'sage',
+ atlas: 'guardian',
 }
 
 export const ChatAvatarIcon: React.FC<ChatAvatarIconProps> = ({
-  size = 26,
-  className = '',
-  expression = 'happy',
-  state = 'idle',
+ size = 26,
+ className = '',
+ expression = 'happy',
+ state = 'idle',
 }) => {
-  const [preset, setPreset] = useState<string>(() => localStorage.getItem('zezo_avatar_preset') || 'qivi')
-  const [theme, setTheme] = useState<string>(() => localStorage.getItem('zezo_avatar_theme') || 'match_theme')
+ const [preset, setPreset] = useState<string>(() => localStorage.getItem('zezo_avatar_preset') || 'qivi')
+ const [theme, setTheme] = useState<string>(() => localStorage.getItem('zezo_avatar_theme') || 'match_theme')
 
-  useEffect(() => {
-    const handleAvatarSettings = (e: Event) => {
-      const customEvent = e as CustomEvent
-      if (customEvent.detail) {
-        if (customEvent.detail.preset) setPreset(customEvent.detail.preset)
-        if (customEvent.detail.theme) setTheme(customEvent.detail.theme)
-      } else {
-        setPreset(localStorage.getItem('zezo_avatar_preset') || 'qivi')
-        setTheme(localStorage.getItem('zezo_avatar_theme') || 'match_theme')
-      }
-    }
+ useEffect(() => {
+ const handleAvatarSettings = (e: Event) => {
+ const customEvent = e as CustomEvent
+ if (customEvent.detail) {
+ if (customEvent.detail.preset) setPreset(customEvent.detail.preset)
+ if (customEvent.detail.theme) setTheme(customEvent.detail.theme)
+ } else {
+ setPreset(localStorage.getItem('zezo_avatar_preset') || 'qivi')
+ setTheme(localStorage.getItem('zezo_avatar_theme') || 'match_theme')
+ }
+ }
 
-    const handleThemeChanged = () => {
-      setTheme(localStorage.getItem('zezo_avatar_theme') || 'match_theme')
-    }
+ const handleThemeChanged = () => {
+ setTheme(localStorage.getItem('zezo_avatar_theme') || 'match_theme')
+ }
 
-    window.addEventListener('zezo_avatar_settings_changed', handleAvatarSettings)
-    window.addEventListener('zezo_theme_changed', handleThemeChanged)
-    return () => {
-      window.removeEventListener('zezo_avatar_settings_changed', handleAvatarSettings)
-      window.removeEventListener('zezo_theme_changed', handleThemeChanged)
-    }
-  }, [])
+ window.addEventListener('zezo_avatar_settings_changed', handleAvatarSettings)
+ window.addEventListener('zezo_theme_changed', handleThemeChanged)
+ return () => {
+ window.removeEventListener('zezo_avatar_settings_changed', handleAvatarSettings)
+ window.removeEventListener('zezo_theme_changed', handleThemeChanged)
+ }
+ }, [])
 
-  const resolvedTheme = useMemo<QiviThemeName>(() => {
-    if (!theme || theme === 'default') return 'default' as QiviThemeName
-    if (theme === 'match_theme') {
-      const osTheme = localStorage.getItem('zezo_theme') || 'copper'
-      if (osTheme.includes('emerald') || osTheme.includes('mint')) return 'mint' as QiviThemeName
-      if (osTheme.includes('arctic') || osTheme.includes('teal')) return 'arctic' as QiviThemeName
-      if (osTheme.includes('indigo') || osTheme.includes('violet') || osTheme.includes('purple')) return 'lavender' as QiviThemeName
-      if (osTheme.includes('copper')) return 'amber' as QiviThemeName
-      return 'default' as QiviThemeName
-    }
-    return theme as QiviThemeName
-  }, [theme])
+ const resolvedTheme = useMemo<any>(() => {
+ if (!theme || theme === 'default') return 'default' as QiviThemeName
+ if (theme === 'match_theme') {
+ const osTheme = localStorage.getItem('zezo_theme') || 'copper'
+ if (osTheme.includes('emerald') || osTheme.includes('mint')) return 'mint' as QiviThemeName
+ if (osTheme.includes('arctic') || osTheme.includes('teal')) return 'arctic' as QiviThemeName
+ if (osTheme.includes('indigo') || osTheme.includes('violet') || osTheme.includes('purple')) return 'lavender' as QiviThemeName
+ if (osTheme.includes('copper')) return 'amber' as QiviThemeName
+ if (osTheme.includes('minimal') || osTheme.includes('mono')) {
+ return {
+ deep: '#141414',
+ mid: '#383838',
+ pale: '#f5f5f5',
+ warm: '#8a8a8a',
+ hi: '#ffffff',
+ accent: '#ffffff',
+ }
+ }
+ return 'default' as QiviThemeName
+ }
+ if (theme === 'minimal' || theme === 'mono') {
+ return {
+ deep: '#141414',
+ mid: '#383838',
+ pale: '#f5f5f5',
+ warm: '#8a8a8a',
+ hi: '#ffffff',
+ accent: '#ffffff',
+ }
+ }
+ return theme as any
+ }, [theme])
 
-  const characterConfig = useMemo(() => {
-    if (preset && preset !== 'custom' && (CHARACTERS as any)[preset]) {
-      return (CHARACTERS as any)[preset]
-    }
-    return undefined
-  }, [preset])
+ const characterConfig = useMemo(() => {
+ if (preset && preset !== 'custom' && (CHARACTERS as any)[preset]) {
+ return (CHARACTERS as any)[preset]
+ }
+ return undefined
+ }, [preset])
 
-  const personality = characterConfig?.personality || PRESET_PERSONALITY_MAP[preset] || 'core'
+ const personality = characterConfig?.personality || PRESET_PERSONALITY_MAP[preset] || 'core'
 
-  return (
-    <QiviIcon
-      size={size}
-      personality={personality}
-      character={characterConfig}
-      theme={resolvedTheme}
-      expression={expression}
-      state={state}
-      className={className}
-    />
-  )
+ return (
+ <QiviIcon
+ size={size}
+ personality={personality}
+ character={characterConfig}
+ theme={resolvedTheme}
+ expression={expression}
+ state={state}
+ className={className}
+ />
+ )
 }

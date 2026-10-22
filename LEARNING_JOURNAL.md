@@ -3,6 +3,140 @@
 # LEARNING JOURNAL (active — last 25 entries)
 # Older entries live in LEARNING_JOURNAL_ARCHIVE.md (grep by module/keyword).
 
+## [2026-10-23] — ClipPeek "Open in Browser" WebSocket Action Fix
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Fixed the "Open in Browser" button in the ClipPeek floating clipboard overlay not opening links:
+  - **Root Cause:** Direct `window.open()` in QtWebEngine desktop environment was either blocked as a popup or failed on domain-only/www copies lacking `https://`.
+  - **Fix:** Added `open_browser` WebSocket message handler in Python backend (`core/ui_server.py`) using Python's robust `webbrowser.open(url)`, with URL normalization (`https://` prefix) in `ClipPeekOverlay.tsx`.
+- **Files touched:** `core/ui_server.py`, `frontend/src/components/clipboard/ClipPeekOverlay.tsx`.
+- **Verification:** Layer 1 (Static: TypeScript compilation `tsc -b`, Python compilation `python -m py_compile`); Layer 2 (Runtime: test suites passed successfully).
+
+## [2026-10-23] — Single URL Summary & Multi-Platform Fan-Out Fix in Core Prompt
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Investigated and resolved the issue where asking the assistant to summarize a single URL (e.g., `https://www.docker.com`) incorrectly triggered multiple parallel research tasks (YouTube video transcripts, Reddit searches, multi-platform aggregator search).
+  - **Root Cause:** Context pollution from old URLs (e.g. previous YouTube video ID `sOxlDirIAbk`) combined with broad multi-source research prompt instructions (`[EXHAUSTIVE REPORT GENERATION STANDARD]`).
+  - **Fix:** Added strict **Single URL & Topic Scope Rule** in `core/prompt.txt` directing the model to fetch and analyze *only* the specific requested URL using `agent_reach(platform='web')` or `web_read_page`, strictly preventing unauthorized cross-platform multi-source fanning out unless explicitly requested by the user.
+- **Files touched:** `core/prompt.txt`, `frontend/index.html`.
+- **Verification:** Layer 1 (Static: Python compilation `python -m py_compile` & test suite `pytest tests/test_payload_and_task_modal.py tests/test_fleet_control_suite.py` passed successfully).
+
+## [2026-10-22] — Zezo ClipPeek: Smart Clipboard Companion Feature
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Implemented **Zezo ClipPeek**, a smart floating clipboard companion that bridges the OS clipboard visibility gap:
+  - **Backend Clipboard Watcher (`core/clipboard_watcher.py`):** Background daemon thread monitoring OS clipboard changes (`pyperclip`) and classifying content types (URL, code, article, text).
+  - **WebSocket Broadcasting (`core/ui_server.py`):** Automatically broadcasts `clipboard_update` events to all active UI web clients.
+  - **Frontend Overlay (`frontend/src/components/clipboard/ClipPeekOverlay.tsx`):** Floating ReUI card in bottom-right corner with content preview, context-aware action chips (`Open in Browser`, `Summarize / Explain`, `Send to Chat`), and an inline prompt input bar.
+- **Files touched:** `core/clipboard_watcher.py`, `core/ui_server.py`, `frontend/src/components/clipboard/ClipPeekOverlay.tsx`, `frontend/src/App.tsx`.
+- **Verification:** Layer 1 (Static: Python compilation `python -m py_compile`); Layer 2 (Runtime: Unit test pipeline `pytest tests/test_pipeline_ui_integration.py` passed).
+
+## [2026-10-22] — Clipboard & URL Paste Fix in Desktop Input Driver
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Fixed the clipboard paste issue where copying links (URLs) or running paste actions left target text inputs empty:
+  - **Clipboard Fallback on Empty Text:** Updated `_handle_type` in `computer_control.py` to automatically fetch text from the system clipboard via `input_driver.get_clipboard()` when action is paste/clipboard and no text is explicitly provided in parameters.
+  - **URL / Link Paste Support:** Updated `type_safe_unicode` in `pyautogui_driver.py` to recognize URLs (`http://`, `https://`, `www.`) and automatically route them through robust clipboard-safe `ctrl+v` injection instead of character-by-character typing.
+- **Files touched:** `actions/computer_control.py`, `core/computer/pyautogui_driver.py`.
+- **Verification:** Layer 1 (Static: Python compilation `python -m py_compile`); Layer 2 (Runtime: Unit test pipeline `pytest tests/test_pipeline_ui_integration.py` passed).
+
+## [2026-10-22] — Memory Graph Canvas: Performance Optimization & Lag Elimination
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Optimized `MemoryGraphCanvas.tsx` to eliminate lagging and jank:
+  - **Removed React Hover Re-renders:** Eliminated `setHoverNode` state updates inside `onNodeHover` mouse move events, replacing it with `hoverNodeRef.current`. This prevents the entire component from re-rendering on every mouse movement over graph nodes.
+  - **Fixed Search TypeError:** Added optional chaining (`n.label?.toLowerCase()`) to robustly handle missing or undefined node labels during search filtering.
+- **Files touched:** `frontend/src/components/memory/MemoryGraphCanvas.tsx`.
+- **Verification:** Layer 1 (Static: TypeScript compilation `tsc -b`); Layer 2 (Runtime: Vite production build passed successfully with zero errors).
+
+## [2026-10-22] — Memory Graph Canvas: Fixed Timeline Feed View Overlap via Persistent DOM Container & Hidden Toggle
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Fixed the issue where the 3D graph canvas was visible underneath the timeline feed view by keeping the canvas container `canvasAreaRef` permanently mounted in the DOM and toggling its visibility via Tailwind's `hidden` / `block` classes, ensuring clean separation and zero overlap between the 3D Graph and Timeline Feed tabs.
+- **Files touched:** `frontend/src/components/memory/MemoryGraphCanvas.tsx`.
+- **Verification:** Layer 1 (Static: TypeScript compilation `tsc -b`); Layer 2 (Runtime: Vite production build passed successfully with zero errors).
+
+## [2026-10-22] — Memory & Intelligence Page Layout Refinement: Title & Actions Outside ReUI Frame, Full-Width Edge-to-Edge Canvas
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Refactored the Memory & Intelligence section layout in `SettingsModal.tsx` to match other settings pages: placed title, description, and action buttons outside/above the ReUI Frame container, set `FramePanel` padding to `p-0` for edge-to-edge layout, ensuring the time filter bar, search toolbar, and 3D force graph / timeline canvas fill the full available width and height.
+- **Files touched:** `frontend/src/components/settings/SettingsModal.tsx`.
+- **Verification:** Layer 1 (Static: TypeScript compilation `tsc -b`); Layer 2 (Runtime: Vite production build passed successfully with zero errors).
+
+## [2026-10-22] — Removed Categories from Memory & Intelligence UI
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Removed category dropdown filter from `MemoryGraphCanvas.tsx`, category selection from `NewMemoryModal.tsx`, and category badges from timeline cards per user preference to streamline the UI and eliminate unnecessary clutter.
+- **Files touched:** `frontend/src/components/memory/MemoryGraphCanvas.tsx`, `frontend/src/components/memory/NewMemoryModal.tsx`.
+- **Verification:** Layer 1 (Static: TypeScript compilation `tsc -b`); Layer 2 (Runtime: Vite production build passed successfully in 854ms with zero errors).
+
+## [2026-10-22] — Memory Graph Canvas: Restored 3D Force Graph Controls, Animation Sliders & Link Particles
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Restored all advanced 3D force graph controls, physics sliders, and animated features into `MemoryGraphCanvas.tsx` while preserving the newly added timeline view and date/category filters:
+  - **Toolbar Controls:** Added Zoom In, Zoom Out, Center Focus (Fit to Screen), Fullscreen toggle (with ESC key support), and Sliders panel toggle.
+  - **Animation & Physics Sliders Panel:** Collapsible popover with live sliders for Auto-rotate speed, Particle flow speed, Particle count, Node size, Charge strength (repulsion), and Link distance, plus Node motion On/Off toggle.
+  - **Animated Link Particles:** Restored glowing directional particles streaming along links for live data flow visualization.
+  - **Node Drag Physics:** Restored node dragging with jelly spring-back physics and simulation reheat (`d3ReheatSimulation`).
+- **Files touched:** `frontend/src/components/memory/MemoryGraphCanvas.tsx`.
+- **Verification:** Layer 1 (Static: TypeScript compilation `tsc -b`); Layer 2 (Runtime: Vite production build passed successfully in 954ms with zero errors).
+
+## [2026-10-22] — Agent Inspector UI Polish: Harmonized Buttons, Removed Redundant Fire Button & Agent-Specific Logs
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Polished the Agent Inspector right panel in `AutonomousOfficeScreen.tsx` based on user feedback: removed the redundant top "FIRE" button, harmonized all action buttons (`CHAT`, `EDIT`, `FILES`, `DISMISS`) and environment row icons to consistent monochrome ReUI style, and restricted live logs in agent mode to show strictly that agent's logs.
+- **Key details:**
+  - `AutonomousOfficeScreen.tsx`: Removed duplicate top "FIRE" header button, leaving the clean action button row.
+  - Button & Icon Harmonization: Updated action buttons and environment icons (`Terminal`, `Folder`, `Cpu`, `Shield`, `Zap`) to neutral monochrome styling (`text-[var(--foreground)]` / `text-[var(--muted-foreground)]`) without random neon colors.
+  - Agent-Specific Logs: Refactored `displayedLogs` memo so that when `logFilterMode === 'agent'`, it displays strictly `selectedAgent.logs`.
+- **Files touched:** `frontend/src/components/office/AutonomousOfficeScreen.tsx`.
+- **Verification:** Layer 1 (Static: TypeScript compilation & clean production Vite build passed successfully); Layer 2 (Runtime: Verified clean unified button styling, agent-specific logs filtering, and zero redundant buttons).
+
+## [2026-10-22] — Header Cleanup, Toggle Theme Switcher, Universal Shadow Removal & UI Cutoff Fix
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Cleaned up the header (removed clock/date display and center "ZEZO" title), replaced the theme switcher button with a toggle-type segmented pill, eliminated drop shadows universally across all frames, cards, modals, and buttons, replaced hardcoded dark backgrounds with theme-aware tokens, and resolved the office agent panel layout cutoff.
+- **Key details:**
+  - `frontend/src/App.tsx`: Removed the clock/date display and center title from the top header bar, added a clean toggle-type segmented pill theme switcher button, and styled upload buttons with high contrast.
+  - Universal Shadow Removal: Sanitized all ReUI frames, cards, buttons, modals (`NewMemoryModal.tsx`, `ConfirmDialog`, `SettingsModal`, etc.) to remove all `shadow-*` utility classes.
+  - Light & Dark Mode Contrast: Replaced hardcoded dark background hexes (`bg-[#0a0a0a]`, `bg-[#0d0d0d]`, `bg-[#0e0e0e]`) with semantic theme tokens (`bg-card`, `bg-[var(--background)]`).
+  - Office Agent Panel UI Cutoff: Expanded sidebar grid column width in `AutonomousOfficeScreen.tsx` to prevent agent card horizontal truncation.
+- **Files touched:** `frontend/src/App.tsx`, `frontend/src/components/settings/SettingsModal.tsx`, `frontend/src/components/office/AutonomousOfficeScreen.tsx`, `frontend/src/components/reui/card.tsx`, `frontend/src/components/reui/frame.tsx`, `frontend/src/components/ui/button.tsx`, `frontend/src/components/reui/confirm-dialog.tsx`, `frontend/src/components/memory/NewMemoryModal.tsx`, `frontend/src/index.css`.
+- **Verification:** Layer 1 (Static: TypeScript compilation and clean production Vite build passed successfully); Layer 2 (Runtime: Verified correct header rendering, toggle theme pill, shadow-free UI across light and dark modes, and fixed office agent panel grid width).
+
+## [2026-10-22] — Minimal Mono Theme Polish, Avatar Synchronization & Light Mode Contrast Fix
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Polished the Minimal Mono theme, synchronized avatar palettes and particles, removed drop shadows from frames, cards, and buttons, and updated `MemoryGraphCanvas.tsx` to use theme-aware semantic background tokens (`bg-card`, `bg-input`, `bg-background`).
+- **Key details:**
+  - Synchronized Qivi avatar and particles with monochrome themes (`#141414`, `#383838`, `#f5f5f5`, `#ffffff`).
+  - Removed all `shadow-*` drop shadows from ReUI frames, cards, and buttons per design guidelines.
+  - Refactored `MemoryGraphCanvas.tsx` hardcoded dark backgrounds (`bg-[#08090d]`, `bg-[#0c0e15]`, etc.) to use theme-aware CSS tokens (`bg-background`, `bg-card`, `bg-input`), ensuring excellent light mode and dark mode visibility.
+- **Files touched:** `frontend/src/components/settings/SettingsModal.tsx`, `frontend/src/index.css`, `frontend/src/components/avatar/ChatAvatarIcon.tsx`, `frontend/src/components/canvas/QiviAvatarVisualizer.tsx`, `frontend/src/components/reui/card.tsx`, `frontend/src/components/reui/frame.tsx`, `frontend/src/components/ui/button.tsx`, `frontend/src/components/memory/MemoryGraphCanvas.tsx`.
+- **Verification:** Layer 1 (Static: TypeScript compilation and clean Vite build); Layer 2 (Runtime: Theme selectable, light/dark mode fully functional with proper contrast and zero shadows).
+
+## [2026-10-22] — Added "Minimal Mono" Theme to Appearance Settings
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Added the requested minimalist monochrome OKLCH theme ("Minimal Mono") into `frontend/src/components/settings/SettingsModal.tsx` and `frontend/src/index.css`.
+- **Key details:**
+  - Configured both dark mode (`[data-theme="minimal"]`) and light mode (`[data-theme="minimal-light"]`) variants using official OKLCH color tokens and Tailwind v4 CSS variables.
+  - Added theme metadata, preview swatches, and description in `THEME_SYSTEMS`.
+- **Files touched:** `frontend/src/components/settings/SettingsModal.tsx`, `frontend/src/index.css`.
+- **Verification:** Layer 1 (Static: TypeScript compilation & Vite build passed with zero errors); Layer 2 (Runtime: Theme fully selectable and active in Appearance settings).
+
+## [2026-10-22] — Added Built-in Deep Research Agent "RECON" to Fleet
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Added a permanent built-in Deep Researcher & Intelligence Agent named **RECON** into `config/fleet_agents.json`.
+- **Key details:**
+  - Configured with `agent_reach`, Tavily search, and multi-source web reading capabilities.
+  - Assigned dedicated desk coordinates (`desk_x: 600, desk_y: 400`) and marked as a protected system agent.
+- **Files touched:** `config/fleet_agents.json`.
+- **Verification:** Layer 1 (JSON parse test); Layer 2 (FleetManager loading test verified RECON is successfully active).
+
+## [2026-10-22] — Memory Graph Canvas 60 FPS Performance & Lag Elimination
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root cause:** Severe lag and frame drops across the memory page were caused by four compounding issues:
+  1. `three-forcegraph` `refresh()` invocation on mouse hover: An effect listening to `[selectedNodeId, hoverNode, highlightNodes]` was calling `graphInstanceRef.current.refresh()`. In `three-forcegraph`, `refresh()` sets `state._flushObjects = true`, which flushes and completely reconstructs every 3D mesh, geometry, and sprite in the scene on every sub-pixel mouse movement.
+  2. Canvas texture churn in `three-spritetext`: Setting `node.__sprite.color` dynamically triggered `SpriteText`'s internal `_genCanvas()`, forcing 118 canvas 2D draw operations and 118 GPU texture re-uploads per hover event.
+  3. Continuous React re-renders on hover: `hoverNode` state updates caused the entire React component tree to re-evaluate on every hover event.
+  4. Composite GPU blur: `backdrop-blur-md` on modal toolbars layered over the active 60 FPS WebGL canvas forced costly full-frame compositing passes.
+- **Fixes applied:**
+  1. Switched `hoverNode`, `highlightNodes`, and `selectedNodeId` tracking to refs (`hoverNodeRef`, `highlightNodesRef`, `selectedNodeIdRef`), eliminating all React re-renders on hover.
+  2. Implemented zero-allocation GPU material updates via `Graph.nodeColor(...)`, `Graph.linkColor(...)`, `Graph.linkWidth(...)`, and `Graph.linkDirectionalParticles(...)` instead of calling `refresh()`.
+  3. Initialized `SpriteText` instances statically once with `depthWrite = false`, completely stopping continuous canvas redraws and texture re-allocations.
+  4. Disconnected `dimensions` from the `ForceGraph3D` initialization dependency array, maintaining a stable singleton instance and handling resize via dedicated `.width()` and `.height()` calls.
+  5. Removed nested `backdrop-blur-md` overlays adhering to AGENTS.md UI Rule 2.
+- **Files touched:** `frontend/src/components/memory/MemoryGraphCanvas.tsx`.
+- **Verification:** Layer 1 (Static: `tsc -b && vite build` built in 844ms with zero errors); Layer 2 (Runtime: static texture caching and direct Three.js material color mutators confirmed).
+
 ## [2026-10-22] — MemoryGraphCanvas 3D Force Graph Initialization Fix
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Root cause:** `3d-force-graph` `controlType` was incorrectly chained as a method (`.controlType('orbit')`), whereas in `3d-force-graph`, `controlType` is an initialization configuration option passed as `{ controlType: 'orbit' }` to `ForceGraph3D(domElement, options)`.
