@@ -356,6 +356,37 @@ def _is_same_user_input(a: str, b: str) -> bool:
     b_norm = re.sub(r"[./\s\-_,!?]+$", "", re.sub(r"^https?://(www\.)?", "", b_clean))
     return bool(a_norm and b_norm and a_norm == b_norm)
 
+
+def _split_multi_command(text: str) -> list[str]:
+    """
+    Split a transcript into multiple commands when conjunctions are detected.
+    Handles Hindi/English mixed text with connectors like "and", "aur", "phir", "then", etc.
+
+    Returns a list of command substrings, or [text] if no split needed.
+    """
+    if not text or not text.strip():
+        return [text] if text else []
+
+    original = text.strip()
+
+    # Pattern for common conjunctions in mixed Hindi-English text
+    # Uses non-capturing group (?:...) so conjunctions are not included in split results
+    # Multi-word conjunctions listed FIRST to match before single words
+    # Matches: "and then", "aur phir", "then and", "phir aur", "and", "aur", "then", "phir"
+    pattern = r'\s+(?:and\s+then|then\s+and|aur\s+phir|phir\s+aur|and|aur|then|phir)\s+'
+
+    # Split the text on conjunctions
+    parts = re.split(pattern, original, flags=re.IGNORECASE)
+
+    # Filter out empty parts and clean up
+    cleaned_parts = [p.strip() for p in parts if p and p.strip()]
+
+    if len(cleaned_parts) > 1:
+        return cleaned_parts
+
+    # No conjunction found, return original
+    return [original]
+
 TOOL_DECLARATIONS = [
     # ── Inline tools ─────────────────────────────────────────────────────────
     # These stay here (rather than in an actions/*.py TOOL dict) because their
@@ -585,6 +616,7 @@ class ZezoLive:
         # Push-to-talk
         self._ptt_enabled          = False
         self._ptt_held             = False
+        self._ptt_audio_buffer     = bytearray()
         self._ptt_release_time     = 0.0     # monotonic time when chord was released
         self._ptt                  = None    # core.hotkey.PushToTalk
         self._out_level            = 0.0     # level of the audio being played right now
@@ -641,6 +673,7 @@ class ZezoLive:
         self._last_user_in_logged = ""             # deduplication for user text/voice input
         self._last_user_text_ts: float = 0.0       # timestamp of last typed command for debounce
         self._session_log: list[str] = []          # conversation turns for end-of-session summary
+        self._summary_watermark: str | None = None  # last turn ts already summarised (window boundary)
         self._tool_busy: bool = False              # pauses audio streaming during tool execution
         self._awaiting_tool_reply: bool = False    # true while waiting for Gemini to answer after tool execution
         try:
@@ -1118,13 +1151,29 @@ class ZezoLive:
         """Chord pressed or released — may arrive on the hotkey thread."""
         self._ptt_held = held
         if held:
+            # Bug #12 fix: Check if chord was released too recently (accidental touch).
+            # If the chord was released within the last 50ms and audio is still streaming,
+            # this is likely an accidental brush rather than a deliberate press.
+            # In that case, ignore the press to avoid truncating mid-sentence.
+            if self._ptt is not None:
+                last_release = self._ptt.last_release_time
+                time_since_release = time.monotonic() - last_release if last_release > 0 else 999.0
+                # If chord was released less than 50ms ago, ignore this press
+                if time_since_release < 0.05:
+                    return
+
             self._awaiting_speech_reply = False
 
-            # Immediate barge-in: If ZEZO is currently speaking or audio is queued, cut it off now
+            # Cancel any stale silence watchdog to prevent ghost replay
+            self._cancel_silence_watchdog()
+
+            # Immediate barge-in: If ZEZO is currently speaking, cut it off now.
+            # Note: We do NOT interrupt based on queue having audio alone, because
+            # the queue may contain buffered audio during brief model pauses/silences.
+            # The interrupt should only happen when ZEZO is actively speaking.
             with self._speaking_lock:
                 speaking = self._is_speaking
-            q_has_audio = bool(self.audio_in_queue and not self.audio_in_queue.empty())
-            if speaking or q_has_audio:
+            if speaking:
                 self.interrupt()
             else:
                 self._interrupted = False
@@ -1144,43 +1193,36 @@ class ZezoLive:
                     except Exception:
                         break
 
-            # Holding the key wakes it and opens the mic
+            # Holding the key wakes it and opens the mic and resets local PTT buffer
             if self._wake_enabled and not self._awake:
                 self._awake = True
+            self._ptt_audio_buffer = bytearray()
             self._last_user_speech = time.monotonic()
             try:
                 self.ui.set_state("LISTENING")
             except Exception:
                 pass
         else:
-            # On release: keep awake, mark release time so audio tail escapes cleanly
+            # On release: keep awake, mark release time
             self._ptt_release_time = time.monotonic()
             self._last_user_speech = time.monotonic()
             self._awaiting_speech_reply = True
-
-            # Final drain of any chunks that arrived while the user was speaking
-            if self.audio_in_queue:
-                while not self.audio_in_queue.empty():
-                    try:
-                        self.audio_in_queue.get_nowait()
-                    except Exception:
-                        break
-
-            # Clear interrupted flag now so the upcoming response for this turn is accepted
             self._interrupted = False
 
-            def _schedule_release_signals():
-                # Enqueue ~150ms of trailing silence PCM to cleanly close phonemes before stream end
-                silence_frame = b"\x00" * int(SEND_SAMPLE_RATE * 2 * 0.05)  # 50ms per slice
-                for _ in range(3):
-                    self._enqueue_out_audio({"data": silence_frame, "mime_type": f"audio/pcm;rate={SEND_SAMPLE_RATE}"})
-                # Signal Google Gemini Live that user audio stream has ended (triggers turn commit)
-                self._enqueue_out_audio({"audio_stream_end": True})
+            # Cancel any stale silence watchdog
+            self._cancel_silence_watchdog()
 
-            if self._loop and self._loop.is_running():
-                self._loop.call_soon_threadsafe(_schedule_release_signals)
-            else:
-                _schedule_release_signals()
+            # Send audio_stream_end after 0.5s delay (prevents premature turn commit)
+            def _delayed_stream_end():
+                import time as _t
+                _t.sleep(0.5)
+                if self._loop and self._loop.is_running():
+                    self._loop.call_soon_threadsafe(
+                        self._enqueue_out_audio,
+                        {"audio_stream_end": True}
+                    )
+            import threading
+            threading.Thread(target=_delayed_stream_end, daemon=True).start()
 
             try:
                 if not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
@@ -1188,6 +1230,10 @@ class ZezoLive:
                 self._arm_ptt_watchdog()
             except Exception:
                 pass
+
+    async def _stream_buffered_ptt(self) -> None:
+        # No-op: replaced by real-time streaming + delayed commit approach
+        pass
 
     def interrupt(self) -> None:
         """Stop ZEZO mid-speech: drain queued audio and open mic immediately."""
@@ -1278,17 +1324,40 @@ class ZezoLive:
             if hasattr(self, "ui") and self.ui and not getattr(self.ui, "muted", False) and not self._is_speaking:
                 self.ui.set_state("THINKING")
 
-            # Wait remainder to complete 5.0s silence watchdog window
-            await asyncio.sleep(3.5)
-            msg = f"[Audio] ⏱️ Silence watchdog: 5s elapsed since user speech '{user_text[:60]}' with NO model output"
-            print(f"[Zezo] ⚠️ {msg}")
-            if log_bus is not None:
-                log_bus.emit("WARNING", "audio.silence", msg)
-            if hasattr(self, "ui") and self.ui:
-                self.ui.write_log(f"SYS: [Silence Watchdog] No reply within 5s for: '{user_text[:40]}'")
-            self._awaiting_speech_reply = False
-            if hasattr(self, "ui") and self.ui and not getattr(self.ui, "muted", False) and not self._is_speaking:
-                self.ui.set_state(self._get_resting_state())
+            # Wait remainder to complete silence watchdog window (extended for PTT utterances)
+            extra_wait = 12.0 if getattr(self, "_ptt_enabled", False) else 3.5
+            await asyncio.sleep(extra_wait)
+
+            # Bug #16 fix: Only trigger watchdog if we're still awaiting speech reply
+            # (i.e., no tool result has arrived and we're still waiting for model output)
+            if not self._awaiting_speech_reply and not self._awaiting_tool_reply:
+                msg = f"[Audio] ⏱️ Silence watchdog: 5s elapsed since user speech '{user_text[:60]}' with NO model output"
+                print(f"[Zezo] ⚠️ {msg}")
+                if log_bus is not None:
+                    log_bus.emit("WARNING", "audio.silence", msg)
+                if hasattr(self, "ui") and self.ui:
+                    self.ui.write_log(f"SYS: [Silence Watchdog] No reply within 5s for: '{user_text[:40]}'")
+
+                # Silence watchdog triggered — interrupt the turn and reset to listening state
+                self._interrupted = True
+                self._awaiting_speech_reply = False
+
+                # Drain incoming audio queue to stop processing buffered chunks
+                q = self.audio_in_queue
+                if q:
+                    drained = 0
+                    while True:
+                        try:
+                            q.get_nowait()
+                            drained += 1
+                        except Exception:
+                            break
+                    if drained:
+                        print(f"[Zezo] ⏱️ Silence watchdog: drained {drained} audio chunks")
+
+                # Reset UI to listening state
+                if hasattr(self, "ui") and self.ui and not getattr(self.ui, "muted", False) and not self._is_speaking:
+                    self.ui.set_state(self._get_resting_state())
         except asyncio.CancelledError:
             pass
 
@@ -1379,12 +1448,13 @@ class ZezoLive:
         resp_lang = get_response_language()
         if resp_lang and resp_lang.lower() != "auto":
             lang_dir = (
-                f"STRICT FIXED RESPONSE LANGUAGE DIRECTIVE (MANDATORY):\n"
-                f"- The user has configured the fixed response language to '{resp_lang}'.\n"
-                f"- You MUST speak and reply to the user in {resp_lang} ONLY. Even if the user speaks to you in Urdu, Hindi, Spanish, or any other language, you MUST understand their intent but deliver your spoken response exclusively in {resp_lang}.\n"
-                f"- NEVER reply in Urdu, Hindi, or any other language unless the user explicitly commands a language change (e.g. 'speak in Urdu', 'Hindi mein bolo').\n"
-                f"- If the user explicitly asks to switch language, immediately obey, reply in the newly requested language, and save it via save_memory(category='identity', key='language', value='<Language>').\n"
-                f"- Code syntax, file paths, and tool parameters are in English, but spoken voice MUST be strictly in {resp_lang}."
+                f"COMPULSORY NON-NEGOTIABLE RESPONSE LANGUAGE ENFORCEMENT:\n"
+                f"- USER CONFIGURED RESPONSE LANGUAGE: {resp_lang}\n"
+                f"- YOU MUST respond in {resp_lang} ONLY. This is NON-NEGOTIABLE and COMPULSORY.\n"
+                f"- If the user speaks in Urdu, Hindi, Spanish, or any other language, you MUST understand their intent but deliver your spoken response EXCLUSIVELY in {resp_lang}.\n"
+                f"- STRICT PROHIBITION: NEVER reply in Urdu, Hindi, or any language other than {resp_lang} unless explicitly commanded.\n"
+                f"- If the user commands a language switch (e.g. 'speak in Urdu', 'Hindi mein bolo'), obey IMMEDIATELY and save via save_memory(category='identity', key='language', value='<Language>').\n"
+                f"- Code syntax, file paths, and tool parameters MUST remain in English. Only spoken voice and textual responses MUST be in {resp_lang}."
             )
         else:
             lang_dir = (
@@ -1451,10 +1521,25 @@ class ZezoLive:
             parts.append(skills_str)
         parts.append(sys_prompt)
 
+        # Map response language to robust ASR language hints / codes to prevent language mixing / hallucination
+        lang_map = {
+            "English": ["en-US", "en-GB"],
+            "Urdu": ["ur-PK", "en-US"],
+            "Hindi": ["hi-IN", "en-US"],
+            "Spanish": ["es-ES", "en-US"],
+            "French": ["fr-FR", "en-US"],
+            "German": ["de-DE", "en-US"],
+            "Arabic": ["ar-SA", "en-US"],
+            "Turkish": ["tr-TR", "en-US"],
+        }
+        active_lang_codes = lang_map.get(resp_lang, ["en-US", "ur-PK", "hi-IN", "es-ES"])
+
         cfg = dict(
             response_modalities=["AUDIO"],
             output_audio_transcription={},
-            input_audio_transcription={},
+            input_audio_transcription=types.AudioTranscriptionConfig(
+                language_codes=active_lang_codes
+            ),
             system_instruction="\n".join(parts),
             tools=[{"function_declarations": _all_decls}],
             # Hand back the handle captured from the last session_resumption
@@ -1471,6 +1556,15 @@ class ZezoLive:
                 )
             ),
         )
+
+        # When Push-to-Talk is enabled, extend VAD silence duration (2.5s) so mid-sentence
+        # pauses during long speech don't prematurely trigger turn completion / speech leaks.
+        if getattr(self, "_ptt_enabled", False):
+            cfg["realtime_input_config"] = types.RealtimeInputConfig(
+                automatic_activity_detection=types.AutomaticActivityDetection(
+                    silence_duration_ms=2500
+                )
+            )
         proactive_enabled = get_proactive_audio_enabled()
         print(f"[Zezo] 🎙️ Proactive Audio Config: enabled={proactive_enabled}, enhanced_live={self._enhanced_live}")
         if log_bus is not None:
@@ -1996,11 +2090,24 @@ class ZezoLive:
             elif self._echo._hist:
                 self._echo.reset()
 
-            # ── Push-to-talk ─────────────────────────────────────────────────
-            # When push-to-talk is active, microphone only streams while the chord is held.
-            # Trailing phoneme flush (150ms silence) and audio_stream_end are handled by
-            # _on_ptt, so no further live mic chunks should be enqueued once the chord is released.
-            if self._ptt_enabled and not self._ptt_held:
+            # ── Push-to-talk (Real-time streaming + delayed commit) ─────────────
+            # Stream audio in real-time through out_queue (normal flow).
+            # Delay audio_stream_end by 0.5s after release to prevent
+            # premature turn commit during long speech.
+            if self._ptt_enabled:
+                if self._ptt_held:
+                    if not self.ui.muted and not self._phone_active:
+                        data = indata.tobytes()
+                        loop.call_soon_threadsafe(
+                            self._enqueue_out_audio,
+                            {"data": data, "mime_type": f"audio/pcm;rate={SEND_SAMPLE_RATE}"}
+                        )
+                return
+
+            # ── Turn interruption ────────────────────────────────────────────
+            # When Gemini closes a turn, stop mic streaming immediately to prevent
+            # buffered audio from being sent after the turn ends.
+            if self._interrupted:
                 return
 
             if not self.ui.muted and not self._phone_active:
@@ -2149,28 +2256,11 @@ class ZezoLive:
                             self._cancel_silence_watchdog()
                             self._cancel_ptt_watchdog()
                             txt = _clean_transcript(sc.output_transcription.text)
-                            # Log user speech immediately as soon as model starts answering
-                            if in_buf and not in_logged:
-                                full_in = " ".join(in_buf).strip()
-                                is_dup = _is_same_user_input(full_in, self._last_user_in_logged)
-                                is_recent_typed = (time.monotonic() - getattr(self, "_last_user_text_ts", 0)) < 5.0
-                                if full_in and not is_dup and not is_recent_typed:
-                                    self._last_user_in_logged = full_in
-                                    self._last_out_logged = ""
-                                    self.ui.write_log(f"You: {full_in}")
-                                    self.ui.stream_transcript("user", full_in, done=True)
-                                    self._session_log.append(f"User: {full_in}")
-                                    try:
-                                        sqlite_memory.log_turn("user", full_in)
-                                    except Exception:
-                                        pass
-                                    if self._dashboard:
-                                        asyncio.create_task(self._dashboard.broadcast({
-                                            "type": "log", "speaker": "user",
-                                            "text": full_in,
-                                            "ts": datetime.now().isoformat(),
-                                        }))
-                                in_logged = True
+                            # Bug #24 fix: User turns are logged at turn_complete, not here.
+                            # Logging here when the model starts answering would capture
+                            # partial user input if Gemini streams output_transcription
+                            # before the user finishes speaking.
+                            pass
 
                             if txt and not _is_repeat_chunk(txt, out_buf):
                                 out_buf.append(txt)
@@ -2210,8 +2300,22 @@ class ZezoLive:
                             self._interrupted = True
                             self._cancel_silence_watchdog()
                             self.interrupt()
+                            # Flush the outgoing mic queue immediately to stop streaming user audio
+                            # when Gemini closes the turn. Without this, buffered mic chunks
+                            # continue sending even after the user stops speaking.
+                            if self.out_queue:
+                                flushed = 0
+                                while True:
+                                    try:
+                                        self.out_queue.get_nowait()
+                                        flushed += 1
+                                    except Exception:
+                                        break
+                                if flushed:
+                                    print(f"[Zezo] 🗑️  Interrupt: flushed {flushed} mic chunks from queue")
 
                         if sc.turn_complete:
+                            self._interrupted = False
                             self._awaiting_speech_reply = False
                             self._cancel_silence_watchdog()
                             if self._turn_done_event:
@@ -2243,6 +2347,11 @@ class ZezoLive:
                             full_in = " ".join(in_buf).strip()
                             is_dup = _is_same_user_input(full_in, self._last_user_in_logged)
                             is_recent_typed = (time.monotonic() - getattr(self, "_last_user_text_ts", 0)) < 5.0
+
+                            # Bug #11 fix: Split multi-command transcripts before sending to Gemini
+                            # This handles cases like "close calculator and close notepad"
+                            command_parts = _split_multi_command(full_in) if full_in else [full_in]
+
                             if full_in and not in_logged and not is_dup and not is_recent_typed:
                                 self._last_user_in_logged = full_in
                                 self._last_out_logged = ""   # new exchange
@@ -2251,33 +2360,41 @@ class ZezoLive:
                                     loop_gates.reset_session("global")
                                 except Exception:
                                     pass
-                                self.ui.write_log(f"You: {full_in}")
-                                self.ui.stream_transcript("user", full_in, done=True)
-                                self._session_log.append(f"User: {full_in}")
-                                try:
-                                    sqlite_memory.log_turn("user", full_in)
-                                except Exception:
-                                    pass
-                                if self._dashboard:
-                                    asyncio.create_task(self._dashboard.broadcast({
-                                        "type": "log", "speaker": "user",
-                                        "text": full_in,
-                                        "ts": datetime.now().isoformat(),
-                                    }))
 
-                                # ── Voice Confirmation Gate Hook ──
-                                if confirm_gate.pending_title():
-                                    norm_in = full_in.lower().strip()
-                                    if re.search(r"\b(yes|yeah|sure|confirm|proceed|install|haan|kardo|kar do|theek hai|bilkul|ok|okay)\b", norm_in):
-                                        print(f"[Confirm] 🎙️ Voice confirmed: '{full_in}'")
-                                        confirm_gate.resolve(accepted=True)
-                                    elif re.search(r"\b(no|nope|cancel|don't|dont|nah|nahi|mat karna|rehnedo|rehne do|reject)\b", norm_in):
-                                        print(f"[Confirm] 🎙️ Voice rejected: '{full_in}'")
-                                        confirm_gate.resolve(accepted=False)
+                                # Send each command part separately to Gemini
+                                for idx, cmd_part in enumerate(command_parts):
+                                    if cmd_part and cmd_part.strip():
+                                        self.ui.write_log(f"You: {cmd_part.strip()}")
+                                        self.ui.stream_transcript("user", cmd_part.strip(), done=True)
+                                        self._session_log.append(f"User: {cmd_part.strip()}")
+                                        try:
+                                            sqlite_memory.log_turn("user", cmd_part.strip())
+                                        except Exception:
+                                            pass
+                                        if self._dashboard:
+                                            asyncio.create_task(self._dashboard.broadcast({
+                                                "type": "log", "speaker": "user",
+                                                "text": cmd_part.strip(),
+                                                "ts": datetime.now().isoformat(),
+                                            }))
+
+                                        # ── Voice Confirmation Gate Hook ──
+                                        if confirm_gate.pending_title():
+                                            norm_in = cmd_part.lower().strip()
+                                            if re.search(r"\b(yes|yeah|sure|confirm|proceed|install|haan|kardo|kar do|theek hai|bilkul|ok|okay)\b", norm_in):
+                                                print(f"[Confirm] 🎙️ Voice confirmed: '{cmd_part.strip()}'")
+                                                confirm_gate.resolve(accepted=True)
+                                            elif re.search(r"\b(no|nope|cancel|don't|dont|nah|nahi|mat karna|rehnedo|rehne do|reject)\b", norm_in):
+                                                print(f"[Confirm] 🎙️ Voice rejected: '{cmd_part.strip()}'")
+                                                confirm_gate.resolve(accepted=False)
+                                    else:
+                                        self.ui.stream_transcript("user", "", done=True)
+                                in_buf = []
+                                in_logged = True
                             else:
                                 self.ui.stream_transcript("user", "", done=True)
-                            in_buf = []
-                            in_logged = False
+                                in_buf = []
+                                in_logged = False
 
                             full_out = " ".join(out_buf).strip()
                             if full_out and len(full_out) >= _REPEAT_MIN and self._last_out_logged:
@@ -2354,6 +2471,7 @@ class ZezoLive:
                                 await self.session.send_tool_response(
                                     function_responses=fn_responses
                                 )
+                                self._interrupted = False
                                 self._tool_busy = False
                                 self._awaiting_tool_reply = True
                                 if hasattr(self, "ui") and self.ui and not getattr(self.ui, "muted", False) and not getattr(self.ui, "_sleeping", False):
@@ -2708,6 +2826,17 @@ class ZezoLive:
             return
         self._session_log = []    # reset immediately so the next session starts clean
 
+        # The summary must be dated by WHEN THE CONVERSATION HAPPENED, not by
+        # when it was written. A session that started at 23:50 on the 21st and
+        # is summarised at 00:10 on the 22nd belongs to the 21st — the user
+        # remembers it as "last night". The turns table is the source of truth
+        # for that date; the watermark marks the end of the previous window.
+        first_ts, last_ts = ("", "")
+        try:
+            first_ts, last_ts = sqlite_memory.get_session_turn_window(self._summary_watermark)
+        except Exception as e:
+            print(f"[Memory] ⚠️ session window lookup failed: {e}")
+
         memory = load_memory()
         lang_entry = memory.get("identity", {}).get("language", {})
         lang = (lang_entry.get("value", "") if isinstance(lang_entry, dict) else str(lang_entry)).strip()
@@ -2725,7 +2854,17 @@ class ZezoLive:
                 gemini.text, prompt, gemini.SMART, None, 30_000,
             )
             if summary:
-                save_session_summary(summary, lang)
+                save_session_summary(
+                    summary,
+                    lang,
+                    session_date=(first_ts or "")[:10],
+                    started_at=(first_ts or "")[:19],
+                )
+            # Every turn up to `last_ts` is now summarised; the next window
+            # starts after it. Done even if the summary failed, so a failed
+            # summary cannot make the same turns repeat forever.
+            if last_ts:
+                self._summary_watermark = last_ts
         except Exception as e:
             print(f"[Memory] ⚠️ Session summary failed: {e}")
 
@@ -2754,6 +2893,28 @@ class ZezoLive:
                 )
             except Exception as e:
                 print(f"[Monitor] ⚠️ Could not send alert: {e}")
+
+    # ── Vault synchronisation ────────────────────────────────────────────────────
+
+    async def _run_vault_sync(self) -> None:
+        """Keep the Markdown memory vault in step with the live conversation.
+
+        The vault used to be written once at startup and then left to rot:
+        nodes froze at the first 12 turns of their session and never grew
+        again while the conversation kept going. This re-synthesises the
+        nodes every few minutes so the Memory screen always reflects what
+        actually happened. Notes the user edited by hand are never touched.
+        """
+        await asyncio.sleep(120)      # let the first minutes settle
+        while True:
+            try:
+                from memory.vault_engine import vault_engine
+                count = await asyncio.to_thread(vault_engine.sync_real_conversations_from_db)
+                if count:
+                    print(f"[Vault] 🧠 Synced {count} conversation node(s) from the live DB.")
+            except Exception as e:
+                print(f"[Vault] ⚠️ Sync error: {e}")
+            await asyncio.sleep(300)  # every 5 minutes
 
     # ── Task completion watcher ──────────────────────────────────────────────────
 
@@ -2845,11 +3006,28 @@ class ZezoLive:
 
                 try:
                     if self.session and self._awake:
-                        await self.session.send_client_content(
-                            turns=[{"role": "user", "parts": [{"text": msg}]}],
-                            turn_complete=True,
-                        )
-                        print(f"[Zezo] 🔔 Task notification sent for {task.id} (status: {task.status.value})")
+                        # Guard against duplicate emission: if this task's summary was
+                        # already spoken (via the normal tool-response round trip), skip
+                        # the extra injection to avoid a second summary turn.
+                        already_spoken = False
+                        try:
+                            # Check if the full summary was already spoken (not just a partial match)
+                            # _last_out_logged contains the assistant's last spoken response
+                            if summary_str and self._last_out_logged:
+                                # Summary must appear at the START of the logged response to count as duplicate
+                                # This prevents false positives from partial substring matches
+                                already_spoken = self._last_out_logged.startswith(summary_str)
+                                print(f"[Zezo] 🔍 Duplicate guard check: summary={summary_str[:50]!r}, logged={self._last_out_logged[:50]!r}, match={already_spoken}")
+                        except Exception:
+                            already_spoken = False
+                        if not already_spoken:
+                            await self.session.send_client_content(
+                                turns=[{"role": "user", "parts": [{"text": msg}]}],
+                                turn_complete=True,
+                            )
+                            print(f"[Zezo] 🔔 Task notification sent for {task.id} (status: {task.status.value})")
+                        else:
+                            print(f"[Zezo] 🔕 Skipped duplicate task notification for {task.id} (already spoken)")
                         self.ui.write_log(log_text)
                         await asyncio.sleep(1)
                 except Exception as e:
@@ -3262,6 +3440,7 @@ class ZezoLive:
                     tg.create_task(self._receive_audio())
                     tg.create_task(self._play_audio())
                     tg.create_task(self._run_system_monitor())
+                    tg.create_task(self._run_vault_sync())
                     tg.create_task(self._run_task_completion_watcher())
                     tg.create_task(self._run_background_monitor())
                     tg.create_task(self._run_proactive_mode())

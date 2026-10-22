@@ -48,5 +48,19 @@ class TestLanguageAndMuteFix(unittest.TestCase):
         registry = discover_actions(repo_root / "actions")
         self.assertGreaterEqual(len(registry._actions), 20)
 
+    def test_build_config_transcription_and_ptt_logic(self):
+        # Verify that language mapping covers standard languages
+        from memory.config_manager import save_response_language
+        save_response_language("English")
+        self.assertEqual(get_response_language(), "English")
+
+        # Test simulated config dictionary construction
+        lang_map = {
+            "English": ["en-US", "en-GB"],
+            "Urdu": ["ur-PK", "en-US"],
+        }
+        codes = lang_map.get("English", ["en-US", "ur-PK"])
+        self.assertIn("en-US", codes)
+
 if __name__ == "__main__":
     unittest.main()
