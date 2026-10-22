@@ -407,6 +407,13 @@ export const MemoryGraphCanvas: React.FC<MemoryGraphCanvasProps> = ({
         nodes: effectiveNodes,
         links: effectiveLinks,
       })
+      if (effectiveNodes.length > 0) {
+        setTimeout(() => {
+          try {
+            graphInstanceRef.current?.zoomToFit?.(500, 40)
+          } catch (e) {}
+        }, 150)
+      }
     }
   }, [effectiveNodes, effectiveLinks])
 
