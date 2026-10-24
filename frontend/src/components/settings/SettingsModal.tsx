@@ -38,6 +38,7 @@ import {
   Plus,
   Trash2,
   Loader2,
+  Terminal,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { api } from '../../lib/api'
@@ -45,6 +46,7 @@ import type { AudioDeviceState } from '../../hooks/useZezoSocket'
 import { QiviAvatarVisualizer } from '../canvas/QiviAvatarVisualizer'
 import type { QiviShape } from 'qivi-react'
 import { SkillsSettingsTab } from './SkillsSettingsTab'
+import { CodeEnginesSettingsTab } from './CodeEnginesSettingsTab'
 import { MemoryGraphCanvas, type GraphNode, type GraphLink } from '../memory/MemoryGraphCanvas'
 import { MemoryInspectorDrawer } from '../memory/MemoryInspectorDrawer'
 import { NewMemoryModal } from '../memory/NewMemoryModal'
@@ -70,6 +72,7 @@ type SectionId =
   | 'appearance'
   | 'memory'
   | 'skills'
+  | 'code-engines'
   | 'about'
 
 export interface ThemeSystem {
@@ -888,6 +891,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         { id: 'appearance' as SectionId, label: 'Appearance', keywords: ['appearance', 'theme', 'accent', 'color', 'dark', 'light', 'avatar'], icon: Palette },
         { id: 'memory' as SectionId, label: 'Memory', keywords: ['memory', 'intelligence', 'graph', 'sqlite', 'vector', 'notes'], icon: Atom },
         { id: 'skills' as SectionId, label: 'Skills', keywords: ['skills', 'plugins', 'tools', 'declarative'], icon: Sparkles },
+        { id: 'code-engines' as SectionId, label: 'Code Engines', keywords: ['code', 'engines', 'cli', 'antigravity', 'opencode', 'kilo', 'coding'], icon: Terminal },
       ],
     },
     {
@@ -1875,6 +1879,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* ──────────────── 7. SKILLS & AUTONOMOUS CAPABILITIES ──────────────── */}
               {activeSection === 'skills' && (
                 <SkillsSettingsTab />
+              )}
+
+              {/* ──────────────── 7b. CODE ENGINES ──────────────── */}
+              {activeSection === 'code-engines' && (
+                <CodeEnginesSettingsTab />
               )}
 
               {/* ──────────────── 8. ABOUT ──────────────── */}

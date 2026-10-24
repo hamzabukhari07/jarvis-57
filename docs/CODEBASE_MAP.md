@@ -1,425 +1,219 @@
-# JARVIS — Codebase Map
+# ZEZO — Codebase Map & Directory Architecture
 
-## Top-Level Structure
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux
+
+---
+
+## Top-Level Repository Structure
 
 ```
-JARVIS/
-├── main.py                          # Application entry point, JarvisLive class
-├── ui.py                            # PyQt6 HUD (5438 lines)
-├── setup.py                         # OS-aware installer
-├── requirements.txt                 # All Python dependencies
-├── readme.md                        # User-facing documentation
-├── .gitignore                       # Excludes config, certs, memory
+ZEZO/
+├── main.py                          # Core async engine, ZezoLive orchestrator, Gemini Live loop
+├── ui.py                            # PyQt6 host window & WebEngine wrapper for React HUD
+├── setup.py                         # OS-aware package installer & post-install setup
+├── requirements.txt                 # Backend Python package manifest
+├── readme.md                        # User-facing onboarding guide
+├── .gitignore                       # Excludes logs, configs, caches, venv
 ├── LICENSE                          # CC BY-NC 4.0
-├── core/
-│   ├── __init__.py                  # Core module init
-│   ├── prompt.txt                   # System prompt template (160 lines)
-│   ├── models.py                    # Single source of truth for model ids (Gemini/Antigravity/Groq)
-│   ├── provider_health.py           # Startup provider/model health-check
-│   ├── gemini.py                    # One-shot Gemini calls, model ladder
-│   ├── llm_client.py                # Local LLM client (Ollama/OpenAI)
-│   ├── llm_router.py                # Background text router: Groq → Gemini → Ollama
-│   ├── voice_fallback.py            # Offline voice loop: VAD → STT → LLM → TTS (fallback only)
-│   ├── stt.py                       # Whisper/Vosk STT engines (optional)
-│   ├── tts.py                       # EdgeTTS/Kokoro/ElevenLabs TTS engines
-│   ├── viseme.py                    # Transcript→mouth shapes fusion
-│   ├── echo.py                      # Self-echo detection and cancellation
-│   ├── wake_word.py                 # Local "Hey Jarvis" detector
-│   ├── hotkey.py                    # Push-to-talk chord detection
-│   ├── audio_devices.py             # Mic/speaker enumeration and selection
-│   ├── action_loader.py             # Auto-discovers actions/*.py (25 actions)
+├── core/                            # Core runtime systems, drivers & dispatchers
+│   ├── prompt.txt                   # Production system prompt template (~480 lines)
+│   ├── models.py                    # Single source of truth for model identifiers & ladders
+│   ├── provider_health.py           # Background health-checker for Gemini & Groq
+│   ├── gemini.py                    # One-shot tiered Gemini REST client & fallback ladder
+│   ├── llm_client.py                # Local Ollama / OpenAI-compatible REST client
+│   ├── llm_router.py                # Fast background text router (Groq → Gemini → Ollama)
+│   ├── code_engines.py              # CLI coding engine drivers (Antigravity CLI, OpenCode, Kilo)
+│   ├── teardown_engine.py           # REA Teardown Engine via rea-agents@6.7.0 CLI
+│   ├── tunnel_manager.py            # Cloudflare Quick Tunnel daemon manager
+│   ├── action_loader.py             # Dynamic action discoverer & registry (33 actions)
 │   ├── fleet_manager.py             # Autonomous multi-agent fleet orchestrator & workspace isolation
-│   ├── plugin_loader.py             # Auto-discovers plugins/*.py
-│   ├── skill_loader.py              # Declarative skill registry & context manager
-│   ├── task_manager.py              # Background task execution, concurrency limiter & status tracker
-│   ├── log_bus.py                   # In-memory ring buffer with secret redaction
-│   ├── repo_context.py              # Active workspace resolver & persistence
-│   ├── design_resolver.py           # Raw HTML blueprint injector & adaptive resolver
-│   ├── computer/                    # Modular Desktop Automation Engine (0 MB VRAM)
-│   │   ├── __init__.py              # Perception & driver exports
-│   │   ├── windows_native.py        # Win32 APIs, DWM extended frame bounds, DPI awareness
-│   │   ├── windows_uia.py           # Windows UI Automation (L1 UIA, STA COM worker)
-│   │   ├── ocr_engine.py            # Multilingual RapidOCR (L1.5 OCR, Urdu normalizer, CPU ONNX)
-│   │   └── pyautogui_driver.py      # Input driver, Unicode clipboard typing, key aliases
-│   ├── undo.py                      # Shared undo stack
-│   ├── confirm.py                   # Irreversible-action confirmation gate
-│   └── installer.py                 # OS-specific post-install setup
-├── actions/
-│   ├── fleet_control.py             # Multi-agent fleet orchestrator (spawn, instruct, status, cancel)
-│   ├── antigravity_agent.py         # Google Antigravity autonomous coding agent
-│   ├── opencode_agent.py            # OpenCode CLI multi-file implementation agent
-│   ├── kilo_agent.py                # Kilo Code multi-file refactoring agent
-│   ├── design_extractor.py          # On-demand design system extractor tool
-│   ├── task_status.py               # Background task query and cancellation
-│   ├── background_monitor.py        # Background topic monitoring
-│   ├── browser_control.py           # Web browser automation
-│   ├── code_helper.py               # Code review and generation
-│   ├── computer_control.py          # Keyboard, mouse, window management
-│   ├── computer_settings.py         # Volume, brightness, WiFi, power
-│   ├── desktop.py                   # Desktop and taskbar control
-│   ├── dev_agent.py                 # Developer task agent
-│   ├── file_controller.py           # File system operations
-│   ├── file_processor.py            # Document reading and summarization
-│   ├── flight_finder.py             # Flight search
-│   ├── game_updater.py              # Steam/Epic game updates
-│   ├── open_app.py                  # Application launcher
-│   ├── proactive.py                 # Proactive 2.0 check-ins
+│   ├── plugin_loader.py             # Plugin discoverer & execution sandbox
+│   ├── skill_loader.py              # Declarative skill registry (`skills/<name>/SKILL.md`)
+│   ├── skill_scanner.py             # Multi-stage security & prompt injection scanner
+│   ├── task_manager.py              # Background task execution & subtask streaming
+│   ├── clipboard_watcher.py         # Background OS clipboard monitor & classifier
+│   ├── ui_server.py                 # aiohttp / FastAPI WebSocket & static UI server
+│   ├── audio_devices.py             # Audio I/O device enumerator & resolver
+│   ├── echo.py                      # Multi-band energy acoustic echo canceller
+│   ├── hotkey.py                    # Push-to-Talk global keyboard hook (Ctrl+Alt)
+│   ├── wake_word.py                 # Offline openwakeword detection engine
+│   ├── viseme.py                    # Real-time phoneme-to-viseme mouth shape engine
+│   ├── loop_gates.py                # Loop iteration guards & tool execution quotas
+│   ├── git_sandbox.py               # Isolated Git worktree sandboxing for fleet agents
+│   ├── repo_context.py              # Active workspace resolver & desktop project tracker
+│   ├── design_resolver.py           # Blueprint injector & adaptive design resolver
+│   ├── undo.py                      # Undo stack & contextual GUI undo dispatcher
+│   ├── confirm.py                   # Irreversible action confirmation gate
+│   ├── installer.py                 # Runtime requirement verifier & Playwright downloader
+│   └── computer/                    # 3-Tier Desktop Perception & Automation Engine
+│       ├── __init__.py              # Unified perception export
+│       ├── windows_native.py        # Win32 APIs, DWM extended frame bounds, DPI awareness
+│       ├── windows_uia.py           # Tier 1: Windows UI Automation (STA COM worker)
+│       ├── ocr_engine.py            # Tier 1.5: Multilingual RapidOCR (CPU ONNX, 0 MB VRAM)
+│       └── pyautogui_driver.py      # Cross-platform mouse & keyboard driver
+├── actions/                         # Discrete atomic action tools (33 files)
+│   ├── agent_reach.py               # Media metadata & video transcript extraction
+│   ├── antigravity_agent.py         # Google Antigravity CLI autonomous coding agent
+│   ├── ast_tool.py                  # Abstract Syntax Tree structural code analysis
+│   ├── background_monitor.py        # Long-term topic & headline watcher
+│   ├── browser_control.py           # Playwright headless browser automation
+│   ├── code_engines_status.py       # Probe & health-check for Antigravity, OpenCode, Kilo
+│   ├── computer_control.py          # Native OS automation, mouse, keyboard & batch actions
+│   ├── computer_settings.py         # Hardware volume, brightness, power & network settings
+│   ├── design_extractor.py          # On-demand design system token & CSS extractor
+│   ├── desktop.py                   # Desktop workspace & active window controller
+│   ├── file_controller.py           # Filesystem mutations, directory navigation, safe trash
+│   ├── file_processor.py            # Rich document ingestion (PDF, DOCX, XLSX, PPTX, CSV)
+│   ├── fleet_control.py             # Autonomous multi-agent fleet orchestrator
+│   ├── flight_finder.py             # Flight schedule & price aggregator
+│   ├── game_updater.py              # Gaming platform updates & launcher
+│   ├── kilo_agent.py                # Kilo terminal coding engine wrapper
+│   ├── opencode_agent.py            # OpenCode autonomous coding agent wrapper
+│   ├── open_app.py                  # Native OS application launcher
+│   ├── proactive.py                 # Proactive 2.0 conversational check-ins
+│   ├── quick_snippet.py             # Fast code snippet generator & syntax validator
+│   ├── recall_history.py            # Full-text BM25 search across sqlite_memory
 │   ├── reminder.py                  # OS-native scheduled notifications
-│   ├── screen_processor.py          # Screen/webcam capture
-│   ├── send_message.py              # Messaging integration
-│   ├── system_monitor.py            # CPU/RAM/GPU telemetry
-│   ├── weather_report.py            # Live weather data
-│   ├── web_search.py                # Gemini + DDG parallel search
-│   └── youtube_video.py             # YouTube playback control
-├── skills/                          # Declarative skill packages (hamza_taste, opencode, kilo_code, figma_helper, etc.)
-├── memory/
-│   ├── __init__.py
-│   ├── sqlite_memory.py             # SQLite FTS5 database with BM25 indexing
-│   ├── memory_manager.py            # Load/save long_term.json, search
-│   └── config_manager.py            # api_keys.json read/write, all getters/setters
-├── plugins/
-│   ├── __init__.py
-
-│   ├── _template.py                 # Copy this to create a new plugin
-│   ├── _google_core.py              # Shared OAuth for Gmail/Calendar
-│   ├── _printer_core.py             # Shared printer connectivity
-│   ├── quiz.py                      # Interactive quiz
-│   ├── document_review.py           # Contract/policy review
-│   └── ...                          # Drop-in skills
-├── dashboard/
-│   ├── __init__.py
-│   └── server.py                    # FastAPI HTTP dashboard server
-├── config/
-│   ├── __init__.py
-│   └── api_keys.json                # Configuration (git-ignored)
-├── docs/                            # This documentation
-└── DOCUMENTATION/                   # Previous documentation attempt
+│   ├── reverse_engineer.py          # REA Teardown Engine browser scenario runner
+│   ├── run_tool_batch.py            # Atomic execution of multiple action tools in 1 turn
+│   ├── screen_processor.py          # Multi-monitor screenshot & webcam capture
+│   ├── send_message.py              # External messaging integration (WhatsApp, Telegram)
+│   ├── system_monitor.py            # Real-time hardware telemetry (CPU, RAM, GPU, temp)
+│   ├── task_status.py               # Background task telemetry & cancellation
+│   ├── weather_report.py            # Real-time weather data & forecasts
+│   ├── website_cloner.py            # Offline website cloner using Uncage engine
+│   ├── web_reader.py                # Anti-bot web content reader (Scrapling)
+│   ├── web_search.py                # Google Grounded + DuckDuckGo search aggregator
+│   └── youtube_video.py             # YouTube playback & transcript controller
+├── frontend/                        # Modern React 18 / Vite SPA Frontend
+│   ├── package.json                 # Modern dependencies (@assistant-ui, Three.js, Tailwind v4)
+│   ├── vite.config.ts               # Vite configuration with Tailwind CSS plugin
+│   └── src/                         # React component & state architecture
+│       ├── App.tsx                  # Root shell hosting office, canvas, chat & modals
+│       ├── main.tsx                 # React DOM mount point
+│       ├── types/zezo.ts            # Complete TypeScript schema definitions
+│       ├── hooks/useZezoSocket.ts   # WebSocket client with auto-reconnect & packet dispatcher
+│       ├── lib/api.ts               # REST API fetch client (/api/settings, /api/tasks, etc.)
+│       └── components/
+│           ├── office/              # Scranton Autonomous Office Screen
+│           │   ├── AutonomousOfficeScreen.tsx  # 2D pixel desk grid, sprite rendering, monitor telemetry
+│           │   └── AgentDirectChatView.tsx     # 1-on-1 isolated context chat thread per agent
+│           ├── memory/              # Knowledge Graph & Vault Visualization
+│           │   ├── MemoryGraphCanvas.tsx       # 3D Force-Directed Knowledge Graph (Three.js)
+│           │   ├── MemoryInspectorDrawer.tsx   # Markdown node viewer & wikilink inspector
+│           │   └── NewMemoryModal.tsx          # Fast manual fact insertion dialog
+│           ├── tasks/               # Background Task Management
+│           │   └── TaskManagerModal.tsx        # Task tree viewer, output streaming, cancellation
+│           ├── remote/              # Mobile Remote Access
+│           │   └── MobileRemoteModal.tsx       # Cloudflare Quick Tunnel QR code & OTP token
+│           ├── clipboard/           # Live Clipboard Watcher
+│           │   └── ClipPeekOverlay.tsx         # Floating quick-action HUD for copied snippets
+│           ├── assistant-ui/        # Conversational Chat Thread
+│           │   ├── ZezoChatThread.tsx          # Assistant-UI thread with turn pills & shimmer labels
+│           │   ├── thinking.tsx                # Reasoning step container
+│           │   └── elements/                   # Turn process pills, web search chips
+│           ├── canvas/              # WebGL Avatar & Visualizers
+│           │   ├── CanvasView.tsx              # Split HUD workspace canvas
+│           │   └── QiviAvatarVisualizer.tsx    # Audio-reactive 3D WebGL point-cloud avatar
+│           ├── telemetry/           # Real-Time Telemetry & Logs
+│           │   ├── BackendLogModal.tsx         # Real-time log bus stream with secret redaction
+│           │   └── VortexVisualizer.tsx        # High-performance CSS canvas vortex animation
+│           ├── settings/            # Modular ReUI Settings Dialog
+│           │   ├── SettingsModal.tsx           # 9-tab settings modal dialog
+│           │   ├── CodeEnginesSettingsTab.tsx  # Antigravity/OpenCode/Kilo status & configuration
+│           │   └── SkillsSettingsTab.tsx       # Declarative skills viewer & editor
+│           ├── fleet/               # Multi-Agent Management & Roster
+│           │   ├── FleetRoster.tsx             # Interactive agent roster sidebar
+│           │   └── AgentInspector.tsx          # Agent profile, permissions & sandbox inspector
+│           ├── avatar/              # Avatar Badges & Icons
+│           │   └── ChatAvatarIcon.tsx          # Real-time state-reactive agent avatar badge
+│           ├── prompt-kit/          # Advanced Prompting & Thinking Primitives
+│           │   ├── chain-of-thought.tsx        # Reasoning disclosure accordion
+│           │   ├── code-block.tsx              # Syntax-highlighted code container
+│           │   └── message.tsx                 # Base message card primitive
+│           ├── layout/              # HUD Application Shell Layout
+│           │   └── Header.tsx                  # Top status bar, audio device pill & tunnel indicator
+│           ├── reui/                # ReUI Design System Primitives
+│           │   ├── frame.tsx                   # Modal panel framing with opaque backgrounds
+│           │   ├── confirm-dialog.tsx          # High-risk action confirmation modal
+│           │   ├── card.tsx, chat.tsx, badge.tsx, callout.tsx, kbd.tsx
+│           └── ui/                  # Headless UI Components (Buttons, Dialogs, Selects, Tabs)
+├── memory/                          # Hybrid 3-Tier Memory Engine
+│   ├── long_term.json               # Tier 1: User facts, core preferences & session summaries
+│   ├── sqlite_memory.py             # Tier 2: SQLite WAL + FTS5 BM25 database (`zezo_brain.db`)
+│   ├── vault_engine.py              # Tier 3: Local Markdown Vault (`memory/vault/*.md`) with `[[wikilinks]]`
+│   ├── memory_manager.py            # High-level memory coordinator & prompt builder
+│   └── config_manager.py            # Thread-safe getters/setters for `config/api_keys.json`
+├── skills/                          # Declarative Agent Skills (`skills/<name>/SKILL.md`)
+│   ├── hamza_taste/                 # Lead architect UI/UX aesthetic rules & ReUI invariants
+│   ├── opencode/                    # OpenCode CLI workflow instructions
+│   ├── kilo_code/                   # Kilo terminal refactoring instructions
+│   └── figma_helper/                # Design-to-code extraction conventions
+└── plugins/                         # Modular Drop-In Feature Extensions
+    ├── _template.py                 # Standard plugin blueprint
+    ├── _google_core.py              # Google OAuth2 credentials & token management
+    ├── home_assistant/              # Tuya & smart home appliance integrations
+    └── printer_control/             # Network printer spooling via MQTT
 ```
 
-## File-by-File Documentation
-
-### main.py (2284 lines)
-
-**Purpose**: Application entry point, core engine, Gemini Live session management, audio I/O, tool dispatch.
-
-**Key class**: `JarvisLive`
-**Key functions**: `_build_config()`, `_execute_tool()`, `_listen_audio()`, `_send_realtime()`, `_pcm_visemes()`, `_build_config()`
-
-**Dependencies**: `sounddevice`, `numpy`, `google-genai`, `PyQt6`, `memory/memory_manager.py`, `actions/*.py`, `core/*`
-
-**Called by**: `python main.py`
-
-### ui.py (5438 lines)
-
-**Purpose**: PyQt6 HUD — main window, avatar canvas, waveform, activity log, settings drawer, all Qt widgets.
-
-**Key class**: `JarvisUI` (inherits `QMainWindow`)
-**Key classes**: `C` (color palette), `apply_ui_accent()`
-
-**Dependencies**: `PyQt6`, `psutil`, `core/ui_server.py`, `memory/config_manager.py`
-
-**Called by**: `main.py` creates `JarvisUI()` instance
-
-### core/action_loader.py (221 lines)
-
-**Purpose**: Auto-discovers `actions/*.py` files with `TOOL` dict. Validates and registers actions (25 discovered actions).
-
-**Key classes**: `ActionRegistry`, `ActionRecord`
-**Key functions**: `discover_actions()`, `_validate()`, `_call_handler()`
-
-**Called by**: `main.py` in `JarvisLive.__init__()`
-
-### core/fleet_manager.py
-
-**Purpose**: Autonomous multi-agent fleet orchestrator. Manages named agent instances, Git worktree isolation, dynamic agent roster registration, desk allocation, and live status streaming for the Scranton pixel office.
-
-**Key classes**: `FleetManager`, `FleetAgent`, `AgentDesk`
-**Key functions**: `get_fleet()`, `spawn_agent()`, `instruct_agent()`, `cancel_agent()`, `get_status()`, `register_agent()`, `broadcast_event()`
-
-**Called by**: `actions/fleet_control.py`, `core/ui_server.py`
-
-### actions/fleet_control.py
-
-**Purpose**: Built-in voice & text action for controlling autonomous multi-agent fleets (`fleet_control`). Enables Jarvis to spawn, query, instruct, and terminate specialized autonomous agents operating across isolated workspaces.
-
-**Key dictionary**: `TOOL` (`fleet_control`)
-**Key functions**: `handler()` (sub-actions: `status`, `spawn`, `instruct`, `cancel`, `report`)
-
-**Called by**: `main.py:_execute_tool()`, Gemini Live function calling
-
-### core/plugin_loader.py (285 lines)
-
-**Purpose**: Auto-discovers `plugins/*.py` files with `PLUGIN` dict. Validates and registers plugins.
-
-**Key classes**: `PluginRegistry`, `PluginRecord`
-**Key functions**: `discover_plugins()`, `_validate()`, `_call_run()`
-
-**Called by**: `main.py` in `JarvisLive.__init__()`
-
-### core/undo.py (121 lines)
-
-**Purpose**: Shared undo stack. Actions register reverse functions.
-
-**Key functions**: `push_undo()`, `undo_last()`, `history()`, `clear()`
-**Key constant**: `MAX_DEPTH = 10`
-
-**Called by**: `main.py:_execute_tool()` (undo tool), action handlers
-
-### core/confirm.py (161 lines)
-
-**Purpose**: Confirmation gate for irreversible actions. UI-issued tokens.
-
-**Key functions**: `request()`, `resolve()`, `bind()`
-**Key constant**: `TIMEOUT_SECONDS = 90.0`
-
-**Called by**: `actions/computer_settings.py` (shutdown, restart, WiFi)
-
-### core/viseme.py (275 lines)
-
-**Purpose**: Transcript-to-mouth-shape fusion. 50 mouth shapes per second.
-
-**Key classes**: `VisemeStream`
-**Key functions**: `text_to_visemes()`, `to_latin()`, `coverage()`
-**Key data**: `VISEMES` dict, `_LETTER` dict, `_DIGRAPH` dict
-
-**Called by**: `main.py` (viseme extraction), `ui.py` (avatar)
-
-### core/echo.py (288 lines)
-
-**Purpose**: Self-echo detection. Distinguishes user voice from assistant's own echo.
-
-**Key classes**: `EchoGuard`
-**Key functions**: `band_energies()`, `note_output()`, `is_user_speech()`
-
-**Called by**: `main.py` (audio callback)
-
-### core/wake_word.py
-
-**Purpose**: Local "Hey &lt;assistant name&gt;" detection using openwakeword (selectable name).
-
-**Key classes**: `WakeWordDetector(model_id=…)`
-**Key functions**: `list_wake_presets()`, `model_for_name()`, `phrase_for_name()`, `resolve_model()`, `default_wake_model()`, `is_ready(model_id)`, `install_and_download(model_id)`, `feed()`
-**Key constants**: `WAKE_PRESETS` (name → wake model), `DEFAULT_PRESET_ID`, `DEFAULT_ASSISTANT_NAME`
-**Models folder**: `config/wakewords/*.onnx`
-
-**Called by**: `main.py` (audio callback when sleeping)
-
-### core/hotkey.py (173 lines)
-
-**Purpose**: Push-to-talk chord detection (Ctrl+Space).
-
-**Key classes**: `PushToTalk`
-**Key functions**: `start()`, `stop()`, `_poll_loop()`
-
-**Called by**: `main.py` (via `set_push_to_talk()`)
-
-### core/audio_devices.py (421 lines)
-
-**Purpose**: Microphone/speaker enumeration, filtering, measurement, resolution by name.
-
-**Key functions**: `list_devices()`, `resolve()`, `prefetch()`, `_query()`
-**Key constants**: `DEFAULT_LABEL`, `DEFAULT_VALUE`
-
-**Called by**: `main.py`, `memory/config_manager.py`
-
-### memory/memory_manager.py (479 lines)
-
-**Purpose**: Load/save `long_term.json`, memory indexing, search, session summaries.
-
-**Key functions**: `load_memory()`, `save_memory()`, `update_memory()`, `format_memory_for_prompt()`, `search_memory()`, `save_session_summary()`, `pop_last_session()`
-**Key constants**: `MEMORY_MAX_CHARS = 200000`, `PROMPT_CORE_CHARS = 900`, `PROMPT_INDEX_CHARS = 420`
-
-**Called by**: `main.py:_build_config()`, `save_memory` tool, `recall_memory` tool
-
-### memory/config_manager.py (384 lines)
-
-**Purpose**: All configuration getters/setters for `api_keys.json`.
-
-**Key functions**: `get_voice()`, `save_voice()`, `get_wake_word_enabled()`, `save_wake_word_enabled()`, `get_push_to_talk_enabled()`, `get_plugin_enabled()`, `get_input_device()`, `save_input_device()`, etc.
-**Key constants**: `AVAILABLE_VOICES`, `DEFAULT_VOICE`
-
-**Called by**: `main.py`, `ui.py`, `core/*`
-
-### core/models.py
-
-**Purpose**: Single source of truth for every provider model identifier (Gemini
-Live + one-shot ladders, Antigravity CLI, Groq). Import model names from here;
-never hardcode a model string elsewhere.
-
-**Key constants**: `GEMINI_LIVE_MODEL`, `GEMINI_FAST/SMART/SEARCH_MODELS`,
-`ANTIGRAVITY_CLI_MODELS`, `DEFAULT_ANTIGRAVITY_MODEL`, `ANTIGRAVITY_MODEL_ALIASES`,
-`DEFAULT_GROQ_*`
-
-**Called by**: `main.py`, `core/gemini.py`, `memory/config_manager.py` (re-exports),
-`core/provider_health.py`, `core/task_manager.py`, `actions/antigravity_agent.py`,
-`actions/website_cloner.py`
-
-### core/provider_health.py
-
-**Purpose**: Startup health-check. Pings every configured Gemini model (cheap
-`models.get`, no generation) and the Groq `/models` endpoint, logs a one-line
-summary, and marks retired Gemini models so `core/gemini.py`'s ladder skips them.
-Runs off the GUI thread via `start_background_check()`.
-
-**Key functions**: `run_health_check()`, `start_background_check()`, `get_status()`
-
-**Called by**: `main.py` (`_bootstrap_deps`)
-
-### core/gemini.py (439 lines)
-
-**Purpose**: One-shot Gemini calls (non-live). Model ladder, quota management.
-
-**Key functions**: `call()`, `text()`, `as_json()`, `client()`, `mark_unavailable()`
-**Key classes**: `_Reply`
-**Key constants**: `_LADDERS` (built from `core/models.py`), `LIVE`, `FAST`, `SMART`, `SEARCH`
-
-**Called by**: Actions, plugins, `actions/web_search.py`, `core/provider_health.py`
-
-### core/llm_router.py
-
-**Purpose**: Provider router for **background** (non-realtime) text. Tries Groq
-(fast + free), then the Gemini ladder, then local Ollama; first answer wins.
-Live voice is untouched (still Gemini Live).
-
-**Key functions**: `generate_text(prompt, system, tier, timeout_ms, allow_groq, log)`
-
-**Called by**: `actions/code_helper.py`, `actions/youtube_video.py`,
-`actions/flight_finder.py`, `actions/desktop.py`
-
-### core/voice_fallback.py
-
-**Purpose**: Offline/local **fallback** voice loop. When Gemini Live is
-unavailable, this runs: mic → energy VAD (Silero if installed) → STT
-(local `faster-whisper` → Groq Whisper) → `core.llm_router` (Groq → Gemini →
-Ollama) → TTS (`core.tts` Kokoro → edge-tts). Half-duplex (no barge-in in v1),
-no tool dispatch. **Never** the primary path — Live stays primary.
-
-**Config**: `voice_fallback` = `off` | `manual` | `auto` (`off` default).
-
-**Run standalone**: `python -m core.voice_fallback`
-
-**Key pieces**: `UtteranceSegmenter`, `transcribe_utterance`, `make_tts`,
-`VoiceFallback`
-
-**Tests**: `tests/test_voice_fallback_suite.py`
-
-### core/llm_client.py (586 lines)
-
-**Purpose**: Local LLM client (Ollama/OpenAI-compatible) for planning and agent tasks.
-
-**Key functions**: `call_llm()`, `call_llm_text()`, `call_llm_stream()`, `warmup_model()`, `ensure_ollama_running()`
-**Key classes**: None (module-level functions)
-
-**Called by**: `actions/dev_agent.py`, `actions/code_helper.py`
-
-### dashboard/server.py (884 lines)
-
-**Purpose**: FastAPI HTTP server for phone-based remote control.
-
-**Key features**: AES-256-CBC encryption, QR code pairing, WebSocket support
-**Key functions**: `new_key()`, `get_url()`, endpoint handlers
-
-**Called by**: User's phone browser
-
-### actions/computer_settings.py (962 lines)
-
-**Purpose**: Volume, brightness, WiFi, power controls. Platform-specific implementations.
-
-**Key functions**: `volume_up()`, `volume_down()`, `toggle_wifi()`, `shutdown()`, `restart()`
-**Key import**: `from core import confirm`, `from core.undo import push_undo`
-
-### actions/computer_control.py (589 lines)
-
-**Purpose**: Keyboard shortcuts, mouse control, window management, clipboard.
-
-**Key functions**: Keyboard/mouse/window operations
-**Key import**: `pyautogui`, `pyperclip`, `pygetwindow`
-
-### actions/screen_processor.py (183 lines)
-
-**Purpose**: Screen and webcam capture for vision.
-
-**Key functions**: `_capture_screen()`, `_capture_camera()`
-**Key imports**: `mss`, `cv2`, `PIL`
-
-### actions/web_search.py
-
-**Purpose**: Web search with Gemini Grounded + DuckDuckGo fallback.
-
-**Key functions**: `_news()`, search handlers
-**Key imports**: `ddgs`, `requests`, `beautifulsoup4`
-
-### plugins/_template.py (45 lines)
-
-**Purpose**: Template for creating new plugins. Copy, rename, fill in.
-
-**Shape**: `PLUGIN` dict + `run()` function
-
-### setup.py (129 lines)
-
-**Purpose**: OS-aware installer. Checks Python version, installs deps, fetches Playwright browsers.
-
-**Key functions**: `_check_python()`, `_check_assets()`, `main()`
-
-## Dependency Graph
+---
+
+## Detailed Component Documentation
+
+### 1. Application Core (`main.py`)
+- **Key Class:** `ZezoLive`
+- **Core Loop:** Connects to Google Gemini Live API via bidirectional WebSocket streaming (`cl.aio.live.connect`). Streams 16/24kHz PCM mic audio, manages turn commits, handles interruptions, and routes tool calls.
+- **Background Task Watcher:** `_run_task_completion_watcher()` periodically polls `core.task_manager` to announce completed coding/scraping jobs via natural 1-sentence voice summaries while outputting full reports to the React HUD.
+- **Push-to-Talk (PTT):** Controlled strictly via **`Ctrl+Alt`** chord detection in `core/hotkey.py`.
+
+### 2. Frontend Container (`ui.py` & `core/ui_server.py`)
+- `ui.py` launches a lightweight, frameless `PyQt6-WebEngine` window serving as the desktop container.
+- `core/ui_server.py` hosts an asynchronous `aiohttp` server exposing:
+  - Static distribution files built from `frontend/`.
+  - WebSocket endpoint `/ws` providing full-duplex communication between Python and React.
+  - REST endpoints for settings, task telemetry, skills, and code engine probing.
+
+### 3. Modern React 18 SPA (`frontend/src/`)
+- **AutonomousOfficeScreen:** Visualizes the autonomous fleet (Verve, Flux, Ahmad, Michael, Kelly) in an interactive 2D pixel-art office grid. Supports live task telemetry, desk coordinates, and instant 1-on-1 direct chat.
+- **MemoryGraphCanvas:** Renders the 3D Force-Directed Knowledge Graph powered by Three.js, visualising memory nodes and wikilink topologies with audio-reactive viseme pulsing.
+- **TaskManagerModal:** Provides real-time visibility into background subagents, displaying progress trees, execution logs, and immediate task cancellation buttons.
+- **ClipPeekOverlay:** Non-intrusive floating HUD widget that detects clipboard updates and provides 1-click refactoring, explanation, or execution actions.
+
+### 4. Action Tools (33 Discovered Actions)
+Every action adheres strictly to `AGENTS.md` Rule 4 (one file per action, exporting `TOOL` and `handler()`). Newly added action tools include:
+- `actions/code_engines_status.py`: Health inspector for CLI coding engines (`agy`, `opencode`, `kilo`).
+- `actions/reverse_engineer.py`: REA Teardown Engine runner executing browser scenario interceptions.
+- `actions/quick_snippet.py`: Instant verified code snippet generation.
+- `actions/run_tool_batch.py`: Compound atomic tool execution in a single turn.
+- `actions/recall_history.py`: High-speed BM25 full-text search across SQLite memory logs.
+- `actions/ast_tool.py`: AST structural code inspector for Python files.
+
+---
+
+## High-Level Execution Dataflow
 
 ```
-main.py
-├── imports: sounddevice, numpy, google-genai, PyQt6
-├── ui.py (JarvisUI)
-├── memory/memory_manager.py (load_memory, update_memory, etc.)
-├── memory/config_manager.py (get_voice, get_wake_word_enabled, etc.)
-├── core.action_loader (discover_actions)
-├── core.plugin_loader (discover_plugins)
-├── core.undo (undo_stack)
-├── core.confirm (confirm_gate)
-├── core.audio_devices
-├── core.echo (EchoGuard)
-├── core.viseme (VisemeStream)
-├── core.wake_word (WakeWordDetector)
-├── core.hotkey (PushToTalk)
-├── actions.* (auto-discovered)
-└── plugins.* (auto-discovered)
-
-ui.py
-├── imports: PyQt6, psutil
-├── core.avatar (HoloAvatar)
-└── memory.config_manager (config reads)
-
-core/gemini.py
-├── imports: google-genai
-└── Called by: actions/web_search.py, plugins
-
-core/llm_client.py
-├── imports: requests
-└── Called by: actions/dev_agent.py, actions/code_helper.py
-
-actions/computer_settings.py
-├── imports: core.confirm, core.undo
-└── Uses: pyautogui, pyperclip, subprocess
-
-actions/computer_control.py
-├── imports: pyautogui, pyperclip
-└── Uses: subprocess, platform
-
-actions/screen_processor.py
-├── imports: mss, cv2, PIL
-└── Uses: config/api_keys.json
-
-dashboard/server.py
-├── imports: fastapi, uvicorn, cryptography
-└── Uses: config/api_keys.json
-```
-
-## Summary
-
-```
-Entry: main.py → JarvisLive → JarvisUI
-Core: core/*.py (all utility modules)
-Actions: actions/*.py (auto-discovered tools)
-Plugins: plugins/*.py (auto-discovered skills)
-Memory: memory/*.py (persistent storage)
-Dashboard: dashboard/server.py (remote control)
-Config: memory/config_manager.py (all settings)
-Total: ~30 Python files, ~15,000 lines of code
+[ User Microphone ] ──(Ctrl+Alt PTT)──> [ core/hotkey.py ]
+                                               │
+                                               ▼
+[ Google Gemini Live WebSocket ] <─── PCM Audio (16kHz) ─── [ main.py (ZezoLive) ]
+           │                                                       ▲
+           │ (Tool Call Dispatched)                                │ (Tool Result)
+           ▼                                                       │
+  [ core/action_loader.py ] ───────────────────────────────────────┘
+           │
+           ├──> [ actions/reverse_engineer.py ] ──> [ rea-agents@6.7.0 ]
+           ├──> [ actions/fleet_control.py ]    ──> [ Git Sandboxed Workspaces ]
+           ├──> [ actions/code_engines_status.py ] ──> [ agy / opencode / kilo ]
+           └──> [ actions/computer_control.py ] ──> [ 3-Tier Perception: UIA / RapidOCR / Vision ]
+                                               │
+                                               ▼
+                              [ core/ui_server.py (/ws) ]
+                                               │
+                                               ▼
+                              [ React HUD: frontend/src/ ]
+                               ├── AutonomousOfficeScreen.tsx
+                               ├── MemoryGraphCanvas.tsx
+                               └── ZezoChatThread.tsx
 ```

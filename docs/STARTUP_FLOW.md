@@ -1,4 +1,7 @@
-# JARVIS — Startup Flow
+# ZEZO — Startup Flow
+
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux
 
 ## Entry Point
 
@@ -9,7 +12,7 @@ main() function (top-level script)
   ↓
 QLockFile single-instance guard (second launch exits immediately)
   ↓
-JarvisLive.__init__(ui)
+ZezoLive.__init__(ui)
   ↓
 runner(): dependency bootstrap thread (requirements.txt + Playwright browser)
   ↓
@@ -22,7 +25,7 @@ provider health-check (core/provider_health.py — verifies Gemini + Groq models
 > the UI. A second launch prints `Another instance is already running` and returns
 > instead of starting a duplicate audio engine, WebEngine renderer and dashboard.
 
-`main.py` defines `main()` and calls it from an `if __name__ == "__main__":` block at the bottom. `main()` acquires the single-instance lock, builds the UI, then starts `runner()` on a daemon thread. `runner()` waits for the API key, starts the dependency bootstrap **and** the provider health-check in the background, and runs the `JarvisLive` live loop.
+`main.py` defines `main()` and calls it from an `if __name__ == "__main__":` block at the bottom. `main()` acquires the single-instance lock, builds the UI, then starts `runner()` on a daemon thread. `runner()` waits for the API key, starts the dependency bootstrap **and** the provider health-check in the background, and runs the `ZezoLive` live loop.
 
 ## Detailed Startup Sequence
 
@@ -84,7 +87,7 @@ Inline tool declarations that are hardcoded in `main.py` because they interact w
 2. `screen_process` — screen/webcam capture for vision
 3. `close_camera` — close camera stream
 4. `manage_monitor` — background monitoring topics
-5. `shutdown_jarvis` — end the session
+5. `shutdown_zezo` — end the session
 6. `save_memory` — save to long-term memory
 7. `recall_memory` — search long-term memory
 8. `undo` — reverse last action
@@ -94,12 +97,12 @@ Inline tool declarations that are hardcoded in `main.py` because they interact w
 - `_ReconnectSignal` — exception for voluntary session rebuilds
 - `_is_reconnect_signal()`, `_keep_context_of()` — reconnect signal detection
 
-### Step 6: JarvisLive.__init__() — Main Initialization (lines 530-654)
+### Step 6: ZezoLive.__init__() — Main Initialization (lines 530-654)
 
 This is the heart of startup. Every step below happens in order:
 
 ```
-JarvisLive.__init__(ui)
+ZezoLive.__init__(ui)
   ↓
 1. Store UI reference and set assistant name
   ↓
@@ -218,7 +221,7 @@ macOS/Linux: Window-scoped Qt shortcut
 ```
 main.py
   ↓
-JarvisUI()  (in ui.py)
+ZezoUI()  (in ui.py)
   ↓
 PyQt6.QMainWindow setup
   ↓
@@ -235,11 +238,11 @@ Content panel setup
 Show window
 ```
 
-**File:** `ui.py` — `JarvisUI` class (5438 lines)
+**File:** `ui.py` — `ZezoUI` class (5438 lines)
 
 ### Step 8: Event Loop Starts
 
-After `JarvisLive` and `JarvisUI` are constructed, the application enters its main event loops:
+After `ZezoLive` and `ZezoUI` are constructed, the application enters its main event loops:
 
 1. **Qt event loop** — handles all UI rendering, user input, settings changes
 2. **asyncio event loop** — manages Gemini Live WebSocket communication
@@ -264,7 +267,7 @@ Define constants and utility functions
     ↓
 Define inline TOOL_DECLARATIONS
     ↓
-Create JarvisLive(ui)
+Create ZezoLive(ui)
     ↓
   ├── Discover actions (core/action_loader)
   ├── Discover plugins (core/plugin_loader)
@@ -273,7 +276,7 @@ Create JarvisLive(ui)
   ├── Set up UI callbacks
   └── Create audio device cache
     ↓
-Create JarvisUI (PyQt6 window)
+Create ZezoUI (PyQt6 window)
     ↓
 Connect signals/slots
     ↓
@@ -286,16 +289,16 @@ Application ready
 
 | File | Function | When Called |
 |------|----------|-------------|
-| `main.py` | Entry point, JarvisLive construction | Immediately |
-| `core/action_loader.py` | Auto-discover built-in tools | In JarvisLive.__init__ |
-| `core/plugin_loader.py` | Auto-discover plugins | In JarvisLive.__init__ |
-| `core/wake_word.py` | Load openwakeword model | In JarvisLive.__init__ (if enabled) |
-| `core/hotkey.py` | Set up push-to-talk | In JarvisLive.__init__ (if enabled) |
-| `core/audio_devices.py` | Prefetch device list | In JarvisLive.__init__ (via config_manager) |
+| `main.py` | Entry point, ZezoLive construction | Immediately |
+| `core/action_loader.py` | Auto-discover built-in tools | In ZezoLive.__init__ |
+| `core/plugin_loader.py` | Auto-discover plugins | In ZezoLive.__init__ |
+| `core/wake_word.py` | Load openwakeword model | In ZezoLive.__init__ (if enabled) |
+| `core/hotkey.py` | Set up push-to-talk | In ZezoLive.__init__ (if enabled) |
+| `core/audio_devices.py` | Prefetch device list | In ZezoLive.__init__ (via config_manager) |
 | `memory/memory_manager.py` | Load long_term.json | In _build_config() |
 | `memory/config_manager.py` | Read api_keys.json | Throughout |
 | `core/prompt.txt` | Load system prompt template | In _build_config() |
-| `ui.py` | Build PyQt6 HUD | After JarvisLive |
+| `ui.py` | Build PyQt6 HUD | After ZezoLive |
 | `core/gemini.py` | One-shot Gemini client | On demand (not at startup) |
 | `core/llm_client.py` | Local LLM client | On demand (for planning) |
 | `dashboard/server.py` | Start FastAPI server | On demand |

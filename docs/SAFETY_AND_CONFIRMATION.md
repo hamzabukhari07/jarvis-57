@@ -1,148 +1,112 @@
-# JARVIS — Safety and Confirmation System
+# 🛡️ ZEZO — Safety, Confirmation & Guardrail Architecture
 
-## Overview
+> **Project:** ZEZO  
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux  
+> **Core Modules:** `core/confirm.py`, `actions/website_cloner.py`, ReUI `ConfirmDialog`
 
-Dangerous actions (shutdown, restart, WiFi toggle) are protected by a **confirmation gate** where the confirmation token is issued by the UI, never by the AI model.
+---
 
-**File:** `core/confirm.py`
+## 🧭 Overview
 
-## The Problem It Solves
+AI voice assistants must never perform destructive or irreversible actions based solely on ambiguous conversational inference. However, asking *"Are you sure?"* before minor actions (like adjusting volume or creating a file) makes an assistant tedious to use.
 
-The old gate was broken:
+ZEZO implements a strict two-pillar safety model:
+1. **Reversible Actions**: Execute immediately and push to `core/undo.py`.
+2. **Irreversible / Heavy Actions**: Enforce unforgeable confirmation gates where confirmation originates from the user interface, never from the model.
+
+---
+
+## 🛑 The Model-Forged Confirmation Vulnerability
+
+Traditional LLM function calling designs rely on tool parameter conventions:
 ```python
-# OLD CODE (broken):
+# OLD VULNERABLE PATTERN:
 confirmed = str(params.get("confirmed", "")).lower()
-if confirmed not in ("yes", "true", "1", "confirm"):
+if confirmed != "yes":
     return "Please confirm by calling again with confirmed=yes."
 ```
 
-**Problem**: `confirmed` is a tool parameter, which means the *model* writes it. Nothing stops it from sending `confirmed=yes` on the first call.
+### Why This Fails
+`confirmed` is a tool parameter written by the model. Nothing prevents an eager LLM from sending `confirmed="yes"` on the very first invocation, entirely bypassing the human user.
 
-## The Design
+---
 
-The confirmation token is issued by the **interface**:
+## 🔐 Pillar 1: ReUI Interface-Bound Confirmation Gate (`core/confirm.py`)
 
-```
-1. Action calls confirm.request(key, title, detail, run)
-    ↓
-2. Module hands UI a banner (CONFIRM / CANCEL)
-    ↓
-3. Returns immediately with [CONFIRMATION_PENDING] sentence
-    ↓
-4. User presses CONFIRM on HUD
-    ↓
-5. UI calls confirm.resolve(True)
-    ↓
-6. Stored callable runs on worker thread
-    ↓
-7. Action executes
-```
+In ZEZO, confirmation tokens for irreversible OS actions (shutdown, restart, WiFi disable) are issued exclusively by the **user interface**, never by the model.
 
-## How It Works
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User (Hamza)
+    participant Model as Gemini Live Model
+    participant Action as actions/computer_settings.py
+    participant Confirm as core/confirm.py
+    participant UI as ReUI Frontend (HUD)
 
-### request() — Park the Action
+    User->>Model: "Shut down my PC"
+    Model->>Action: computer_settings(action='shutdown')
+    Action->>Confirm: request("shutdown", "Shut Down", "Close applications and power down", callable)
+    Confirm->>UI: Show ReUI Confirmation Modal (CONFIRM / CANCEL)
+    Confirm-->>Action: "[CONFIRMATION_PENDING] I have put a confirmation on screen..."
+    Action-->>Model: Phrased instruction
+    Model-->>User: "I've placed a confirmation on your screen to shut down."
 
-```python
-def request(key: str, title: str, detail: str, run: Callable[[], str]) -> str:
-    global _pending
-    _pending = _Pending(key=key, title=title, detail=detail, run=run, at=time.monotonic())
-    _show_cb(title, detail)  # Show banner on UI
-    return "[CONFIRMATION_PENDING] I have put a confirmation on screen for: {title}..."
-```
-
-**Key**: Returns a sentence for the model to say out loud. The model asks the user to confirm. It never claims the action is done.
-
-### resolve() — Execute the Action
-
-```python
-def resolve(accepted: bool) -> None:
-    global _pending
-    p, _pending = _pending, None
-    if not accepted:
-        return  # Cancelled
-    if time.monotonic() - p.at > TIMEOUT_SECONDS:  # 90s
-        return  # Expired
-    threading.Thread(target=_worker, daemon=True).start()
-    # _worker calls p.run()
+    alt User clicks CANCEL or 90s Timeout Expires
+        User->>UI: Clicks CANCEL
+        UI->>Confirm: resolve(accepted=False)
+        Note over Confirm: Callable discarded safely
+    else User clicks CONFIRM
+        User->>UI: Clicks CONFIRM
+        UI->>Confirm: resolve(accepted=True)
+        Confirm->>Confirm: Spawn background worker thread
+        Confirm->>Action: Execute stored shutdown callable
+    end
 ```
 
-**Key**: Runs on a worker thread — shutting down from a button handler would freeze the UI.
+### Key Engineering Invariants
+1. **Model Cannot Forge Confirmation**: The action callable is parked in `core/confirm.py` in-memory storage. Only a WebSocket message from the frontend button click triggers `resolve(True)`.
+2. **Non-Blocking Conversational Loop**: `request()` returns immediately with a spoken prompt sentence. The Gemini Live session does not stall waiting for a synchronous reply.
+3. **90-Second Timeout Expiry**: `TIMEOUT_SECONDS = 90.0`. If the user walks away from the machine, the pending confirmation expires automatically, preventing orphaned buttons from executing hours later.
+4. **Worker Thread Execution**: Action execution runs on a detached daemon thread, preventing UI freezes or WebSocket event-loop blocking.
 
-## Timeout
+---
 
-```python
-TIMEOUT_SECONDS = 90.0  # 90 seconds
-```
+## 🌐 Pillar 2: Website Cloner Stateless Confirmation Gate
 
-Abandoned confirmations are discarded after 90 seconds.
-
-## What Requires Confirmation
-
-| Action | Why |
-|--------|-----|
-| Shutdown | Irreversible |
-| Restart | Irreversible |
-| WiFi toggle | Cuts Live API connection, cannot be undone |
-
-## Why Not All Actions Use Confirmation
-
-> The split between the two mechanisms is about reversibility, not about how alarming a word sounds. Anything undoable is done at once; only the genuinely irreversible asks. An assistant that checks with you before turning the volume down is one you stop talking to.
-
-- **Undoable actions**: Do immediately, register undo (`core/undo.py`)
-- **Irreversible actions**: Confirmation gate (`core/confirm.py`)
-
-## Security Properties
-
-1. **Model cannot forge confirmation**: The token is issued by the UI, not the model
-2. **No blocking**: The model keeps talking while the banner is up
-3. **Cheaper than the old gate**: The old gate burned 2 tool round trips (reject then re-call); the new gate costs 0
-4. **Timeout safety**: 90-second expiry prevents stale banners
-5. **Worker thread**: Actions run off the Qt thread to prevent UI freeze
-
-## Confirmation Flow Example
+Website cloning (`actions/website_cloner.py`) involves network crawling, DOM extraction, and reverse-engineering. To prevent runaway web crawls or accidental disk usage, `website_cloner` enforces a **two-step stateless confirmation gate**:
 
 ```
-User: "Shutdown my computer"
-    ↓
-Gemini calls computer_settings(action="shutdown")
-    ↓
-confirm.request("shutdown", "Shutdown", "This will turn off your computer", shutdown_fn)
-    ↓
-Returns: "[CONFIRMATION_PENDING] I have put a confirmation on screen for: Shutdown..."
-    ↓
-UI shows banner: "SHUTDOWN — CONFIRM / CANCEL"
-    ↓
-Model speaks: "I've put a confirmation on screen for Shutdown. Please confirm on the HUD."
-    ↓
-User presses CONFIRM
-    ↓
-confirm.resolve(True)
-    ↓
-Worker thread runs shutdown_fn()
-    ↓
-Computer shuts down
+Step 1: INTAKE
+  User asks: "Clone stripe.com"
+  ZEZO checks parameters: URL, mode (single_page vs full_site), output_format, target_dir
+  If any required parameter is missing:
+    -> Returns: "CLONE NOT STARTED. Ask the user these questions out loud: [missing list]"
+
+Step 2: COMMIT
+  Parameters are complete, but confirmed != True
+  ZEZO reads back the exact plan in one sentence:
+    "Plan: clone https://stripe.com - only the landing page, then rebuild it as clean React/Vite, into 'Desktop/stripe.com_rebuild'."
+  Waits for user's verbal approval
+  Only when user confirms -> calls clone_website(..., confirmed=True)
 ```
 
-## Binding to the UI
+### Stateless Security Properties
+- **Zero In-Memory Sticky State**: The handler does not rely on persistent session state that could become stale or corrupted across turns.
+- **Explicit Read-Back**: By reading back the target directory, the user always knows where files will land on disk (e.g. `Desktop/<domain>_rebuild`).
+- **Protected Directories**: Specifically forbids targeting the ZEZO source repository or system directories (`is_zezo_source_dir`).
 
-```python
-confirm.bind(show_cb, hide_cb, log_cb)
-# show_cb(title, detail) → show banner on HUD
-# hide_cb() → remove banner
-# log_cb(msg) → log to activity log
-```
+---
 
-Called once from `main.py` at startup.
+## 📋 Confirmation Enforcement Summary
 
-## Summary
-
-```
-Protection: confirmation gate for irreversible actions
-Token source: UI (never the model)
-Actions: shutdown, restart, WiFi toggle
-Timeout: 90 seconds
-Execution: Worker thread
-Non-blocking: Model keeps talking while waiting
-Security: Model cannot forge confirmation
-Alternative: Undo stack for reversible actions
-```
+| Action / Capability | Risk Classification | Protection Mechanism |
+|---|---|---|
+| **System Shutdown** | Irreversible Hardware | ReUI Modal Banner (`core/confirm.py`) |
+| **System Restart** | Irreversible Hardware | ReUI Modal Banner (`core/confirm.py`) |
+| **WiFi Adapter Toggle** | Irreversible Network Loss | ReUI Modal Banner (`core/confirm.py`) |
+| **Website Crawl & Rebuild**| Heavy Network / Disk I/O | Two-Step Stateless Verbal Gate (`actions/website_cloner.py`) |
+| **Chat Message Dispatch** | External User Communication | Explicit verbal confirmation before sending (`core/prompt.txt`) |
+| **File Deletion / Movement**| Reversible System State | Automatic Rollback Stack (`core/undo.py`) |
+| **Coding Agent Edits** | Reversible Codebase Mutation| Git Snapshot Rollback (`core/undo.py`) |

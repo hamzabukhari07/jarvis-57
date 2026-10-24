@@ -20,6 +20,9 @@ __pycache__/
 /tools/uncage/
 # Generated clone/teardown output
 /workspace/
+# Website-clone output must never be written into the repo. Stopgap for the
+# target_dir CWD-resolution bug (see docs/CLONE_PIPELINE_ISSUES.md, Issue 1).
+/Desktop/
 # Auto-added ignore rules
 node_modules/
 .venv/

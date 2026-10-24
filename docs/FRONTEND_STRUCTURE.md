@@ -1,199 +1,152 @@
-# 🖥️ ZEZO — Frontend Structure Reference
+# 🖥️ ZEZO — Frontend Structure & Component Reference
 
-> **Purpose:** Complete DOM structure, element IDs, modal registry, CSS class directory, and JavaScript function reference. AI agents must consult this document before modifying `frontend/index.html`, `frontend/style.css`, or `frontend/js/ui.js`.
-
----
-
-## 1. Top-Level Layout (`frontend/index.html`)
-
-### Body Structure
-- `<div class="container-lines">` — Background grid corner accents
-- `<div class="app-shell">` — Outer application wrapper (`height: 100vh; width: 100vw; display: flex; flex-direction: column; overflow: hidden;`)
-  - `<header class="top-navbar">` — Fixed top bar (`height: 48px; position: relative; z-index: 100;`)
-  - `<main class="workspace-grid">` — Master 3-column tactical workspace (`height: calc(100vh - 58px); display: grid; grid-template-columns: minmax(210px, 250px) minmax(0, 1fr) minmax(260px, 300px);`)
-    - `<aside>` (Left Column) — Hardware Telemetry (Panel 01) & Autonomous Task Queue (Panel 02)
-    - `<section class="center-column-wrapper" id="center-column">` (Center Column) — Avatar Frame + Drag Splitter + Live Display Canvas / Inspector (Panel 03)
-    - `<aside>` (Right Column) — Payload Ingestion (Panel 04) & Activity Log / Prompt Input (Panel 05)
-
-### Top Navbar Elements (`.top-navbar`)
-- **Left Actions (`.header-left-actions`):**
-  - `#settings-trigger-btn` — Button (`onclick="openModal('settings-modal')"`, `title="Full Settings & Quick Controls"`)
-  - `button` — Log Console Button (`onclick="openModal('log-modal')"`, `title="Backend Log Console (Ctrl+L)"`)
-  - `button` — Task Matrix Button (`onclick="openModal('task-modal')"`, `title="Task Matrix & Registry"`)
-  - `button` — QR Remote Button (`onclick="openModal('qr-modal')"`, `title="Mobile Remote Control & Key"`)
-- **Center Branding (`.header-center-branding`):**
-  - `.header-brand-title` — "ZEZO" brand text
-  - `.header-brand-divider` — Dynamic accent underbar
-- **Right Digital Clock (`.header-right-clock`):**
-  - `#header-clock-time` — Monospace time readout (e.g. `18:50:38`)
-  - `#header-clock-date` — Date readout (e.g. `MON 21 SEP 2026`)
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **System Component:** Modern Single-Page Tactical Interface & Autonomous Office Deck  
+> **Frontend Stack:** React 18 / 19, Vite, Tailwind CSS v4, ReUI Component System, Assistant-UI  
+> **Backend Integration:** FastAPI WebSocket Server (`core/ui_server.py`), REST API (`/api/*`), Live Gemini Streaming (`main.py`)  
 
 ---
 
-## 2. Left Column — Telemetry & Task Queue
+## 📖 1. Overview & Architectural Stack
 
-### Panel 01 — Hardware Telemetry
-- **Section Label:** `01 · Hardware Telemetry`
-- **CPU Core Load:** `#val_cpu` (percentage text) & `#bar_cpu` (progress fill track)
-- **RAM Usage:** `#val_mem` (percentage text) & `#bar_mem` (progress fill track)
-- **System GPU:** `#val_gpu` (percentage text) & `#bar_gpu` (progress fill track)
-- **Net Bandwidth:** `#val_net` (throughput text) & `#bar_net` (progress fill track)
+The ZEZO frontend is a high-performance, dark cyberpunk single-page application built on **React and Vite**. It replaces legacy PyQt6 and vanilla DOM architectures with a componentized, reactive interface governed by the **ReUI Component System** and styled with **Tailwind CSS**.
 
-### Panel 02 — Autonomous Task Queue
-- **Header:** `02 · Task Queue`
-- **Active Badge:** `#task-count-badge` (e.g. `0 ACTIVE`)
-- **Task List Container:** `#task-queue-list` — Dynamic list rendered via `renderTasks(taskList)` containing task cards (`#task-card-{id}`) with subtask trees and live progress bars.
+### Core Technology Stack:
+- **Framework:** React 18/19 with Vite bundler (`@vitejs/plugin-react`).
+- **Design System:** ReUI (`components/reui/*`) providing high-contrast tactical frames, cards, badges, callouts, and confirm dialogs.
+- **Styling:** Tailwind CSS v4 (`@tailwindcss/vite`) with strict semantic tokens (`--background`, `--foreground`, `--primary`, `--border`, etc.).
+- **Conversational UI:** Assistant-UI (`@assistant-ui/react`, `@assistant-ui/react-markdown`) powering the streaming chat thread, reasoning collapse, and tool execution cards.
+- **3D & Visualizations:** Three.js (`three`), 3D Force Graph (`3d-force-graph`, `react-force-graph-3d`), Qivi holographic point-cloud avatar (`qivi-react`), and Blobatar (`blobatar/react`).
+- **Communication:** Bi-directional JSON WebSocket (`ws://127.0.0.1:8765/ws`) via `useZezoSocket` hook plus targeted REST endpoints (`/api/*`).
 
 ---
 
-## 3. Center Column — Avatar & Live Display Canvas
+## 📐 2. Application Layout Structure (`frontend/src/App.tsx`)
 
-### Panel — Avatar Frame (`#avatar-frame`)
-- **Container:** `#avatar-container`
-- **Fluid Vortex Avatar:** `#vortex-gif` (`<img src="download.gif" class="vortex-gif" id="vortex-gif">`)
-- **Unified Avatar Command Dock (`#avatar-command-dock`):**
-  - **Microphone Control:** `#dock-mic-btn`, `#dock-mic-icon`, `#dock-mic-label` (`onclick="toggleMic()"`)
-  - **State Phosphor Matrix Badge (`#dock-state-badge`):**
-    - `#state-matrix-icon` — 2x3 Canvas (`width="16" height="18"`)
-    - `#state-heading-text` — State label (`Standby...`, `Listening...`, `Thinking...`, `Speaking...`, `Executing...`, `Muted...`, `Halted...`)
-  - **Emergency Halt:** `#dock-stop-btn` (`onclick="emergencyStop()"`)
-  - **Power / Sleep Toggle:** `#dock-power-btn`, `#dock-power-icon`, `#dock-power-label` (`onclick="togglePowerSleep()"`)
+The root `App.tsx` controls global telemetry, active modals, WebSocket streaming, and master view switching.
 
-### Drag Splitter
-- `#drag-splitter` — Interactive splitter bar with `.splitter-grip` to resize avatar viewport vs inspector canvas.
+### Master View Switching:
+The navigation header provides tabs to transition across operational interfaces:
+1. **Tactical View (`activeTab === 'tactical'`):** 3-panel command dashboard featuring hardware telemetry, holographic avatar visualizer, live execution canvas, and real-time Assistant-UI chat stream.
+2. **Office View (`activeTab === 'office'`):** Autonomous 2D pixel Scranton Office screen displaying specialist agent desks, monitor screens, sprite states, and 1-on-1 direct chat channels.
+3. **Workflow View (`activeTab === 'workflow'`):** Interactive node-based agent pipeline execution builder.
 
-### Panel 03 — Live Display Canvas (`#inspector-frame`)
-- **Frame Header:** `#inspector-header` (`03 · LIVE DISPLAY CANVAS`)
-- **Context Badge:** `#canvas-context-badge` — Dynamic context badge (e.g. `ZEZO CODER`, `WEB EXTRACTION`)
-- **Header Actions:**
-  - Copy Button (`onclick="copyCanvasContent(this)"`)
-  - Clear Button (`onclick="clearCanvasContent()"`)
-  - Expand/Fullscreen Focus Button: `#canvas-expand-btn` (`onclick="toggleCanvasExpand()"`)
-- **Body Container:** `#inspector-body`
-  - **Empty State:** `#canvas-empty-state` (Autonomous Execution Engine Ready placeholder)
-  - **Active Content Wrapper:** `#canvas-active-content`
-    - `#canvas-content-text` — Pre-wrap monospace output for code, web scraping, diffs, and tool results.
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            HEADER (Header.tsx)                              │
+│  [⚙ SETTINGS] [⧉ LOGS] [⊞ TASKS] [📱 REMOTE]   [TACTICAL | OFFICE | WORKFLOW]│
+├───────────────────┬─────────────────────────────────────┬───────────────────┤
+│                   │      CENTER COLUMN                  │                   │
+│   LEFT TELEMETRY  │  ┌───────────────────────────────┐  │   RIGHT ACTIVITY  │
+│   System metrics, │  │   HOLOGRAPHIC AVATAR          │  │   STREAM          │
+│   CPU/RAM/GPU/Net │  │   (QiviAvatarVisualizer.tsx)  │  │   (ZezoChatThread)│
+│   Gauges, Ingestion│ ├───────────────────────────────┤  │   Spoken turns,   │
+│                   │  │   LIVE DISPLAY CANVAS         │  │   Tool executions,│
+│                   │  │   (CanvasView.tsx)            │  │   Reasoning steps │
+│                   │  └───────────────────────────────┘  │                   │
+└───────────────────┴─────────────────────────────────────┴───────────────────┘
+```
 
 ---
 
-## 4. Right Column — Payload & Activity
+## 🧩 3. Key Component Directory & Specifications
 
-### Panel 04 — Payload Ingestion
-- **Section Label:** `04 · Payload Ingestion`
-- **Hidden Inputs:**
-  - `#payload-file-input` — `<input type="file" multiple>` (`onchange="uploadPayloadFiles(this.files)"`)
-  - `#payload-folder-input` — `<input type="file" webkitdirectory directory multiple>` (`onchange="uploadPayloadFolder(this.files)"`)
-- **Dropzone Area:** `#dropzone-box` (Drag and drop target)
-- **Ingested Files Container:** `#payload-items-container`
-  - `#payload-count-label` (e.g. `INGESTED PAYLOADS (0)`)
-  - `#payload-list-items` (Scrollable list of files with remove actions)
+### 3.1. Autonomous Scranton Office (`AutonomousOfficeScreen.tsx`)
+- **Path:** `frontend/src/components/office/AutonomousOfficeScreen.tsx`
+- **Purpose:** Full-featured 2D pixel desk simulation representing the autonomous fleet in their physical workspace layout.
+- **Key Capabilities:**
+  - **Workstation Matrix:** 18 workstation slots (`WORKSTATION_SLOTS`) positioned on precise percentage coordinates (Michael, Ali, Haider, Ahmad, Dwight, Pam, Kelly, Quantum, DevDynamo, DataEinstein, Annex desks).
+  - **Sprite & Monitor Telemetry:** Real-time agent status states (`idle`, `working`, `thinking`, `speaking`, `offline`) reflected through avatar motion, desk monitor glow, and speech bubbles.
+  - **Agent Soul Editor:** Inspect and modify individual agent `SOUL.md` persona files directly in the HUD with persistent saving via `/api/fleet/save_soul`.
+  - **Task Dispatch:** Assign tasks to isolated Git worktrees with safety tier verification (`L0_READ_ONLY`, `L1_MUTATION`, `L2_DESTRUCTIVE`).
+  - **Zero Fake Simulation:** Renders purely from live WebSocket fleet events (`agent_task_started`, `task_progress`, `task_done`, `fleet_updated`).
 
-### Panel 05 — Activity Log & Command Bar
-- **Section Label:** `05 · Activity Log`
-- **Header Actions:**
-  - `#copy-stream-btn` (`onclick="copyEntireStream(this)"`)
-  - Clear Button (`onclick="clearStream()"`)
-- **Activity Log Stream:** `#stream-box` (Container for `.stream-msg` user/assistant cards)
-- **Command Input Bar (`.command-input-container`):**
-  - `#user-input` — `<input type="text" class="command-input-field">` (`onkeydown="if(event.key==='Enter') executeCommand()"`)
-  - `.command-send-btn` — Action button (`onclick="executeCommand()"`)
+### 3.2. Agent Direct 1-on-1 Chat (`AgentDirectChatView.tsx`)
+- **Path:** `frontend/src/components/office/AgentDirectChatView.tsx`
+- **Purpose:** Isolated, direct conversational thread with a specific fleet agent.
+- **Key Capabilities:**
+  - **Context Isolation:** Conversations are scoped to the selected specialist agent without polluting the main live voice pipeline context.
+  - **Thread Persistence:** Chat threads are stored locally per agent (`zezo_agent_threads_<agent_id>`), allowing multi-session history tracking.
+  - **Model & Engine Overrides:** Direct selection of coding engines and LLM models for the specific conversation.
+  - **Seamless Floor Navigation:** Toggle between the wide office floor view and deep direct chat.
 
----
+### 3.3. 3D Memory Knowledge Graph (`MemoryGraphCanvas.tsx`)
+- **Path:** `frontend/src/components/memory/MemoryGraphCanvas.tsx`
+- **Purpose:** Interactive 3D Force-Directed visualizer for ZEZO's episodic, profile, and knowledge memory.
+- **Key Capabilities:**
+  - **Force-Directed 3D Graph:** Built on `3d-force-graph` and `three-spritetext`, rendering memory nodes interconnected by `[[wikilinks]]`.
+  - **Category Color Coding:** Profile (Purple), Project (Cyan), Preference (Orange), Relationship (Yellow), Knowledge (Emerald), General (Slate).
+  - **Viseme & Audio Reactivity:** Node sizes, particle speeds, and rotation oscillate dynamically in response to incoming mic and speech levels.
+  - **Inspector Drawer:** Integrated with `MemoryInspectorDrawer.tsx` to read full markdown snippets, tags, timestamps, and connected outbound links upon clicking any node.
+  - **Timeline & Filter Controls:** Filter nodes by query or temporal horizons (`all`, `24h`, `7d`, `30d`), and switch between 3D spherical graph and timeline mode.
 
-## 5. Modal Registry
+### 3.4. Background Task Tree Viewer (`TaskManagerModal.tsx`)
+- **Path:** `frontend/src/components/tasks/TaskManagerModal.tsx`
+- **Purpose:** Centralized inspection dialog for all background processes, workers, and agent jobs.
+- **Key Capabilities:**
+  - **Hierarchical Task Tree:** Renders parent/child task relationships, showing subtask trees and milestone progress bars.
+  - **Live Progress Streaming:** Receives real-time percentage and step updates over WebSocket.
+  - **Lifecycle Management:** Supports filtering by state (`ALL`, `RUNNING`, `QUEUED`, `DONE`, `FAILED`) and provides instant recursive task cancellation.
+  - **Telemetry Inspection:** Displays process ID (PID), engine type, target paths, start time, and log stream.
 
-All modals use standard `.modal-overlay` structure (`background: rgba(0,0,0,0.92); contain: layout paint style;`) and `.modal-panel.frame` (`will-change: transform; transform: translateZ(0);`).
+### 3.5. Mobile Remote Control Gateway (`MobileRemoteModal.tsx`)
+- **Path:** `frontend/src/components/remote/MobileRemoteModal.tsx`
+- **Purpose:** Pairing and gateway interface for remote mobile smartphone control.
+- **Key Capabilities:**
+  - **Cloudflare Quick Tunnel Integration:** Displays the live public secure tunnel URL established via background `cloudflared`.
+  - **QR Code Generation:** Generates a real-time QR code using `qrcode` for instant mobile camera pairing.
+  - **OTP Security Key:** Displays the rotating one-time pairing key with a 10-minute time-to-live (`REMOTE_KEY_TTL_SECONDS = 600`) and countdown timer.
+  - **Status Feedback:** Live indicators for tunnel connection status (`starting`, `active`, `error`, `idle`).
 
-| Modal ID | Trigger / Opened By | Purpose | Key Inner Element IDs | Close Action |
-| :--- | :--- | :--- | :--- | :--- |
-| `settings-modal` | `#settings-trigger-btn` | Full Desktop Settings, Toggles & Quick Controls Hub | `#drawer-keys-btn`, `#drawer-autostart-btn`, `#autostart-switch`, `#drawer-brief-btn`, `#brief-mode-switch`, `#drawer-wake-btn`, `#wake-word-switch`, `#drawer-ptt-btn`, `#ptt-switch`, `#drawer-fallback-btn`, `#fallback-switch`, `#drawer-hud-btn`, `#hud-style-label`, `#color-dot-*` | `closeModal('settings-modal')` |
-| `log-modal` | Top navbar log button / `Ctrl+L` | Real-time Python Log Bus terminal viewer | `#log-stats-badge`, `#log-follow-btn`, `#log-pause-btn`, `#log-search-filter`, `#log-level-filter`, `#log-source-filter`, `#log-modal-buffer` | `closeModal('log-modal')` |
-| `task-modal` | Top navbar task button | Autonomous Process Registry & KPI matrix | `#task-modal-running-count`, `#task-modal-queued-count`, `#task-modal-done-count`, `#task-modal-list` | `closeModal('task-modal')` |
-| `task-detail-modal` | Card click on `#task-queue-list` or `#task-modal-list` | Deep subagent telemetry, parameters & logs | `#task-detail-badge`, `#task-detail-id`, `#task-detail-title`, `#task-detail-target`, `#task-detail-status-badge`, `#task-detail-progress-bar`, `#task-detail-engine`, `#task-detail-model`, `#task-detail-pid`, `#task-detail-started`, `#task-detail-elapsed`, `#task-detail-log-stream`, `#task-detail-cancel-btn`, `#btn-copy-task-logs` | `closeModal('task-detail-modal')` |
-| `qr-modal` | Top navbar QR button / `#settings-modal` | LAN Mobile Remote Control Gateway & OTP Key | `#remote-url-display`, `#remote-qr-img`, `#pairing-key-display`, `#copy-pairing-key-btn`, `#remote-timer-value` | `closeModal('qr-modal')` |
-| `api-keys-modal` | `#settings-modal` / `#pipeline-modal` | Secure API Key Credential Manager (Gemini, Groq, ElevenLabs) | `#keys-gemini-input`, `#keys-gemini-status`, `#keys-groq-input`, `#keys-groq-status`, `#keys-elevenlabs-input`, `#keys-elevenlabs-status`, `#btn-save-api-keys` | `closeModal('api-keys-modal')` |
-| `customise-modal` | `#settings-modal` | Persona Name, Language, Voice Persona & Kokoro Fallback | `#customise-asst-name`, `#customise-voice-select`, `#btn-preview-voice`, `#customise-lang-select`, `#customise-fallback-switch`, `#customise-fallback-voice-select` | `closeModal('customise-modal')` |
-| `pipeline-modal` | `#settings-modal` | Voice Engine Mode (Live vs. Cascade) & STT/LLM/TTS selectors | `name="pipeline-mode"`, `#pipeline-fallback-switch`, `#cascade-engines-section`, `#stt-engine-select`, `#llm-engine-select`, `#tts-engine-select`, `#tts-voice-select`, `#pipeline-gemini-status-tag`, `#pipeline-groq-status-tag`, `#pipeline-elevenlabs-status-tag` | `closeModal('pipeline-modal')` |
-| `audio-modal` | `#settings-modal` | Audio Input/Output Endpoint selection & Mic bleed monitor | `#audio-input-select`, `#audio-mic-bar`, `#audio-mic-status`, `#audio-output-select`, `#audio-echo-state` | `closeModal('audio-modal')` |
-| `memory-modal` | `#settings-modal` | SQLite FTS5 Memory Engine & BM25 search interface | Search input & scrollable memory history list | `closeModal('memory-modal')` |
-| `plugin-modal` | `#settings-modal` | Discovered plugins & ecosystem extension status | Cards for Git Workflow, YouTube Intel, Design Extractor, System Telemetry | `closeModal('plugin-modal')` |
-| `skills-modal` | `#settings-modal` | Discovered Declarative Skill Packages list | Discovered skills cards (`hamza_taste`, `opencode`, `social_research`, etc.) | `closeModal('skills-modal')` |
-| `onboarding-modal` | Startup initial probe (when Gemini key is missing) | First-launch onboarding gate for Gemini API Key | `#onboarding-gemini-key` | `saveOnboardingKey()` |
+### 3.6. Clipboard Watcher Floating HUD (`ClipPeekOverlay.tsx`)
+- **Path:** `frontend/src/components/clipboard/ClipPeekOverlay.tsx`
+- **Purpose:** Intelligent HUD overlay that activates when the operating system clipboard updates.
+- **Key Capabilities:**
+  - **Content Classification:** Distinguishes between code snippets, URLs, long articles, and plain text.
+  - **Instant Context Actions:** One-click shortcuts to Explain, Refactor, Run, or Reverse-Engineer captured clipboard text.
+  - **Non-Intrusive Floating Interface:** Floats at the bottom corner with smooth enter/exit animations and direct message injection into the ZEZO stream.
 
----
+### 3.7. Assistant-UI Conversational Thread (`ZezoChatThread.tsx`)
+- **Path:** `frontend/src/components/assistant-ui/ZezoChatThread.tsx`
+- **Purpose:** Production-grade conversation stream powered by Assistant-UI primitives.
+- **Key Capabilities:**
+  - **Shimmer Labels & Turn Process Pills:** Dynamic status chips indicating background tool execution and active thinking states.
+  - **Reasoning Collapse:** `ChainOfThought` component that renders collapsible step-by-step model reasoning without cluttering the chat view.
+  - **Avatar Expression Binding:** `ChatAvatarIcon` dynamically reflects model emotions (`thinking`, `happy`, `talking`, `idle`).
+  - **Markdown & Code Rendering:** Syntax-highlighted code blocks with instant copy actions and formatted markdown prose.
 
-## 6. Core JavaScript Function Reference
-
-### Modal & Overlay Management (`frontend/js/ui.js` & `frontend/index.html`)
-- `window.openModal(id)`: Adds `.open` class to target element, sets `window._zezoAnimActive = false`, and sets `#vortex-gif` to `visibility = 'hidden'`. Dispatches background log requests if `id === 'log-modal'` or remote key requests if `id === 'qr-modal'`.
-- `window.closeModal(id)`: Removes `.open` class. If no other `.modal-overlay.open` exists, restores `window._zezoAnimActive` and sets `#vortex-gif` to `visibility = 'visible'`.
-- `window.toggleSettingsDrawer(e)`: Legacy-compatible wrapper; opens `#settings-modal`.
-- `window.closeSettingsDrawer(e)`: Legacy-compatible wrapper; closes `#settings-modal`.
-
-### UI Notifications & Utilities (`frontend/js/ui.js`)
-- `window.showToast(msg, type, duration)`: Appends a floating toast badge into `#zezo-toast-container` with severity styling (`info`, `success`, `error`).
-- `window.showHudToast(msg)`: Auto-detects status emojis (`❌` -> `error`, `✅` -> `success`) and triggers toast.
-- `window.copyToClipboard(text, btnEl)`: Safe navigator clipboard writer with visual feedback on the triggering button.
-
-### Assistant State & Telemetry (`frontend/index.html`)
-- `setAssistantState(stateKey)`: Switches assistant state (`standby`, `listening`, `thinking`, `speaking`, `executing`, `muted`, `interrupted`, `offline`), updating the matrix dot canvas palette, dock button labels, and `#state-heading-text`.
-- `renderTasks(taskList)`: Renders full task queue in `#task-queue-list` and `#task-modal-list`, including progress bars, subtask trees, and statuses (`running`, `done`, `failed`, `queued`).
-- `openTaskDetail(taskId, showModal)`: Populates `#task-detail-modal` with internal metadata (PID, Engine, Model, Elapsed time, Logs) and optionally displays the dialog.
-- `setCanvasContent(text, contextTitle)`: Streams textual and code payloads directly into `#inspector-body` and `#canvas-content-text`.
-
----
-
-## 7. CSS Class Reference (`frontend/style.css`)
-
-- **Modals:**
-  - `.modal-overlay`: Fullscreen fixed container (`background: rgba(0,0,0,0.92); z-index: 200; contain: layout paint style;`).
-  - `.modal-overlay.open`: `display: flex; align-items: center; justify-content: center;`.
-  - `.modal-panel`: Centered dialog panel (`box-shadow: 0 25px 60px -12px rgba(0,0,0,0.98); will-change: transform; transform: translateZ(0); animation: modalIn 0.2s ease-out;`).
-- **Frames & Tactical Borders:**
-  - `.frame`: Tactical panel container with relative positioning and subtle border.
-  - `.frame-inner`: Inner container with opaque background (`#0a0a0a`).
-  - `.corner`, `.corner-v`: Absolute corner bracket decorations (`rgba(255,255,255,0.4)`).
-- **Cards & Badges:**
-  - `.card`: Surface card container (`background: var(--bg-surface); border: 1px solid var(--border-subtle);`).
-  - `.card-interactive`: Clickable card with explicit hover transitions (`transition: border-color 0.2s ease, background-color 0.2s ease;`).
-  - `.badge`: Monospace indicator pill (`.badge-accent`, `.badge-success`, `.badge-warn`, `.badge-danger`).
-- **Buttons:**
-  - `.btn`: Standard button base with explicit property transitions (`transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;`).
-  - `.btn-primary`, `.btn-ghost`, `.btn-danger`, `.btn-outline`, `.btn-sm`, `.btn-icon`.
-  - `.dock-btn`: Transparent command dock buttons with explicit hover transitions.
-- **Activity Stream:**
-  - `.stream-msg`: Chat bubble container (`.stream-msg.user`, `.stream-msg.ai`, `.stream-msg.system`).
-  - `.stream-msg-tag`: Origin tag pill (`USER`, `ZEZO`, `SYSTEM`, `TOOL`).
-- **HUD Switches:**
-  - `.hud-switch`: Custom toggle pill (`.hud-switch.active`, `.hud-switch.active-accent`).
-  - `.hud-switch .switch-knob`: Animated knob sliding via explicit `left` and `background-color` transitions.
+### 3.8. Code Engines Management Tab (`CodeEnginesSettingsTab.tsx`)
+- **Path:** `frontend/src/components/settings/CodeEnginesSettingsTab.tsx`
+- **Purpose:** Engine health status and CLI configuration panel inside the Settings modal.
+- **Key Capabilities:**
+  - **Health Cards:** Real-time status cards for **Antigravity CLI (`agy`)**, **OpenCode (`opencode`)**, and **Kilo Code (`kilo`)**.
+  - **Binary & Version Probes:** Live resolution indicators showing detected binary paths, CLI versions, and authenticated model rosters.
+  - **Probing Triggers:** One-click re-probe triggering the backend `/api/code_engines/probe` endpoint with non-blocking feedback.
 
 ---
 
-## 8. Regression Rules (Strict Enforcement)
+## 🎛️ 4. Settings Modal Architecture (`SettingsModal.tsx`)
 
-1. **No `backdrop-filter` on Modal Panels or Overlays:** Fullscreen overlays use solid `rgba(0,0,0,0.92)` to eliminate GPU compositor stalls in fullscreen mode.
-2. **Never Use `transition: all`:** Always declare explicit CSS transitions to prevent hover-induced layout invalidations.
-3. **Always Maintain `_zezoAnimActive`:** `openModal` must pause rAF loops (`_zezoAnimActive = false`) and `closeModal` must resume them if no modals remain open.
-4. **Hide Avatar GIF During Modals:** `#vortex-gif` style must be set to `visibility: 'hidden'` on open, and restored to `'visible'` on close.
-5. **No Recursive Self-Close in `openModal`:** `openModal(id)` must never call any function that invokes `closeModal` for the same ID.
-6. **Settings is a Modal:** The settings panel is `#settings-modal` (never reintroduce anchored dropdown drawers).
-7. **QtWebEngine Viewport Handling:** Avoid un-fallback `vh` calculations on critical modal wrappers; use `position: fixed` with explicit `inset: 0` or bounded `max-height`.
+The settings interface is housed in `frontend/src/components/settings/SettingsModal.tsx`, implemented as a clean ReUI dialog with 9 modular category tabs:
+
+| Tab ID | Component / Focus | Key Configurations |
+| :--- | :--- | :--- |
+| `general` | General System Controls | Autostart, Brief Voice Confirmations, Push-to-Talk (`Ctrl+Alt`), Wake Word toggle. |
+| `voice` | Audio & Voice Persona | Gemini Live Voice selection (Puck, Charon, Aoede, Fenrir, Kore), Kokoro fallback, Mic bleed monitor. |
+| `code-engines` | `CodeEnginesSettingsTab` | Binary resolution, model selection, and auth verification for Antigravity, OpenCode, and Kilo. |
+| `skills` | `SkillsSettingsTab` | Declarative skill packages inspection, safety scanner reports, and dynamic skill creation. |
+| `appearance` | HUD Aesthetics | Holographic Companion archetype (Qivi WebGL vs. Vortex), particle density, and color accents. |
+| `tunnel` | Cloudflare Tunnel Gateway | Background daemon status, quick tunnel initialization, and OTP security controls. |
+| `providers` | API Credential Hub | Secure management of Google Gemini, Groq, and ElevenLabs API keys. |
+| `memory` | Memory & Brain Explorer | Interactive `MemoryGraphCanvas` 3D graph and Markdown note vault browser. |
+| `about` | System Telemetry | Version, creator attribution (**Hamza Bukhari**), and runtime diagnostics. |
 
 ---
 
-## 9. Scranton Office Deck (`frontend/office.html`)
+## ⚡ 5. Performance & Anti-Regression Rules
 
-- **Route:** `GET /office` (served directly by `core/ui_server.py`).
-- **Purpose:** Dedicated full-screen multi-agent office deck with real-time floor telemetry, desk workstations, and live inspector.
-- **WebSocket Event Architecture (`ws://127.0.0.1:8765/ws`):**
-  - `agent_task_started`: Dynamically activates agent monitor glow, displays task speech bubble, and streams log entry.
-  - `task_progress`: Real-time task progress tracking.
-  - `task_done`: Deactivates task, seats sprite in idle state, and reports summary.
-  - `fleet_updated`: Auto-syncs agent roster from `config/fleet_agents.json`.
-- **4-Tab Inspector:**
-  - `OVERVIEW`: Live task, sandbox worktree, model engine, and risk tier.
-  - `SOUL.MD`: Real-time persona editor with `/api/fleet/save_soul` persistence.
-  - `MEMORY`: SQLite FTS5 episodic memories and knowledge query.
-  - `DISPATCH`: Instant task assignment to isolated Git worktrees via `/api/fleet/dispatch_task`.
-- **Zero Simulation:** Purely event-driven; no fake client-side `Math.random()` loops.
+1. **ReUI Components as Ground Truth:** Always import and utilize canonical ReUI components (`Button`, `Card`, `Badge`, `Frame`, `Dialog`, `Select`, `Switch`) rather than ad-hoc HTML elements.
+2. **No Backdrop-Filter Inside Modals:** `.modal-overlay` may apply subtle backdrop blur, but elements *inside* modal panels must maintain solid opaque backgrounds (`#0a0a0a` / `var(--background)`) to prevent GPU rasterization stalls.
+3. **Explicit Transitions Only:** Never use `transition: all`. Always list explicit CSS transitions (`transition: border-color 0.15s ease, background-color 0.15s ease`).
+4. **Animation Gating:** Background Three.js rendering loops and WebGL animations must gate their render loops when modals or full-screen overlays are active to minimize idle CPU/GPU consumption.
+5. **No Legacy DOM Selectors:** Never introduce or reference obsolete PyQt6 DOM IDs (`#vortex-gif`, `#payload-file-input`, `#task-queue-list`, `#stream-box`, or `frontend/js/ui.js`). Everything flows through React state and props.

@@ -1,8 +1,13 @@
-# JARVIS — Plugin System
+# ZEZO — Plugin System
+
+> **Project:** ZEZO  
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux
+
 
 ## Overview
 
-JARVIS has a **drop-in plugin system** where adding a new skill is as simple as dropping a `.py` file into `plugins/`. Plugins are auto-discovered at startup and registered as tools the AI can invoke.
+ZEZO has a **drop-in plugin system** where adding a new skill is as simple as dropping a `.py` file into `plugins/`. Plugins are auto-discovered at startup and registered as tools the AI can invoke.
 
 ## Discovery Mechanism
 
@@ -44,7 +49,7 @@ PLUGIN = {
 def run(parameters: dict, player=None, session_memory=None) -> str:
     """
     parameters: dict of args Gemini extracted
-    player: JarvisUI instance (for logging)
+    player: ZezoUI instance (for logging)
     session_memory: reserved
     Return: short natural-language string (spoken back)
     Never raise: catch own errors
@@ -177,7 +182,7 @@ def run(parameters: dict, player=None, session_memory=None) -> str:
     try:
         result = f"Found results for {query}."
         if player:
-            player.write_log(f"JARVIS: {result}")
+            player.write_log(f"ZEZO: {result}")
         return result
     except Exception as e:
         return f"Sir, my_plugin failed: {e}"

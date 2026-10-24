@@ -1,4 +1,9 @@
-# JARVIS — LLM / Reasoning Pipeline
+# ZEZO — LLM / Reasoning Pipeline
+
+> **Project:** ZEZO  
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux
+
 
 ## How the AI Processes a User Request
 
@@ -91,7 +96,7 @@ async def _execute_tool(self, fc) -> types.FunctionResponse:
     elif name == "close_camera": ...
     elif name == "system_status": ...
     elif name == "manage_monitor": ...
-    elif name == "shutdown_jarvis": ...
+    elif name == "shutdown_zezo": ...
     elif name == "undo": ...
     
     # Discovered actions
@@ -109,7 +114,7 @@ async def _execute_tool(self, fc) -> types.FunctionResponse:
 
 Each action handler receives:
 - `parameters`: dict of extracted arguments
-- `player`: JarvisUI instance (for logging, showing content)
+- `player`: ZezoUI instance (for logging, showing content)
 - `speak`: method to speak mid-execution
 - `response`: response channel
 - `session_memory`: persistent session memory

@@ -1,8 +1,13 @@
-# JARVIS — Platform Support
+# ZEZO — Platform Support
+
+> **Project:** ZEZO  
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux
+
 
 ## Overview
 
-JARVIS runs on **Windows 10/11, macOS, and Linux**. Most code is platform-agnostic, but specific features use platform-specific implementations.
+ZEZO runs on **Windows 10/11, macOS, and Linux**. Most code is platform-agnostic, but specific features use platform-specific implementations.
 
 ## Platform Detection
 

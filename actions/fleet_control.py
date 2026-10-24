@@ -43,6 +43,22 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
     if not task:
         return "Error: task instruction is required to dispatch work to an agent."
 
+    if not target_path:
+        # Do not invent a default here: just make the fallback visible. Without a `path` the
+        # dispatch lands in an auto-selected folder instead of the one the user named, which is
+        # exactly how a real rebuild ended up running in a stale remembered repo (Issue 7a/10).
+        try:
+            from core.repo_context import get_last_repo
+            remembered = get_last_repo()
+        except Exception:
+            remembered = None
+        logger.warning(
+            "[FleetControl] dispatch to %s received no 'path' - falling back to an auto-selected folder "
+            "instead of the folder the user meant%s. Pass path=<existing folder> to work in place.",
+            agent_id,
+            f" (last remembered repo: {remembered})" if remembered else "",
+        )
+
     # Debounce / deduplication check (12 seconds window for same agent and similar prompt)
     now = time.time()
     agent_key = agent_id.upper()

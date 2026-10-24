@@ -1,4 +1,9 @@
-# JARVIS — Complete Data Flow
+# ZEZO — Complete Data Flow
+
+> **Project:** ZEZO  
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux
+
 
 ## High-Level Architecture Diagram
 
@@ -110,7 +115,7 @@ User speaks
 sounddevice.InputStream callback (1024 frames, 16kHz, int16, mono)
     ↓
 ┌─ Wake word gate: sleeping? → feed(openwakeword) → return
-├─ Speaking lock: JARVIS speaking? → return (barge-in blocked)
+├─ Speaking lock: ZEZO speaking? → return (barge-in blocked)
 ├─ Echo guard: tail active? → EchoGuard.is_user_speech() → drop echo
 ├─ Push-to-talk: enabled and not held? → return
 └─ All gates passed → out_queue.put_nowait({data, mime_type})
@@ -189,7 +194,7 @@ AES-256-CBC encryption established
     ↓
 FastAPI endpoints receive commands
     ↓
-Commands → JarvisLive methods (via asyncio.call_soon_threadsafe)
+Commands → ZezoLive methods (via asyncio.call_soon_threadsafe)
     ↓
 Responses → encrypted → phone
 ```
@@ -279,6 +284,6 @@ stateDiagram-v2
 All audio flows through: Microphone → gates → Gemini Live → Speakers
 All tool calls flow through: Gemini → _execute_tool → Action/Plugin handler
 All memory flows through: long_term.json ↔ memory_manager.py ↔ system prompt
-All UI flows through: PyQt6 signals/slots → JarvisLive methods
-All dashboard flows through: FastAPI → asyncio.call_soon_threadsafe → JarvisLive
+All UI flows through: PyQt6 signals/slots → ZezoLive methods
+All dashboard flows through: FastAPI → asyncio.call_soon_threadsafe → ZezoLive
 ```

@@ -1,157 +1,114 @@
-# ZEZO OS — Modular Computer Control Architecture
+# 🖥️ ZEZO OS — Modular Computer Control Architecture
 
+> **Project:** ZEZO  
 > **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux  
 > **Core Principle:** *"Observe only when necessary — Escalate perception, don't waterfall it."*
 
-## Overview
+---
 
-ZEZO executes computer control through modular drivers under `core/computer/` with 4-tier escalated perception and execution:
-$$\text{L0: Fast Win32 State (1ms)} \longrightarrow \text{L1: Windows UIA (<15ms)} \longrightarrow \text{L1.5: Multilingual RapidOCR (<80ms)} \longrightarrow \text{L2: Gemini Vision (~2.0s)}$$
+## 🧭 Architecture Overview
+
+ZEZO executes computer automation through a modular driver architecture under `core/computer/` and unified action tools in `actions/computer_control.py` and `actions/computer_settings.py`. Rather than relying on slow, expensive cloud vision models for every interaction, ZEZO implements **3-Tier Escalated Perception**:
+
+$$\text{Tier 1: Windows UIA (<15ms)} \longrightarrow \text{Tier 1.5: Multilingual RapidOCR (<80ms)} \longrightarrow \text{Tier 2: Gemini Vision (~2.0s)}$$
 
 ---
 
-## Driver Modules (`core/computer/`)
+## 🏎️ 3-Tier Escalated Perception Architecture
 
-| Module | Purpose | Key Capabilities |
-| :--- | :--- | :--- |
-| `windows_native.py` | Win32 OS Integration | Window enumeration, state-preserving focus switching (`AttachThreadInput` + `IsIconic`/`IsZoomed` → `SW_RESTORE`/`SW_MAXIMIZE`/`SW_SHOW`, so maximized windows never shrink), physical bounds calibration via `DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS=9)`, safe closing (`WM_CLOSE`), DPI awareness initialization (`SetProcessDPIAware`). |
-| `windows_uia.py` | Windows UI Automation (L1 UIA) | Fast accessibility tree inspection (< 15ms, `searchDepth=6`) inside STA COM `ThreadPoolExecutor` worker with strict 0.8s timeout boundaries. Finds native buttons, edits, tabs, and list items. Includes real browser tab discovery (`get_browser_tabs`) and switch-by-title (`switch_tab_by_title`) for live desktop Chrome. |
-| `ocr_engine.py` | Multilingual CPU OCR (L1.5 RapidOCR) | Sub-80ms CPU ONNX text detection and spatial bounding box extraction with **0 MB GPU VRAM footprint** (~80MB RAM). Unicode Urdu/Arabic normalization `normalize_urdu()` (tashkeel stripping, yeh/kaf/heh unification) and fuzzy matching (`fuzzy_threshold=0.75`). |
-| `pyautogui_driver.py` | Hardware Input Driver | Mouse/keyboard input with `POST_MOVE_VERIFY`, action aliases (`enter`, `escape`, `space`, `backspace`, `tab`, `delete`), and safe multilingual Unicode typing. |
+When targeting an on-screen element or text label (`screen_click`, `click`, `double_click` with a `description` parameter), ZEZO automatically escalates through three perception tiers:
+
+```mermaid
+flowchart TD
+    A[Target Element Description\ne.g. 'Save', 'Width', 'Search'] --> B[Tier 1: Windows UIA COM Worker]
+    B -->|Found <15ms| C[Click Coordinates\nl1_uia]
+    B -->|Not Found| D[Tier 1.5: Multilingual RapidOCR CPU ONNX]
+    D -->|Found <80ms| E[Click Coordinates\nl1.5_ocr]
+    D -->|Not Found| F[Tier 2: Gemini Multimodal Vision]
+    F -->|Found ~2.0s| G[Click Coordinates\nl2_vision]
+    F -->|Not Found| H[Return Clean Not-Found Status\nZero Blind Clicking]
+
+    classDef default fill:#0f172a,stroke:#3b82f6,stroke-width:1px,color:#fff;
+    classDef success fill:#064e3b,stroke:#10b981,stroke-width:1px,color:#fff;
+    class C,E,G success;
+```
+
+### 1. Tier 1: Windows UI Automation (L1 UIA)
+- **Module:** `core/computer/windows_uia.py`
+- **Latency:** **< 15ms**
+- **Mechanism:** Direct COM access to the Windows UI Automation tree (`searchDepth=6`) inside an STA COM `ThreadPoolExecutor` worker with strict 0.8s timeout boundaries.
+- **Scope:** Detects native Win32/WPF/Electron accessibility elements (`Button`, `Hyperlink`, `Edit`, `MenuItem`, `TabItem`, `CheckBox`, `RadioButton`, `ListItem`, `ComboBox`).
+- **Browser Tab Switching:** Scans Chrome/Edge tab strips to discover live browser tabs (`get_browser_tabs`) and focus tabs by title (`switch_tab_by_title`).
+
+### 2. Tier 1.5: Multilingual CPU ONNX RapidOCR
+- **Module:** `core/computer/ocr_engine.py`
+- **Latency:** **< 80ms**
+- **Resource Footprint:** **0 MB GPU VRAM** (~80MB system RAM on CPU).
+- **Scope:** Extracts rendered text inside web canvas elements, desktop games, or graphic editors (e.g. Figma canvas controls like "Width", "Fill", "Opacity", or web app buttons that don't expose accessibility trees).
+- **Text Normalization:** Unicode normalization for Urdu/Arabic (`normalize_urdu` for tashkeel stripping and letter unification) and fuzzy Levenshtein matching (`fuzzy_threshold=0.75`).
+
+### 3. Tier 2: Gemini Multimodal Vision Fallback
+- **Module:** `actions/screen_processor.py`
+- **Latency:** **~2.0s**
+- **Scope:** High-level visual reasoning for non-text graphical icons (e.g. magnifying glass, gear icon, avatar picture, complex layout bounding boxes).
+- **Safety:** If all three tiers fail, the tool returns a clear `Element not found` message rather than clicking blind coordinates.
 
 ---
 
-## 3-Tier Perception Escalation (`actions/computer_control.py`)
-When targeting an on-screen control or text label (`screen_click`, `click`, `double_click` with a `description`):
-1. **Tier 1 (L1 UIA):** Inspects the active window's Windows UI Automation tree (<15ms). Finds native buttons ("Save", "Cancel", "File"), edit controls, and tabs.
-2. **Tier 2 (L1.5 RapidOCR):** Runs local CPU RapidOCR on the active window crop (<80ms). Finds rendered text in canvas/web apps (Figma "Width", "Fill", web canvas strings, Urdu text) without cloud round-trips.
-3. **Tier 3 (L2 Gemini Multimodal Vision):** Fallback to Gemini Multimodal Vision (~2.0s) only for graphical icons, color swatches, and complex visual scenes.
+## ⚡ Compound Atomic `batch` Actions
 
----
+To avoid incurring multiple Gemini round-trip delays for multi-step desktop workflows, `actions/computer_control.py` supports the **`batch`** action (aliases: `sequence`, `macro`).
 
-## Hotkey Anti-Loop Circuit Breaker & Safety Directives
-- **In-Turn Circuit Breaker (`core/action_loader.py`):** Automatically detects and aborts tight repetitive hotkey loops (>4 identical key actions within 10s, e.g. `shift+tab` spam in canvas editors).
-- **Chat App Governance (`core/prompt.txt`):** When typing in WhatsApp/Telegram, ZEZO only types the message text and strictly requires explicit user confirmation ("bhejo", "send it") before pressing enter.
-- **Contextual GUI Undo:** Commands to undo in active GUI applications (Figma, VS Code, Browser) map directly to `Ctrl+Z` hotkey dispatches instead of filesystem snapshots.
+### Specification
+`batch` accepts a sequential list of steps and executes them atomically within a single turn:
 
----
-
-## Safe Unicode Typing & Buffer Preservation
-- Automatically detects non-ASCII text (Urdu, Arabic, Hindi, emojis, symbols) or multiline strings.
-- Stashes the user's prior clipboard string in memory.
-- Writes the text to system clipboard and triggers native paste (`Ctrl+V` / `Cmd+V`).
-- Restores the previous user clipboard buffer after paste (`RESTORE_CLIPBOARD_AFTER_PASTE = True`).
-
-**Screen-grounded clicks:** `click`, `double_click`, `right_click` accept either `x,y` OR a `description` — when only a description is given they automatically escalate through L1 UIA ➔ L1.5 RapidOCR ➔ L2 Vision, clicking the found coordinates. `screen_click` / `screen_double_click` are the explicit description-based actions; `smart_click` is accepted as an alias. If the element is not found, the tool returns a clear not-found status rather than clicking blind.
-
-### Application Launching (actions/open_app.py)
-
-```python
-# Per-OS name map
-APP_NAMES = {
-    "Windows": {"chrome": "chrome", "vscode": "code", ...},
-    "Darwin":  {"chrome": "Google Chrome", ...},
-    "Linux":   {"chrome": "google-chrome", ...},
+```json
+{
+  "action": "batch",
+  "sequence": [
+    {"action": "screen_click", "description": "Width"},
+    {"action": "type", "text": "1440"},
+    {"action": "press", "key": "tab"},
+    {"action": "type", "text": "900"},
+    {"action": "press", "key": "enter"}
+  ]
 }
 ```
 
-Uses `subprocess.Popen` with `CREATE_NO_WINDOW` on Windows.
+### Benefits
+- **Zero Roundtrip Overhead**: Executes 5–10 UI actions sequentially in ~200ms instead of waiting ~15 seconds across 5 separate model turns.
+- **Fail-Fast Safety**: If any step in the sequence fails, execution halts immediately and returns the exact step error to the model.
 
-**Honest launch (2026-09-25):** opening a file in a named app no longer runs the fragile `cmd /c start "" "code" "<file>"` (which silently failed because VS Code's `code` shim is not on PATH, while the tool still reported success). `_resolve_windows_launcher()` now finds the real executable (e.g. `%LOCALAPPDATA%\Programs\Microsoft VS Code\Code.exe`) and launches it with the file; if it cannot resolve the app it opens the file with the OS default and says so — it never claims an app opened when it did not.
+---
 
-### Browser Control (actions/browser_control.py)
+## ↩️ Contextual GUI Undo
 
-Uses **Playwright** for browser automation:
-```python
-from playwright.sync_api import sync_playwright
-# Launch Chromium/Firefox, navigate, click, type
-```
+ZEZO distinguishes between **filesystem/state undo** and **active desktop application undo**:
 
-### Vision (actions/screen_processor.py)
+- **Active App Context:** When the user says *"undo that"* or *"Ctrl+Z"* while working in an active desktop application (such as Figma, VS Code, Notepad, or a web browser), ZEZO dispatches native OS `Ctrl+Z` (`Cmd+Z` on macOS) via `actions/computer_settings.py::undo()`.
+- **Focus Preservation:** Input actions preserve active foreground window focus using Win32 `GetForegroundWindow` and `SetForegroundWindow` wrappers.
+- **Shared Undo Stack:** If the user explicitly asks to reverse an action performed by ZEZO itself (such as moving files or altering system volume), the request routes to `core/undo.py`.
 
-| Source | Library | Format |
-|--------|---------|--------|
-| Screen capture | `mss` + `PIL` | JPEG (max 1280x720, quality 82) |
-| Webcam | `opencv-python` (cv2) | JPEG |
-| Compression | `PIL` | Resized, compressed |
+---
 
-### How Vision Works
+## 🛡️ Safety, Guardrails & Anti-Loop Circuit Breaker
 
-```python
-# Capture
-img_b, mime_t = _capture_screen()  # or _capture_camera()
-# Returns (bytes, "image/jpeg")
-# Inject into Gemini session via send_client_content()
-# Image carried with the same exchange as the tool result
-```
+1. **In-Turn Circuit Breaker (`core/action_loader.py`)**: Automatically aborts repetitive hotkey loops if more than 4 identical keyboard actions occur within 10 seconds (e.g., runaway `tab` or `shift+tab` loops).
+2. **Chat App Governance (`core/prompt.txt`)**: When automating chat applications (WhatsApp, Telegram, Slack), ZEZO types the message text into the input field but **strictly requires explicit verbal confirmation** ("bhejo", "send it") before pressing Enter.
+3. **Safe Unicode Clipboard Typing**:
+   - Detects non-ASCII text (Urdu, Arabic, Hindi, emojis, multiline code).
+   - Stashes the user's prior clipboard string in memory.
+   - Writes the text to the system clipboard and triggers native paste (`Ctrl+V` / `Cmd+V`).
+   - Automatically restores the previous user clipboard buffer immediately after paste (`RESTORE_CLIPBOARD_AFTER_PASTE = True`).
 
-**Important**: Vision images are labelled with their source. A webcam frame shows the USER; a screen capture shows the COMPUTER.
+---
 
-## Platform-Specific Details
+## 🎛️ Driver Modules Summary (`core/computer/`)
 
-### Windows
-- **Volume**: `pycaw` library or `pyautogui`
-- **Brightness**: `pywinauto` or registry
-- **WiFi**: `netsh` / `subprocess`
-- **Window management**: `pygetwindow`, `pywin32`
-- **Keyboard/mouse**: `pyautogui`
-- **Process control**: `subprocess`, `psutil`
-- **Power management**: `subprocess` (shutdown, restart)
-- **Special**: `comtypes`, `wmi` for system queries
-
-### macOS
-- **Volume**: `osascript` (AppleScript)
-- **Brightness**: `osascript`
-- **WiFi**: `networksetup`
-- **Window management**: `subprocess` (AppleScript)
-- **Keyboard/mouse**: `pyautogui`
-- **Special**: `LaunchAgent` for auto-start
-
-### Linux
-- **Volume**: `pactl` (PulseAudio)
-- **Brightness**: `brightnessctl`
-- **WiFi**: `nmcli` (NetworkManager)
-- **Window management**: `subprocess`
-- **Keyboard/mouse**: `pyautogui`
-- **Special**: `systemd` for auto-start and reminders
-
-## Safety and Confirmation
-
-**File:** `core/confirm.py`
-
-Irreversible actions go through the confirmation gate:
-```python
-# shutdown, restart, toggle_wifi → confirm.request()
-# UI shows CONFIRM/CANCEL banner
-# Only user pressing CONFIRM runs the action
-# Model cannot forge confirmation (token issued by UI)
-```
-
-## Undo System
-
-**File:** `core/undo.py`
-
-```python
-from core.undo import push_undo
-
-# In action handlers:
-old = volume_get()
-volume_set(new)
-push_undo(f"volume → {new}%", lambda: volume_set(old))
-```
-
-- Stack depth: 10 entries max
-- Covers: file operations, settings changes, desktop organization
-- Files over 1 MB excluded from undo (memory limit)
-- `organize_desktop` has special journal-based undo
-
-## Summary
-
-```
-Control tools: computer_settings, computer_control, open_app, browser_control
-Libraries: pyautogui, pycaw, pywin32, pygetwindow, playwright, subprocess
-Platform-specific: Each action has per-OS branches
-Safety: confirm.py for irreversible actions
-Undo: core/undo.py stack for reversible actions
-Vision: mss + cv2 + PIL for screen/webcam capture
-```
+| Module | Core Responsibility |
+|---|---|
+| `windows_native.py` | Win32 window enumeration, DPI awareness, bounds calibration via `DwmGetWindowAttribute`, state-preserving window restoration (`IsIconic`/`IsZoomed`). |
+| `windows_uia.py` | UI Automation tree crawler (<15ms) running in STA COM thread pool, native control identification, and live browser tab switching. |
+| `ocr_engine.py` | Sub-80ms CPU ONNX RapidOCR engine (0 MB VRAM) with Urdu/Arabic normalization and fuzzy coordinate matching. |
+| `pyautogui_driver.py` | Mouse and keyboard hardware input driver with post-move verification and cross-platform key mapping. |

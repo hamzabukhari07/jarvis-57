@@ -3,7 +3,147 @@
 # LEARNING JOURNAL (active — last 25 entries)
 # Older entries live in LEARNING_JOURNAL_ARCHIVE.md (grep by module/keyword).
 
+## [2026-10-24] — Comprehensive Documentation Modernization & Codebase Synchronization
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built:** The repository underwent a complete architectural transformation from an early single-agent prototype into ZEZO, an autonomous desktop operating system. However, the `docs/` folder suffered from significant drift (obsolete PyQt6 DOM references, retired tools `code_helper.py`/`dev_agent.py`, deprecated cascade STT/TTS assumptions, outdated PTT shortcuts `Ctrl+Space`, and zero documentation for 7 major modern subsystems).
+- **Execution & Scope:**
+  1. **Zero Code Changes Policy:** Confirmed 0 modifications to Python, TypeScript, React, or configuration files. Work was strictly confined to markdown in `docs/` and `planning/`.
+  2. **Authoring 7 Missing Subsystem Docs:**
+     - `docs/REVERSE_ENGINEERING.md`: REA CLI (`rea-agents@6.7.0`), 0-LLM CDP evidence envelopes (`evidence.json`, `blueprint.md`, `ledger.json`), isolated desktop rebuilds, and automated Vite server.
+     - `docs/CODE_ENGINES.md`: Unified registry for Antigravity CLI (`agy`), OpenCode (`opencode`), Kilo Code (`kilo`), binary resolution, authentication probing, and 5-min TTL caching.
+     - `docs/FLEET_MANAGEMENT.md`: Scranton Office 2D desk layout (`OFFICE_DESK_COORDINATES`), specialized agent roster, role inference, and Git worktree sandboxes.
+     - `docs/TASK_SYSTEM.md`: 7-state task lifecycle, hierarchical parent/child trees, unnotified child suppression, and UI broadcasting.
+     - `docs/REMOTE_TUNNELING.md`: Cloudflare Quick Tunnels, public DNS verification (`dns.google`), and QR code/OTP pairing.
+     - `docs/CLIPBOARD_WATCHER.md`: Background clipboard daemon, real-time content classification, and ClipPeek floating HUD.
+     - `docs/SKILLS_SYSTEM.md`: Declarative package format (`skills/<skill>/SKILL.md`), multi-stage security scanner, and inline skills tools (`read_skill`, `list_skills`, `save_learned_skill`).
+  3. **Overhaul of Core Architecture & Tools:**
+     - `docs/TOOLS.md`: Documented 31 active action tools + 9 inline tools; purged dead tools; relocated misattributed tools (`system_status`, `manage_monitor`); updated `shutdown_zezo`.
+     - `docs/ARCHITECTURE.md` & `docs/AI_ARCHITECTURE.md`: Documented decoupled FastAPI/aiohttp WebSocket server + React 18/Vite SPA + Google Gemini Live bidirectional PCM voice streaming.
+     - `docs/FRONTEND_STRUCTURE.md` & `docs/UI.md`: Documented Autonomous Office, 3D Memory Canvas, Task Matrix, and Assistant-UI threads.
+     - `docs/WEBSITE_CLONER.md`: Updated to v6 Prompt-Driven Reverse Engineering standards (`rebuilt.html` vs `rebuilt_app/`).
+     - `docs/MEMORY.md` & `docs/STORAGE.md`: Upgraded to Hybrid 3-Tier Engine (JSON, SQLite WAL + FTS5, Markdown Vault).
+     - `docs/PROMPT_SYSTEM.md`: Synchronized with 480-line `core/prompt.txt` (Executive Brevity, Temporal Grounding, Disambiguation).
+  4. **Global Brand, Hotkey & Diagram Sweep:**
+     - Standardized Push-to-Talk hotkey to strictly `Ctrl+Alt` globally.
+     - Replaced all legacy "JARVIS" branding with ZEZO.
+     - Documented Qivi WebGL Three.js point-cloud avatar visualizer in `docs/HUD_AND_AVATAR.md`.
+     - Updated Mermaid diagrams in `docs/DIAGRAMS.md` and component tree in `docs/CODEBASE_MAP.md`.
+- **Key Files Created / Touched:**
+  - 7 new documents authored in `docs/`.
+  - 37 existing documentation files modernized in `docs/`.
+  - `planning/PLAN_DOCS_SYNCHRONIZATION.md` & `planning/DOCS_VS_CODEBASE_COMPREHENSIVE_AUDIT.md`.
+- **Verification:**
+  - Layer 1 (Blast Radius): `git status` confirmed zero code files touched.
+  - Layer 2 (Integrity): All file links, tool schemas, and endpoints verified against live source code.
+  - Layer 3 (Consistency): Verified zero legacy "JARVIS" or "Ctrl+Space" references remaining.
+
+## [2026-10-24] — Fix: Response Language Reconnect, Cloner Deliverable Opening, Anti-Clutter & Action Governance
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Causes & Issues Diagnosed:**
+  1. **Strict Response Language Ignored:** When user toggled response language to "English Strict" (or other explicit languages), the Gemini Live WebSocket session retained the system prompt configured at initial connection. `main.py` did not reconnect or dynamically update system instructions on language setting change. Additionally, `core/prompt.txt` contained conflicting guidance ("mirror the language the user speaks in naturally") that overrode the `[LANGUAGE]` system block, causing ZEZO to fall back to conversational Urdu/Hindi mirroring instead of enforcing English.
+  2. **Cloned Deliverable Opening Failure (`file://` silent rejection):** In `actions/website_cloner.py`, opening the finished `rebuilt.html` via `browser_control` returned an error dict (`Invalid URL: Must start with http:// or https://`) without raising an exception. The cloner's `try...except` swallowed the error and falsely announced `open_browser` success while leaving the user's browser unopened.
+  3. **Duplicate Artifact / Clutter (`antigravity_clone.html` alongside `rebuilt.html`):** Step 7 (`_deliver_capture`) wrote `antigravity_clone.html` unconditionally before Step 11 (`_run_reverse_engineer`) generated `rebuilt.html`, polluting the rebuild workspace with an unintended capture snapshot.
+  4. **Action Loader Rejection:** `actions/code_engines_status.py` was rejected at startup with error `TOOL['risk'] missing` because `core/action_loader.py` strictly validates the `"risk"` tier.
+  5. **Missing Unified Settings Documentation:** Disconnect between backend settings schema, UI controls, and developer docs caused recurring regressions when adjusting setting toggles.
+- **Fixes Applied:**
+  1. **Dynamic Language Reconnect & Prompt Alignment:**
+     - Connected `ui.on_language_change` callback in `ui.py` when assistant settings change.
+     - Wired handler `_on_language_change` in `main.py` to trigger `self.request_reconnect(reason=f"response language set to {current_lang}")`, cleanly forcing Gemini Live session re-initialization with the updated system prompt.
+     - Mapped `"English Strict"` to `["en-US", "en-GB"]` in `lang_map`.
+     - Subordinated natural mirroring in `core/prompt.txt` to strictly respect explicit `[LANGUAGE]` directive blocks.
+  2. **Direct Browser & File Launcher:**
+     - In `actions/website_cloner.py`, implemented direct `file://` dispatch using Python's `webbrowser.open(target_url)` with fallback to `os.startfile(file_path)` on Windows, bypassing `browser_control`'s HTTP-only restriction.
+  3. **Rebuild Anti-Clutter Guard:**
+     - Guarded Step 7 in `actions/website_cloner.py` with `if output_format in CAPTURE_ONLY_FORMATS:` so rebuild pipelines produce exclusively `rebuilt.html` (or `rebuilt_app/`) without generating dummy `antigravity_clone.html`.
+  4. **Action Risk Tier Compliance:**
+     - Added `"risk": "read_only"` to the `TOOL` dictionary in `actions/code_engines_status.py`.
+  5. **Documentation Governance:**
+     - Authored `docs/SETTINGS.md` detailing all 9 UI settings tabs, their API endpoints, state keys, and event flows.
+     - Synchronized `docs/CONFIGURATION.md` and created `planning/DIAGNOSED_ISSUES_AND_FIX_PLAN.md`.
+- **Crucial Architectural Context (Traps & Anti-Regression):**
+  - **Live WebSocket System Prompts Are Immutable Per Connection:** Gemini Live WebSocket connections bind the initial system prompt upon session handshakes. Toggling critical system prompt directives (like voice response language) requires calling `request_reconnect()` rather than assuming state changes update in-flight prompts.
+  - **`browser_control` Rejects `file://` by Design:** Never route local HTML files through `browser_control(action='open', url='file://...')` as it strictly validates `http://` / `https://` schemes. Local files must always use `webbrowser.open` or `os.startfile`.
+  - **Rebuild Formats Must Skip Step 7:** Any new stack added to `website_cloner` must be checked against `CAPTURE_ONLY_FORMATS` to prevent creating capture artifact copies in project rebuild workspaces.
+  - **Tool Schemas Must Have `"risk"`:** Every action added to `actions/` must define `"risk"` in its `TOOL` specification (`read_only`, `low`, `medium`, `high`, `critical`) or `core/action_loader.py` will reject it during load.
+- **Key Files Touched:**
+  - `ui.py`
+  - `main.py`
+  - `core/prompt.txt`
+  - `actions/website_cloner.py`
+  - `actions/code_engines_status.py`
+  - `docs/SETTINGS.md`
+  - `docs/CONFIGURATION.md`
+  - `planning/DIAGNOSED_ISSUES_AND_FIX_PLAN.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile ui.py main.py core/code_engines.py actions/code_engines_status.py actions/website_cloner.py core/ui_server.py` passed with 0 errors.
+  - Layer 2 (Runtime): Real simulated browser opening verified for `file://` URIs; runtime language delta reconnect tested; cloner deliverable generation verified.
+  - Layer 3 (Regression): `pytest tests/test_website_cloner_suite.py tests/test_language_and_mute_fix.py tests/test_code_engines_phase1.py` passed 72/72 tests.
+
+## [2026-10-24] — Part II Phase 1: Code Engines Health & Readiness Architecture
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built:** Closes the UI/health half of the CLI readiness gap diagnosed in `CLONE_PIPELINE_FIX_PLAN.md`. Previously, coding actions only checked binary presence via naive search paths (`_find_antigravity_bin()`), leading to silent failures when an engine (like `agy`) was installed but unauthenticated (producing 0 files while false-reporting success).
+- **Core Architecture & Components:**
+  1. **Registry & Unified Provider Seam (`core/code_engines.py`):**
+     - Dataclasses `Engine` and `EngineStatus`.
+     - Static registration `ENGINES: dict[str, Engine]` for Antigravity CLI (`agy`), OpenCode (`opencode`), and Kilo Code (`kilo`).
+     - Replaces ad-hoc binary discovery with `resolve_binary(engine_id)` using PATH and known vendor paths.
+     - Probe dispatch table `AUTH_PROBERS` avoids if/elif ladders and maintains cyclomatic complexity < 15.
+     - Probes check honest authentication signals: `agy models` for Antigravity, local `auth.json` and `auth list` for OpenCode & Kilo.
+     - In-memory 5-minute TTL caching (`_CACHE`) ensures zero blocking overhead (cached calls complete in 0.0 ms).
+     - Subprocess calls strictly utilize `creationflags=CREATE_NO_WINDOW` and `stdin=subprocess.DEVNULL` with timeouts to prevent hanging or UI freeze.
+  2. **Voice-First Status Action (`actions/code_engines_status.py`):**
+     - Follows Rule 4 with standalone `TOOL` declaration and `handler()`.
+     - Supports `action="list"` and `action="check"`, returning structured engine diagnostics and a high-level conversational summary (1-2 sentences) compliant with Rule 6.
+  3. **Backend API Endpoints (`core/ui_server.py`):**
+     - Exposes `/api/code_engines`, `/api/code_engines/probe`, and `/api/code_engines/default` using `asyncio.to_thread` to guarantee non-blocking async execution.
+  4. **Settings Panel UI (`frontend/src/components/settings/CodeEnginesSettingsTab.tsx`):**
+     - ReUI-styled interface following `prototypes/wireframe-code-engines.html`.
+     - Features 3-tally health strip (ready, needs sign-in, not installed), engine status cards, model tags, action buttons (Test, Sign in, Install, Open folder), toggle switch, and automatic warning callout when the default engine is not ready with active fallback indication.
+     - Wired cleanly into `frontend/src/components/settings/SettingsModal.tsx` under `'code-engines'`.
+- **Key files created / touched:**
+  - `core/code_engines.py` (new)
+  - `actions/code_engines_status.py` (new)
+  - `core/ui_server.py`
+  - `frontend/src/lib/api.ts`
+  - `frontend/src/components/settings/CodeEnginesSettingsTab.tsx` (new)
+  - `frontend/src/components/settings/SettingsModal.tsx`
+  - `tests/test_code_engines_phase1.py` (new)
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` clean across all touched Python files; `npm run build` compiled without errors.
+  - Layer 2 (Runtime): Real runtime probe of host engines detected all 3 binaries and authenticated states accurately; action tool verified for single and multi-engine voice reporting.
+  - Layer 3 (Regression): `tests/test_code_engines_phase1.py` suite passed 6/6 tests.
+
+## [2026-10-24] — Website Cloner v6: Prompt-Driven Reverse Engineering (supersedes the v5 React rebuild)
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why v5's approach was replaced:** v5 had ZEZO assemble its **own** scaffolding prompt (React markers, design guard, 6000-char cap) and check the result against a hard-coded React shape. Hamza's correction: **"Everything, it should happen in custom... हम CLI run करेंगे. CLI के अंदर custom prompt देंगे Antigravity को"** — the CLI must receive *his own* authored prompt, with **no ZEZO pre-built file/scaffolding** ("ये pre-built कुछ नहीं हो रहा. ये files कुछ नहीं करेंगी"). Only the **output-format clause inside the prompt** changes per request; the rest is fixed. So the whole React-specific machinery (`_run_react_rebuild`, `react_rebuild_prompt`, `REBUILD_PROMPT_MAX_CHARS`, `get_unique_rebuild_dir`, the `_engine_stack_markers` test) was **deleted** and replaced by one prompt-driven stage.
+- **Why rebuild at all (the feature's actual purpose):** uncage's own export is a **non-customizable snapshot** — it retains the source framework's own chunk bundles (a real `asset-map.json` ships e.g. `./assets/js/49450.ba8bdeacb2ae3f4e-c78ad30e.js` plus a Next.js `polyfills` CDN ref), so a verbatim copy looks right but is functionally inert because hydration depends on the origin. The rebuilt artifact is the editable deliverable.
+- **New pipeline (all in `actions/website_cloner.py`):**
+  1. Uncage capture runs first and is **always delivered and previewed** (`antigravity_clone.html` at `http://127.0.0.1:<port>/antigravity_clone.html`).
+  2. **Uncage's output folder is never modified** — no `index.html`/`assets/`/`asset-map.json` rewrite. The rebuilt artifact is written **alongside** it.
+  3. Step 11: `_run_reverse_engineer(url, clone_dir, ctx, output_format)` calls `antigravity_action({"task": reverse_engineer_prompt(url, fmt), "project_path": str(clone_dir), "run_in_place": True, "task_ctx": ctx, "prompt_mode": "verbatim", "skip_design": True, "skip_preview": True})`. The engine's cwd **is the capture folder**, exactly like running the agent by hand on an export.
+  4. Verification is ZEZO's, not the engine's claim: `_verify_re_artifact` (specs in the `RE_ARTIFACT_SPECS` data dict, not an if/elif ladder).
+- **Artifact placement (load-bearing, deliberate):**
+  - Single-file rebuilds → `rebuilt.html` **inside the capture folder**, because a one-file page must resolve relative `assets/...`.
+  - Project rebuilds (React/Next/PHP/any named stack) → `rebuilt_app/` **subfolder**, because uncage already writes its own `package.json`/`README.md` at the folder root and must not be clobbered.
+  - `captured-raw*.html` and `antigravity_clone.html` are **excluded** from artifact detection — a raw uncage snapshot can never be accepted as the "rebuilt" deliverable.
+- **Custom stacks:** `output_format` is **free text** (the enum was removed) — `raw_html`/`react`/`nextjs`/`php`/`capture_only` get curated clauses; **anything else is treated as a stack named in the user's own words** and routed to `rebuilt_app/`. `CAPTURE_ONLY_FORMATS = ("capture_only", "static", "clean_html", "none")` keeps the old capture-only behaviour reachable (legacy `static`/`clean_html` map here), so no existing caller regressed.
+- **Critical architectural context (traps — do not "improve" these away):**
+  - **`prompt_mode="verbatim"` is a mode, not a flag.** When set, the engine (a) sends `task` to the CLI byte-for-byte, **skipping the 6000-char cap** (that cap exists only to stop ZEZO's *own* assembled scaffolding overflowing the 32KB Windows command line; a caller-authored ~3.3KB prompt is well inside it), (b) skips design resolution entirely, and (c) **skips `_ensure_gitignore`** — adding a `.gitignore` would modify the caller-owned capture folder. Two contradicting instruction sets (a reverse-engineering prompt saying "one standalone HTML, reuse the real assets" + ZEZO's "modular React + Tailwind project") is the same class of pollution `skip_design` guards against.
+  - **`prompt_mode` MUST be in `extra_flags`.** `antigravity_action` builds a **fresh** `worker_params` dict on the `run_in_place` path, so any flag not copied into `extra_flags` is silently dropped. This exact trap already ate `skip_design` once.
+  - **`skip_preview` must gate the CLI-success preview, not just the REST fallback.** The agy-success branch opened `file://…/index.html` unconditionally. In the RE flow the workspace *is* the capture folder, so that popped uncage's own raw `index.html` on top of ZEZO's served preview — the exact snapshot the user does not want presented as the deliverable. Now guarded in both branches.
+  - **A copy of the capture is NOT enough.** Because the artifact lives in the capture folder, the engine reads the real bundle in place; do not "helpfully" stage it into `app_dir/_source` as v5 did.
+  - **The confirmation gate stays stateless** (`main.py` never sets `session_id` → always `"global"`, wiped every utterance) and **failure messages front-load the folder path** (`main.py` truncates at 150 chars) — both unchanged from v5. The gate now also reads the requested format back, passing an unrecognised stack through **verbatim** so the user hears what they asked for.
+- **Key files touched:** `actions/website_cloner.py`, `actions/antigravity_agent.py`, `tests/test_website_cloner_suite.py`, `LEARNING_JOURNAL.md`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile actions/website_cloner.py actions/antigravity_agent.py tests/test_website_cloner_suite.py` → clean.
+  - **Layer 2 (Runtime, real, offline):** drove `_clone_worker(output_format="raw_html")` end-to-end against a **real uncage export** (`tools/uncage/output/www_heyclicky_com`, pre-staged so no live crawl was needed) with a real preview server. Result: engine cwd **== the capture folder**, `--add-dir` the same, the prompt delivered **byte-identical** to `reverse_engineer_prompt(...)` at 3266 chars with **zero ZEZO directive leakage** and `rebuilt.html` requested. Capture-folder delta: `index.html` md5 **unchanged**, `.gitignore` **unchanged**, modified/removed **none**, added only `antigravity_clone.html` + `rebuilt.html`. Both previews served over HTTP: raw `200` (117 363 B), artifact `200` (251 B, contains the rebuilt copy). **Failure half:** an engine that exits 0 having written nothing raises `Rebuild FAILED - capture intact at <path> (preview open at …)` with the folder at **char offset 35** (inside the 150-char window), offers the fleet handoff, leaves the capture on disk unmodified, writes no fake artifact, and leaves the raw preview reachable (`200`).
+  - **Honest limitation:** the **real `agy.exe` was never executed** in this session — launching it with `--dangerously-skip-permissions` was declined by the approval classifier, and I did not work around that. The E2E fakes **only** the third-party binary (a stand-in `Popen` that records argv and writes the deliverable, mirroring the user's own successful manual transcript); every other stage is real.
+  - **Layer 3 (Regression):** `pytest tests/test_website_cloner_suite.py tests/test_reverse_engineer_suite.py tests/test_fleet_control_suite.py` → **74 passed**. Scoped deliberately to the feature; the repo-wide suite was not used as the gate.
+
 ## [2026-10-24] — Website Cloner v5: Killed False Success, Uncage Auto-Tuning, Voice Confirmation Gate & ZEZO-Native React Rebuild
+> ⚠️ **Partly superseded by v6 (above).** The false-success kill, uncage auto-tuning, the confirmation gate, the asset integrity gate and the failure escalation all still stand. The **Native React Rebuild** (item 7) is gone: v6 replaced it with the prompt-driven reverse-engineering stage. Read v6's traps before touching step 11.
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Root Cause (the unstyled / "फाड़ रही थी" clone):** The clone reported **SUCCESS while shipping a half-extracted page.** Evidence from a real broken export (`tools/uncage/output/linear_app/`): it contained only `captured-raw.html` + `public/assets/**`. `captured-raw*.html` is written **per route during extraction** (`tools/uncage/src/extractor.ts:708`), while `asset-map.json` is the extractor's **last** write (`:748`, after the unbounded JS-module dependency scan). The export was **killed mid-extraction inside that scan**, so the compile/consolidate/assemble stages (`src/assembler.ts`, `src/formats/html.ts`) never ran at all. `md5(served index.html) == md5(captured-raw.html)` — the served page was the pre-assembly snapshot with absolute `/assets/...` refs while `clone_dir/assets/` did not exist, so every asset 404'd. Two Python code paths converted that into SUCCESS: one accepted *any* `.html` as proof of success, the other **promoted the raw capture to `index.html`**.
 - **Fix Applied:**
@@ -25,9 +165,9 @@
 - **Key files touched:** `actions/website_cloner.py`, `actions/antigravity_agent.py`, `actions/fleet_control.py`, `core/repo_context.py`, `core/prompt.txt`, `tests/test_website_cloner_suite.py`, `docs/WEBSITE_CLONER.md`, `docs/TOOLS.md`, `LEARNING_JOURNAL.md`.
 - **Verification:**
   - **Layer 1 (Static):** `python -m py_compile actions/website_cloner.py actions/antigravity_agent.py actions/fleet_control.py core/repo_context.py` → passed with 0 errors.
-  - **Layer 2 (Runtime):** The four real export dirs are a permanent offline fixture — `_uncage_result_ok(linear_app, 0)` → `False` ("stopped before assembly"), `_uncage_result_ok(stripe_com, 0)` → `True`. Silent stall reproduced with a fake `Popen` whose stdout never yields. **Real clone of `https://www.heyclicky.com/`:** 227 files, preview HTTP 200, 5 served stylesheets all 200; integrity reported `8 of 87 local asset reference(s) could not be saved ...; 16 video/audio file(s) were not downloaded` and the summary carried the honest media caveat. **Real React rebuild:** `heyclicky_com_cloned_app/` with `package.json` + `src/{App,main}.tsx` + 4 components; `npm install` → 65 packages in 11 s, `npx vite` → ready in 219 ms, `GET /` 200 with a browser `Accept: text/html` and `GET /src/main.tsx` 200 with 2150 bytes of transformed JS.
+  - **Layer 2 (Runtime):** The four real export dirs are a permanent offline fixture — `_uncage_result_ok(linear_app, 0)` → `False` ("stopped before assembly"), `_uncage_result_ok(stripe_com, 0)` → `True`. Silent stall reproduced with a fake `Popen` whose stdout never yields. **Real clone of `https://www.heyclicky.com/` (×3 runs, 227–231 files):** uncage completed, preview HTTP 200, integrity reported `8 of 88 local asset reference(s) could not be saved ...; 16 video/audio file(s) were not downloaded` and the summary carried the honest media caveat — a caveat, not a false success. **Real React rebuild:** `heyclicky_com_cloned_app/` with `package.json` + `src/{App,main}.tsx` + components, `app_dir` returned in the result dict; `npm install` → 65 packages in 11 s, `npx vite` → ready in 219 ms, `GET /` 200 (with a browser `Accept: text/html`) and `GET /src/main.tsx` 200 with 2150 bytes of transformed JS. **The `skip_design` fix is confirmed by A/B:** the pre-fix run logged `Design resolved: Dub (reference_raw_html)` → `Plan ready: 10 files for 'heyclicky_com_react' [Dub]` and shipped Hero copy reading "Dub Links" with `dub.sh` URLs; the post-fix run has no design line, plans `'heyclicky_react_port'`, and Hero copy reads "Clicky helps you automatically schedule your social media content" with zero `dub` matches. **Failure escalation confirmed:** a rebuild that died raised `React rebuild FAILED - folder kept at <path> (...). Static clone is intact at <clone_dir> and its preview is open at <url>.`
   - **Layer 3 (Regression):** `pytest tests/test_website_cloner_suite.py tests/test_reverse_engineer_suite.py tests/test_fleet_control_suite.py` → **62 passed**.
-  - **Known limitation (UNVERIFIED as fixed):** when the local `agy` CLI exits without deliverables, the direct Gemini REST fallback takes over and produces a *regenerated* app rather than a byte-faithful port — it did not carry the captured `assets/` across (no `public/`, so `/assets/favicon.ico` 404s) and it hits `APIError: 1011 ... exceeded your current quota` mid-plan while still completing.
+  - **Known limitation (not fixed by this work — needs the user's call):** the local `agy` CLI **consistently exits without deliverables** on this task (`CLI exited without creating valid project deliverables`), in both the pre- and post-fix runs, so the **direct Gemini REST fallback does the actual code generation**. That fallback regenerates an approximation instead of porting the capture: it did not carry `_source/assets/` across (no `public/`, so `/assets/favicon.ico` 404s) and writes its own condensed stylesheet (`captured.css` ~6–13 KB) instead of the captured CSS (~203 KB across files) — so the React output is a *plausible reconstruction*, not a pixel-faithful port. Two contributing causes observed: the fallback emits `APIError: 1011 ... You exceeded your current quota` mid-plan while still completing, and `agy.EXE` **self-updated to a new build on 2026-10-24 11:12** (previous build retained as `agy.EXE.1792822347585165300.old`). Diagnosing the CLI itself was left alone — reproducing it needs an approvals-off launch, which I declined to run unattended.
 
 ## [2026-10-23] — Fix: Restored `sleep_toggle` Message Handler in `core/ui_server.py` WebSocket Dispatcher
 - **Creator & Lead Architect:** Hamza Bukhari

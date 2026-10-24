@@ -173,6 +173,9 @@ class ZezoUIServer:
         app.router.add_get("/api/backend_logs", self._get_backend_logs_handler)
         app.router.add_post("/api/backend_logs/clear", self._clear_backend_logs_handler)
         app.router.add_get("/api/system/status", self._system_status_handler)
+        app.router.add_get("/api/code_engines", self._code_engines_handler)
+        app.router.add_post("/api/code_engines/probe", self._code_engines_probe_handler)
+        app.router.add_post("/api/code_engines/default", self._code_engines_default_handler)
         app.router.add_get("/zezo-avatar.png", self._avatar_handler)
         app.router.add_get("/favicon.ico", self._favicon_handler)
         app.router.add_get("/favicon.svg", self._dist_file_handler)
@@ -1299,6 +1302,52 @@ class ZezoUIServer:
             })
         except Exception as e:
             logger.exception("Error in /api/models handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _code_engines_handler(self, request: web.Request) -> web.Response:
+        """Return status for all registered coding engines."""
+        try:
+            from core.code_engines import probe_all_engines, get_default_engine
+            engines = await asyncio.to_thread(probe_all_engines, False)
+            default_engine = get_default_engine()
+            return web.json_response({
+                "status": "success",
+                "engines": engines,
+                "default_engine": default_engine,
+            })
+        except Exception as e:
+            logger.exception("Error in /api/code_engines handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _code_engines_probe_handler(self, request: web.Request) -> web.Response:
+        """Force re-probe of a specific engine or all engines."""
+        try:
+            data = await request.json() if request.can_read_body else {}
+            engine_id = data.get("engine_id")
+            from core.code_engines import probe_engine, probe_all_engines, get_default_engine
+            if engine_id:
+                engine = await asyncio.to_thread(probe_engine, str(engine_id), True)
+                return web.json_response({"status": "success", "engine": engine})
+            engines = await asyncio.to_thread(probe_all_engines, True)
+            return web.json_response({
+                "status": "success",
+                "engines": engines,
+                "default_engine": get_default_engine(),
+            })
+        except Exception as e:
+            logger.exception("Error in /api/code_engines/probe handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _code_engines_default_handler(self, request: web.Request) -> web.Response:
+        """Save default code engine."""
+        try:
+            data = await request.json() if request.can_read_body else {}
+            engine_id = data.get("engine_id")
+            from core.code_engines import set_default_engine
+            ok = set_default_engine(str(engine_id))
+            return web.json_response({"status": "success" if ok else "error"})
+        except Exception as e:
+            logger.exception("Error in /api/code_engines/default handler: %s", e)
             return web.json_response({"status": "error", "message": str(e)}, status=500)
 
     async def _audio_devices_handler(self, request: web.Request) -> web.Response:

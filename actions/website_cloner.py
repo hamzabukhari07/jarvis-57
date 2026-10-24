@@ -59,7 +59,13 @@ try:
 except ImportError:
     SCRAPLING_AVAILABLE = False
 
-from core.repo_context import get_unique_clone_dir, get_unique_rebuild_dir, register_clone, register_rebuild
+from core.repo_context import (
+    expand_user_dir,
+    get_unique_clone_dir,
+    is_zezo_source_dir,
+    register_clone,
+    register_rebuild,
+)
 from core.task_manager import get_task_manager, TaskContext
 from core.undo import register_clone_snapshot
 
@@ -181,6 +187,75 @@ def start_local_preview_server(directory: Path) -> Tuple[str, int]:
         t.start()
         logger.info("Started preview server on %s for %s", preview_url, norm_path)
         return preview_url, selected_port
+
+
+def _open_in_browser(url: str) -> None:
+    """Open a URL/URI in the user's browser, preferring ZEZO's own browser channel."""
+    if url.startswith("file://"):
+        opened = False
+        try:
+            import webbrowser
+            opened = bool(webbrowser.open(url))
+        except Exception:
+            opened = False
+        if not opened and os.name == "nt":
+            try:
+                path_str = urllib.request.url2pathname(urllib.parse.urlparse(url).path)
+                os.startfile(path_str)
+            except Exception:
+                pass
+        return
+
+    try:
+        from actions.browser_control import browser_control
+        res = browser_control({"action": "go_to", "url": url})
+        if not res or (
+            isinstance(res, str)
+            and (
+                res.startswith("Validation error")
+                or res.startswith("Invalid URL")
+                or res.startswith("Error")
+            )
+        ):
+            import webbrowser
+            webbrowser.open(url)
+    except Exception:
+        try:
+            import webbrowser
+            webbrowser.open(url)
+        except Exception:
+            pass
+
+
+def _open_deliverable(path: Path, clone_dir: Path) -> str:
+    """Open the finished artifact and return where it was opened.
+
+    A single self-contained HTML page opens straight off disk (file://) - a localhost server for
+    one file is pointless indirection. A page whose refs are root-absolute ('/assets/...') cannot
+    render over file://, and a project folder has no single file to open, so only those two cases
+    keep the server. Which one applies is read from the file's own markup, never assumed.
+    """
+    html = ""
+    if path.is_file():
+        try:
+            html = path.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            html = ""
+
+    if html and not re.search(r'(?:src|href)\s*=\s*["\']/(?!/)', html):
+        uri = path.resolve().as_uri()
+        _open_in_browser(uri)
+        return uri
+
+    _preview_url, port = start_local_preview_server(clone_dir)
+    try:
+        rel = path.relative_to(clone_dir).as_posix()
+        subpath = "" if rel == "." else f"/{rel}"
+    except Exception:
+        subpath = ""
+    url = f"http://127.0.0.1:{port}{subpath}"
+    _open_in_browser(url)
+    return url
 
 
 # ── URL Normalization & Sanitization ────────────────────────────────────────
@@ -2453,91 +2528,291 @@ def _faithful_cleanup(raw_html: str, url: str, clone_dir: Path, ctx=None) -> str
     return raw_html
 
 
-# ── ZEZO-native React/Next rebuild (no fleet agent involved) ─────────────────
+# ── ZEZO-native reverse engineering of a captured site ───────────────────────
+#
+# ZEZO ports nothing itself and pre-builds nothing. Once uncage has finished, it runs the
+# local coding engine (agy) ONCE with a complete caller-authored prompt whose ONLY variable
+# is the output-format clause, and the engine writes the artifact itself.
+#
+# The capture folder is the reference and is NEVER rewritten: uncage's index.html, assets/
+# and asset-map.json stay exactly as uncage produced them. The rebuilt artifact is ADDED at a
+# new path. That placement is forced, not cosmetic - a single-file rebuild must sit inside the
+# capture folder or its relative assets/... references would 404, and a project rebuild needs
+# its own subfolder because uncage already writes a package.json and README.md at its root.
 
-REACT_FORMATS = ("react", "nextjs")
-REBUILD_PROMPT_MAX_CHARS = 6000   # actions/antigravity_agent.py truncates the full prompt here
+RE_ARTIFACT_SINGLE = "rebuilt.html"
+RE_ARTIFACT_APP_DIR = "rebuilt_app"
+DEFAULT_OUTPUT_FORMAT = "raw_html"
+
+# The prefix of the text a failed rebuild raises. core/prompt.txt decides how ZEZO explains a
+# failed clone by matching this exact prefix, and the two drifted apart once already (the message
+# became "Rebuild FAILED -" while the prompt still matched "React rebuild FAILED -"), which
+# silently killed the branch that tells the model to pass `path` to fleet_control. It is a shared
+# constant now, and tests/test_website_cloner_suite.py asserts it appears in core/prompt.txt, so
+# the next rewrite of either side fails the suite instead of failing quietly in a live session.
+RE_REBUILD_FAILURE_PREFIX = "Rebuild FAILED - capture intact at"
 
 
-def react_rebuild_prompt(url: str) -> str:
-    """Task prompt for the ZEZO-native React rebuild of a freshly captured clone.
+def rebuild_failure_message(clone_dir: Path, preview_url: str, detail: str) -> str:
+    """The exact text a failed rebuild raises.
 
-    It must satisfy the stack markers in actions/antigravity_agent.py: contain a
-    react/vite/jsx/tsx token, contain no static-HTML marker ("single html", "one index",
-    "no framework", ...) and no negated React phrasing - otherwise the engine builds a
-    static page instead of a React project. tests/test_website_cloner_suite.py asserts this.
+    Kept as one function so the prompt contract and the raiser cannot drift: the folder path leads
+    the message because the failure notification ZEZO receives is cut at 150 chars.
     """
     return (
-        f"REBUILD THE CAPTURED SITE AS A REACT APP.\n\n"
-        f"The '_source' folder in this workspace is a faithful offline capture of {url}: "
-        f"'_source/index.html' plus its stylesheets, scripts, fonts and images under "
-        f"'_source/assets/'. It is the design reference and must stay exactly as it is - "
-        f"never edit or delete anything inside it. Put the runnable React + Vite project in "
-        f"this workspace root, as a sibling of '_source'.\n\n"
-        f"1. Open '_source/index.html' and study its structure, section order, colours, "
-        f"typography, spacing and images. Reproduce them 1:1. This is a faithful port, not a "
-        f"redesign: invent no extra sections, and bring in no outside visual style of your own.\n"
-        f"2. Split the page into small reusable components under src/components/ (Navbar, Hero, "
-        f"Features, Pricing, Footer, ...). src/App.tsx composes them in the captured order.\n"
-        f"3. Bring the captured styling across as-is: import the captured CSS (copy the files to "
-        f"src/styles/ if that is cleaner) or port the rules verbatim into the component styles. "
-        f"Reuse the captured fonts and images by copying them into public/ and referencing them "
-        f"by relative path. Keep every class name the capture depends on.\n"
-        f"4. Translate the markup into JSX: class -> className, for -> htmlFor, inline style "
-        f"strings -> style objects, void elements self-closed. Keep every text string, link URL "
-        f"and image from the capture verbatim; add state only for behaviour the capture had.\n"
-        f"5. Ship package.json (react, react-dom, vite, @vitejs/plugin-react), vite.config.ts, "
-        f"an index.html entry and src/main.tsx so that 'npm install' then 'npm run dev' runs it "
-        f"immediately. Do not run npm install, do not run npm run dev, do not start any server.\n"
-        f"6. End by writing the files themselves. Answering with a plan, a summary or a diff "
-        f"instead of real code counts as failure.\n"
+        f"{RE_REBUILD_FAILURE_PREFIX} {clone_dir} (preview open at {preview_url}). "
+        f"Reason: {detail}. A fleet agent can be pointed at that folder to finish it."
+    )
+
+# Explicit opt-out: deliver the capture and skip the engine stage entirely.
+# The legacy 'static'/'clean_html' values map here so the old capture-only behaviour stays
+# reachable and unchanged; the default for a fresh clone is now a rebuilt single HTML page.
+CAPTURE_ONLY_FORMATS = ("capture_only", "static", "clean_html", "none")
+
+# Human phrases for the read-back, so the user hears what they will get before any crawl.
+RE_READBACK_FORMATS = {
+    "raw_html": "one rebuilt single HTML page (rebuilt from the capture, not a copy of it)",
+    "single_html": "one rebuilt single HTML page (rebuilt from the capture, not a copy of it)",
+    "html": "one rebuilt single HTML page (rebuilt from the capture, not a copy of it)",
+    "react": "a React + Vite project",
+    "nextjs": "a Next.js project",
+    "php": "a PHP project",
+    "capture_only": "nothing new - just the raw capture and its preview",
+    "static": "nothing new - just the raw capture and its preview",
+    "clean_html": "nothing new - just the raw capture and its preview",
+    "none": "nothing new - just the raw capture and its preview",
+}
+
+# The inspection half of the reverse-engineering prompt. Taken from the prompt Hamza Bukhari
+# runs by hand against an uncage export, which is the proven-fidelity version of this task.
+RE_PROMPT_INSPECT = (
+    "You are an expert Web Designer, UI Designer, Frontend Engineer, and Website Reverse "
+    "Engineering AI Agent. Your only task is to inspect the entire project provided to you "
+    "through the project files and then rebuild the website as accurately as possible based on "
+    "the actual files, code, assets, screenshots, components, styles, routes, content, and "
+    "existing implementation. Do not rely on assumptions when the required information already "
+    "exists inside the project. First inspect the complete project structure and identify all "
+    "relevant files including HTML, JSX, TSX, JavaScript, CSS, SCSS, Tailwind files, JSON, "
+    "images, SVGs, videos, fonts, icons, components, layouts, routes, configuration files, and "
+    "any other assets or references that affect the website's visual appearance. Understand how "
+    "the original website is structured from top to bottom and reverse engineer every visible "
+    "section, including announcement bars, header, navigation, hero, sub-navigation, feature "
+    "sections, content blocks, image sections, cards, testimonials, logos, statistics, pricing, "
+    "FAQs, forms, CTAs, footer, and any additional sections or reusable patterns found in the "
+    "project. Inspect the existing code and assets carefully to determine exact typography, "
+    "colors, spacing, dimensions, layout behavior, responsive rules, animations, interactions, "
+    "image usage, iconography, borders, shadows, gradients, backgrounds, and component "
+    "relationships."
+)
+
+# The shared rules half. The "no design system / no analysis report / no description" clauses
+# are what keep the engine writing artifacts instead of prose, so they are load-bearing.
+RE_PROMPT_TAIL = (
+    "Reuse the project's actual assets whenever possible instead of creating replacements, "
+    "preserve original image proportions and visual hierarchy, use the actual fonts when "
+    "available, and reproduce important interactions such as dropdowns, mobile navigation, "
+    "accordions, tabs, sliders, hover effects, scroll animations, menus, and other visible "
+    "behaviors when they can reasonably be recreated with vanilla JavaScript. Do not create a "
+    "design system, do not write an analysis report, do not explain what you found, and do not "
+    "simplify the website into a basic approximation. The objective is to reverse engineer the "
+    "provided project and produce a highly accurate visual recreation of the website. After "
+    "inspecting the files, directly build the final implementation using the information "
+    "available in the project. Keep the implementation clean, structured, responsive, and "
+    "production-quality. Write the actual deliverable files - answering with a plan, a summary "
+    "or a diff instead of real files counts as failure."
+)
+
+# The ONE part of the prompt that varies with what the user asked for.
+RE_OUTPUT_CLAUSES = {
+    "raw_html": (
+        f"Recreate the website as a single standalone HTML file named '{RE_ARTIFACT_SINGLE}' "
+        f"written in the workspace root, containing the complete visual experience, with "
+        f"embedded CSS and JavaScript, and make it fully responsive across desktop, tablet, and "
+        f"mobile. Keep the capture's local asset references working by pointing them at the same "
+        f"relative 'assets/...' paths the capture already uses. Do NOT overwrite or modify "
+        f"index.html, assets/ or asset-map.json - they are the reference. The deliverable is "
+        f"that one file, not a description of it."
+    ),
+    "react": (
+        f"Recreate the website as a React + Vite project inside a new subfolder named "
+        f"'{RE_ARTIFACT_APP_DIR}' in the workspace root. Split the captured page into reusable "
+        f"components, translate the markup to valid JSX (class -> className, for -> htmlFor, "
+        f"inline style strings -> style objects), and carry the captured stylesheets, fonts and "
+        f"images across unchanged rather than restyling them. Ship package.json, vite.config.ts, "
+        f"an index.html entry and the src/ entrypoint so 'npm install' then 'npm run dev' runs "
+        f"it. Do not run npm install, do not run npm run dev, do not start any server."
+    ),
+    "nextjs": (
+        f"Recreate the website as a Next.js project inside a new subfolder named "
+        f"'{RE_ARTIFACT_APP_DIR}' in the workspace root, using the App Router. Split the "
+        f"captured page into reusable components and carry the captured stylesheets, fonts and "
+        f"images across unchanged. Ship package.json, next.config.js and the app/ route files "
+        f"so 'npm install' then 'npm run dev' runs it. Do not run npm install, do not run "
+        f"npm run dev, do not start any server."
+    ),
+    "php": (
+        f"Recreate the website as a PHP project inside a new subfolder named "
+        f"'{RE_ARTIFACT_APP_DIR}' in the workspace root: index.php plus the shared markup split "
+        f"into partials under includes/, with the captured stylesheets, fonts and images carried "
+        f"across unchanged. It must run with 'php -S localhost:8000' with no build step. Do not "
+        f"start any server yourself."
+    ),
+}
+
+# How success is judged per format - inspected on disk, never taken from the engine's prose.
+# globs are single-segment patterns because Path.rglob already recurses.
+RE_ARTIFACT_SPECS = {
+    "raw_html": {"kind": "single"},
+    "react": {
+        "kind": "project", "require": ["package.json"],
+        "dirs": ["src", "app"], "globs": ["*.tsx", "*.jsx"],
+    },
+    "nextjs": {
+        "kind": "project", "require": ["package.json"],
+        "dirs": ["app", "pages", "src"], "globs": ["*.tsx", "*.jsx"],
+    },
+    "php": {
+        "kind": "project", "require": ["index.php"],
+        "dirs": [], "globs": ["*.php"],
+    },
+}
+
+
+def _re_output_clause(output_format: str) -> str:
+    """Return the output-format clause for the requested format.
+
+    Any value that is not one of the curated formats is treated as a stack the user named in
+    their own words ("svelte", "ruby on rails", "a one-page portfolio"). The confirmation gate
+    reads the value back before this runs, and that read-back is what catches a misheard stack
+    name - so free text is safe here where a silent default would not be.
+    """
+    fmt = (output_format or "").strip()
+    clause = RE_OUTPUT_CLAUSES.get(fmt.lower())
+    if clause:
+        return clause
+    return (
+        f"Recreate the website as: {fmt}. Build it inside a new subfolder named "
+        f"'{RE_ARTIFACT_APP_DIR}' in the workspace root, unless that request names a single "
+        f"file, in which case write that one file in the workspace root. Ship everything the "
+        f"stack needs to run (manifest, entrypoint, source files) - do not describe it."
     )
 
 
-def _run_react_rebuild(url: str, clone_dir: Path, ctx: TaskContext) -> Tuple[bool, str, Optional[Path]]:
-    """Rebuild a completed clone as a React app using ZEZO's own coding engine.
+def reverse_engineer_prompt(url: str, output_format: str) -> str:
+    """The complete prompt handed to the coding engine, in verbatim mode.
 
-    Returns (ok, detail, app_dir). The engine call reuses the existing run_in_place seam in
+    Sent untouched: actions/antigravity_agent.py skips its own stack directives and its 6000
+    character cap when prompt_mode='verbatim'. Appending ZEZO's directives to this prompt would
+    hand the agent two contradicting instruction sets - a reverse-engineering prompt that says
+    "reuse the real assets, one file" next to ZEZO's "modular React + Tailwind project".
+    """
+    return "\n\n".join(
+        (
+            f"REFERENCE PROJECT: this workspace is a complete offline capture of {url}. Inspect "
+            f"it directly - index.html, assets/, asset-map.json and every other file in it are "
+            f"the ground truth. Never modify or delete anything already in this folder; it is "
+            f"the reference you are rebuilding from.",
+            RE_PROMPT_INSPECT,
+            _re_output_clause(output_format),
+            RE_PROMPT_TAIL,
+        )
+    )
+
+
+def _new_html_files(root: Path, before: Set[str]) -> List[Path]:
+    """HTML files that appeared during the engine run, newest first.
+
+    Uncage's own snapshots are excluded: a `captured-raw*` file is the pre-assembly state and
+    antigravity_clone.html is ZEZO's verbatim copy, so neither is ever a rebuilt artifact.
+    """
+    fresh = [
+        p for p in root.rglob("*.html")
+        if str(p) not in before
+        and not p.name.startswith("captured-raw")
+        and p.name != "antigravity_clone.html"
+    ]
+    return sorted(fresh, key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def _verify_re_artifact(
+    clone_dir: Path, output_format: str, before_html: Set[str]
+) -> Tuple[bool, str, Optional[Path]]:
+    """Decide success by inspecting the folder, never by what the engine says it did."""
+    spec = RE_ARTIFACT_SPECS.get((output_format or "").strip().lower())
+
+    if spec is None:
+        # A stack named in the user's own words: we cannot know its shape, so the honest test
+        # is that real files appeared - either in the app subfolder or as a new HTML file.
+        app = clone_dir / RE_ARTIFACT_APP_DIR
+        if app.is_dir() and any(p.is_file() for p in app.rglob("*")):
+            return True, f"build written to {RE_ARTIFACT_APP_DIR}/", app
+        fresh = _new_html_files(clone_dir, before_html)
+        if fresh:
+            return True, f"build written as {fresh[0].name}", fresh[0]
+        return False, "the engine produced no files for the requested stack", None
+
+    if spec["kind"] == "single":
+        fresh = _new_html_files(clone_dir, before_html)
+        if not fresh:
+            return False, (
+                "the engine wrote no new HTML file - answering with a plan or a summary "
+                "instead of the file counts as failure"
+            ), None
+        return True, f"rebuilt page written as {fresh[0].name}", fresh[0]
+
+    app = clone_dir / RE_ARTIFACT_APP_DIR
+    if not app.is_dir():
+        return False, f"the engine created no {RE_ARTIFACT_APP_DIR}/ folder", None
+    missing = [f for f in spec["require"] if not (app / f).exists()]
+    if missing:
+        return False, f"the engine finished without {', '.join(missing)}", app
+    if spec["dirs"] and not any((app / d).is_dir() for d in spec["dirs"]):
+        return False, f"the engine finished without any of {', '.join(spec['dirs'])}/", app
+    if spec["globs"]:
+        found = sum(len(list(app.rglob(g))) for g in spec["globs"])
+        if found == 0:
+            return False, f"the engine produced no source files ({', '.join(spec['globs'])})", app
+        return True, f"{found} source file(s) in {RE_ARTIFACT_APP_DIR}/", app
+    if not any(p.is_file() for p in app.rglob("*")):
+        return False, f"{RE_ARTIFACT_APP_DIR}/ is empty", app
+    return True, f"build written to {RE_ARTIFACT_APP_DIR}/", app
+
+
+def _run_reverse_engineer(
+    url: str, clone_dir: Path, ctx: TaskContext, output_format: str
+) -> Tuple[bool, str, Optional[Path]]:
+    """Reverse-engineer a completed capture into the requested format with ZEZO's own engine.
+
+    Returns (ok, detail, artifact_path). The call reuses the existing run_in_place seam in
     actions/antigravity_agent.py, so the build reports into THIS task's card instead of
     spawning a second task - and it is the same agy.exe invocation a fleet agent would make.
-
-    Success is decided here, by inspecting the folder, never by what the engine claims.
     """
-    try:
-        app_dir = get_unique_rebuild_dir(_extract_domain(url))
-    except Exception as e:
-        return False, f"could not allocate a rebuild folder ({e})", None
+    fmt = (output_format or DEFAULT_OUTPUT_FORMAT).strip()
+    before_html = {str(p) for p in clone_dir.rglob("*.html")}
 
-    source_dir = app_dir / "_source"
-    try:
-        app_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(
-            clone_dir, source_dir,
-            dirs_exist_ok=True,
-            ignore=shutil.ignore_patterns("antigravity_clone.html"),
-        )
-    except Exception as e:
-        return False, f"could not copy the captured bundle into {source_dir} ({e})", app_dir
-
-    _safe_report(ctx, 99, f"[REACT] ZEZO is rebuilding the captured design as a React app in {app_dir.name}...")
+    _safe_report(ctx, 99, f"[REBUILD] ZEZO is reverse-engineering the capture into '{fmt}' in {clone_dir.name}...")
     try:
         from actions.antigravity_agent import antigravity_action
         engine_out = antigravity_action(
             {
-                "task": react_rebuild_prompt(url),
-                "project_path": str(app_dir),
+                "task": reverse_engineer_prompt(url, fmt),
+                # cwd == the capture folder, exactly like running the agent by hand against an
+                # uncage export: the reference is right there and --add-dir covers it.
+                "project_path": str(clone_dir),
                 "run_in_place": True,
                 "task_ctx": ctx,
-                # A clone must reproduce the captured design, so no Hamza Taste blueprint is
-                # injected here, and the engine's own file:// preview is left alone (a Vite
-                # source tree is not previewable without npm install; the clone preview is open).
+                # verbatim: send this prompt untouched, no ZEZO stack directives appended.
+                "prompt_mode": "verbatim",
+                # A rebuild reproduces the captured design, so no Hamza Taste blueprint may be
+                # injected; and the engine's own file:// preview is suppressed because ZEZO
+                # serves the capture and the rebuilt artifact itself.
                 "skip_design": True,
                 "skip_preview": True,
             },
             session_memory={},
         )
     except Exception as e:
-        return False, f"the coding engine crashed ({e})", app_dir
+        return False, f"the coding engine crashed ({e})", None
 
     engine_status = ""
     try:
@@ -2548,26 +2823,12 @@ def _run_react_rebuild(url: str, clone_dir: Path, ctx: TaskContext) -> Tuple[boo
         pass
 
     # An engine that reports failure is taken at its word even if the folder looks plausible:
-    # it may have written a few files before dying, and a half-built app reported as finished
-    # is exactly the false success this tool must not produce.
+    # it may have written a few files before dying, and a half-built artifact reported as
+    # finished is exactly the false success this tool must not produce.
     if engine_status:
-        return False, f"the coding engine reported a failure ({engine_status[:120]})", app_dir
+        return False, f"the coding engine reported a failure ({engine_status[:120]})", None
 
-    if not (app_dir / "package.json").exists():
-        return False, "the engine finished without a package.json", app_dir
-    if not ((app_dir / "src").is_dir() or (app_dir / "app").is_dir()):
-        return False, "the engine finished without a src/ or app/ folder", app_dir
-
-    components = 0
-    for sub in ("src", "app"):
-        d = app_dir / sub
-        if d.is_dir():
-            components = len(list(d.rglob("*.tsx"))) + len(list(d.rglob("*.jsx")))
-            break
-    if components == 0:
-        return False, "the engine produced no React component files (.jsx/.tsx)", app_dir
-
-    return True, f"{components} React component file(s) in {app_dir.name}", app_dir
+    return _verify_re_artifact(clone_dir, fmt, before_html)
 
 
 def _clone_worker(params: dict, ctx: TaskContext) -> dict:
@@ -2577,7 +2838,9 @@ def _clone_worker(params: dict, ctx: TaskContext) -> dict:
     raw_url = params.get("url") or params.get("link") or params.get("target") or ""
     url = _normalize_url(raw_url)
     mode = params.get("mode") or "single_page"
-    output_format = params.get("output_format") or "static"
+    # The confirmation gate always supplies this, so the fallback is for direct callers only;
+    # it matches the default the gate advertises.
+    output_format = params.get("output_format") or DEFAULT_OUTPUT_FORMAT
     target_dir_param = params.get("target_dir") or params.get("repo") or params.get("project_path")
 
     if not url:
@@ -2586,8 +2849,10 @@ def _clone_worker(params: dict, ctx: TaskContext) -> dict:
     domain = _extract_domain(url)
 
     # 1. Setup Workspace Directory
+    #    expand_user_dir (not Path.resolve) so a user-facing name like "Desktop/x" is placed on the
+    #    real Desktop instead of being resolved against ZEZO's own CWD, i.e. inside the repo.
     if target_dir_param:
-        clone_dir = Path(target_dir_param).resolve()
+        clone_dir = expand_user_dir(target_dir_param)
         clone_dir.mkdir(parents=True, exist_ok=True)
     else:
         clone_dir = get_unique_clone_dir(domain)
@@ -2663,119 +2928,112 @@ def _clone_worker(params: dict, ctx: TaskContext) -> dict:
         if ("could not be saved" in assets_msg or "were not downloaded" in assets_msg) else ""
     )
 
-    # 7. Antigravity Master Reverse-Engineering (section-aware multimodal, with faithful fallback)
-    _safe_report(ctx, 90, "[ANTIGRAVITY] Running reverse-engineering synthesis...")
-    raw_html = ""
-    index_file = clone_dir / "index.html"
-    if index_file.exists():
-        try:
-            raw_html = index_file.read_text(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
-
-    synth_html = ""
-    # Primary: faithful cleanup (preserves 100% of original design)
-    try:
-        synth_html = _faithful_cleanup(raw_html, url, clone_dir, ctx)
-    except Exception as _fe:
-        logger.warning("Faithful cleanup failed: %s", _fe)
-        synth_html = ""
-
-    # Secondary: section-aware multimodal (only for redesign mode)
-    if output_format == "redesign" and (not synth_html or len(synth_html) < 500):
-        try:
-            _safe_report(ctx, 91, "[ANTIGRAVITY] Capturing multi-viewport DOM + computed styles...")
-            html_d, title_d, computed_desktop = _fetch_html_and_visual_data_playwright(url, clone_dir, ctx)
-            design_tokens = synthesize_design_tokens(computed_desktop or {})
-            sections = capture_section_screenshots_sync  # placeholder guard
-            # capture sections via playwright page already closed; re-open lightweight by reusing html_d
-            # We'll use the existing helper that returns section slices if available
-            try:
-                from playwright.sync_api import sync_playwright as _sp
-                with _sp() as _p:
-                    _b = _p.chromium.launch(headless=True, args=["--no-sandbox"])
-                    _c = _b.new_context(viewport={"width": 1440, "height": 900})
-                    _pg = _c.new_page()
-                    _pg.goto(url, wait_until="domcontentloaded", timeout=25000)
-                    time.sleep(1.0)
-                    for _y in range(0, 8000, 350):
-                        _pg.evaluate(f"window.scrollTo(0, {_y})")
-                        time.sleep(0.05)
-                    _pg.evaluate("window.scrollTo(0, 0)")
-                    time.sleep(0.3)
-                    slices = capture_section_screenshots_sync(_pg, clone_dir, viewport_width=1440)
-                    _b.close()
-            except Exception as _se:
-                logger.warning("Section capture failed: %s", _se)
-                slices = []
-
-            if slices:
-                _safe_report(ctx, 93, f"[ANTIGRAVITY] Synthesizing {len(slices)} sections via Gemini vision...")
-                sec_htmls = []
-                for _sec in slices:
-                    try:
-                        _sh = generate_section_html(
-                            _sec,
-                            _sec.get("screenshot_path", ""),
-                            design_tokens,
-                            (computed_desktop or {}).get("elements", []) if isinstance(computed_desktop, dict) else [],
-                            clone_dir,
-                            ctx,
-                        )
-                        if _sh:
-                            sec_htmls.append(_sh)
-                    except Exception as _ge:
-                        logger.warning("Section synth failed: %s", _ge)
-                if sec_htmls:
-                    synth_html = assemble_master_html(sec_htmls, design_tokens, url, title_d or "", clone_dir)
-        except Exception as _pe:
-            logger.warning("Section-aware pipeline failed: %s", _pe)
-            synth_html = ""
-
-    # Fallback: faithful rewrite (preserve all content, clean/enhance only)
-    if not synth_html or len(synth_html) < 500:
-        _safe_report(ctx, 94, "[ANTIGRAVITY] Falling back to faithful rewrite synthesis...")
-        try:
-            synth_html = _synthesize_clean_website(url, raw_html, clone_dir, output_format, ctx)
-        except Exception as _fe:
-            logger.warning("Faithful rewrite failed: %s", _fe)
-            synth_html = ""
-
-    # Validation gate: never ship a degraded version
-    raw_size = len(raw_html)
-    if synth_html and raw_size > 0 and len(synth_html) < int(raw_size * 0.95):
-        logger.warning("Antigravity output degraded (%d < 60%% of %d). Using raw bundle.", len(synth_html), raw_size)
-        synth_html = raw_html
-
-    if not synth_html:
-        synth_html = raw_html if raw_html else "<!DOCTYPE html><html><body><h1>Website Cloned</h1></body></html>"
-
     antigravity_file = clone_dir / "antigravity_clone.html"
-    try:
-        antigravity_file.write_text(synth_html, encoding="utf-8")
-        _safe_report(ctx, 96, f"[ANTIGRAVITY] Clean standalone HTML written to {antigravity_file.name}.")
-    except Exception as e:
-        logger.warning("Failed to write antigravity clone file: %s", e)
+    if output_format in CAPTURE_ONLY_FORMATS:
+        # 7. Antigravity Master Reverse-Engineering (section-aware multimodal, with faithful fallback)
+        _safe_report(ctx, 90, "[ANTIGRAVITY] Running reverse-engineering synthesis...")
+        raw_html = ""
+        index_file = clone_dir / "index.html"
+        if index_file.exists():
+            try:
+                raw_html = index_file.read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
 
-    # 8. Start Local Ephemeral HTTP Preview Server
-    _safe_report(ctx, 97, f"[SERVER] Starting local preview server for {clone_dir.name}...")
-    preview_url, port = start_local_preview_server(clone_dir)
-    antigravity_preview_url = f"http://127.0.0.1:{port}/antigravity_clone.html"
-    _safe_report(ctx, 98, f"[SERVER] Preview running on {antigravity_preview_url} (opened in browser).")
+        synth_html = ""
+        # Primary: faithful cleanup (preserves 100% of original design)
+        try:
+            synth_html = _faithful_cleanup(raw_html, url, clone_dir, ctx)
+        except Exception as _fe:
+            logger.warning("Faithful cleanup failed: %s", _fe)
+            synth_html = ""
 
-    # 9. Open in Default Browser
-    try:
-        from actions.browser_control import browser_control
-        browser_control({"action": "go_to", "url": antigravity_preview_url})
-    except Exception:
-        import webbrowser
-        webbrowser.open(antigravity_preview_url)
+        # Secondary: section-aware multimodal (only for redesign mode)
+        if output_format == "redesign" and (not synth_html or len(synth_html) < 500):
+            try:
+                _safe_report(ctx, 91, "[ANTIGRAVITY] Capturing multi-viewport DOM + computed styles...")
+                html_d, title_d, computed_desktop = _fetch_html_and_visual_data_playwright(url, clone_dir, ctx)
+                design_tokens = synthesize_design_tokens(computed_desktop or {})
+                sections = capture_section_screenshots_sync  # placeholder guard
+                # capture sections via playwright page already closed; re-open lightweight by reusing html_d
+                # We'll use the existing helper that returns section slices if available
+                try:
+                    from playwright.sync_api import sync_playwright as _sp
+                    with _sp() as _p:
+                        _b = _p.chromium.launch(headless=True, args=["--no-sandbox"])
+                        _c = _b.new_context(viewport={"width": 1440, "height": 900})
+                        _pg = _c.new_page()
+                        _pg.goto(url, wait_until="domcontentloaded", timeout=25000)
+                        time.sleep(1.0)
+                        for _y in range(0, 8000, 350):
+                            _pg.evaluate(f"window.scrollTo(0, {_y})")
+                            time.sleep(0.05)
+                        _pg.evaluate("window.scrollTo(0, 0)")
+                        time.sleep(0.3)
+                        slices = capture_section_screenshots_sync(_pg, clone_dir, viewport_width=1440)
+                        _b.close()
+                except Exception as _se:
+                    logger.warning("Section capture failed: %s", _se)
+                    slices = []
 
-    # 10. Sync Active Repository Context & Memory
+                if slices:
+                    _safe_report(ctx, 93, f"[ANTIGRAVITY] Synthesizing {len(slices)} sections via Gemini vision...")
+                    sec_htmls = []
+                    for _sec in slices:
+                        try:
+                            _sh = generate_section_html(
+                                _sec,
+                                _sec.get("screenshot_path", ""),
+                                design_tokens,
+                                (computed_desktop or {}).get("elements", []) if isinstance(computed_desktop, dict) else [],
+                                clone_dir,
+                                ctx,
+                            )
+                            if _sh:
+                                sec_htmls.append(_sh)
+                        except Exception as _ge:
+                            logger.warning("Section synth failed: %s", _ge)
+                    if sec_htmls:
+                        synth_html = assemble_master_html(sec_htmls, design_tokens, url, title_d or "", clone_dir)
+            except Exception as _pe:
+                logger.warning("Section-aware pipeline failed: %s", _pe)
+                synth_html = ""
+
+        # Fallback: faithful rewrite (preserve all content, clean/enhance only)
+        if not synth_html or len(synth_html) < 500:
+            _safe_report(ctx, 94, "[ANTIGRAVITY] Falling back to faithful rewrite synthesis...")
+            try:
+                synth_html = _synthesize_clean_website(url, raw_html, clone_dir, output_format, ctx)
+            except Exception as _fe:
+                logger.warning("Faithful rewrite failed: %s", _fe)
+                synth_html = ""
+
+        # Validation gate: never ship a degraded version
+        raw_size = len(raw_html)
+        if synth_html and raw_size > 0 and len(synth_html) < int(raw_size * 0.95):
+            logger.warning("Antigravity output degraded (%d < 60%% of %d). Using raw bundle.", len(synth_html), raw_size)
+            synth_html = raw_html
+
+        if not synth_html:
+            synth_html = raw_html if raw_html else "<!DOCTYPE html><html><body><h1>Website Cloned</h1></body></html>"
+
+        try:
+            antigravity_file.write_text(synth_html, encoding="utf-8")
+            _safe_report(ctx, 96, f"[ANTIGRAVITY] Clean standalone HTML written to {antigravity_file.name}.")
+        except Exception as e:
+            logger.warning("Failed to write antigravity clone file: %s", e)
+
+    # 8. Opening is deferred to step 11, once the deliverable is known. Opening the raw snapshot
+    #    here forced a localhost server for every clone even when the finished deliverable is a
+    #    single HTML page that opens straight off disk, and it put uncage's byte-faithful copy in
+    #    front of the user instead of the artifact. antigravity_clone.html genuinely needs the
+    #    server (its refs are '/assets/...'), so _open_deliverable decides from the file's own
+    #    markup rather than from an assumption.
+
+    # 9. Sync Active Repository Context & Memory
     register_clone(clone_dir)
     try:
         from memory.memory_manager import remember
-        remember("active_project", str(clone_dir), category="projects")
         remember("recent_task", f"Cloned website {url} into {clone_dir.name}", category="goals")
     except Exception:
         pass
@@ -2783,6 +3041,13 @@ def _clone_worker(params: dict, ctx: TaskContext) -> dict:
     total_files = len(list(clone_dir.rglob("*")))
     _safe_report(ctx, 98, f"[DONE] Static clone complete ({total_files} files in {clone_dir.name}).")
 
+    opened_url = ""
+    initial_summary = (
+        f"Capture complete for '{url}'. Raw bundle in '{clone_dir.name}' ({total_files} files), "
+        f"verbatim page saved as 'antigravity_clone.html'.{media_note}"
+        if output_format in CAPTURE_ONLY_FORMATS
+        else f"Capture complete for '{url}'. Raw bundle in '{clone_dir.name}' ({total_files} files).{media_note}"
+    )
     result = {
         "status": "success",
         "url": url,
@@ -2792,44 +3057,87 @@ def _clone_worker(params: dict, ctx: TaskContext) -> dict:
         "clone_dir": str(clone_dir),
         "files_downloaded": total_files,
         "failed_assets": 0,
-        "preview_url": antigravity_preview_url,
-        "summary": (
-            f"Cloning complete for '{url}'. Static bundle in '{clone_dir.name}' ({total_files} files); "
-            f"Antigravity reverse-engineered standalone HTML saved as 'antigravity_clone.html'. "
-            f"Preview live at {antigravity_preview_url}.{media_note}"
-        ),
+        "preview_url": "",
+        "summary": initial_summary,
     }
 
-    # 11. Optional ZEZO-native React/Next rebuild of the captured design
-    if output_format in REACT_FORMATS:
-        rebuild_ok, rebuild_detail, app_dir = _run_react_rebuild(url, clone_dir, ctx)
+    # 11. Reverse-engineer the capture into the format the user asked for (ZEZO's own engine)
+    if output_format not in CAPTURE_ONLY_FORMATS:
+        rebuild_ok, rebuild_detail, artifact = _run_reverse_engineer(url, clone_dir, ctx, output_format)
         if not rebuild_ok:
-            # The static clone succeeded and its preview is open, but the user asked for a React
-            # project. Report the failure plainly instead of shipping a fake success, and keep
-            # the folder so a fleet agent can be pointed straight at it. The folder path leads
-            # the message because the failure notification ZEZO receives is cut at 150 chars.
-            kept = f"folder kept at {app_dir}" if app_dir else "no rebuild folder was created"
-            _safe_report(ctx, 100, f"[REACT ERROR] {rebuild_detail}")
-            raise RuntimeError(
-                f"React rebuild FAILED - {kept} ({rebuild_detail}). "
-                f"Static clone is intact at {clone_dir} and its preview is open at {antigravity_preview_url}."
+            # The user asked for a rebuilt artifact and it did not arrive. Open the capture - it is
+            # the deliverable now - and report the failure plainly instead of shipping a fake
+            # success. The folder is kept so a fleet agent can be pointed straight at it, and the
+            # message comes from rebuild_failure_message so core/prompt.txt cannot drift from it.
+            _safe_report(ctx, 100, f"[REBUILD ERROR] {rebuild_detail}")
+            fallback_target = (
+                antigravity_file
+                if antigravity_file.exists()
+                else (clone_dir / "index.html" if (clone_dir / "index.html").exists() else clone_dir)
             )
-        result["app_dir"] = str(app_dir)
+            capture_url = _open_deliverable(fallback_target, clone_dir)
+            result["preview_url"] = capture_url
+            raise RuntimeError(rebuild_failure_message(clone_dir, capture_url, rebuild_detail))
+        if artifact:
+            # Never open the raw snapshot when a rebuild exists: the rebuilt artifact is the
+            # deliverable, and on success it is the only thing the user is shown.
+            artifact_url = _open_deliverable(artifact, clone_dir)
+            result["artifact"] = str(artifact)
+            result["artifact_url"] = artifact_url
+            try:
+                register_rebuild(
+                    artifact if artifact.is_dir() else clone_dir,
+                    entrypoint=artifact.name if not artifact.is_dir() else "index.html",
+                )
+            except Exception as e:
+                logger.warning("Could not register rebuild workspace: %s", e)
+            opened_url = artifact_url
+
         result["summary"] = (
-            f"Clone complete for '{url}' as a React project. Captured bundle in '{clone_dir.name}' "
-            f"(preview at {antigravity_preview_url}); React app in '{app_dir.name}' ({rebuild_detail}) - "
-            f"run 'npm install' then 'npm run dev' inside it.{media_note}"
+            f"Rebuilt '{url}' from its offline capture as {output_format} - {rebuild_detail}. "
+            f"Raw capture kept in '{clone_dir.name}'; the rebuilt artifact is open in the browser "
+            f"at {result.get('artifact_url') or clone_dir}.{media_note}"
         )
-        try:
-            register_rebuild(app_dir, entrypoint="src/App.tsx")
-        except Exception as e:
-            logger.warning("Could not register rebuild workspace: %s", e)
+    elif output_format in CAPTURE_ONLY_FORMATS:
+        # Nothing was rebuilt, so the capture itself is the deliverable and gets opened.
+        deliverable_target = (
+            antigravity_file
+            if antigravity_file.exists()
+            else (clone_dir / "index.html" if (clone_dir / "index.html").exists() else clone_dir)
+        )
+        opened_url = _open_deliverable(deliverable_target, clone_dir)
+        result["summary"] = (
+            f"Capture complete for '{url}'. Static bundle in '{clone_dir.name}' "
+            f"({total_files} files), preview live at {opened_url}. "
+            f"No rebuild was requested.{media_note}"
+        )
+
+    result["preview_url"] = opened_url
 
     _safe_report(ctx, 100, result["summary"])
     return result
 
 
 # ── Action Entrypoint & Tool Schema ─────────────────────────────────────────
+
+def _readback_target(target_dir: Optional[str], default_dir: Path) -> str:
+    """The absolute folder the clone will really land in, for the read-back.
+
+    The read-back used to speak only the last path segment ("into 'linear_app_clone'"), so the user
+    confirmed a name they could not place - and never learned the folder was inside ZEZO's own
+    repo. This resolves with expand_user_dir, the exact resolution _clone_worker uses, so what is
+    spoken is the folder that will actually be created.
+    """
+    resolved = expand_user_dir(target_dir) if target_dir else default_dir
+    if is_zezo_source_dir(resolved):
+        # Unreachable after the workspace resolution, so treat it as an assertion: a clone must
+        # never be planted inside ZEZO's own source tree.
+        raise ValueError(
+            f"Refusing to clone into {resolved}: it is inside ZEZO's own source tree. "
+            f"Pass a folder outside the ZEZO installation (e.g. Desktop/<name>)."
+        )
+    return str(resolved)
+
 
 def clone_website_action(
     parameters: dict,
@@ -2859,6 +3167,8 @@ def clone_website_action(
     confirmed = parameters.get("confirmed") is True
 
     default_dir = get_unique_clone_dir(domain)
+    # Resolved once, so the read-back and the HUD name the same real folder the worker will use.
+    folder = _readback_target(target_dir, default_dir)
 
     # ── Two-step confirmation gate ─────────────────────────────────────────
     # A parameter that is PRESENT means "the user said this"; absent means "still
@@ -2876,7 +3186,10 @@ def clone_website_action(
     if not mode:
         missing.append("- scope: only the landing page (single_page), or the whole site (full_site)?")
     if not output_format:
-        missing.append("- output: one offline HTML file (static), or a React/Next.js project?")
+        missing.append(
+            "- output: a rebuilt single HTML page (the default), a project in a stack you name "
+            "(React, Next.js, PHP, or anything else), or just the raw capture with no rebuild?"
+        )
     if not target_dir:
         missing.append(f"- folder: the default '{default_dir.name}', or a different folder?")
 
@@ -2892,16 +3205,12 @@ def clone_website_action(
             if mode == "single_page"
             else f"the whole site (up to {min(MAX_PAGES_FULL_SITE, 25)} pages)"
         )
-        fmt = (
-            "one offline HTML file with local assets"
-            if output_format in ("static", "clean_html")
-            else f"a {output_format} project, rebuilt from the capture (this one takes several minutes longer)"
-        )
-        folder = Path(target_dir).name if target_dir else default_dir.name
+        fmt = RE_READBACK_FORMATS.get(output_format, f"a '{output_format}' build, reverse-engineered from the capture")
         return (
             "CLONE NOT STARTED. Read the plan back to the user in ONE short sentence and wait "
             "for a clear yes, then call clone_website again with identical arguments plus "
-            f"confirmed=true. Plan: clone {url} - {scope}, as {fmt}, into '{folder}'."
+            f"confirmed=true. Plan: clone {url} - {scope}, then rebuild it as {fmt}, into '{folder}'. "
+            f"The capture is always kept and previewed, so the rebuild is added alongside it."
         )
 
     tm = get_task_manager()
@@ -2918,13 +3227,17 @@ def clone_website_action(
         player.show_content(
             "WEBSITE CLONER",
             f"URL: {url}\nMode: {mode}\nFormat: {output_format}\nTask ID: {task_id}\n"
-            f"Target: {Path(target_dir).name if target_dir else default_dir.name}",
+            f"Target: {folder}",
         )
 
     tail = (
-        "The clone lands first and its preview opens; the React rebuild runs after it."
-        if output_format in REACT_FORMATS
-        else "A live preview will open in your browser once complete."
+        "A live preview will open in your browser once complete."
+        if output_format in CAPTURE_ONLY_FORMATS
+        else (
+            "The raw capture lands first; ZEZO then rebuilds it into "
+            f"{output_format} from that capture, and the rebuilt artifact opens when it is ready "
+            f"(the rebuild takes several minutes longer)."
+        )
     )
     return f"Cloning {domain} (Task ID: {task_id}). {tail}"
 
@@ -2959,12 +3272,14 @@ TOOL = {
             },
             "output_format": {
                 "type": "STRING",
-                "enum": ["static", "clean_html", "react", "nextjs"],
                 "description": (
-                    "'static' (default answer) = ONE faithful offline HTML file with local assets. "
-                    "'react'/'nextjs' = ZEZO rebuilds the clone into a React/Vite project (slower). "
-                    "Set this ONLY if the user explicitly stated the format. Otherwise OMIT it — "
-                    "ZEZO will ask the user. Never fill in a default yourself."
+                    "What to rebuild the capture into. 'raw_html' = one standalone HTML page with "
+                    "its CSS/JS embedded (the usual answer). 'react', 'nextjs', 'php' = a project "
+                    "in that stack. Any other value is treated as the stack the user named in "
+                    "their own words, so pass it verbatim ('svelte', 'ruby on rails'). "
+                    "'capture_only' = no rebuild, just the raw offline capture. "
+                    "Set this ONLY if the user explicitly stated the output they want. Otherwise "
+                    "OMIT it - ZEZO will ask the user. Never fill in a default yourself."
                 ),
             },
             "target_dir": {

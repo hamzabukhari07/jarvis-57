@@ -641,6 +641,7 @@ class ZezoLive:
         self.ui.on_interrupt      = self.interrupt
         self.ui.on_sleep_toggle   = self._on_ui_sleep_toggle
         self.ui.on_voice_change   = self._on_voice_change     # voice picker → rebuild session
+        self.ui.on_language_change = self._on_language_change # language picker → rebuild session
         self.ui.on_pipeline_change = self._on_pipeline_change # pipeline switcher
         self.ui.on_audio_device_change = self._on_audio_device_change
         self._reconnect_event: asyncio.Event | None = None
@@ -953,6 +954,14 @@ class ZezoLive:
             return
         self._active_voice = new_voice
         self.request_reconnect(keep_context=False, reason="new voice")
+
+    def _on_language_change(self, new_lang: str):
+        from memory.config_manager import get_response_language
+        current_lang = (new_lang or get_response_language() or "").strip()
+        if getattr(self, "_active_language", None) == current_lang:
+            return
+        self._active_language = current_lang
+        self.request_reconnect(reason=f"response language set to {current_lang}")
 
     def _on_pipeline_change(self):
         """Pipeline mode or custom engine configuration changed in UI."""
@@ -1524,6 +1533,7 @@ class ZezoLive:
         # Map response language to robust ASR language hints / codes to prevent language mixing / hallucination
         lang_map = {
             "English": ["en-US", "en-GB"],
+            "English Strict": ["en-US", "en-GB"],
             "Urdu": ["ur-PK", "en-US"],
             "Hindi": ["hi-IN", "en-US"],
             "Spanish": ["es-ES", "en-US"],
@@ -1532,7 +1542,16 @@ class ZezoLive:
             "Arabic": ["ar-SA", "en-US"],
             "Turkish": ["tr-TR", "en-US"],
         }
-        active_lang_codes = lang_map.get(resp_lang, ["en-US", "ur-PK", "hi-IN", "es-ES"])
+        # Case-insensitive or alias lookup so "English Strict" cleanly resolves
+        active_lang_codes = lang_map.get(resp_lang)
+        if not active_lang_codes and resp_lang:
+            resp_clean = resp_lang.strip().lower()
+            for k, codes in lang_map.items():
+                if k.lower() == resp_clean:
+                    active_lang_codes = codes
+                    break
+        if not active_lang_codes:
+            active_lang_codes = ["en-US", "ur-PK", "hi-IN", "es-ES"]
 
         cfg = dict(
             response_modalities=["AUDIO"],
@@ -3395,8 +3414,9 @@ class ZezoLive:
 
                     # Record active session parameters to prevent duplicate voluntary reconnects
                     self._active_voice      = get_voice()
-                    from memory.config_manager import get_pipeline_mode
+                    from memory.config_manager import get_pipeline_mode, get_response_language
                     self._active_pipeline   = get_pipeline_mode()
+                    self._active_language   = get_response_language()
                     self._active_input_dev  = get_input_device()
                     self._active_output_dev = get_output_device()
 

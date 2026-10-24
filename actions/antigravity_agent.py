@@ -54,12 +54,27 @@ def _find_antigravity_bin() -> Optional[str]:
 
 
 def _resolve_model(model: Optional[str]) -> str:
-    """Resolve configured model or normalize short aliases."""
+    """Resolve configured model or normalize short aliases.
+
+    Validates against ANTIGRAVITY_CLI_MODELS. If invalid or unrecognized, logs a warning
+    and returns empty string so the caller omits --model and agy uses its default.
+    """
     from memory.config_manager import get_antigravity_model, DEFAULT_ANTIGRAVITY_MODEL
-    from core.models import ANTIGRAVITY_MODEL_ALIASES
+    from core.models import ANTIGRAVITY_MODEL_ALIASES, ANTIGRAVITY_CLI_MODELS
     selected = (model or "").strip() or get_antigravity_model() or DEFAULT_ANTIGRAVITY_MODEL
+    if not selected:
+        return ""
     # Alias map is the single source in core/models.py — no local copy.
-    return ANTIGRAVITY_MODEL_ALIASES.get(selected.lower(), selected)
+    canonical = ANTIGRAVITY_MODEL_ALIASES.get(selected.lower(), selected)
+    if canonical in ANTIGRAVITY_CLI_MODELS:
+        return canonical
+    logger.warning(
+        "antigravity_agent: model '%s' (resolved from '%s') is not in ANTIGRAVITY_CLI_MODELS; "
+        "omitting --model so agy uses its default.",
+        canonical,
+        selected,
+    )
+    return ""
 
 
 def _strip_fences(text: str) -> str:
@@ -108,6 +123,39 @@ def _ensure_gitignore(repo_path: Path) -> None:
                     f.write("\n# Auto-added ignore rules\n" + "\n".join(missing) + "\n")
     except Exception:
         pass
+
+
+def _tree_snapshot(repo: Path) -> dict[str, int]:
+    """Map of relative path -> mtime_ns for every file under `repo`.
+
+    Used as a before/after diff to detect what a CLI actually wrote. A plain full-tree
+    scan cannot tell a freshly written file from one that was already in the folder, which
+    made a CLI that exited having written zero bytes look like a success (Issue 3).
+    """
+    out: dict[str, int] = {}
+    skip = (".git", "node_modules", ".venv", "__pycache__")
+    try:
+        for p in repo.rglob("*"):
+            if p.is_file() and not any(part in skip for part in p.parts):
+                out[p.relative_to(repo).as_posix()] = p.stat().st_mtime_ns
+    except Exception:
+        pass
+    return out
+
+
+# A rebuild / reverse-engineering task reproduces an EXISTING design, so injecting a Hamza
+# Taste blueprint would restyle it instead of reproducing it (Issue 7b). The clone's own
+# rebuild declares this (skip_design + prompt_mode="verbatim"); a fleet/agent hand-off states
+# it only in words, so the intent has to be detectable from the task text too.
+_REBUILD_MARKERS = (
+    "rebuild", "reverse engineer", "reverse-engineer", "reproduce",
+    "replicate", "clone this", "finish the rebuild", "same design as",
+)
+
+
+def _is_rebuild_task(task: str) -> bool:
+    low = (task or "").lower()
+    return any(m in low for m in _REBUILD_MARKERS)
 
 
 # ── Windows Job Object Throttling (Hardware-Enforced) ─────────────────────────
@@ -382,7 +430,18 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
     session_mem = payload.get("session_memory") or {}
     model_override = payload.get("model")
 
-    _ensure_gitignore(repo)
+    # prompt_mode="verbatim": the caller supplied the COMPLETE prompt and the CLI must
+    # receive it unmodified. Appending ZEZO's own stack directives to it would hand the
+    # agent two contradicting instruction sets — e.g. a reverse-engineering prompt that
+    # says "one standalone HTML, reuse the real assets" plus ZEZO's "modular React +
+    # Tailwind project" directive. That is the same class of pollution skip_design
+    # guards against, so all local prompt scaffolding is bypassed in this mode.
+    is_verbatim = str(payload.get("prompt_mode") or "").strip().lower() == "verbatim"
+
+    # In verbatim or rebuild mode the workspace is a caller-owned reference (e.g. an uncage capture that
+    # must stay byte-identical or a separate rebuild folder), so ZEZO adds nothing of its own to that folder.
+    if not is_verbatim and not _is_rebuild_task(task):
+        _ensure_gitignore(repo)
     snapshot = capture_repo_snapshot(repo)
 
     
@@ -392,7 +451,7 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
     # skip_design: callers rebuilding an existing design verbatim (e.g. the website cloner
     # turning a captured page into a React app) must not have a Hamza Taste blueprint
     # injected, which would restyle the source instead of reproducing it.
-    if is_ui_task(task) and not payload.get("skip_design"):
+    if is_ui_task(task) and not is_verbatim and not _is_rebuild_task(task) and not payload.get("skip_design"):
         resolved_design = resolve_design(task, session_memory=session_mem, repo_path=repo)
         if resolved_design and resolved_design.is_active():
             design_context = format_design_prompt(resolved_design)
@@ -407,7 +466,8 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
 
     if agy_bin:
         resolved_model = _resolve_model(model_override)
-        ctx.report(8, f"Launching Antigravity CLI ({resolved_model}) in {repo.name}...")
+        model_display = resolved_model or "default"
+        ctx.report(8, f"Launching Antigravity CLI ({model_display}) in {repo.name}...")
 
         # Write the resolved Hamza Taste blueprint so the CLI agent can inspect it locally.
         # If the reference has no raw HTML (spec-only design), write the extracted spec +
@@ -545,17 +605,28 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
                 f"directly inside the workspace directory {repo.as_posix()}."
             )
         
-        full_prompt = "\n\n".join(prompt_parts)
-        if len(full_prompt) > 6000:
-            full_prompt = full_prompt[:6000]
+        if is_verbatim:
+            # Caller owns the entire prompt; no ZEZO directives, no truncation. The cap
+            # below exists to stop ZEZO's own assembled scaffolding overflowing Windows'
+            # 32KB command line, which does not apply to a caller-authored prompt.
+            full_prompt = task
+        else:
+            full_prompt = "\n\n".join(prompt_parts)
+            if len(full_prompt) > 6000:
+                full_prompt = full_prompt[:6000]
+
+        # Snapshot taken BEFORE the CLI runs: the diff computed after it exits then counts
+        # only files this run actually wrote, instead of every file already in the folder.
+        before_tree = _tree_snapshot(repo)
 
         cmd = [
             agy_bin,
             "-p", full_prompt,
             "--add-dir", str(repo),
             "--dangerously-skip-permissions",
-            "--model", resolved_model,
         ]
+        if resolved_model:
+            cmd.extend(["--model", resolved_model])
 
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
@@ -659,7 +730,7 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
                     status_msg = f"Planning architecture & design tokens for '{repo.name}'..."
                 elif elapsed < 18:
                     pct = int(25 + ((elapsed - 6) / 12) * 25)  # 25% -> 50%
-                    status_msg = f"Synthesizing layout, hero section & components ({resolved_model})..."
+                    status_msg = f"Synthesizing layout, hero section & components ({model_display})..."
                 elif elapsed < 35:
                     pct = int(50 + ((elapsed - 18) / 17) * 25)  # 50% -> 75%
                     status_msg = "Generating CSS animations, glass depth & responsive styling..."
@@ -682,16 +753,24 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
         if ctx.cancelled():
             return {"status": "cancelled", "repo": str(repo)}
 
-        # Inspect generated files in repo
-        created_list = []
+        # A signed-OUT `agy` is a distinct, user-fixable state - not a build outcome. It runs,
+        # writes 0 bytes and exits, so without this check its silence is either misread as
+        # success (before FIX-03) or silently replaced by the REST fallback, and a retry is
+        # pointless until the user signs in. Raise a separate, actionable error instead.
+        cli_output = "\n".join(stdout_lines)
+        if "not logged into Antigravity" in cli_output:
+            raise RuntimeError(
+                "Antigravity CLI is not signed in, so it produced no files. "
+                "Sign in to the agy CLI and re-run the build - the workspace was "
+                f"{repo}."
+            )
+
+        # Inspect generated files in repo. This is a before/after diff against the snapshot
+        # taken before Popen: only files this run actually created or rewrote count, so a CLI
+        # that exits having written nothing is reported as a failure, not a success (Issue 3).
+        after_tree = _tree_snapshot(repo)
+        created_list = [rel for rel, mt in after_tree.items() if before_tree.get(rel) != mt]
         entry_point = "index.html" if (repo / "index.html").exists() else "main.py"
-        try:
-            for p in repo.rglob("*"):
-                if p.is_file() and not any(part in (".git", "node_modules", ".venv", "__pycache__") for part in p.parts):
-                    rel = p.relative_to(repo).as_posix()
-                    created_list.append(rel)
-        except Exception:
-            pass
 
         # If repo is missing key files, check and rescue from CLI scratch directories
         if not created_list or not (repo / "index.html").exists():
@@ -752,8 +831,12 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
                 except Exception:
                     pass
 
-            # Automatically launch live preview in the user's default browser if index.html exists
-            if (repo / "index.html").exists():
+            # Automatically launch live preview in the user's default browser if index.html exists.
+            # Honours skip_preview like the fallback path below: a caller that serves its own
+            # preview must not also get this one opened over it. In the reverse-engineering flow
+            # the workspace is the capture folder, so an unguarded open here would pop uncage's
+            # own index.html - the raw snapshot - on top of the caller's rebuilt page.
+            if not payload.get("skip_preview") and (repo / "index.html").exists():
                 try:
                     import webbrowser
                     target_url = (repo / "index.html").resolve().as_uri()
@@ -771,7 +854,11 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
                 "summary": f"Successfully created {len(created_list)} project files in '{repo.name}'.",
                 "design_source": resolved_design.source_name if resolved_design else None,
             }
-            ctx.on_complete(result_payload)
+            # A caller that supplied its own task_ctx owns that card's lifecycle (it may still
+            # have to verify the artifact afterwards); completing it here would flip the clone's
+            # card to DONE mid-pipeline. Issue 4.
+            if payload.get("owns_task", True):
+                ctx.on_complete(result_payload)
             return result_payload
 
     # 3. Fallback: Python Gemini REST Generation
@@ -872,7 +959,8 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
         "summary": summary,
         "design_source": resolved_design.source_name if resolved_design else None,
     }
-    ctx.on_complete(result_payload)
+    if payload.get("owns_task", True):
+        ctx.on_complete(result_payload)
     return result_payload
 
 
@@ -924,9 +1012,14 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
     # worker_params dict, so anything not copied here never reaches _run_worker.
     #   skip_design  - reproduce an existing design verbatim instead of applying a blueprint
     #   skip_preview - the caller serves its own preview (a Vite tree renders blank over file://)
+    #   prompt_mode  - "verbatim" sends `task` to the CLI untouched (no ZEZO directives)
+    #   owns_task    - False when the caller passed its own task_ctx: that caller decides when
+    #                  the card is complete, because it may still have to verify the artifact.
     extra_flags = {
         "skip_design": bool(parameters.get("skip_design", False)),
         "skip_preview": bool(parameters.get("skip_preview", False)),
+        "prompt_mode": str(parameters.get("prompt_mode") or "").strip(),
+        "owns_task": not bool(parameters.get("task_ctx")),
     }
 
     if run_in_place:
@@ -956,7 +1049,6 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
     try:
         remember_repo(str(repo))
         from memory.memory_manager import remember
-        remember("active_project", str(repo), category="projects")
         file_matches = re.findall(r"[\w\-]+\.[a-zA-Z0-9]+", task)
         if file_matches:
             remember("active_file", file_matches[0], category="projects")

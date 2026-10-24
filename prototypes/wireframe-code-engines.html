@@ -1,0 +1,503 @@
+<title>Code Engines Settings</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* ------------------------------------------------------------------
+     ZEZO · "Code Engines" settings section — wireframe
+     Layout: app-modal mockup (sidebar + pane), then state matrix,
+     install gate, and design notes.
+     Single-theme by choice: ZEZO's settings modal is dark-only, so a
+     light variant would misrepresent the product.
+     Palette is taken from ZEZO's own theme set (Cyber Mint, Solar Amber,
+     Midnight Navy) so the mock reads as the real app.
+     ------------------------------------------------------------------ */
+  :root {
+    --bg:        #08080a;
+    --panel:     #0a0a0a;
+    --panel-2:   #131316;
+    --panel-3:   #191920;
+    --line:      #26262c;
+    --line-soft: #1c1c21;
+    --fg:        #f4f4f5;
+    --fg-mute:   #a1a1aa;
+    --fg-dim:    #6b6b74;
+    --accent:    #818cf8;
+    --accent-dim:#2a2a45;
+    --ok:        #34d399;
+    --ok-dim:    #10291f;
+    --warn:      #f59e0b;
+    --warn-dim:  #2b1f07;
+    --off:       #52525b;
+    --off-dim:   #17171b;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 40px 72px;
+  }
+
+  .shell { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 44px; }
+
+  /* ---------- page header ---------- */
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--fg-dim);
+  }
+  h1 { font-size: 27px; font-weight: 600; letter-spacing: -.02em; margin: 10px 0 0; text-wrap: balance; }
+  .lede { color: var(--fg-mute); max-width: 62ch; margin: 10px 0 0; }
+  .sect { display: flex; flex-direction: column; gap: 16px; }
+  h2 { font-size: 15px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
+  .sect > p { color: var(--fg-mute); margin: 0; max-width: 68ch; font-size: 14px; }
+
+  /* ---------- the mockup frame ---------- */
+  .app {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .app-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--panel-2);
+  }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 9px; height: 9px; border-radius: 50%; background: #33333b; display: block; }
+  .app-title { font-family: var(--mono); font-size: 11px; color: var(--fg-dim); margin-left: 4px; }
+
+  .app-body { display: grid; grid-template-columns: 208px 1fr; }
+  @media (max-width: 760px) { .app-body { grid-template-columns: 1fr; } }
+
+  /* sidebar */
+  .nav { border-right: 1px solid var(--line-soft); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; }
+  @media (max-width: 760px) {
+    .nav { border-right: 0; border-bottom: 1px solid var(--line-soft); flex-direction: row; overflow-x: auto; }
+    .nav-item { white-space: nowrap; }
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 10px; border-radius: 8px;
+    font-size: 13.5px; color: var(--fg-mute);
+  }
+  .nav-item.on { background: var(--accent-dim); color: var(--fg); font-weight: 500; }
+  .nav-item .k { width: 14px; height: 14px; border-radius: 4px; background: currentColor; opacity: .35; flex: none; }
+
+  .pane { padding: 22px; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  @media (max-width: 560px) { .pane { padding: 18px 14px; } }
+
+  .pane-head { display: flex; flex-direction: column; gap: 6px; }
+  .pane-head h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+  .pane-head p { margin: 0; color: var(--fg-mute); font-size: 13.5px; max-width: 60ch; }
+
+  /* summary strip: summary before detail */
+  .strip { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tally {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 10px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--panel-2);
+    font-size: 12px; color: var(--fg-mute);
+  }
+  .tally b { font-weight: 500; font-variant-numeric: tabular-nums; }
+  .tally s { width: 7px; height: 7px; border-radius: 50%; display: block; text-decoration: none; }
+
+  /* engine cards */
+  .engine {
+    border: 1px solid var(--line); border-radius: 11px;
+    background: var(--panel-2); padding: 15px;
+    display: flex; flex-direction: column; gap: 13px;
+  }
+  .engine.warn { border-color: #4a3410; }
+  .engine.off  { background: var(--off-dim); border-color: var(--line-soft); }
+  @media (max-width: 560px) {
+    .engine-head { flex-direction: column; align-items: flex-start !important; }
+    .acts { width: 100%; }
+    .acts .btn { flex: 1; justify-content: center; }
+  }
+
+  .engine-head { display: flex; align-items: flex-start; gap: 12px; }
+  .mark {
+    width: 34px; height: 34px; border-radius: 9px; flex: none;
+    display: grid; place-items: center;
+    font-family: var(--mono); font-size: 12px; font-weight: 500;
+    border: 1px solid var(--line); background: var(--panel-3); color: var(--fg-mute);
+  }
+  .identity { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+  .name-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .name-row strong { font-size: 14.5px; font-weight: 600; }
+  .path {
+    font-family: var(--mono); font-size: 11.5px; color: var(--fg-dim);
+    overflow-wrap: anywhere;
+  }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 500; letter-spacing: .02em;
+    padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  }
+  .pill i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: block; }
+  .pill.ok   { color: var(--ok);   background: var(--ok-dim);   border: 1px solid #1c4535; }
+  .pill.warn { color: var(--warn); background: var(--warn-dim); border: 1px solid #4a3410; }
+  .pill.off  { color: var(--off);  background: var(--off-dim);  border: 1px solid var(--line); }
+
+  .why { font-size: 13px; color: var(--fg-mute); margin: 0; }
+  .why strong { color: var(--fg); font-weight: 500; }
+
+  .meta-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .chip {
+    font-family: var(--mono); font-size: 11px; color: var(--fg-mute);
+    background: var(--panel-3); border: 1px solid var(--line);
+    padding: 2px 8px; border-radius: 6px;
+  }
+  .meta-label { font-size: 11px; color: var(--fg-dim); letter-spacing: .04em; text-transform: uppercase; margin-right: 2px; }
+
+  .acts { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
+  .btn {
+    font-family: var(--sans); font-size: 12.5px; font-weight: 500;
+    padding: 6px 13px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel-3); color: var(--fg);
+  }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #0a0a12; }
+  .btn.warnbtn { background: var(--warn); border-color: var(--warn); color: #1a1300; }
+  .btn.ghost { background: transparent; color: var(--fg-mute); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn[disabled] { opacity: .42; cursor: not-allowed; }
+
+  /* toggle */
+  .use { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--fg-mute); }
+  .sw { width: 32px; height: 18px; border-radius: 999px; background: #2c2c33; border: 1px solid var(--line); position: relative; flex: none; }
+  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--fg-dim); }
+  .sw.on { background: var(--accent-dim); border-color: var(--accent); }
+  .sw.on::after { left: auto; right: 2px; background: var(--accent); }
+  .sw.locked { opacity: .4; }
+
+  /* default engine row */
+  .row-box {
+    border: 1px solid var(--line); border-radius: 11px;
+    background: var(--panel-2); padding: 14px 15px;
+    display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; justify-content: space-between;
+  }
+  .row-box .lbl { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .row-box .lbl span { font-size: 13.5px; font-weight: 500; }
+  .row-box .lbl small { font-size: 12.5px; color: var(--fg-mute); max-width: 46ch; }
+  .select {
+    font-family: var(--mono); font-size: 12.5px;
+    background: var(--panel-3); border: 1px solid var(--line);
+    border-radius: 8px; padding: 7px 11px; color: var(--fg);
+    display: inline-flex; align-items: center; gap: 9px;
+  }
+  .select em { font-style: normal; color: var(--fg-mute); }
+
+  .fallback {
+    display: flex; gap: 9px; align-items: flex-start;
+    border: 1px solid #4a3410; background: var(--warn-dim);
+    border-radius: 9px; padding: 10px 12px;
+    font-size: 12.5px; color: #f0d9a8;
+  }
+  .fallback i { width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid var(--warn); flex: none; margin-top: 2px; position: relative; }
+  .fallback i::after { content: ""; position: absolute; inset: 3.5px; border-radius: 50%; background: var(--warn); }
+
+  /* ---------- state matrix ---------- */
+  .matrix { display: flex; flex-direction: column; gap: 1px; background: var(--line-soft); border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
+  .m-row { display: grid; grid-template-columns: 34px 168px 1fr auto; gap: 14px; align-items: center; background: var(--panel); padding: 13px 15px; }
+  @media (max-width: 700px) { .m-row { grid-template-columns: 26px 1fr; gap: 10px; } .m-row .m-act { grid-column: 2; } }
+  .m-n { font-family: var(--mono); font-size: 11px; color: var(--fg-dim); }
+  .m-row p { margin: 0; font-size: 12.5px; color: var(--fg-mute); }
+  .m-act { justify-self: start; }
+  @media (min-width: 701px) { .m-act { justify-self: end; } }
+
+  /* ---------- install gate ---------- */
+  .gate { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; max-width: 470px; }
+  .gate-top { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .gate-top h4 { margin: 0; font-size: 15px; font-weight: 600; }
+  .gate-top p { margin: 0; font-size: 13px; color: var(--fg-mute); }
+  .kv { display: grid; grid-template-columns: 92px 1fr; gap: 7px 12px; font-size: 12.5px; }
+  .kv dt { color: var(--fg-dim); }
+  .kv dd { margin: 0; font-family: var(--mono); color: var(--fg-mute); overflow-wrap: anywhere; }
+  .gate-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--line-soft); background: var(--panel-2); }
+
+  /* ---------- notes ---------- */
+  .notes { display: grid; gap: 1px; background: var(--line-soft); border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
+  .note { background: var(--panel); padding: 15px 16px; display: grid; grid-template-columns: 26px 1fr; gap: 12px; align-items: start; }
+  .note .n { font-family: var(--mono); font-size: 11px; color: var(--accent); padding-top: 2px; }
+  .note h4 { margin: 0 0 4px; font-size: 13.5px; font-weight: 600; }
+  .note p { margin: 0; font-size: 13px; color: var(--fg-mute); max-width: 70ch; }
+  code { font-family: var(--mono); font-size: 12.5px; color: #cfcfe6; background: var(--panel-3); padding: 1px 5px; border-radius: 5px; }
+
+  .scroller { overflow-x: auto; }
+  .scroller > * { min-width: 0; }
+</style>
+
+<div class="shell">
+
+  <header>
+    <div class="eyebrow">ZEZO · Settings · wireframe v1</div>
+    <h1>Code Engines</h1>
+    <p class="lede">
+      A settings section where the user sees which coding agents ZEZO can hand work to, installs the
+      missing ones, and signs them in. Sample data below. The Antigravity card shows the real state of
+      this machine.
+    </p>
+  </header>
+
+  <!-- ============ THE PANEL ============ -->
+  <section class="sect">
+    <h2>The section, as it would appear</h2>
+
+    <div class="app">
+      <div class="app-bar">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <div class="app-title">ZEZO — Settings</div>
+      </div>
+
+      <div class="app-body">
+        <nav class="nav">
+          <div class="nav-item"><span class="k"></span>General</div>
+          <div class="nav-item"><span class="k"></span>Audio</div>
+          <div class="nav-item"><span class="k"></span>API &amp; Keys</div>
+          <div class="nav-item"><span class="k"></span>Persona</div>
+          <div class="nav-item"><span class="k"></span>Appearance</div>
+          <div class="nav-item"><span class="k"></span>Memory</div>
+          <div class="nav-item"><span class="k"></span>Skills</div>
+          <div class="nav-item on"><span class="k"></span>Code Engines</div>
+          <div class="nav-item"><span class="k"></span>About</div>
+        </nav>
+
+        <div class="pane">
+          <div class="pane-head">
+            <h3>Code Engines</h3>
+            <p>These are the command-line agents ZEZO hands coding work to. ZEZO runs an engine only
+              when it is installed and signed in. Anything else produces no files.</p>
+          </div>
+
+          <div class="strip">
+            <span class="tally"><s style="background:var(--ok)"></s><b>1</b> ready</span>
+            <span class="tally"><s style="background:var(--warn)"></s><b>1</b> needs sign-in</span>
+            <span class="tally"><s style="background:var(--off)"></s><b>1</b> not installed</span>
+          </div>
+
+          <!-- Card 1: the real broken state -->
+          <div class="engine warn">
+            <div class="engine-head">
+              <div class="mark">AG</div>
+              <div class="identity">
+                <div class="name-row">
+                  <strong>Antigravity CLI</strong>
+                  <span class="pill warn"><i></i>Sign in required</span>
+                </div>
+                <div class="path">%LOCALAPPDATA%\agy\bin\agy.exe · v1.4.6</div>
+              </div>
+            </div>
+            <p class="why">
+              Installed, but no account is signed in. The CLI exits in about five seconds and writes
+              <strong>zero files</strong>, so every build looks like it ran and produces nothing.
+            </p>
+            <div class="acts">
+              <button class="btn warnbtn" type="button">Sign in</button>
+              <button class="btn" type="button">Test</button>
+              <button class="btn ghost" type="button">Open folder</button>
+            </div>
+            <div class="use"><span class="sw locked"></span>Use for coding tasks — off until signed in</div>
+          </div>
+
+          <!-- Card 2: ready -->
+          <div class="engine">
+            <div class="engine-head">
+              <div class="mark">OC</div>
+              <div class="identity">
+                <div class="name-row">
+                  <strong>OpenCode</strong>
+                  <span class="pill ok"><i></i>Ready</span>
+                </div>
+                <div class="path">~/.opencode/bin/opencode</div>
+              </div>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Models</span>
+              <span class="chip">glm-5.3-flash-free</span>
+              <span class="chip">mimo-v2.5-free</span>
+              <span class="chip">+2 more</span>
+            </div>
+            <div class="acts">
+              <button class="btn" type="button" disabled>Set as default</button>
+              <button class="btn" type="button">Test</button>
+              <button class="btn ghost" type="button">Sign out</button>
+            </div>
+            <div class="use"><span class="sw on"></span>Use for coding tasks</div>
+          </div>
+
+          <!-- Card 3: not installed -->
+          <div class="engine off">
+            <div class="engine-head">
+              <div class="mark">KC</div>
+              <div class="identity">
+                <div class="name-row">
+                  <strong>Kilo Code</strong>
+                  <span class="pill off"><i></i>Not installed</span>
+                </div>
+                <div class="path">Not found on PATH or in ~/.kilo/bin</div>
+              </div>
+            </div>
+            <p class="why">ZEZO checks PATH and the vendor folders it knows. Nothing matched.</p>
+            <div class="acts">
+              <button class="btn primary" type="button">Install</button>
+              <button class="btn ghost" type="button">How to install</button>
+            </div>
+          </div>
+
+          <!-- Default + routing -->
+          <div class="row-box">
+            <div class="lbl">
+              <span>Default engine</span>
+              <small>Used when the request does not name one.</small>
+            </div>
+            <span class="select">Antigravity CLI <em>▾</em></span>
+          </div>
+
+          <div class="fallback">
+            <i></i>
+            <span>Antigravity is the default but is not signed in. ZEZO will use <b>OpenCode</b> until
+              it is. You can change the default above, or sign in on the card.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STATE MATRIX ============ -->
+  <section class="sect">
+    <h2>Four states, and what each one offers</h2>
+    <p>
+      Presence alone is not enough. The second row is the state this machine is actually in, and the
+      state a plain "is it installed?" check would have reported as fine.
+    </p>
+
+    <div class="matrix">
+      <div class="m-row">
+        <span class="m-n">01</span>
+        <span class="pill off"><i></i>Not installed</span>
+        <p>Binary not found. Nothing can run.</p>
+        <span class="m-act"><button class="btn primary" type="button">Install</button></span>
+      </div>
+      <div class="m-row">
+        <span class="m-n">02</span>
+        <span class="pill warn"><i></i>Sign in required</span>
+        <p>Binary found, no account. Runs and writes nothing.</p>
+        <span class="m-act"><button class="btn warnbtn" type="button">Sign in</button></span>
+      </div>
+      <div class="m-row">
+        <span class="m-n">03</span>
+        <span class="pill ok"><i></i>Ready</span>
+        <p>Installed and authenticated. Lists the models it accepts.</p>
+        <span class="m-act"><button class="btn" type="button">Set as default</button></span>
+      </div>
+      <div class="m-row">
+        <span class="m-n">04</span>
+        <span class="pill off"><i></i>Off</span>
+        <p>The user turned it off. ZEZO will not select it, and says so if asked.</p>
+        <span class="m-act"><button class="btn ghost" type="button">Turn on</button></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ INSTALL GATE ============ -->
+  <section class="sect">
+    <h2>The install step</h2>
+    <p>
+      Installing runs a real program on the user's machine, so it passes the same confirmation gate
+      ZEZO already uses for software installs: the token comes from the UI, never from the model.
+    </p>
+
+    <div class="gate">
+      <div class="gate-top">
+        <h4>Install Kilo Code?</h4>
+        <p>ZEZO will run the installer and then check that the engine answers before marking it ready.</p>
+        <dl class="kv">
+          <dt>Source</dt><dd>npm global package</dd>
+          <dt>Command</dt><dd>npm install -g @kilo/cli</dd>
+          <dt>Needs</dt><dd>Node 20+, ~120 MB</dd>
+        </dl>
+      </div>
+      <div class="gate-foot">
+        <button class="btn" type="button">Cancel</button>
+        <button class="btn primary" type="button">Install</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ NOTES ============ -->
+  <section class="sect">
+    <h2>Why it is built this way</h2>
+
+    <div class="notes">
+      <div class="note">
+        <span class="n">01</span>
+        <div>
+          <h4>Health, not presence</h4>
+          <p>An installed / not-installed check would have shown Antigravity green during the entire
+            failed run. The binary was there. The account was not. Any check that cannot tell those
+            apart would have shipped a lie, which is the exact bug this section exists to prevent.</p>
+        </div>
+      </div>
+      <div class="note">
+        <span class="n">02</span>
+        <div>
+          <h4>The reason is on the card</h4>
+          <p>"Sign in required" alone is not enough for someone who does not know what a CLI is. The
+            card says what happens if you ignore it: the engine exits in seconds and writes nothing.</p>
+        </div>
+      </div>
+      <div class="note">
+        <span class="n">03</span>
+        <div>
+          <h4>Summary before detail</h4>
+          <p>Three tallies at the top. A user opens the panel to answer one question, whether anything
+            needs attention, and the answer should not require reading three cards.</p>
+        </div>
+      </div>
+      <div class="note">
+        <span class="n">04</span>
+        <div>
+          <h4>Turning an engine on cannot lie</h4>
+          <p>The toggle is locked off while an engine is not signed in, and the routing row states out
+            loud that OpenCode will be used instead. A toggle that looks on while nothing runs is the
+            same defect as a build that reports success while writing nothing.</p>
+        </div>
+      </div>
+      <div class="note">
+        <span class="n">05</span>
+        <div>
+          <h4>Models come from the engine</h4>
+          <p>The chips are read from the engine rather than typed into ZEZO's config. Today a model is
+            passed that the CLI does not recognise and silently substitutes its own, and the settings
+            file cannot show that.</p>
+        </div>
+      </div>
+      <div class="note">
+        <span class="n">06</span>
+        <div>
+          <h4>Install ends with a check</h4>
+          <p>A finished installer is not a working engine. After installing, ZEZO probes the engine and
+            only then marks it ready, so an install that half-worked shows up here instead of at the
+            next build.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>

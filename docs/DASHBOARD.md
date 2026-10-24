@@ -1,8 +1,13 @@
-# JARVIS — Dashboard / Remote Control
+# ZEZO — Dashboard / Remote Control
+
+> **Project:** ZEZO  
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux
+
 
 ## Overview
 
-JARVIS includes a **local HTTP dashboard** for phone-based remote control. It uses FastAPI with AES-256-CBC encryption.
+ZEZO includes a **local HTTP dashboard** for phone-based remote control. It uses FastAPI with AES-256-CBC encryption.
 
 **File**: `dashboard/server.py` (884 lines)
 
@@ -15,7 +20,7 @@ HTTPS → localhost:8000 (FastAPI)
     ↓
 AES-256-CBC encrypted communication
     ↓
-FastAPI endpoints → JarvisLive methods
+FastAPI endpoints → ZezoLive methods
 ```
 
 ## Technology
@@ -34,7 +39,7 @@ FastAPI endpoints → JarvisLive methods
 |--------|----------------|
 | Transport | Plain HTTP on port 8000 |
 | Encryption | AES-256-CBC with session-key-derived key |
-| Key derivation | SHA-256(sessionKey‖salt), salt = b'JARVIS-DASHBOARD-v1' |
+| Key derivation | SHA-256(sessionKey‖salt), salt = b'ZEZO-DASHBOARD-v1' |
 | Key exchange | QR code with auto-login URL |
 | Session key | Generated per session, 32 bytes |
 | CryptoJS | Auto-downloaded locally, served from static |

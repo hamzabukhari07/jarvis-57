@@ -198,6 +198,7 @@ class MainWindow(QMainWindow):
         self.on_file_uploaded: Callable[[dict], None] | None = None
         self.on_interrupt: Callable[[], None] | None = None
         self.on_voice_change: Callable[[], None] | None = None
+        self.on_language_change: Callable[[str], None] | None = None
         self.on_audio_device_change: Callable[[], None] | None = None
         self.on_push_to_talk: Callable[[bool], str] | None = None
         self.on_sleep_toggle: Callable[[bool], None] | None = None
@@ -371,6 +372,11 @@ class MainWindow(QMainWindow):
                 self.on_voice_change()
             except Exception as e:
                 logger.warning("Error in on_voice_change callback: %s", e)
+        if lang and getattr(self, "on_language_change", None):
+            try:
+                self.on_language_change(lang)
+            except Exception as e:
+                logger.warning("Error in on_language_change callback: %s", e)
 
     def _handle_pipeline_settings_changed(self):
         if getattr(self, "on_pipeline_change", None):
@@ -750,6 +756,14 @@ class ZezoUI:
     @on_voice_change.setter
     def on_voice_change(self, cb: Callable[[], None] | None):
         self._win.on_voice_change = cb
+
+    @property
+    def on_language_change(self) -> Callable[[str], None] | None:
+        return self._win.on_language_change
+
+    @on_language_change.setter
+    def on_language_change(self, cb: Callable[[str], None] | None):
+        self._win.on_language_change = cb
 
     @property
     def on_pipeline_change(self) -> Callable[[], None] | None:

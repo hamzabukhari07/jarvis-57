@@ -1,4 +1,9 @@
-# JARVIS — Request Lifecycle
+# ZEZO — Request Lifecycle
+
+> **Project:** ZEZO  
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux
+
 
 ## Example 1: "Open Chrome"
 
@@ -235,7 +240,7 @@ plugin_registry.run("quiz", parameters, player=self.ui)
     ↓
 plugins/quiz.py:run(parameters, player, session_memory)
     ↓
-JARVIS writes questions on screen
+ZEZO writes questions on screen
     ↓
 User answers on screen
     ↓

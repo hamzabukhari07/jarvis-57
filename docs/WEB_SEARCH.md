@@ -1,8 +1,13 @@
-# JARVIS — Web Search / Internet System
+# ZEZO — Web Search / Internet System
+
+> **Project:** ZEZO  
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux
+
 
 ## Overview
 
-JARVIS has multi-mode web search powered by **Gemini Grounded** with **DuckDuckGo fallback**.
+ZEZO has multi-mode web search powered by **Gemini Grounded** with **DuckDuckGo fallback**.
 
 **File**: `actions/web_search.py`
 

@@ -1,35 +1,53 @@
-# JARVIS — Voice Pipeline
+# 🎙️ ZEZO — Voice Pipeline Architecture
 
-## Pipeline Modes
+> **Project:** ZEZO  
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux  
+> **Core Engineering Rule (AGENTS.md Rule 6):** Audio and voice pipeline code is finely calibrated and hardware-dependent. Google Gemini Live API bidirectional WebSocket PCM streaming is the sole active conversational voice brain. Secondary STT/TTS engines are strictly for offline failover and background/telemetry tasks.
+
+---
+
+## 🧭 Architecture Overview
+
+ZEZO's active conversational voice pipeline runs **100% via the Google Gemini Live API** (`main.py` bidirectional WebSockets PCM audio streaming loops `_listen_audio`, `_receive_audio`, and `_play_audio`). There is **no separate STT or TTS model running in the conversational loop**:
+
+- **Microphone Capture**: Raw 16kHz 16-bit mono PCM is streamed directly to Gemini Live over WebSocket in real time.
+- **Speech-to-Text & Reasoning**: Gemini Live's unified multimodal model transcribes, reasons, and invokes tools natively within the stream.
+- **Text-to-Speech**: Gemini Live synthesizes 24kHz PCM audio natively alongside text transcripts, streamed directly into `_play_audio()`.
+- **Secondary STT / TTS**: `core/stt.py`, `core/tts.py`, and `core/voice_fallback.py` (Whisper, Kokoro, Edge-TTS, Vosk) are strictly reserved for offline failover, background workers, and telemetry tasks—never for the active conversation.
+
+---
+
+## ⚙️ Pipeline Modes
 
 ZEZO supports two voice pipeline architectures:
 
-### UI initialization contract
+### UI Initialization Contract
 
 The pipeline and assistant settings controls are defined in the frontend ES module. The module must parse completely before `socket.connect()` runs; otherwise the browser cannot register `saveCustomiseSettings`, `togglePipelineMode`, `applyPreset`, or `savePipelineSettings`. Keep the WebSocket connection call after all UI handler declarations, and syntax-check the complete module after editing it.
 
-### 1. Gemini Live (Default)
+### 1. Gemini Live (Active Conversational Brain — Default)
 
 **Mode**: `pipeline_mode = "live"`
 
-All audio processing in a single Google Gemini Live WebSocket:
-- **STT**: Google automatic speech recognition (real-time)
-- **LLM**: Gemini reasoning and function-calling
-- **TTS**: Gemini synthetic voice (Puck, Charon, Fenrir, Kore, Aoede)
-- **Barge-in**: User can interrupt mid-response
-- **Tool-calling**: Native function invocation
-- **Latency**: ~200-500ms end-to-end
+All audio processing occurs within a single Google Gemini Live bidirectional WebSocket session:
+- **STT**: Google native acoustic speech recognition (real-time streaming)
+- **LLM**: Gemini 2.0 / 3.x Flash native reasoning and function-calling
+- **TTS**: Gemini native synthetic neural voice (`Puck`, `Charon`, `Fenrir`, `Kore`, `Aoede`)
+- **Barge-in**: User can interrupt mid-response via live mic energy gating or Push-to-Talk
+- **Tool-calling**: Zero-latency native function invocation with inline client content roundtrips
+- **End-to-End Latency**: ~200–500ms
 
-**Best for**: Real-time conversations, tool invocation, natural interruption.
+**Best for**: Real-time fluid conversations, instant tool execution, natural interruption.
 
-### 2. Cascade Mode (Custom Engines)
+### 2. Cascade Mode (Offline Fallback & Custom Engines)
 
 **Mode**: `pipeline_mode = "cascade"`
 
-Decoupled pipeline where each stage runs locally or on custom endpoints:
+Decoupled pipeline where each stage runs locally or on custom endpoints (used when offline or explicitly enabled):
 
 | Stage | Options | Source |
-|-------|---------|--------|
+|---|---|---|
 | **STT** | `local_whisper`, `groq_whisper`, `vosk` | Config key `stt_engine` |
 | **LLM** | `groq`, `gemini`, `ollama` | Config key `llm_engine` |
 | **TTS** | `kokoro`, `edge_tts`, `elevenlabs` | Config key `tts_engine` |
@@ -40,333 +58,177 @@ Decoupled pipeline where each stage runs locally or on custom endpoints:
 2. Text → `llm_generate(engine=llm_engine)` → response
 3. Response → `make_tts(engine=tts_engine, voice=tts_voice)` → audio
 
-**Presets** (UI one-click)
-- **Gemini Live**: Live mode (fastest, best quality)
-- **Cloud Fast**: `groq_whisper` + `groq` + `edge_tts` (good quality, lower cost)
+**Presets** (UI one-click):
+- **Gemini Live**: Live mode (fastest, best conversational quality)
+- **Cloud Fast**: `groq_whisper` + `groq` + `edge_tts` (good quality, low cost)
 - **Balanced**: `groq_whisper` + `groq` + `kokoro` (local TTS, cloud inference)
-- **Fully Offline**: `local_whisper` + `ollama` + `kokoro` (no cloud, needs local LLM)
-
-**Best for**: Offline-first, cost control, testing individual engines, custom voice synthesis.
+- **Fully Offline**: `local_whisper` + `ollama` + `kokoro` (0 cloud, local LLM)
 
 ### 3. Voice Fallback Failover & Error Surfacing
 
 **Mode**: `voice_fallback = "auto" | "off"` (Config key `voice_fallback`)
 
-Controlled via the UI toggles in the Settings Drawer, Customise Assistant modal, and Voice Pipeline modal:
+Controlled via the UI toggles in Settings:
 - **`auto` (Default)**: If the Gemini Live WebSocket connection drops, encounters a network timeout, or hits quota limits, ZEZO immediately fails over to the local/cascade voice loop (`VoiceFallback`) without dropping user interaction.
 - **`off`**: Automatic failover is strictly disabled. Instead of falling back to offline engines, the exact connection, authentication, or model error is rendered directly to the HUD (`ERR: Live connection failed: ...`), and the user is informed with a prompt to toggle Fallback ON if offline voice is desired.
 - **Direct Groq Key Entry**: The Voice Pipeline modal includes an inline Groq API key configuration card that saves directly to local `config/api_keys.json` and dynamically refreshes telemetry warnings without modal swapping.
 
 ---
 
-## Complete Voice Interaction Flow (Gemini Live)
+## 🔄 Complete Voice Interaction Flow (Gemini Live)
 
-```
-User speaks
-    ↓
-Microphone captures audio (sounddevice.InputStream, 16kHz, mono, int16)
-    ↓
-Audio callback fires (1024 frames = ~64ms)
-    ↓
-callback() in _listen_audio()
-    ↓
-┌──────────────────────────────────────┐
-│ GATE 1: Wake Word                    │
-│ if waking_enabled and not awake:     │
-│   → audio goes to WakeWordDetector   │
-│   → if "Hey Jarvis" detected → wake()│
-│   → otherwise: return (no streaming) │
-└──────────────────────────────────────┘
-    ↓ (if awake)
-┌──────────────────────────────────────┐
-│ GATE 2: Speaking Lock                │
-│ if self._is_speaking:                │
-│   → DON'T stream (barge-in blocked)  │
-│   → BUT listen locally for interrupt  │
-└──────────────────────────────────────┘
-    ↓ (if not speaking)
-┌──────────────────────────────────────┐
-│ GATE 3: Echo Tail Guard              │
-│ if self._tail_active():              │
-│   → EchoGuard.is_user_speech()       │
-│   → if echo → drop block             │
-│   → if user voice → pass through     │
-└──────────────────────────────────────┘
-    ↓
-┌──────────────────────────────────────┐
-│ GATE 4: Push-to-Talk                 │
-│ if ptt_enabled and not ptt_held:     │
-│   → block audio                      │
-└──────────────────────────────────────┘
-    ↓
-Audio bytes → out_queue → send_realtime_input()
-    ↓
-WebSocket → Google Gemini Live API
-    ↓
-┌──────────────────────────────────────┐
-│ Gemini Live Processing               │
-│                                      │
-│ STT: Converts audio to transcript    │
-│ LLM: Processes transcript, reasons   │
-│ Tool: Calls functions if needed      │
-│ TTS: Generates response audio        │
-└──────────────────────────────────────┘
-    ↓
-session.receive() yields response
-    ↓
-┌──────────────────────────────────────┐
-│ RESPONSE HANDLING                    │
-│                                      │
-│ Transcript → _clean_transcript()     │
-│           → _is_repeat_chunk()       │
-│           → VisemeStream.feed_text() │
-│           → UI activity log          │
-│                                      │
-│ Audio → _play_audio()                │
-│      → sounddevice.OutputStream      │
-│      → Speakers                      │
-│                                      │
-│ Audio → VisemeStream.frames()        │
-│      → Avatar mouth animation        │
-└──────────────────────────────────────┘
-    ↓
-User hears response, avatar speaks
-    ↓
-set_speaking(False) → echo tail guard starts
-    ↓
-Wait for next user input or auto-sleep
+```mermaid
+flowchart TD
+    A[User Speaks] --> B[Microphone InputStream\n16kHz 16-bit Mono]
+    B --> C[Audio Callback\n1024 frames ~64ms]
+    C --> D{Gate 1: Wake Word\nAwake?}
+    D -- No --> E[WakeWordDetector.feed\nHey Zezo Detection]
+    D -- Yes --> F{Gate 2: Speaking Lock\nZEZO Speaking?}
+    F -- Yes --> G[Block Mic Stream\nListen locally for barge-in]
+    F -- No --> H{Gate 3: Echo Tail\nTail Active?}
+    H -- Yes --> I[EchoGuard: Filter Self-Voice]
+    H -- No --> J{Gate 4: Push-to-Talk\nPTT Enabled?}
+    J -- PTT Held --> K[Stream Real-Time\nExplicit Sample Rate]
+    J -- Normal Open Mic --> K
+    K --> L[out_queue Bounded Buffer]
+    L --> M[send_realtime_input\nBlob: audio/pcm;rate=16000]
+    M --> N[Google Gemini Live WebSocket]
+    N --> O[Multimodal Inference\nSTT + LLM + Tools + TTS]
+    O --> P[session.receive]
+    P --> Q[output_transcription\nText Transcript & Visemes]
+    P --> R[server_content.audio\n24kHz 16-bit Mono PCM]
+    R --> S[_play_audio\nRawOutputStream Speakers]
+    Q --> T[UI Log & Avatar Animation]
+
+    classDef default fill:#0f172a,stroke:#3b82f6,stroke-width:1px,color:#fff;
+    classDef gate fill:#1e293b,stroke:#f59e0b,stroke-width:1px,color:#fff;
+    class D,F,H,J gate;
 ```
 
-## Detailed Transition Explanations
+---
 
-### Transition 1: User Speaks → Microphone
+## 🔍 Detailed Transition Mechanics
 
-**File:** `main.py`, `_listen_audio()` line 1296
+### Transition 1: User Speaks → Microphone Callback
+**File:** `main.py` (`_listen_audio`)
 
-The `sounddevice.InputStream` is opened with a callback:
+The `sounddevice.InputStream` is opened with a non-blocking PortAudio callback:
 ```python
 sd.InputStream(
-    samplerate=16000, channels=1, dtype="int16",
-    blocksize=1024, device=mic_dev, callback=callback
+    samplerate=16000,
+    channels=1,
+    dtype="int16",
+    blocksize=1024,
+    device=mic_dev,
+    callback=callback,
 )
 ```
+The callback fires whenever ~64ms of audio is captured on a dedicated PortAudio audio worker thread.
 
-The callback fires whenever ~64ms of audio is captured. It runs on a **dedicated sounddevice thread**.
+### Transition 2: Microphone Audio Gating
+The callback enforces four sequential gates:
+1. **Wake Word Gate**: While asleep (`_awake == False`), audio is routed strictly to the local `openwakeword` detector. No audio is streamed externally.
+2. **Speaking Lock**: While ZEZO is speaking (`_is_speaking == True`), mic frames are blocked from external streaming to prevent self-interruption, but monitored locally for user barge-in.
+3. **Echo Tail Guard**: After ZEZO finishes speaking, a ~260ms window (`_out_latency + _TAIL_MARGIN`) checks `EchoGuard.is_user_speech` to drop residual room echo of the assistant's own voice.
+4. **Push-to-Talk Gate**: When PTT is enabled, audio streams only while the `Ctrl+Alt` chord is actively held.
 
-### Transition 2: Microphone → Audio Gating
-
-The callback applies four sequential gates. Each gate can stop the audio from reaching Gemini:
-
-1. **Wake word gate**: If asleep and wake word enabled, audio goes ONLY to the local wake word detector
-2. **Speaking lock**: If JARVIS is speaking, microphone is muted to prevent self-interference
-3. **Echo tail guard**: After JARVIS finishes speaking, a ~260ms window (`_out_latency` + `_TAIL_MARGIN=0.06s`) where the assistant's own voice is filtered out
-4. **Push-to-talk**: If enabled, audio is blocked unless the Ctrl+Space chord is held
-
-### Transition 3: Audio → Gemini Live
+### Transition 3: Audio Streaming & Explicit Sample Rate Rule
+**File:** `main.py` (`_send_realtime`, `_listen_audio`)  
+**Core Rule (AGENTS.md Rule 6):** When streaming PCM mic chunks to Gemini Live, always include the explicit sample rate. Never send bare `audio/pcm`:
 
 ```python
-# _send_realtime()
+# main.py line 2010
 await self.session.send_realtime_input(
     audio=types.Blob(
         data=msg["data"],
-        mime_type=msg.get("mime_type", "audio/pcm")
+        mime_type=f"audio/pcm;rate={SEND_SAMPLE_RATE}",
     )
 )
 ```
 
-Audio is sent as raw PCM bytes over the Gemini Live WebSocket connection. Each chunk is ~20ms of audio.
+### Transition 4: Push-to-Talk Real-Time Streaming & 0.5s Delayed Turn Commit
+**Commit:** `fd7fcfa` update  
+**File:** `main.py` (`_on_ptt`, `_listen_audio`)
 
-### Transition 4: Gemini Live → Response
+- **Real-Time Streaming**: Rather than bulk-buffering audio locally in memory, audio chunks are streamed in real time through `out_queue` while `Ctrl+Alt` is held.
+- **50ms Brush-Protection Debounce**: If the hotkey was released less than 50ms ago, subsequent accidental brush taps are ignored to prevent cutting off mid-sentence speech.
+- **0.5s Delayed Turn Commit**: Upon releasing `Ctrl+Alt`, an asynchronous daemon thread sleeps for 0.5s before enqueuing `{"audio_stream_end": True}`:
+  ```python
+  def _delayed_stream_end():
+      import time as _t
+      _t.sleep(0.5)
+      if self._loop and self._loop.is_running():
+          self._loop.call_soon_threadsafe(
+              self._enqueue_out_audio,
+              {"audio_stream_end": True}
+          )
+  threading.Thread(target=_delayed_stream_end, daemon=True).start()
+  ```
+  This 0.5-second buffer prevents premature server VAD turn completion during brief natural pauses at the end of speech.
 
+### Transition 5: Gemini Live Response Handling & Visemes
+**File:** `main.py` (`_receive_audio`)
+
+Gemini Live produces both text and audio concurrently:
+- `sc.output_transcription.text`: Model's spoken words transcribed.
+- `server_content.model_turn.parts[].inline_data.data`: Raw 24kHz PCM audio bytes.
+- Transcripts feed into `VisemeStream.feed_text()`, which blends 72% text-determined mouth shapes with 28% audio envelope energy for high-fidelity avatar mouth animation.
+
+### Transition 6: Audio Playback & Cursor Tracking
+**File:** `main.py` (`_play_audio`)
+
+Playback utilizes `sounddevice.RawOutputStream`:
 ```python
-async for resp in session.receive():
-    sc = getattr(resp, "server_content", None)
-    # Extract transcript
-    if sc and sc.output_transcription and sc.output_transcription.text:
-        transcript = sc.output_transcription.text
-    # Extract audio
-    # Gemini produces both text and audio simultaneously
+sd.RawOutputStream(
+    samplerate=24000,
+    channels=1,
+    dtype="int16",
+    blocksize=0,
+    device=output_dev,
+)
 ```
+The audio cursor (`_play_cursor`) tracks exact hardware playback timing to coordinate viseme rendering with speaker output.
 
-The response contains:
-- `output_transcription.text` — the model's spoken words transcribed
-- `audio` — the raw audio bytes for playback
-- `tool_calls` — function calls the model wants to execute
+---
 
-### Transition 5: Transcript → Viseme
+## 🛡️ Audio Hardware Disconnect & Resilience Strategy
 
-```python
-# VisemeStream.feed_text()
-for item in text_to_visemes(text):
-    self._q.append(item)
+Per **AGENTS.md Rule 6**, ZEZO must **never crash the live session on hardware errors**:
+- **Microphone Fallback (`_listen_audio`)**: If the saved microphone is missing, unplugged, or permission-denied, ZEZO attempts to resolve the system default. If no working input device exists:
+  ```python
+  if _mic_stream is None:
+      print("[Zezo] ⚠️ No working microphone found or permission denied — running in silent/text mode (UI, Text, and Remote ready).")
+      self.ui.write_log("SYS: Microphone unavailable — running in text/remote mode.")
+      while True:
+          await asyncio.sleep(2.0)
+  ```
+- **Speaker Fallback (`_play_audio`)**: If the output endpoint cannot be opened, ZEZO prints an alert, logs to the HUD, and continues operating in visual/text mode without throwing an unhandled exception.
+- **TaskGroup Integrity**: By keeping the worker tasks alive in a non-crashing sleep loop, the session `TaskGroup` remains active, allowing text chat, remote gateway controls, and tools to operate unimpeded.
 
-# VisemeStream.frames() — called per audio frame
-out = []
-for level, a_open, a_wide in audio:
-    self._carry += hop / self._step_seconds()
-    while self._carry >= 1.0 and self._q:
-        self._cur = self._q.popleft()
-        self._carry -= 1.0
-    t_open, t_wide, closure = VISEMES.get(self._cur[0], VISEMES["REST"])
-    o = 0.72 * t_open + 0.28 * a_open  # text leads, audio corrects
-    w = 0.78 * t_wide + 0.22 * a_wide
-    out.append((level, o, w))
-```
+---
 
-**Blend ratio**: 72% text-determined shape + 28% audio-determined shape. This means the transcript supplies the mouth shape (critical for closures like /m/, /b/, /p/) while the audio supplies timing and force.
-
-### Transition 6: Audio → Speakers
-
-```python
-def _play_audio(audio_bytes):
-    # Decode and play via sounddevice
-    sd.play(decoded_samples, 24000)
-    # Non-blocking — the callback continues
-```
-
-The audio playback cursor is tracked precisely:
-```python
-self._play_cursor = 0.0  # updated per audio batch
-# The mouth animation is scheduled against this cursor
-```
-
-### Transition 7: Auto-Sleep
-
-```python
-async def _run_sleep_watch():
-    while True:
-        await asyncio.sleep(5)
-        if not self._wake_enabled or not self._awake:
-            continue
-        if speaking:
-            continue
-        if (time.monotonic() - self._last_user_speech) > 120.0:
-            self.sleep(reason="no speech for 2 minutes")
-```
-
-The assistant auto-sleeps after 2 minutes of silence (wake-word mode only).
-
-## Timing Constants
+## ⏱️ Timing Constants Reference
 
 | Constant | Value | Purpose |
-|----------|-------|---------|
-| `SEND_SAMPLE_RATE` | 16000 | Mic sample rate |
-| `RECEIVE_SAMPLE_RATE` | 24000 | Speaker sample rate |
-| `CHUNK_SIZE` | 1024 | Audio frames per callback |
+|---|---|---|
+| `SEND_SAMPLE_RATE` | 16000 Hz | Microphone PCM sample rate |
+| `RECEIVE_SAMPLE_RATE` | 24000 Hz | Speaker output PCM sample rate |
+| `CHUNK_SIZE` | 1024 frames | Audio frames per PortAudio callback (~64ms) |
 | `_VIS_HOP` | 480 | Viseme frame step (20ms at 24kHz) |
 | `_VIS_WIN` | 1024 | Viseme analysis window (~43ms) |
-| `_TAIL_MARGIN` | 0.06s | Echo tail margin (plus measured `_out_latency`) |
-| `WAKE_SLEEP_TIMEOUT` | 120.0s | Auto-sleep after silence |
-| `_REPEAT_MIN` | 12 chars | Minimum chunk length for dedup |
+| `_TAIL_MARGIN` | 0.06s | Echo tail margin beyond measured output latency |
+| `WAKE_SLEEP_TIMEOUT` | 120.0s | Auto-sleep timeout after silence |
+| `PTT_COMMIT_DELAY` | 0.5s | Turn commit delay upon hotkey release |
+| `PTT_DEBOUNCE` | 50ms | Brush-protection debounce threshold |
 
-## Error Handling in Voice Pipeline
+---
 
-### Interrupted Speech
-```python
-def interrupt():
-    self._interrupted = True
-    # Drain the audio queue
-    while True:
-        q.get_nowait()  # discard queued audio
-    self._visemes.reset()
-    self._play_cursor = 0.0
-```
+## 🔄 Offline Voice Fallback Loop (`core/voice_fallback.py`)
 
-### Session Reconnection
-```python
-# _ReconnectSignal raised inside TaskGroup
-# TaskGroup unwinds → session destroyed → new session created
-# Resumption handle replayed if keep_context=True
-```
-
-### Audio Device Failure
-```python
-try:
-    _mic_stream = _open_mic(_mic_dev)
-except Exception:
-    # Falls back to system default
-    _mic_stream = _open_mic(None)
-```
-
-## Offline Voice Fallback & Cascade Architecture (`core/voice_fallback.py`)
-
-Gemini Live is the primary real-time voice path. When Gemini Live is unavailable (offline, quota limit, service disruption) or when the user explicitly configures **Cascade Mode**, ZEZO executes a high-performance decoupled voice loop:
-
-```
-Full-Duplex Mic (sounddevice 16k InputStream)
-    ↓
-UtteranceSegmenter (180ms VAD pause, 200ms min length, 600.0 RMS energy gate)
-    ↓ (complete utterance)
-Background Utterance Worker Thread (non-blocking mic stream, generation_id tracked)
-    ↓
-STT Transcribe: local faster-whisper (tiny)  →  Groq Whisper Large v3 Turbo  →  Vosk
-    ↓
-┌────────────────────────────────────────────────────────────────────────┐
-│ LAYER 1: Fast Deterministic Matcher (0ms LLM overhead)                 │
-│ Exact & conversational variations: "can you please open the calc",     │
-│ "launch vscode", "mute", "increase volume", "stop", "next track"       │
-│ → Direct action invocation without Groq LLM or conversational TTS      │
-└────────────────────────────────────────────────────────────────────────┘
-    ↓ (if unhandled)
-┌────────────────────────────────────────────────────────────────────────┐
-│ LAYER 2: Laya Secondary Intent Router (Confidence Gated >= 0.75)       │
-│ Isolated intent classifier with confidence scoring & abstention        │
-└────────────────────────────────────────────────────────────────────────┘
-    ↓ (if abstained)
-┌────────────────────────────────────────────────────────────────────────┐
-│ LAYER 3: Groq LLM Streaming & Sentence TTS Pipeline                    │
-│ Streaming tokens → sentence accumulator → parallel synthesis           │
-│ Kokoro offline / Edge-TTS / ElevenLabs                                 │
-└────────────────────────────────────────────────────────────────────────┘
-    ↕
-Instant Barge-In Interruption (Continuous mic detects user speech → sd.stop() < 20ms, cancels in-flight TTS & increments generation_id)
-```
-
-### Key Cascade Features:
-
-1. **Full-Duplex Continuous Mic Stream**:
-   - `sd.InputStream` runs continuously on its own thread without pausing during STT, LLM inference, or TTS playback.
-   - Utterances are dispatched to a dedicated daemon worker (`utterance-worker`), ensuring the microphone loop never stalls or drops incoming audio frames.
-
-2. **Race-Condition-Safe Instant Barge-in & Generation IDs**:
-   - Monotonically increasing `_generation_id` tracks active response lifecycle.
-   - When the user speaks over the assistant (`_is_speaking == True` and `level >= energy * 1.4`):
-     - `_interrupt()` halts audio playback immediately via `sd.stop()` (< 20ms).
-     - Increments `_generation_id` and sets `_interrupted` event.
-     - Drains audio queues in TTS engine and halts pending synthesis tasks.
-     - Prevents stale sentence callbacks from old generations from playing or entering the audio queue.
-     - Feeds interruption audio block directly into `UtteranceSegmenter.push()` so the new user turn begins seamlessly without dropping frames.
-
-3. **3-Layer Intent Architecture (`core/fast_intent.py` & `core/laya_router.py`)**:
-   - **Layer 1: Deterministic Matcher**: Extensible registry handling prefix/suffix stripping ("can you please", "could you", "jarvis please"), app alias mapping (calculator, chrome, vscode, terminal, spotify, discord, notepad, settings, etc.), media controls (play/pause, next track, prev track), volume adjustments, and system queries. Directly dispatches actions (`open_app`, `computer_settings`, `pyautogui`) without invoking Groq LLM or generating conversational TTS.
-   - **Layer 2: Laya Secondary Router**: Isolated classifier with confidence gating and abstention. Handles complex conversational variations.
-   - **Layer 3: Groq LLM Fallback**: Streaming LLM response via `call_groq_stream` when neither layer classifies the command.
-
-4. **Real Latency Instrumentation**:
-   - Real-time logging of all pipeline transitions:
-     - `[TIMING] STT start / end / total`
-     - `[TIMING] FAST_INTENT start / end / FAST_DISPATCH total`
-     - `[TIMING] LAYA start / end / total`
-     - `[TIMING] LLM start / LLM first token`
-     - `[TIMING] FIRST_SENTENCE / TTFT`
-     - `[TIMING] TTS start / first audio / PLAYBACK start`
-     - `[TIMING] TTFA`
-     - `[TIMING] BARGE_IN detected / PLAYBACK stopped / stop duration`
-
-5. **Configurable Engines & Auto-Start**:
-   - **Config:** `voice_fallback` = `auto` (default) | `manual` | `off`.
-   - **Engines:** `stt_engine` (`groq_whisper` / `local_whisper` / `vosk`), `llm_engine` (`groq` / `gemini` / `ollama`), `tts_engine` (`kokoro` / `edge_tts` / `elevenlabs`), `tts_voice`.
-   - **Dynamic Language Support:** Response prompt dynamically enforces user-configured language (`get_response_language()`), automatically falling back to Edge-TTS for non-English scripts.
-   - **Standalone Execution:** `python -m core.voice_fallback`.
-
-## Data Flow Summary
-
-```
-MIC → callback → gates → out_queue → WebSocket → Gemini
-                                                          ↓
-Gemini ← receive ← WebSocket ← audio ← speakers ← output stream
-                                     ↓
-                              VisemeStream → avatar
-                              transcript → UI log
-                              audio → playback cursor → speakers
-```
+When offline or when Gemini Live quota limits are reached, the secondary cascade loop executes:
+1. **Continuous Full-Duplex Mic**: `sd.InputStream` runs on a dedicated thread with `UtteranceSegmenter` (180ms VAD pause, 600.0 RMS energy gate).
+2. **3-Layer Intent Routing**:
+   - **Layer 1: Fast Deterministic Matcher (0ms LLM)**: Exact regex matches for app launches, volume, media control (`core/fast_intent.py`).
+   - **Layer 2: Laya Intent Router**: Secondary intent classification with confidence thresholding >= 0.75 (`core/laya_router.py`).
+   - **Layer 3: Groq LLM & Streaming TTS**: Token streaming to Kokoro/Edge-TTS.
+3. **Instant Barge-In**: User speech detection triggers `sd.stop()` in <20ms, incrementing `_generation_id` and draining in-flight audio queues.

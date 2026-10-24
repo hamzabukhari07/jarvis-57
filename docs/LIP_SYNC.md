@@ -1,4 +1,7 @@
-# JARVIS — Lip-Sync System
+# ZEZO — Lip-Sync System
+
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux
 
 ## Overview
 

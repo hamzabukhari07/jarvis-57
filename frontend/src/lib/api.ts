@@ -23,6 +23,19 @@ export interface AvailableModelsResponse {
   kilo?: string[]
 }
 
+export interface CodeEngineStatus {
+  id: string
+  label: string
+  short_code: string
+  state: 'ready' | 'sign_in_required' | 'not_installed' | 'off' | 'unknown'
+  binary_path: string | null
+  version: string | null
+  models: string[]
+  reason: string
+  backs_tool: string
+  timestamp: number
+}
+
 export const api = {
   async getFleetState(): Promise<FleetStateResponse> {
     const res = await fetch(`${API_BASE}/api/fleet/state`)
@@ -394,6 +407,32 @@ export const api = {
   async getAudioDevices(): Promise<any> {
     const res = await fetch(`${API_BASE}/api/audio_devices`)
     if (!res.ok) throw new Error(`Failed to fetch audio devices: ${res.statusText}`)
+    return res.json()
+  },
+
+  async getCodeEngines(): Promise<{ status: string; engines: CodeEngineStatus[]; default_engine: string }> {
+    const res = await fetch(`${API_BASE}/api/code_engines`)
+    if (!res.ok) throw new Error(`Failed to fetch code engines: ${res.statusText}`)
+    return res.json()
+  },
+
+  async probeEngine(engineId?: string): Promise<{ status: string; engine?: CodeEngineStatus; engines?: CodeEngineStatus[]; default_engine?: string }> {
+    const res = await fetch(`${API_BASE}/api/code_engines/probe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(engineId ? { engine_id: engineId } : {}),
+    })
+    if (!res.ok) throw new Error(`Failed to probe engine: ${res.statusText}`)
+    return res.json()
+  },
+
+  async setDefaultCodeEngine(engineId: string): Promise<{ status: string }> {
+    const res = await fetch(`${API_BASE}/api/code_engines/default`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ engine_id: engineId }),
+    })
+    if (!res.ok) throw new Error(`Failed to set default engine: ${res.statusText}`)
     return res.json()
   },
 }

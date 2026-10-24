@@ -16,13 +16,20 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 _STORE_KEY = "last_active_repo"
-_STORE_PATH = Path(__file__).resolve().parent.parent / "memory" / "repo_context.json"
+# Production store by default. Tests point ZEZO_REPO_CONTEXT_STORE at a temp file so a
+# pytest run can never write into the real memory/repo_context.json (Issue 10: test
+# pollution of production state, invisible because memory/*.json is gitignored).
+_STORE_PATH = Path(
+    os.environ.get("ZEZO_REPO_CONTEXT_STORE")
+    or Path(__file__).resolve().parent.parent / "memory" / "repo_context.json"
+)
 _ZEZO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -178,6 +185,18 @@ def _expand(raw: str) -> Optional[Path]:
     return (Path.home() / "Desktop" / raw).resolve()
 
 
+def expand_user_dir(raw: str | Path) -> Path:
+    """Expand 'Desktop/x', '~/x', 'downloads/x' to a real absolute path.
+
+    Callers that accept a folder from the user must use this instead of Path(...).resolve(),
+    which resolves a user-facing folder name against ZEZO's own CWD and writes the output
+    into the repo.
+    """
+    p = _expand(str(raw))
+    if p is None:
+        raise ValueError(f"Cannot work out the folder for {raw!r}.")
+    return p
+
 
 def resolve(
     explicit: Optional[str] = None,
@@ -193,13 +212,21 @@ def resolve(
     # 1. explicit
     if explicit:
         p = _expand(explicit)
-        if p and not is_zezo_source_dir(p):
+        if p and is_zezo_source_dir(p):
+            # Never discard an explicit path in silence: doing so made the caller's engine run
+            # in an unrelated remembered folder while it believed it was using this one.
+            raise ValueError(
+                f"Refusing to use {p} as a project folder: it is inside ZEZO's own source tree. "
+                f"Pass a folder outside {_ZEZO_ROOT} (e.g. Desktop/<name>)."
+            )
+        if p:
             # Auto-create project folder if specified explicitly
             p.mkdir(parents=True, exist_ok=True)
             if require_git and not _is_git_repo(p):
                 logger.info("repo_context: explicit %s is not a git repo", p)
             remember_repo(str(p))
             return p, "explicit"
+    # Falls through to the remember-state only when the caller gave NO explicit path.
 
     # 1.5. Brand-new project isolation: do not stick to stale previous repo
     if is_new_project:
@@ -360,7 +387,12 @@ def register_rebuild(rebuild_path: str | Path, entrypoint: str = "index.html") -
     Sets runtime memory manager key active_project if available.
     Returns the absolute Path.
     """
+    if not rebuild_path:
+        return Path.cwd()
     p = Path(rebuild_path).resolve()
+    if is_zezo_source_dir(p):
+        logger.debug("repo_context: ignoring request to register rebuild in Zezo root: %s", p)
+        return p
     p.mkdir(parents=True, exist_ok=True)
     resolved_path = str(p)
     data = _load()

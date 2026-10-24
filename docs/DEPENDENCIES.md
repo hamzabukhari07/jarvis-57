@@ -1,188 +1,164 @@
-# JARVIS — Dependencies
+# ZEZO — Dependencies & Package Manifest
+
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux
+
+---
 
 ## Overview
 
-JARVIS uses a single `requirements.txt` file with OS-specific markers. `setup.py` installs dependencies filtered by OS.
+ZEZO relies on a curated ecosystem consisting of:
+1. **Python Backend**: Manifested in `requirements.txt` and auto-bootstrapped via `core/installer.py`.
+2. **Frontend SPA**: React 18/19 + Vite modern single-page application located in `frontend/package.json`.
+3. **CLI & System Engines**: External developer tools, browser agents, and network tunnel binaries.
 
-**Files**: `requirements.txt`, `setup.py`, `core/installer.py`
+---
 
-## Auto-Install on Launch
+## Auto-Install on Launch (`core/installer.py`)
 
-`core/installer.py` is the runtime safety net so a normal `python main.py` gets
-the baseline without the user having to remember `python setup.py`:
+`core/installer.py` acts as the runtime safety net so executing `python main.py` ensures all requirements are present:
 
-- **`ensure_requirements(log)`** — installs the entire `requirements.txt` (a
-  comprehensive "everything by default" manifest). Success is stamped by a
-  SHA-256 of the manifest in `config/.deps_stamp`, so pip runs exactly once per
-  manifest revision and is a no-op afterwards. If the full install fails — one
-  heavy package (e.g. `docling` → `antlr4-python3-runtime`) can abort the rest —
-  it logs the real error and falls back to installing only the sentinel packages
-  the app needs, so a single bad sdist cannot disable unrelated features. The
-  first run installs the full voice stack (`torch`, `faster-whisper`,
-  `openai-whisper`, …) so it can be large and slow; it runs on a daemon thread
-  and the next launch picks the packages up.
-- **`ensure_playwright_browsers(log)`** — asks Python Playwright where its
-  Chromium is and downloads it if absent. This is now always checked, not only
-  when the `playwright` package was just installed — a later `pip install -U
-  playwright` used to leave the browser stale and every browser action failed
-  with "Executable doesn't exist".
-- **`install_for_config(config, log)`** — installs the STT/TTS engine packages
-  for the selected engines (unchanged).
+- **`ensure_requirements(log)`**: Installs `requirements.txt`. Execution is stamped with a SHA-256 hash in `config/.deps_stamp`, preventing redundant pip invocations. If an optional heavy wheel fails, it logs cleanly and falls back without aborting core features.
+- **`ensure_playwright_browsers(log)`**: Verifies Chromium browser binaries for headless browser automation and downloads them if absent.
+- **`install_for_config(config, log)`**: Installs optional offline voice/STT models on demand.
 
-`main.py::runner` starts this on a daemon thread right after the API key is
-entered, concurrent with the live session, so a first run fills in missing
-packages without freezing the UI. The next launch picks them up.
+---
 
-## Python Version
+## Python Version Compatibility
 
-| Requirement | Value |
-|-------------|-------|
-| Minimum | Python 3.11 |
-| Maximum tested | Python 3.13 |
-| Newer versions | Warning, not fatal |
+| Requirement | Value | Notes |
+|-------------|-------|-------|
+| Minimum | Python 3.11 | Modern async, exception groups |
+| Recommended | Python 3.12 / 3.13 | Optimal compatibility for all local OCR and media libraries |
+| Python 3.14+ | Warning / Experimental | `audioop-lts` used for Python 3.13+ compatibility |
 
-> On Python 3.14 the install still succeeds; only `kokoro` is skipped (its
-> `spacy`/`blis` dependency chain has no 3.14 wheels yet). See
-> [Everything Installs by Default](#everything-installs-by-default).
-
-### Running on a dedicated Python 3.12 / 3.13 venv (recommended if you want Kokoro)
-
-Kokoro installs on Python 3.10–3.13 but **not 3.14**. Do **not** change the
-system Python — create a virtual environment instead so the machine and other
-projects are untouched:
-
+### Recommended Setup (Virtual Environment):
 ```powershell
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
 .venv\Scripts\python main.py
 ```
 
-- The ZEZO **code** is unchanged (it targets 3.11–3.13).
-- Each Python version keeps its own `site-packages`, so the venv needs its own
-  install (downloads are cached).
-- `.venv/` is already in `.gitignore`.
-- Playwright/Patchright browsers live in the shared
-  `%LOCALAPPDATA%\ms-playwright` cache, so they are **not** re-downloaded.
-- On 3.12/3.13 the `kokoro` marker passes and offline TTS is available; the
-  `audioop-lts` marker (`python_version >= "3.13"`) correctly stays off on 3.12.
+---
 
-## Dependency Categories
+## Frontend NPM Dependencies (`frontend/package.json`)
 
-### Core: UI, Audio, Gemini Live
+The ZEZO desktop HUD is an ultra-modern React single-page application built on Vite, Tailwind CSS v4, and the ReUI component system.
 
+| Package | Version | Purpose | Component / Usage |
+|---------|---------|---------|-------------------|
+| `@assistant-ui/react` | `^0.15.26` | Enterprise conversational UI primitives | `ZezoChatThread.tsx`, thinking & thread runtime |
+| `@assistant-ui/react-markdown` | `^0.14.20` | Streaming markdown rendering with syntax highlighting | Chat response formatting, code blocks |
+| `@tailwindcss/vite` | `^4.3.3` | Tailwind v4 compilation plugin | Modern CSS-first design tokens |
+| `tailwindcss` | `^4.3.3` | Utility-first styling framework | ReUI design system, atomic styles |
+| `three` | `^0.180.0` | 3D WebGL rendering engine | Particle visualizers, avatar point-cloud |
+| `@types/three` | `^0.186.0` | TypeScript definitions for Three.js | Type safety across 3D canvas modules |
+| `3d-force-graph` | `^1.80.1` | WebGL 3D force-directed graph | Tier 3 Knowledge Graph visualization |
+| `react-force-graph-3d` | `^1.29.2` | React bindings for 3D force graph | `MemoryGraphCanvas.tsx` |
+| `react-force-graph-2d` | `^1.29.2` | 2D graph fallback view | Desktop graph layout alternative |
+| `lucide-react` | `^1.53.0` | Iconography library | Navigation, toolbars, buttons, status indicators |
+| `zustand` | (integrated) | Lightweight client state management | Agent desk coordinates, global HUD state |
+| `framer-motion` | (integrated) | Motion & transition animations | Modal overlays, slide-overs, desk animations |
+| `@xyflow/react` | `^12.12.0` | Node-based workflow & pipeline editor | Agent workflow decomposition visualizer |
+| `qivi-react` | `^0.1.2` | Audio-reactive avatar component | `QiviAvatarVisualizer.tsx` |
+| `qrcode` | `^1.5.4` | In-app QR code generation | `MobileRemoteModal.tsx` (Cloudflare tunnel OTP pairing) |
+| `@radix-ui/*` | `latest` | Headless accessible UI primitives | Dialog, Tabs, ScrollArea, Tooltip, Select |
+| `blobatar` | `^2.7.0` | Generative agent avatar badges | Autonomous office agent profile portraits |
+
+---
+
+## CLI & System Dependencies
+
+ZEZO orchestrates external command-line engines and network services to execute advanced coding, cloning, and remote tunneling tasks.
+
+| Tool / CLI | Version / Spec | Purpose | Integration Module |
+|------------|----------------|---------|---------------------|
+| **`rea-agents`** | `@6.7.0` (npm) | Headless browser scenario capture & teardown engine | `core/teardown_engine.py`, `actions/reverse_engineer.py` |
+| **`cloudflared`** | Latest binary | Zero-config Quick Tunnel for remote HUD mobile access | `core/ui_server.py`, `frontend/src/components/remote/` |
+| **`uncage`** | CLI tool | Complete website cloner preserving assets & HTML DOM | `actions/website_cloner.py` |
+| **`agy`** (Antigravity CLI) | Latest CLI | High-performance autonomous subagent coding engine | `core/code_engines.py`, `actions/code_engines_status.py` |
+| **`opencode`** | CLI / Agent | Multi-file codebase refactoring and coding engine | `core/code_engines.py`, `main.py` task watcher |
+| **`kilo`** | CLI | Fast lightweight terminal code editor & refactoring agent | `core/code_engines.py`, `main.py` task watcher |
+
+---
+
+## Python Backend Dependencies (`requirements.txt`)
+
+### 1. Core Runtime, Audio & Gemini Live API
 | Package | Version | Purpose | Used By |
 |---------|---------|---------|---------|
 | `PyQt6` | `>=6.6,<7` | Desktop window container, WebEngine host | `ui.py` |
-| `sounddevice` | `>=0.4,<1` | Audio I/O (PortAudio) | `main.py`, `core/audio_devices.py` |
-| `numpy` | `>=1.24,<3` | Audio processing, level & echo math | `main.py`, `core/echo.py` |
-| `google-genai` | `>=2.8.0,<3` | Gemini Live + REST API | `main.py`, `core/gemini.py` |
+| `PyQt6-WebEngine` | `>=6.6,<7` | Chromium browser container for React HUD | `ui.py` |
 | `aiohttp` | `>=3.9,<4` | Desktop WebSocket + static UI server | `core/ui_server.py` |
+| `sounddevice` | `>=0.4,<1` | Audio I/O (PortAudio streaming) | `main.py`, `core/audio_devices.py` |
+| `numpy` | `>=1.24,<3` | Audio signal processing, RMS levels, echo cancellation | `main.py`, `core/echo.py` |
+| `google-genai` | `>=2.8.0,<3` | Gemini Live bidirectional WebSocket audio + REST API | `main.py`, `core/gemini.py` |
 
-### Web Search & Browser Control
-
+### 2. Web Search, Scraping & Automation
 | Package | Version | Purpose | Used By |
 |---------|---------|---------|---------|
-| `requests` | `>=2.31,<3` | HTTP requests | `core/gemini.py`, `actions/*.py` |
-| `beautifulsoup4` | `>=4.12,<5` | HTML parsing | `actions/web_search.py`, `actions/web_reader.py` |
-| `playwright` | `>=1.62,<2` | Browser automation | `actions/browser_control.py` |
-| `scrapling[fetchers]` | `>=0.4,<1` | Anti-bot HTTP/2 & Cloudflare-stealth fetching | `actions/web_reader.py`, `actions/website_cloner.py` |
-| `ddgs` | `>=9,<10` | DuckDuckGo search (primary) | `actions/web_search.py` |
-| `duckduckgo-search` | `>=6,<9` | DuckDuckGo search (legacy fallback) | `actions/web_search.py` |
+| `requests` | `>=2.31,<3` | Synchronous HTTP calls | `core/gemini.py`, `actions/*.py` |
+| `beautifulsoup4` | `>=4.12,<5` | HTML parsing and text extraction | `actions/web_search.py`, `actions/web_reader.py` |
+| `playwright` | `>=1.62,<2` | Headless browser automation | `actions/browser_control.py` |
+| `scrapling[fetchers]` | `>=0.4,<1` | Stealth anti-bot & Cloudflare bypass fetching | `actions/web_reader.py`, `actions/website_cloner.py` |
+| `ddgs` | `>=9,<10` | Primary DuckDuckGo search provider | `actions/web_search.py` |
+| `duckduckgo-search` | `>=6,<9` | Secondary search fallback | `actions/web_search.py` |
 
-### Automation / Input Control & Windows UIA
-
+### 3. Desktop Automation & Windows UIA
 | Package | Version | Purpose | Used By |
 |---------|---------|---------|---------|
-| `pyautogui` | (any) | Keyboard/mouse simulation, screen coordinates | `actions/computer_control.py`, `actions/computer_settings.py` |
-| `pyperclip` | (any) | Clipboard access & preserve buffer | `actions/computer_control.py` |
-| `pywinauto` | (any) | Windows UI Automation (L1 UIA accessibility tree) | `core/computer/windows_uia.py` |
-| `pygetwindow` | (any) | Window management & handle lookups | `actions/computer_control.py` |
+| `pyautogui` | (any) | Native mouse clicks and keyboard typing | `actions/computer_control.py` |
+| `pyperclip` | (any) | OS clipboard access & buffer preservation | `actions/computer_control.py` |
+| `pygetwindow` | (any) | Active window handle detection | `actions/computer_control.py` |
+| `pywinauto` | (any) | L1 Windows UI Automation (COM tree inspection) | `core/computer/windows_uia.py` |
+| `pywin32` / `wmi` | (any) | Windows API, low-level keyboard hooks & WMI | `core/hotkey.py`, `actions/system_monitor.py` |
 
-### Vision, Media & Multilingual RapidOCR
-
+### 4. Vision & Multilingual OCR
 | Package | Version | Purpose | Used By |
 |---------|---------|---------|---------|
-| `rapidocr_onnxruntime` | `>=1.2,<2` | Sub-80ms CPU ONNX Multilingual OCR (0 MB GPU VRAM) | `core/computer/ocr_engine.py`, `actions/screen_processor.py` |
-| `Pillow` | `>=10,<13` | Image processing & synthetic crops | `actions/screen_processor.py`, `core/computer/ocr_engine.py` |
-| `opencv-python` | `>=4.8,<5` | Webcam capture | `actions/screen_processor.py` |
-| `mss` | `>=9,<11` | Fast multi-monitor screen capture | `actions/screen_processor.py` |
+| `rapidocr_onnxruntime` | `>=1.3,<2` | Sub-80ms CPU Multilingual OCR (0 MB GPU VRAM) | `core/computer/ocr_engine.py`, `actions/screen_processor.py` |
+| `pillow` | `>=10,<13` | Image manipulation, resizing & compression | `actions/screen_processor.py` |
+| `opencv-python` | `>=4.8,<5` | Camera capture & frame transforms | `actions/screen_processor.py` |
+| `mss` | `>=9,<11` | High-speed multi-monitor screenshot capture | `actions/screen_processor.py` |
 
-### System, Files & Documents
-
+### 5. Document Processing & File Ingestion
 | Package | Version | Purpose | Used By |
 |---------|---------|---------|---------|
-| `psutil` | `>=5.9,<8` | System metrics, process info | `actions/system_monitor.py`, `ui.py` |
-| `send2trash` | (any) | Safe file deletion | `actions/file_controller.py` |
-| `youtube-transcript-api` | (any) | YouTube transcript | `actions/youtube_video.py` |
-| `yt-dlp` | `>=2024.1.0` | Media/social extraction | `actions/agent_reach.py` |
-| `feedparser` | `>=6.0.0` | RSS/Atom feeds | `actions/agent_reach.py` |
-| `python-pptx` | (any) | PowerPoint reading | `actions/file_processor.py` |
-| `openpyxl` | (any) | Excel reading | `actions/file_processor.py` |
-| `python-docx` | (any) | .docx reading | `core/file_reader.py` |
-| `PyPDF2` | (any) | PDF fallback reader | `actions/file_processor.py` |
-| `pdfplumber` | (any) | Local text-layer PDF extraction | `core/file_reader.py` |
-| `markitdown` | (any) | Office/PDF → Markdown fast path | `core/file_reader.py` |
-| `docling` | `>=2,<3` | Offline OCR/layout for scanned docs | `core/file_reader.py` |
-| `pandas` | `>=2,<4` | Spreadsheet/CSV analysis | `actions/file_processor.py` |
-| `pydub` | `>=0.25,<1` | Audio metadata/conversion | `actions/file_processor.py` |
-| `audioop-lts` | `>=0.2.1` (py≥3.13) | Restores stdlib `audioop` removed in Python 3.13 (PEP 594); required by pydub | `actions/file_processor.py` |
-| `py7zr` | `>=0.20,<2` | .7z archive extraction | `core/file_reader.py` |
-| `pynvml` | (any) | NVIDIA GPU monitoring | `actions/system_monitor.py`, `ui.py` |
+| `psutil` | `>=5.9,<8` | System telemetry, CPU/RAM/battery metrics | `actions/system_monitor.py` |
+| `send2trash` | (any) | Safe recycling bin deletion | `actions/file_controller.py` |
+| `youtube-transcript-api`| (any) | YouTube subtitles and transcript extraction | `actions/youtube_video.py` |
+| `yt-dlp` | `>=2024.1.0` | Audio/video extraction & media metadata | `actions/agent_reach.py` |
+| `feedparser` | `>=6.0.0` | RSS & Atom feed parser | `actions/agent_reach.py` |
+| `python-pptx` | (any) | PowerPoint presentation ingestion | `actions/file_processor.py` |
+| `openpyxl` | (any) | Excel workbook reading and modification | `actions/file_processor.py` |
+| `python-docx` | (any) | Word document reader/writer | `core/file_reader.py` |
+| `reportlab` | `>=4,<6` | PDF generation | `actions/file_processor.py` |
+| `pypdf` / `pdfplumber` | (latest) | Local PDF text and table extraction | `core/file_reader.py` |
+| `markitdown` | (any) | Multi-format Office-to-Markdown parser | `core/file_reader.py` |
+| `pandas` | `>=2,<4` | Tabular data analysis and manipulation | `actions/file_processor.py` |
+| `pydub` | `>=0.25,<1` | Audio file chunking and conversions | `actions/file_processor.py` |
+| `audioop-lts` | `>=0.2.1` | Restores stdlib `audioop` on Python 3.13+ | `actions/file_processor.py` |
+| `py7zr` | `>=0.20,<2` | 7z archive extraction | `core/file_reader.py` |
 
-### Local Speech & Wake Word
-
+### 6. Local Speech, Wake-Word & Remote Dashboard
 | Package | Version | Purpose | Used By |
 |---------|---------|---------|---------|
-| `faster-whisper` | `>=1.0,<2` | Local video transcription (CTranslate2) | `actions/agent_reach.py` |
-| `openwakeword` | `>=0.6,<1` | "Hey Jarvis" wake-word detection | `core/wake_word.py` |
+| `faster-whisper` | `>=1.0,<2` | Video transcription fallback (CTranslate2) | `actions/agent_reach.py` |
+| `openwakeword` | `>=0.6,<1` | Offline wake-word detection | `core/wake_word.py` |
+| `fastapi` | `>=0.110,<1` | HTTP API server for remote endpoints | `dashboard/server.py` |
+| `uvicorn[standard]` | `>=0.27,<1` | ASGI web server | `dashboard/server.py` |
+| `cryptography` | `>=42,<50` | AES-256 session token generation | `dashboard/server.py` |
 
-### Remote Dashboard
-
-| Package | Version | Purpose | Used By |
-|---------|---------|---------|---------|
-| `fastapi` | `>=0.110,<1` | HTTP server | `dashboard/server.py` |
-| `uvicorn[standard]` | `>=0.27,<1` | ASGI server | `dashboard/server.py` |
-| `cryptography` | `>=42,<50` | AES-256-CBC encryption | `dashboard/server.py` |
-| `python-multipart` | `>=0.0.9,<1` | File uploads | `dashboard/server.py` |
-| `qrcode[pil]` | `>=7,<9` | QR code generation | `dashboard/server.py` |
-
-### Windows-Only
-
-| Package | Purpose |
-|---------|---------|
-| `comtypes` | Windows COM |
-| `pycaw` | Windows volume control |
-| `win10toast` | Windows notifications |
-| `pywinauto` | Windows UI automation |
-| `pywin32` | Windows API |
-| `wmi` | Windows WMI queries |
-
-### Dev / Test
-
-| Package | Version | Purpose | Used By |
-|---------|---------|---------|---------|
-| `pytest` | `>=8,<10` | Test suite runner | `tests/` |
-
-## Why Version Bounds
-
-```
-Lower bound: What the app is developed against
-Upper bound: Stops next MAJOR release from breaking fresh clones
-Minor/patch: Flow in freely
-```
+---
 
 ## Summary
 
 ```
-Core: PyQt6, PyQt6-WebEngine, aiohttp, sounddevice, numpy, google-genai
-Web: requests, beautifulsoup4, playwright, scrapling[fetchers], ddgs, duckduckgo-search
-Automation: pyautogui, pyperclip, pygetwindow
-Vision: Pillow, opencv-python, mss
-Documents: youtube-transcript-api, yt-dlp, feedparser, python-pptx, openpyxl,
-           python-docx, PyPDF2, pdfplumber, markitdown, pandas, pydub,
-           audioop-lts (py>=3.13), py7zr, pynvml
-Voice: faster-whisper, openwakeword
-Dashboard: fastapi, uvicorn, cryptography, python-multipart, qrcode
-Windows-only: comtypes, pycaw, win10toast, pywinauto, pywin32, wmi
-Dev: pytest
+Frontend: React 18/19, Vite, Tailwind v4, ReUI, Assistant-UI, Three.js, Lucide
+CLI Tools: rea-agents@6.7.0, cloudflared, uncage, agy, opencode, kilo
+Core Python: PyQt6, aiohttp, sounddevice, numpy, google-genai
+Automation: pyautogui, pyperclip, pygetwindow, pywinauto, pywin32
+Vision: RapidOCR ONNX, Pillow, OpenCV, MSS
+Documents: pdfplumber, pypdf, reportlab, python-docx, openpyxl, pandas
+Speech: Gemini Live (Primary), Faster-Whisper, OpenWakeWord
 ```

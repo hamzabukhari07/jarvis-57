@@ -564,7 +564,11 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
  <div className="space-y-1.5">
  <div className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider">Execution Logs</div>
  <div className="bg-[var(--background)] p-3 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] border border-[var(--border)] text-[10px] text-[var(--foreground)] max-h-40 overflow-y-auto whitespace-pre-wrap">
- {Array.isArray(selectedTask.logs) ? selectedTask.logs.join('\n') : String(selectedTask.logs)}
+ {Array.isArray(selectedTask.logs)
+   ? selectedTask.logs
+       .map((l: string | { time?: string; text?: string; progress?: number }) => (typeof l === 'string' ? l : `${l?.time ?? ''} ${l?.text ?? ''}`.trim()))
+       .join('\n')
+   : String(selectedTask.logs)}
  </div>
  </div>
  )}

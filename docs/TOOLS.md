@@ -1,287 +1,171 @@
-# JARVIS — Tool / Function Calling System
+# 🛠️ ZEZO — Tool & Function Calling System
 
-## Overview
+> **Project:** ZEZO (Autonomous Desktop AI Operating System)  
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows 10/11 (Primary), macOS, Linux  
 
-JARVIS has a **dynamic tool system** where tools are discovered at startup. Every tool follows the same interface: a `TOOL` dict with `name`, `description`, `parameters`, and `handler`.
+---
 
-## Tool Discovery
+## 📖 Overview
 
-### Built-in Actions (actions/*.py)
+ZEZO implements an extensible, highly robust **dynamic tool & function calling architecture**. Tools are discovered at startup across action modules and inline session hooks, validated against rigorous schemas and security risk tiers, and dynamically bound to Google Gemini Live's WebSocket tool declarations.
 
-**File:** `core/action_loader.py` — `discover_actions()`
+Every tool adheres to a standardized schema: an exported `TOOL` dictionary containing its unique identifier `name`, descriptive semantic routing instructions `description`, parameter schema `parameters`, execution callable `handler`, security `risk` tier, and concurrency metadata (`behavior`, `scheduling`).
 
-Scans `actions/` directory for `.py` files with a module-level `TOOL` dict.
+---
 
-### Plugins (plugins/*.py)
+## 🛡️ Tool Discovery & Registration Pipeline
 
-**File:** `core/plugin_loader.py` — `discover_plugins()`
+ZEZO categorizes tools into two primary execution models:
 
-Scans `plugins/` directory for `.py` files with a module-level `PLUGIN` dict.
+```mermaid
+flowchart TD
+    subgraph Discovery["🔍 Startup Discovery"]
+        A["actions/*.py (31 Action Tools)"] -->|core/action_loader.py| AR["Action Registry"]
+        I["main.py (9 Inline Tools)"] -->|TOOL_DECLARATIONS| IR["Inline Registry"]
+        P["plugins/*.py (Optional)"] -->|core/plugin_loader.py| PR["Plugin Registry"]
+    end
 
-### Inline Tools (main.py)
+    subgraph Assembly["⚙️ Declaration Assembly"]
+        AR --> TD["Full Tool Declarations\n(31 Actions + 9 Inline = 40 Tools)"]
+        IR --> TD
+        PR --> TD
+    end
 
-Eight tools are defined directly in `main.py` as `TOOL_DECLARATIONS` because they interact with live-session state (vision, camera, memory writes, shutdown).
-
-## Tool Shape
-
-```python
-TOOL = {
-    "name": "open_app",                    # Unique identifier
-    "description": "...",                   # What Gemini reads to route the call
-    "parameters": {"type": "OBJECT", "properties": {...}},  # Schema
-    "handler": open_app,                     # The callable
-    "behavior": "BLOCKING",                  # Optional: BLOCKING | NON_BLOCKING
-    "scheduling": "WHEN_IDLE",              # Optional: WHEN_IDLE | SILENT | INTERRUPT
-}
+    subgraph Gemini["🧠 Gemini Live Engine"]
+        TD -->|WebSocket session.connect| GL["Google Gemini Live\nFunction Calling Interface"]
+    end
 ```
 
-## Complete Tool Inventory
+### 1. Built-in Action Modules (`actions/*.py`)
+- **Loader:** `core/action_loader.py` — `discover_actions()`
+- **Mechanism:** Scans the `actions/` directory at startup for `.py` modules exposing a module-level `TOOL` dictionary. Modules are validated for signature introspection, parameter schemas, and mandatory risk tiers. Faulty modules are isolated and logged without terminating the runtime.
+- **Supporting Modules:** `actions/screen_processor.py` (provides capture/OCR/vision helpers) and `actions/proactive.py` (background proactive prompt engine).
 
-### Coding & Autonomous Agents
+### 2. Inline Session Tools (`main.py`)
+- Defined directly in `TOOL_DECLARATIONS` inside `main.py` (lines 390–550).
+- Inline tools require direct access to active session state: WebSocket audio streams, camera video view, long-term memory SQLite/JSON transactions, skills catalog persistence, and runtime shutdown signals.
 
-| Tool | File | Purpose | Parameters |
-|------|------|---------|------------|
-| `antigravity_run` | `actions/antigravity_agent.py` | Full multi-file web app & design synthesis agent via official Antigravity CLI (`agy`) with isolated directory allocation, raw HTML reference blueprint injection, stack-fidelity routing (single-file HTML vs React/Next.js), and in-place fleet execution | `task`, `project_path`, `model`, `run_in_place` |
-| `opencode_run` | `actions/opencode_agent.py` | Full autonomous implementation, multi-file code generation & test suite synthesis | `task`, `project_path`, `model` |
-| `kilo_run` | `actions/kilo_agent.py` | Fast refactoring & multi-file editing agent (free tier StepFun / Gemini) | `task`, `project_path`, `model` |
-| `code_helper` | `actions/code_helper.py` | Single function, inline snippet generator, or single-file code review | `task`, `file_path`, `code` |
-| `dev_agent` | `actions/dev_agent.py` | Read-only codebase exploration, architecture analysis, and bug hunting | `task`, `repo_path` |
-| `extract_design_system` | `actions/design_extractor.py` | On-demand design extractor for custom HTML files, URLs, and generating standalone `DESIGN.md` specs | `file_path`, `output_path`, `action`, `force` |
-| `fleet_control` | `actions/fleet_control.py` | Orchestrate named specialist agent fleet (dispatch, hire, fire, list_agents, get_status) with automated capability routing, overflow load-balancing to Haider (max 3 concurrent tasks), and isolated workspaces | `action`, `agent_id`, `task`, `role`, `default_tool`, `model_id`, `specialty` |
-| `task_status` | `actions/task_status.py` | Query live progress, inspect logs, or cancel/terminate running background tasks | `action` ('status'/'cancel'), `task_id` |
+### 3. Dynamic Drop-in Plugins (`plugins/*.py`)
+- **Loader:** `core/plugin_loader.py` — `discover_plugins()`
+- Scans `plugins/` for custom user scripts exposing a `PLUGIN` dictionary.
 
+---
 
-### System Control
+## 🔒 Security Risk Tiers
 
-| Tool | File | Purpose | Parameters |
-|------|------|---------|------------|
-| `system_status` | `main.py` | Returns CPU, RAM, GPU, temperature, uptime | None |
-| `shutdown_jarvis` | `main.py` | Ends the conversation session | None |
-| `manage_monitor` | `main.py` | Add/remove/list background monitoring topics | action, topic |
+Every tool explicitly declares a security classification tier under `TOOL['risk']`. This governs execution sandboxing, confirmation gating, and agent permission boundaries:
 
-### File Control
+| Risk Tier | Definition | Examples |
+|-----------|------------|----------|
+| `read_only` | Pure querying, parsing, hardware telemetry, or data extraction without altering any local or remote state. | `system_status`, `code_engines_status`, `recall_history`, `ast_tool`, `task_status`, `web_search` |
+| `local_mutation` | Modifies local OS state, files, active desktop windows, reminders, volume, or fleet roster. | `computer_control`, `open_app`, `file_controller`, `manage_monitor`, `fleet_control`, `reminder` |
+| `external_mutation` | Transmits outbound data over external networks or third-party communications (e.g., messaging apps). | `send_message`, `agent_reach` |
+| `code_execution` | Executes terminal commands, shell scripts, or autonomous multi-file coding synthesis engines. | `quick_snippet`, `antigravity_run`, `opencode_run`, `kilo_run`, `clone_website` |
+| `privileged_os` | High-impact system commands (reboot, network adapter toggles, full assistant shutdown). Guarded by UI confirmation tokens. | `shutdown_zezo` |
 
-| Tool | File | Purpose |
-|------|------|---------|
-| `file_controller` | `actions/file_controller.py` | Move, rename, copy, create, delete files |
-| `file_processor` | `actions/file_processor.py` | Read, summarize, answer questions about files |
-| `desktop` | `actions/desktop.py` | Desktop organization |
+---
 
-### Browser & Web
+## 📋 Complete Tool Inventory
 
-| Tool | File | Purpose | Parameters |
-|------|------|---------|------------|
-| `clone_website` | `actions/website_cloner.py` | Offline website clone: auto-tuned Uncage crawl → strict completion check → asset integrity gate → faithful standalone HTML + ephemeral local preview (9400-9480). Optional ZEZO-native React/Next rebuild of the capture into `Desktop/<domain>_cloned_app`. Runs only after the user confirms the read-back plan. | `url`, `mode` ('single_page'/'full_site'), `output_format` ('static'/'clean_html'/'react'/'nextjs'), `target_dir`, `confirmed`, `main_pages_only` |
-| `browser_control` | `actions/browser_control.py` | High-speed native browser automation (Rust agent-browser daemon over CDP). Desktop-first when driving the user's live browser: real tab enumeration + switch-by-title via Windows UIA, state-preserving window focus, scroll focus-trap release, and URL/UIA click resolution; isolated daemon sessions unchanged. Ref-based accessibility tree (@e1, @e2), tab management, forms, scrolling, screenshots, headed/headless switching | `action`, `url`, `selector`, `text`, `target`, `headed`, `query`, `direction`, `amount`, `key`, `path`, `annotate`, `fields`, `isolated` |
-| `web_read_page` | `actions/web_reader.py` | Deep web scraping and markdown text extraction. Scrapling (Fetcher/StealthyFetcher) when installed, otherwise a built-in `requests` + BeautifulSoup fallback. | `url`, `stealth`, `max_chars` |
-| `web_search` | `actions/web_search.py` | Ultra-fast 3-tier search (Tavily AI &lt;500ms ➔ Gemini Grounded ➔ DDG) with Groq LPU synthesis, modes: search, news, research, price, compare | `query`, `mode`, `items`, `aspect` |
-| `agent_reach` | `actions/agent_reach.py` | Multi-platform intelligence, spoken audio Whisper transcription, video transcripts, social discussions & repo analysis (Instagram Reels, TikTok, YouTube, Reddit, GitHub, X, Stack Overflow, Hacker News, RSS) | `platform` ('auto'/'multi'/'instagram'/'tiktok'/'youtube'/'reddit'/'github'/'twitter'/'stackoverflow'/'hackernews'/'rss'), `target` |
-| `flight_finder` | `actions/flight_finder.py` | Live flight price and availability | `origin`, `destination`, `date` |
-| `youtube_video` | `actions/youtube_video.py` | Search, play, control YouTube | `query`, `action` |
+ZEZO features **40 tools** (31 active action tools + 9 inline tools).
 
-### OS Controls & Media
+### 1. Coding & Autonomous Multi-Agent Engines
 
-| Tool | File | Purpose | Parameters |
-|------|------|---------|------------|
-| `computer_settings` | `actions/computer_settings.py` | Volume, brightness, WiFi, power, battery queries | `action`, `value` |
-| `computer_control` | `actions/computer_control.py` | Mouse clicks/drags, keyboard hotkeys, Unicode typing, compound batch macros, window maximize/minimize (`SW_MAXIMIZE`/`SW_MINIMIZE`), safe window closure with exact title matching (`_safe_close_window`), and 3-tier escalated perception (L1 UIA ➔ L1.5 RapidOCR ROI ➔ L2 Vision) | `action` ('click'/'screen_click'/'double_click'/'type'/'hotkey'/'press'/'batch'/'maximize'/'minimize'/'get_active_window_info'/'close_window'/aliases), `x`, `y`, `description`, `text`, `keys`, `key`, `sequence` |
-| `open_app` | `actions/open_app.py` | Application launcher with post-launch focus guard, Chrome profile directory resolution (`profile='Hamza'`), non-destructive UI view switching (`office_view` vs `dashboard`), process termination, fast local software install verification (`action='check'`), and silent background software installation via Windows Package Manager (`action='install'`) guarded by ReUI Confirmation Gate | `app_name`, `path`, `profile`, `action` ('open'/'close'/'check'/'install') |
-| `weather_report` | `actions/weather_report.py` | Live weather forecast | `city`, `time` |
-| `game_updater` | `actions/game_updater.py` | Steam/Epic game updates and patch notes | `game_name`, `action` |
-| `reminder` | `actions/reminder.py` | Scheduled alarms, timers, reminders | `time_str`, `message` |
-| `send_message` | `actions/send_message.py` | WhatsApp, Telegram messaging with explicit send governance | `platform`, `action` ('search'/'send'), `recipient`, `message` |
+| Tool Name | Origin File | Risk Tier | Behavior | Purpose & Description | Parameters |
+|-----------|-------------|-----------|----------|-----------------------|------------|
+| `antigravity_run` | `actions/antigravity_agent.py` | `code_execution` | `NON_BLOCKING` | Full autonomous multi-file web app & design synthesis agent via official Antigravity CLI (`agy`) with isolated directory allocation, raw HTML reference blueprint injection, and stack-fidelity routing. | `task` (req), `project_path`, `model` |
+| `opencode_run` | `actions/opencode_agent.py` | `code_execution` | `NON_BLOCKING` | Full autonomous implementation, multi-file code generation, and test suite synthesis engine. | `task` (req), `model`, `project_path` |
+| `kilo_run` | `actions/kilo_agent.py` | `code_execution` | `NON_BLOCKING` | Ultra-fast refactoring and multi-file code editing agent (powered by StepFun / Gemini models). | `task` (req), `model`, `project_path` |
+| `quick_snippet` | `actions/quick_snippet.py` | `code_execution` | `BLOCKING` | Fast 1-second inline code snippet generator, single-file editor, code explainer, and silent background terminal/CLI command execution tool. | `action` (req: 'write'\|'edit'\|'explain'\|'run'\|'command'\|'build'\|'auto'), `command`, `description`, `language`, `output_path`, `file_path`, `code`, `args`, `timeout` |
+| `code_engines_status` | `actions/code_engines_status.py` | `read_only` | `BLOCKING` | Read-only health inspector for local coding engines (Antigravity CLI, OpenCode, Kilo Code). Reports installation status, authentication, and readiness. | `action` ('list'\|'check'), `engine` ('antigravity'\|'opencode'\|'kilo'), `force` (bool) |
+| `ast_tool` | `actions/ast_tool.py` | `read_only` | `BLOCKING` | Structural Python code parser and AST analyzer. Inspects functions, classes, arguments, and calculates cyclomatic complexity hotspots. | `path`, `op` ('inspect'\|'functions'\|'classes'\|'complexity'), `content` |
+| `extract_design_system` | `actions/design_extractor.py` | `read_only` | `BLOCKING` | On-demand deterministic design token extractor for HTML files and URLs to generate standalone `DESIGN.md` specifications. | `file_path`, `output_path`, `action`, `force` |
+| `fleet_control` | `actions/fleet_control.py` | `local_mutation` | `BLOCKING` | Orchestrates the autonomous multi-agent fleet (Verve, Flux, Ahmad, Michael, Dwight, Kelly, etc.). Supports task dispatch, workspace folder binding (`path`), hiring, firing, role updates, and workflow decomposition. | `action` (req: 'dispatch'\|'hire'\|'fire'\|'update'\|'edit'\|'list_agents'\|'get_status'\|'peer_chat'\|'decompose_workflow'), `agent_id`, `from_agent`, `to_agent`, `task`, `path`, `upstream_deliverables`, `name`, `role`, `default_tool`, `allowed_tools`, `model_id`, `specialty` |
+| `task_status` | `actions/task_status.py` | `read_only` | `BLOCKING` | Queries live background task progress, inspects streaming logs, or cancels running background tasks. | `action` ('status'\|'cancel'), `task_id` |
 
-### Vision & Perception
+### 2. Web Intelligence, Reverse Engineering & Browser Automation
 
-| Tool | File | Purpose | Parameters |
-|------|------|---------|------------|
-| `screen_process` | `actions/screen_processor.py` | Fast OS ground-truth state (1ms), RapidOCR text extraction, multi-region capture, dHash caching (0ms hit), and Gemini multimodal vision | `action` ('capture'/'read_text'), `angle` ('screen'/'camera'), `prompt`, `region` |
-| `close_camera` | `main.py` | Close live camera stream view | None |
+| Tool Name | Origin File | Risk Tier | Behavior | Purpose & Description | Parameters |
+|-----------|-------------|-----------|----------|-----------------------|------------|
+| `browser_control` | `actions/browser_control.py` | `local_mutation` | `BLOCKING` | High-speed native browser automation over CDP/UIA. Drives desktop Chrome: live tab enumeration, title switching, scrolling, click resolution, and accessibility navigation. | `action`, `url`, `query`, `engine`, `selector`, `text`, `direction`, `amount`, `key`, `target`, `urls`, `path`, `headed`, `annotate`, `desktop_only`, `fields` |
+| `reverse_engineer` | `actions/reverse_engineer.py` | `read_only` | `NON_BLOCKING` | Native REA (Reverse Engineer Anything) CLI integration. Inspects website DOM, accessibility tree, network headers/bodies, WebGL/shaders, and storage with zero LLM API cost. | `url` (req), `focus` ('full'\|'architecture'\|'apis_network'\|'shaders_webgl'\|'animations') |
+| `clone_website` | `actions/website_cloner.py` | `code_execution` | `NON_BLOCKING` | Offline website cloning: deep crawl with asset integrity check, standalone HTML capture, and optional rebuild. Governed by a strict 2-step confirmation gate. | `url`, `mode` ('single_page'\|'full_site'), `output_format`, `target_dir`, `confirmed` (bool), `main_pages_only` (bool) |
+| `web_read_page` | `actions/web_reader.py` | `read_only` | `NON_BLOCKING` | Deep web scraping and clean markdown text extraction via Scrapling (Fetcher/StealthyFetcher) with fallback to BeautifulSoup. | `url` (req), `stealth` (bool), `max_chars` (int) |
+| `web_search` | `actions/web_search.py` | `read_only` | `BLOCKING` | Ultra-fast 3-tier search engine (Tavily AI <500ms ➔ Gemini Grounded ➔ DDG) with Groq LPU text synthesis. | `query` (req), `mode` ('search'\|'news'\|'research'\|'price'\|'compare'), `items` (int), `aspect` |
+| `agent_reach` | `actions/agent_reach.py` | `external_mutation` | `NON_BLOCKING` | Multi-platform intelligence, Whisper transcription, and social discussions (Instagram Reels, TikTok, YouTube, Reddit, GitHub, X, Stack Overflow, Hacker News, RSS). | `target` (req), `platform` (req: 'auto'\|'multi'\|'instagram'\|'tiktok'\|'youtube'\|'reddit'\|'github'\|'twitter'\|'stackoverflow'\|'hackernews'\|'rss'), `output_file` |
+| `youtube_video` | `actions/youtube_video.py` | `local_mutation` | `BLOCKING` | Search, open, play, pause, and control YouTube video playback directly in the user's browser. | `action` ('play'\|'pause'\|'resume'\|'stop'\|'next'\|'prev'\|'mute'\|'unmute'), `query`, `save`, `region`, `url` |
+| `flight_finder` | `actions/flight_finder.py` | `read_only` | `BLOCKING` | Queries live flight schedules, prices, cabin classes, and availability across routes. | `origin` (req), `destination` (req), `date` (req), `return_date`, `passengers`, `cabin`, `save` |
 
-### Memory
+### 3. OS Automation, Desktop Control & Media
 
-| Tool | File | Purpose |
-|------|------|---------|
-| `save_memory` | `main.py` | Save fact to long-term memory |
-| `recall_memory` | `main.py` | Search long-term memory |
+| Tool Name | Origin File | Risk Tier | Behavior | Purpose & Description | Parameters |
+|-----------|-------------|-----------|----------|-----------------------|------------|
+| `computer_control` | `actions/computer_control.py` | `local_mutation` | `BLOCKING` | Comprehensive OS input automation: mouse clicks, drags, hotkeys, Unicode typing, compound batch macros, window maximize/minimize, safe window close, and 3-tier escalated perception (L1 UIA ➔ L1.5 RapidOCR ➔ L2 Vision). | `action` (req), `sequence`, `text`, `x`, `y`, `x1`, `y1`, `x2`, `y2`, `width`, `height`, `keys`, `key`, `direction`, `amount`, `seconds`, `title`, `monitor_index`, `description`, `type`, `field`, `clear_first`, `path` |
+| `computer_settings` | `actions/computer_settings.py` | `local_mutation` | `BLOCKING` | Adjusts OS settings: system volume, display brightness, WiFi toggles, battery status, and GUI undo shortcuts. | `action` (req), `description`, `value` |
+| `open_app` | `actions/open_app.py` | `local_mutation` | `BLOCKING` | Launches applications with focus guards, resolves Chrome profiles (`profile='Hamza'`), switches main UI views (`home_view` vs `office_view`), checks software install status, and executes silent winget installations. | `app_name`, `path`, `profile`, `action` ('open'\|'close'\|'check'\|'install') |
+| `desktop_control` | `actions/desktop.py` | `local_mutation` | `BLOCKING` | Desktop workspace organization, cleanup, categorization, and shortcut management. | `action` (req), `path`, `url`, `mode`, `task` |
+| `file_controller` | `actions/file_controller.py` | `local_mutation` | `BLOCKING` | Local filesystem controller: create, write, read, move, copy, rename, delete files and folders. | `action` (req), `path`, `destination`, `new_name`, `content`, `name`, `extension`, `count` |
+| `file_processor` | `actions/file_processor.py` | `read_only` | `NON_BLOCKING` | Reads, summarizes, analyzes documents, converts images, and resolves lazy file attachments dropped into the UI. | `file_path`, `action`, `instruction`, `format`, `width`, `height`, `scale`, `quality`, `start`, `end`, `timestamp`, `column`, `value`, `condition`, `ascending`, `save`, `destination` |
+| `manage_monitor` | `actions/background_monitor.py` | `local_mutation` | `BLOCKING` | Configures continuous background surveillance and tracking topics. | `action` (req: 'add'\|'remove'\|'list'\|'clear'), `topic` |
+| `system_status` | `actions/system_monitor.py` | `read_only` | `BLOCKING` | Gathers real-time OS hardware telemetry: CPU load, RAM usage, GPU memory, core temperatures, and system uptime. | None |
+| `reminder` | `actions/reminder.py` | `local_mutation` | `BLOCKING` | Schedules system alarms, timers, and scheduled notifications. | `action` ('set'\|'list'\|'clear'\|'dismiss'), `minutes`, `date`, `time`, `message` |
+| `weather_report` | `actions/weather_report.py` | `read_only` | `BLOCKING` | Retrieves current meteorological conditions and weather forecasts for any city. | `city` (req) |
+| `game_updater` | `actions/game_updater.py` | `read_only` | `BLOCKING` | Checks Steam and Epic Games patch notes and schedules background updates. | `action`, `platform`, `game_name`, `app_id`, `hour`, `minute`, `shutdown_when_done` |
+| `send_message` | `actions/send_message.py` | `external_mutation` | `BLOCKING` | Dispatches WhatsApp and Telegram messages with strict search and confirmation governance. | `receiver` (req), `message_text`, `platform` (req: 'WhatsApp'\|'Telegram'), `action` ('search'\|'send') |
 
-### Undo
+### 4. Inline Session Tools (`main.py`)
 
-| Tool | File | Purpose |
-|------|------|---------|
-| `undo` | `main.py` | Reverse last action |
+| Tool Name | Defined Line | Risk Tier | Behavior | Purpose & Description | Parameters |
+|-----------|--------------|-----------|----------|-----------------------|------------|
+| `screen_process` | `main.py:398` | `read_only` | `BLOCKING` | Captures display or webcam, performs RapidOCR text extraction and Gemini multimodal visual inspection. | `angle` ('screen'\|'camera'), `text` (req) |
+| `close_camera` | `main.py:415` | `local_mutation` | `BLOCKING` | Closes active webcam preview display. | None |
+| `shutdown_zezo` | `main.py:424` | `privileged_os` | `BLOCKING` | Shuts down the ZEZO application gracefully. Guarded by confirmation. | None |
+| `save_memory` | `main.py:437` | `local_mutation` | `BLOCKING` | Silently persists important personal facts about the user to SQLite/JSON long-term memory. | `category` (req), `key` (req), `value` (req) |
+| `recall_memory` | `main.py:467` | `read_only` | `BLOCKING` | Looks up stored user facts or performs full-text lexical search across historical conversations. | `query` |
+| `undo` | `main.py:492` | `local_mutation` | `BLOCKING` | Reverses the last reversible action performed by ZEZO (files moved/written, settings toggled). | `action` ('undo'\|'list') |
+| `read_skill` | `main.py:516` | `read_only` | `BLOCKING` | Reads full step-by-step instructions and markdown best practices for an available declarative skill on disk. | `skill_name` (req) |
+| `list_skills` | `main.py:527` | `read_only` | `BLOCKING` | Lists all available skills and workflows with their summary descriptions. | None |
+| `save_learned_skill` | `main.py:539` | `local_mutation` | `BLOCKING` | Autonomously synthesizes and saves a new skill into the persistent skills catalog after completing complex workflows. | `name` (req), `description` (req), `instructions` (req) |
 
-### Plugins (Dynamic)
+---
 
-Every `.py` file in `plugins/` with a `PLUGIN` dict becomes a tool. Examples:
-- `quiz.py` — Interactive quiz
-- `document_review.py` — Contract/policy review
-- `background_monitor.py` — Background monitoring
-- `proactive.py` — Proactive 2.0
-- `reminder.py` — OS-native notifications
-- `system_monitor.py` — Hardware telemetry
-- `open_app.py` — Application launcher
-- `screen_processor.py` — Screen/camera capture
-- `weather_report.py` — Weather
-- `flight_finder.py` — Flight search
-- `game_updater.py` — Game updates
-- `file_processor.py` — Document reading
-- `code_helper.py` — Code helper
-- `dev_agent.py` — Developer agent
-- `send_message.py` — Messaging
-- `youtube_video.py` — YouTube control
-- `browser_control.py` — Browser control
-- `computer_control.py` — Desktop control
-- `computer_settings.py` — Settings
-- `desktop.py` — Desktop management
+## 🔄 Function Calling Execution Lifecycle
 
-## How Gemini Discovers Tools
+The interaction between Google Gemini Live and ZEZO's tool execution engine proceeds in 6 discrete stages:
 
-```python
-_all_decls = (
-    TOOL_DECLARATIONS                          # Inline (main.py)
-    + self._action_registry.get_tool_declarations()   # Actions
-    + self._plugin_registry.get_tool_declarations()   # Plugins
-)
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User (Voice / Ctrl+Alt)
+    participant Live as Gemini Live API
+    participant Engine as ZezoLive (main.py)
+    participant Registry as Action / Inline Registry
+    participant Tool as Tool Handler
+
+    User->>Live: Spoken command / Request
+    Live->>Engine: types.FunctionCall(name, args)
+    Engine->>Engine: Verify Risk Tier & UI Confirmation Gate
+    Engine->>Registry: Resolve handler & introspect signature
+    Registry->>Tool: Execute handler(parameters, **ctx)
+    Tool-->>Registry: Return JSON/Dict/Text result
+    Registry-->>Engine: Formatted result string
+    Engine->>Live: types.FunctionResponse(id, name, result)
+    Live-->>User: Conversational vocal response (1-2 sentences)
 ```
 
-These are sent to Gemini as:
-```python
-tools=[{"function_declarations": _all_decls}]
-```
+1. **Model Generates Function Call:** Gemini evaluates the prompt, `{capabilities}` list, and conversation context, emitting a `FunctionCall`.
+2. **Main Loop Interception:** `ZezoLive._execute_tool()` extracts tool identifier and argument dictionaries.
+3. **Safety & Confirmation Gate:** For irreversible or `privileged_os` actions, a UI-issued token confirmation banner is presented.
+4. **Signature Introspection:** `core/action_loader.py` dynamically injects declared context arguments (`player`, `speak`, `session_memory`, `context`).
+5. **Non-Blocking / Threaded Execution:** Heavy operations run asynchronously via `asyncio.to_thread` or the background `TaskManager`.
+6. **Result Streaming & Brevity Return:** `FunctionResponse` is returned to Gemini Live. The model speaks a concise 1–2 sentence conversational summary.
 
-## How Tool Calling Works
+---
 
-### Step 1: Gemini Generates a Function Call
+## 🗑️ Purged / Deprecated Tools
 
-The model outputs a function call in its response based on:
-- The tool descriptions in the system prompt
-- The `{capabilities}` section populated with all tool names
-- The user's request
-
-### Step 2: Main Loop Parses the Function Call
-
-```python
-async def _execute_tool(self, fc) -> types.FunctionResponse:
-    name = fc.name
-    args = dict(fc.args or {})
-```
-
-### Step 3: Handler Dispatch
-
-```python
-if name == "save_memory":
-    # Direct inline handler
-elif name == "recall_memory":
-    # Direct inline handler
-elif name == "screen_process":
-    # Direct inline handler
-elif self._action_registry.has(name):
-    self._action_registry.run(name, args, ctx)
-elif self._plugin_registry.has(name):
-    self._plugin_registry.run(name, args, player=self.ui)
-else:
-    result = f"Unknown tool: {name}"
-```
-
-### Step 4: Handler Execution
-
-```python
-def _call_handler(fn, parameters, ctx):
-    sig = inspect.signature(fn)
-    # Passes only the kwargs the function declares
-    # Supports: def run(parameters): and def run(parameters, player=None):
-```
-
-### Step 5: Result Returned to Gemini
-
-```python
-return types.FunctionResponse(
-    id=fc.id, name=name,
-    response={"result": result},
-    scheduling=_sched  # if declared
-)
-```
-
-### Step 6: Gemini Generates Final Response
-
-The model processes the tool result and generates natural language output.
-
-## Tool Parameters
-
-All tools use the same parameter schema:
-```python
-"parameters": {"type": "OBJECT", "properties": {...}}
-```
-
-Example from `open_app`:
-```python
-TOOL = {
-    "name": "open_app",
-    "description": "Launches an application...",
-    "parameters": {
-        "type": "OBJECT",
-        "properties": {
-            "app_name": {"type": "STRING", "description": "Name of the application"},
-        },
-        "required": ["app_name"]
-    },
-    "handler": open_app,
-}
-```
-
-## Tool Behavior
-
-| Behavior | Meaning | Example |
-|----------|---------|---------|
-| `BLOCKING` | Waits for result before continuing | Most tools |
-| `NON_BLOCKING` | Returns immediately, result arrives later | Phone calls |
-
-| Scheduling | Meaning |
-|------------|---------|
-| `WHEN_IDLE` | Wait for a gap in speech |
-| `SILENT` | Record result, don't prompt reply |
-| `INTERRUPT` | Cut in immediately |
-
-## Undo System
-
-**File:** `core/undo.py`
-
-```python
-# In action handlers:
-from core.undo import push_undo
-push_undo(f"volume → {new}%", lambda: volume_set(old))
-```
-
-- Stack depth: 10 entries max
-- Thread-safe with `threading.Lock`
-- `undo_last()` pops and executes the reverse callable
-- `history()` returns labels for the UI undo panel
-
-## Confirmation System
-
-**File:** `core/confirm.py`
-
-For irreversible actions (shutdown, restart, WiFi):
-```python
-confirm.request(key, title, detail, run)
-    ↓
-UI shows CONFIRM/CANCEL banner
-    ↓
-User presses CONFIRM
-    ↓
-confirm.resolve(True) → runs the stored callable
-```
-
-**Key security property**: The confirmation token is issued by the UI, never by the model. The model cannot forge it.
-
-## Summary
-
-```
-All tools follow: TOOL dict + handler function
-Discovery: auto-scanned at startup
-Dispatch: _execute_tool() in main.py
-Security: confirm.py for irreversible actions
-Undo: core/undo.py for reversible actions
-Dynamic: Adding a tool = adding a .py file with TOOL dict
-```
+The following legacy tools were removed from the codebase and are **no longer supported**:
+- `actions/code_helper.py` ➔ Replaced by `actions/quick_snippet.py` (ultra-fast 1s snippets and terminal commands).
+- `actions/dev_agent.py` ➔ Replaced by the autonomous fleet orchestrator (`actions/fleet_control.py`) and AST analyzer (`actions/ast_tool.py`).
+- `shutdown_jarvis` ➔ Renamed to `shutdown_zezo` (`main.py:424`).

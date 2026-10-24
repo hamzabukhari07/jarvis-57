@@ -30,30 +30,40 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import actions.website_cloner as cloner
 from actions.fleet_control import fleet_control
 from actions.website_cloner import (
+    CAPTURE_ONLY_FORMATS,
+    DEFAULT_OUTPUT_FORMAT,
     MAX_CRAWL_TIMEOUT_SEC,
-    REBUILD_PROMPT_MAX_CHARS,
+    RE_ARTIFACT_APP_DIR,
+    RE_ARTIFACT_SINGLE,
+    RE_ARTIFACT_SPECS,
+    RE_OUTPUT_CLAUSES,
+    RE_REBUILD_FAILURE_PREFIX,
     SINGLE_PAGE_TIMEOUT_SEC,
     TOOL,
     UNCAGE_NO_PURGE,
     UNCAGE_PAGE_TIMEOUT_CRAWL_MS,
     UNCAGE_PAGE_TIMEOUT_SINGLE_MS,
     _extract_domain,
+    _new_html_files,
     _normalize_url,
-    _run_react_rebuild,
+    _re_output_clause,
+    _run_reverse_engineer,
     _run_uncage_process,
     _sanitize_filename,
     _uncage_page_timeout_ms,
     _uncage_result_ok,
+    _verify_re_artifact,
     clone_website_action,
     crawl_timeout_budget,
     localize_and_download_assets,
-    react_rebuild_prompt,
+    rebuild_failure_message,
+    reverse_engineer_prompt,
     run_uncage_exporter,
     start_local_preview_server,
     verify_local_assets,
 )
 from core.action_loader import discover_actions
-from core.repo_context import get_unique_clone_dir, register_clone
+from core.repo_context import expand_user_dir, get_unique_clone_dir, register_clone
 from core.task_manager import TaskManager, TaskStatus
 from core.undo import can_undo, clear as clear_undo, push_undo, register_clone_snapshot, undo_last
 
@@ -626,14 +636,27 @@ class TestConfirmationGate(unittest.TestCase):
         self.assertNotIn("Task ID", out)
         self.assertEqual(self.tm.submitted, [])
 
-    def test_react_readback_states_the_extra_cost(self):
+    def test_readback_names_the_rebuild_and_says_the_capture_is_kept(self):
         out = self._call({
             "url": "https://example.com",
             "mode": "single_page",
             "output_format": "react",
             "target_dir": "Desktop/xyz_clone",
         })
-        self.assertIn("minutes longer", out)
+        self.assertIn("React + Vite project", out)
+        self.assertIn("always kept and previewed", out)
+        self.assertEqual(self.tm.submitted, [])
+
+    def test_readback_passes_a_stack_named_in_the_user_own_words_through(self):
+        """Any format ZEZO does not have a phrase for is read back verbatim, so the user hears
+        the stack they asked for instead of a default."""
+        out = self._call({
+            "url": "https://example.com",
+            "mode": "single_page",
+            "output_format": "svelte",
+            "target_dir": "Desktop/xyz_clone",
+        })
+        self.assertIn("svelte", out)
         self.assertEqual(self.tm.submitted, [])
 
     def test_confirmed_submits(self):
@@ -651,87 +674,170 @@ class TestConfirmationGate(unittest.TestCase):
         self.assertEqual(params["target_dir"], "Desktop/xyz_clone")
 
 
-class TestReactRebuild(unittest.TestCase):
-    """Phase 5: ZEZO rebuilds the capture itself, and verifies the folder instead of trusting the engine."""
+class TestReverseEngineer(unittest.TestCase):
+    """ZEZO rebuilds the capture with its own engine; success is verified on disk, never taken
+    from the engine's prose, and uncage's own output is never rewritten."""
 
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp(prefix="zezo_react_test_"))
+        self.tmp = Path(tempfile.mkdtemp(prefix="zezo_re_test_"))
         self.clone_dir = self.tmp / "site_clone"
         (self.clone_dir / "assets").mkdir(parents=True)
-        (self.clone_dir / "index.html").write_text("<html><body>hero</body></html>", encoding="utf-8")
+        self.original_index = "<html><body>hero</body></html>"
+        (self.clone_dir / "index.html").write_text(self.original_index, encoding="utf-8")
         (self.clone_dir / "assets" / "style.css").write_text("body{}", encoding="utf-8")
-        self.app_dir = self.tmp / "site_cloned_app"
         self.ctx = _StubCtx()
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def _run(self, engine):
-        with unittest.mock.patch.object(cloner, "get_unique_rebuild_dir", lambda *a, **k: self.app_dir), \
-             unittest.mock.patch("actions.antigravity_agent.antigravity_action", engine):
-            return _run_react_rebuild("https://example.com", self.clone_dir, self.ctx)
+    def _run(self, engine, output_format="raw_html"):
+        with unittest.mock.patch("actions.antigravity_agent.antigravity_action", engine):
+            return _run_reverse_engineer("https://example.com", self.clone_dir, self.ctx, output_format)
 
-    def test_prompt_targets_react_and_not_static_html(self):
-        prompt = react_rebuild_prompt("https://example.com")
-        self.assertLess(len(prompt), REBUILD_PROMPT_MAX_CHARS)
-        markers = _engine_stack_markers()
-        self.assertTrue(any(m in prompt.lower() for m in markers["_react_markers"]))
-        for bad in markers["_static_markers"]:
-            self.assertNotIn(bad, prompt.lower(), f"static marker '{bad}' would hijack the build")
-        self.assertIsNone(markers["_react_negated"].search(prompt.lower()),
-                          "prompt reads as a negation of React to the engine")
+    # ── the prompt ────────────────────────────────────────────────────────
+    def test_prompt_names_the_capture_and_keeps_the_no_prose_guardrails(self):
+        prompt = reverse_engineer_prompt("https://example.com", "raw_html")
+        self.assertIn("https://example.com", prompt)
+        self.assertIn("reverse engineer", prompt.lower())
+        self.assertIn(RE_ARTIFACT_SINGLE, prompt)
+        # These guardrails are what keep the engine writing files instead of an essay.
+        self.assertIn("do not write an analysis report", prompt.lower())
+        self.assertIn("do not create a design system", prompt.lower())
+        self.assertIn("counts as failure", prompt.lower())
 
-    def test_successful_engine_output_is_accepted_and_source_preserved(self):
+    def test_every_curated_format_has_a_clause_and_a_verification_spec(self):
+        for fmt in RE_OUTPUT_CLAUSES:
+            self.assertTrue(_re_output_clause(fmt).strip(), f"{fmt} has an empty clause")
+            self.assertIn(fmt, RE_ARTIFACT_SPECS, f"{fmt} has no verification spec")
+
+    def test_unknown_format_is_passed_through_as_a_named_stack(self):
+        clause = _re_output_clause("svelte")
+        self.assertIn("svelte", clause)
+        self.assertIn(RE_ARTIFACT_APP_DIR, clause)
+
+    def test_default_format_is_a_single_html_rebuild(self):
+        self.assertEqual(DEFAULT_OUTPUT_FORMAT, "raw_html")
+        self.assertNotIn(DEFAULT_OUTPUT_FORMAT, CAPTURE_ONLY_FORMATS)
+
+    # ── how the engine is driven ──────────────────────────────────────────
+    def test_engine_runs_in_place_on_the_capture_folder_in_verbatim_mode(self):
         seen = {}
 
         def _engine(params, **kw):
             seen.update(params)
-            (self.app_dir / "src" / "components").mkdir(parents=True)
-            (self.app_dir / "package.json").write_text("{}", encoding="utf-8")
-            (self.app_dir / "src" / "App.tsx").write_text("export default 1", encoding="utf-8")
-            (self.app_dir / "src" / "components" / "Hero.tsx").write_text("export default 2", encoding="utf-8")
-            return '{"status": "success"}'
-
-        ok, detail, app_dir = self._run(_engine)
-        self.assertTrue(ok, detail)
-        self.assertEqual(app_dir, self.app_dir)
-        self.assertIn("2 React component", detail)
-        # The capture is handed to the engine inside its own workspace...
-        self.assertTrue((self.app_dir / "_source" / "index.html").exists())
-        self.assertTrue((self.app_dir / "_source" / "assets" / "style.css").exists())
-        # ...and the engine is driven in place, on this task's card, without restyling the design.
-        self.assertEqual(seen["project_path"], str(self.app_dir))
-        self.assertTrue(seen["run_in_place"])
-        self.assertIs(seen["task_ctx"], self.ctx)
-        self.assertTrue(seen["skip_design"])
-        self.assertTrue(seen["skip_preview"])
-
-    def test_empty_output_dir_fails(self):
-        ok, detail, app_dir = self._run(lambda params, **kw: '{"status": "success"}')
-        self.assertFalse(ok)
-        self.assertIn("package.json", detail)
-        self.assertEqual(app_dir, self.app_dir)
-
-    def test_fake_success_without_components_fails(self):
-        def _engine(params, **kw):
-            (self.app_dir / "src").mkdir(parents=True)
-            (self.app_dir / "package.json").write_text("{}", encoding="utf-8")
+            (self.clone_dir / RE_ARTIFACT_SINGLE).write_text("<html>rebuilt</html>", encoding="utf-8")
             return '{"status": "success"}'
 
         ok, detail, _ = self._run(_engine)
+        self.assertTrue(ok, detail)
+        # cwd is the capture folder itself, exactly like running the agent by hand on an export.
+        self.assertEqual(seen["project_path"], str(self.clone_dir))
+        self.assertTrue(seen["run_in_place"])
+        self.assertIs(seen["task_ctx"], self.ctx)
+        # verbatim: the engine must not append its own stack directives to this prompt.
+        self.assertEqual(seen["prompt_mode"], "verbatim")
+        self.assertTrue(seen["skip_design"])
+        self.assertTrue(seen["skip_preview"])
+        self.assertIn("reverse engineer", seen["task"].lower())
+
+    def test_uncage_output_is_never_rewritten(self):
+        def _engine(params, **kw):
+            (self.clone_dir / RE_ARTIFACT_SINGLE).write_text("<html>rebuilt</html>", encoding="utf-8")
+            return '{"status": "success"}'
+
+        self._run(_engine)
+        self.assertEqual(
+            (self.clone_dir / "index.html").read_text(encoding="utf-8"), self.original_index
+        )
+        self.assertTrue((self.clone_dir / "assets" / "style.css").exists())
+
+    # ── single-file verification ──────────────────────────────────────────
+    def test_single_html_success_reports_the_new_file(self):
+        def _engine(params, **kw):
+            (self.clone_dir / RE_ARTIFACT_SINGLE).write_text("<html>rebuilt</html>", encoding="utf-8")
+            return '{"status": "success"}'
+
+        ok, detail, artifact = self._run(_engine)
+        self.assertTrue(ok, detail)
+        self.assertEqual(artifact.name, RE_ARTIFACT_SINGLE)
+        self.assertIn(RE_ARTIFACT_SINGLE, detail)
+
+    def test_prose_instead_of_a_file_fails(self):
+        ok, detail, artifact = self._run(lambda params, **kw: '{"status": "success"}')
         self.assertFalse(ok)
-        self.assertIn("jsx", detail)
+        self.assertIsNone(artifact)
+        self.assertIn("no new HTML file", detail)
+
+    def test_new_uncage_snapshot_is_never_a_valid_artifact(self):
+        def _engine(params, **kw):
+            (self.clone_dir / "captured-raw-2.html").write_text("<html>raw</html>", encoding="utf-8")
+            return '{"status": "success"}'
+
+        ok, detail, _ = self._run(_engine)
+        self.assertFalse(ok, "a raw uncage snapshot must never pass as the rebuilt artifact")
 
     def test_engine_reported_failure_keeps_the_reason(self):
         def _engine(params, **kw):
-            (self.app_dir / "src").mkdir(parents=True)
-            (self.app_dir / "package.json").write_text("{}", encoding="utf-8")
-            (self.app_dir / "src" / "App.jsx").write_text("x", encoding="utf-8")
+            (self.clone_dir / RE_ARTIFACT_SINGLE).write_text("<html>rebuilt</html>", encoding="utf-8")
             return '{"status": "failed", "error": "quota exceeded"}'
 
         ok, detail, _ = self._run(_engine)
-        self.assertFalse(ok, "engine reported failure but the folder was accepted")
+        self.assertFalse(ok, "engine reported failure but the artifact was accepted")
         self.assertIn("quota exceeded", detail)
+
+    # ── project verification ──────────────────────────────────────────────
+    def test_project_format_needs_its_profile_shape(self):
+        def _engine(params, **kw):
+            app = self.clone_dir / RE_ARTIFACT_APP_DIR
+            (app / "src").mkdir(parents=True)
+            (app / "package.json").write_text("{}", encoding="utf-8")
+            (app / "src" / "App.tsx").write_text("export default 1", encoding="utf-8")
+            return '{"status": "success"}'
+
+        ok, detail, artifact = self._run(_engine, "react")
+        self.assertTrue(ok, detail)
+        self.assertEqual(artifact, self.clone_dir / RE_ARTIFACT_APP_DIR)
+        self.assertIn("1 source file", detail)
+
+    def test_project_without_source_files_fails(self):
+        def _engine(params, **kw):
+            app = self.clone_dir / RE_ARTIFACT_APP_DIR
+            (app / "src").mkdir(parents=True)
+            (app / "package.json").write_text("{}", encoding="utf-8")
+            return '{"status": "success"}'
+
+        ok, detail, _ = self._run(_engine, "react")
+        self.assertFalse(ok)
+        self.assertIn("no source files", detail)
+
+    def test_project_missing_its_manifest_fails(self):
+        ok, detail, _ = self._run(lambda params, **kw: '{"status": "success"}', "php")
+        self.assertFalse(ok)
+        self.assertIn(RE_ARTIFACT_APP_DIR, detail)
+
+    def test_custom_stack_succeeds_when_real_files_appear(self):
+        def _engine(params, **kw):
+            app = self.clone_dir / RE_ARTIFACT_APP_DIR
+            app.mkdir(parents=True)
+            (app / "main.go").write_text("package main", encoding="utf-8")
+            return '{"status": "success"}'
+
+        ok, detail, artifact = self._run(_engine, "go")
+        self.assertTrue(ok, detail)
+        self.assertEqual(artifact, self.clone_dir / RE_ARTIFACT_APP_DIR)
+
+    def test_custom_stack_with_no_files_fails(self):
+        ok, detail, artifact = self._run(lambda params, **kw: '{"status": "success"}', "svelte")
+        self.assertFalse(ok)
+        self.assertIsNone(artifact)
+        self.assertIn("no files for the requested stack", detail)
+
+    def test_prompt_fits_the_windows_command_line_budget(self):
+        """The prompt travels as one argv element, and verbatim mode deliberately skips the
+        engine's 6000-char truncation - so this is what guards it instead."""
+        for fmt in ("raw_html", "nextjs", "svelte"):
+            prompt = reverse_engineer_prompt("https://example.com", fmt)
+            self.assertLess(len(prompt), 16000, f"{fmt} prompt is too long for the CLI")
 
     def test_worker_flags_are_forwarded_to_the_engine(self):
         """antigravity_action builds a fresh worker dict, so these flags must be copied explicitly."""
@@ -741,15 +847,17 @@ class TestReactRebuild(unittest.TestCase):
         with unittest.mock.patch.object(aa, "_run_worker",
                                         lambda payload, ctx=None: seen.update(payload) or {"status": "success"}):
             aa.antigravity_action({
-                "task": "Rebuild the captured site as a React app.",
-                "project_path": str(self.app_dir),
+                "task": "Reverse engineer the captured project.",
+                "project_path": str(self.clone_dir),
                 "run_in_place": True,
                 "task_ctx": self.ctx,
                 "skip_design": True,
                 "skip_preview": True,
+                "prompt_mode": "verbatim",
             })
         self.assertTrue(seen.get("skip_design"), "skip_design never reached _run_worker")
         self.assertTrue(seen.get("skip_preview"), "skip_preview never reached _run_worker")
+        self.assertEqual(seen.get("prompt_mode"), "verbatim", "prompt_mode never reached _run_worker")
 
 
 class TestFailureEscalation(unittest.TestCase):
@@ -778,23 +886,73 @@ class TestFailureEscalation(unittest.TestCase):
         self.assertIn("path", FLEET_TOOL["parameters"]["properties"])
 
 
-def _engine_stack_markers() -> dict:
-    """Read the stack markers antigravity_agent actually uses, so this test can't drift from it."""
-    import ast
 
-    src = (Path(__file__).resolve().parent.parent / "actions" / "antigravity_agent.py").read_text(encoding="utf-8")
-    found: dict = {}
-    for node in ast.walk(ast.parse(src)):
-        if not isinstance(node, ast.Assign) or not isinstance(node.targets[0], ast.Name):
-            continue
-        name = node.targets[0].id
-        if name in ("_static_markers", "_react_markers"):
-            found[name] = ast.literal_eval(node.value)
-        elif name == "_react_negated" and isinstance(node.value, ast.Call):
-            found[name] = re.compile(ast.literal_eval(node.value.args[0]))
-    missing = {"_static_markers", "_react_markers", "_react_negated"} - set(found)
-    assert not missing, f"antigravity_agent no longer defines {missing}"
-    return found
+class TestDeliverableOpeningAndCloneHygiene(unittest.TestCase):
+    """Tests for deliverable browser launch routing and antigravity_clone.html avoidance on rebuilds."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="zezo_open_test_"))
+        self.clone_dir = self.tmp / "test_clone"
+        self.clone_dir.mkdir(parents=True)
+        (self.clone_dir / "index.html").write_text("<html><body>Test Index</body></html>", encoding="utf-8")
+        self.ctx = _StubCtx()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_open_in_browser_file_url_calls_webbrowser_directly(self):
+        """file:// URLs must bypass browser_control and open directly via webbrowser."""
+        with unittest.mock.patch("webbrowser.open", return_value=True) as mock_webbrowser,              unittest.mock.patch("actions.browser_control.browser_control") as mock_bc:
+            cloner._open_in_browser("file:///C:/path/to/rebuilt.html")
+            mock_webbrowser.assert_called_once_with("file:///C:/path/to/rebuilt.html")
+            mock_bc.assert_not_called()
+
+    def test_open_in_browser_http_url_uses_browser_control(self):
+        """http:// URLs call browser_control and do not trigger webbrowser if successful."""
+        with unittest.mock.patch("webbrowser.open") as mock_webbrowser,              unittest.mock.patch("actions.browser_control.browser_control", return_value="Opened in browser") as mock_bc:
+            cloner._open_in_browser("http://127.0.0.1:9400/rebuilt.html")
+            mock_bc.assert_called_once_with({"action": "go_to", "url": "http://127.0.0.1:9400/rebuilt.html"})
+            mock_webbrowser.assert_not_called()
+
+    def test_open_in_browser_validation_error_falls_back_to_webbrowser(self):
+        """If browser_control returns a validation error string, fall back to webbrowser."""
+        with unittest.mock.patch("webbrowser.open", return_value=True) as mock_webbrowser,              unittest.mock.patch("actions.browser_control.browser_control", return_value="Validation error: Invalid URL scheme"):
+            cloner._open_in_browser("http://127.0.0.1:9400/test.html")
+            mock_webbrowser.assert_called_once_with("http://127.0.0.1:9400/test.html")
+
+    def test_rebuild_format_does_not_generate_antigravity_clone_html(self):
+        """When output_format is a rebuild, antigravity_clone.html is NOT written."""
+        rebuilt_file = self.clone_dir / "rebuilt.html"
+        rebuilt_file.write_text("<!DOCTYPE html><html><body>Rebuilt</body></html>", encoding="utf-8")
+
+        with unittest.mock.patch.object(cloner, "run_uncage_exporter", return_value=(True, "ok")),              unittest.mock.patch.object(cloner, "verify_local_assets", return_value=(True, "all present")),              unittest.mock.patch.object(cloner, "detect_tech_stack", return_value="standard_html"),              unittest.mock.patch.object(cloner, "_run_reverse_engineer", return_value=(True, "Rebuilt clean page", rebuilt_file)),              unittest.mock.patch.object(cloner, "_open_deliverable", return_value="file:///rebuilt.html"),              unittest.mock.patch.object(cloner, "register_rebuild"):
+            
+            res = cloner._clone_worker({
+                "url": "https://example.com",
+                "mode": "single_page",
+                "output_format": "raw_html",
+                "target_dir": str(self.clone_dir),
+            }, ctx=self.ctx)
+
+            self.assertEqual(res["status"], "success")
+            self.assertFalse((self.clone_dir / "antigravity_clone.html").exists(),
+                             "antigravity_clone.html must not be written on rebuild tasks")
+            self.assertTrue(rebuilt_file.exists())
+
+    def test_capture_only_format_generates_antigravity_clone_html(self):
+        """When output_format is in CAPTURE_ONLY_FORMATS, antigravity_clone.html IS generated."""
+        with unittest.mock.patch.object(cloner, "run_uncage_exporter", return_value=(True, "ok")),              unittest.mock.patch.object(cloner, "verify_local_assets", return_value=(True, "all present")),              unittest.mock.patch.object(cloner, "detect_tech_stack", return_value="standard_html"),              unittest.mock.patch.object(cloner, "_faithful_cleanup", return_value="<html>Clean</html>"),              unittest.mock.patch.object(cloner, "_open_deliverable", return_value="http://127.0.0.1:9400/antigravity_clone.html"):
+
+            res = cloner._clone_worker({
+                "url": "https://example.com",
+                "mode": "single_page",
+                "output_format": "capture_only",
+                "target_dir": str(self.clone_dir),
+            }, ctx=self.ctx)
+
+            self.assertEqual(res["status"], "success")
+            self.assertTrue((self.clone_dir / "antigravity_clone.html").exists(),
+                            "antigravity_clone.html must be generated for capture_only format")
 
 
 if __name__ == "__main__":

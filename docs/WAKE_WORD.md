@@ -1,5 +1,8 @@
 # ZEZO — Wake Word System
 
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux  
+
 ## Overview
 
 ZEZO supports **local, offline wake-word detection**. The wake phrase is

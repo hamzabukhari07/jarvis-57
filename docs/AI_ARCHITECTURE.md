@@ -1,443 +1,138 @@
-# JARVIS — AI Architecture (Gemini Live)
+# 🧠 ZEZO — AI & Conversational Architecture
 
-## Provider, Model, and SDK
+> **Project:** ZEZO (Autonomous Desktop AI Operating System v2)  
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows 10/11 (Primary), macOS, Linux  
+
+---
+
+## 📖 Overview
+
+ZEZO utilizes a hybrid, multi-tier AI architecture centered around **Google Gemini Live (Bidirectional WebSocket PCM Streaming)** as the sole conversational voice brain, coupled with **sub-agent execution ladders** for autonomous coding, web intelligence, and OS automation.
+
+---
+
+## 🎙️ Conversational Voice Brain: Google Gemini Live
+
+The live conversational experience in ZEZO is powered exclusively by the Google Gemini Live API via real-time WebSockets:
 
 ```
-AI Provider: Google (Google AI / Gemini)
-AI Model: gemini-3.1-flash-live-preview
-Model Version: Preview (as of JARVIS)
+Provider: Google AI (Gemini)
+Primary Live Model: models/gemini-3.1-flash-live-preview (configured in core/models.py)
 SDK: google-genai (google-genai>=2.8.0,<3)
-Python Package: google-genai
+Protocol: Full-duplex WebSocket over TLS
+Modalities: Bidirectional Audio (PCM 16kHz in, 24kHz out) + Real-time Text & Tool Declarations
 ```
 
-## Where Configured
-
-| Location | File/Code | What it sets |
-|----------|-----------|-------------|
-| Model identifier | `main.py:99` | `LIVE_MODEL = "models/gemini-3.1-flash-live-preview"` |
-| API key | `config/api_keys.json` | `gemini_api_key` field |
-| Voice | `memory/config_manager.py:81-89` | `get_voice()` reads `voice_name` from config |
-| Available voices | `memory/config_manager.py:81` | `["Charon", "Puck", "Kore", "Fenrir", "Aoede"]` |
-| Default voice | `memory/config_manager.py:82` | `"Charon"` |
-| Turn tuning | `memory/config_manager.py:172-203` | `turn_tuning` config section |
-| Proactive audio | `memory/config_manager.py:221-235` | `proactive_audio` toggle |
-| Thinking enabled | `memory/config_manager.py:158-169` | `thinking_enabled` toggle |
-| Media resolution | `memory/config_manager.py:241-252` | `media_resolution` setting |
-
-## Where Initialized
-
-### Live Session Creation
-
-**File:** `main.py`, method `JarvisLive._build_config()` (line 952)
+### 1. Live WebSocket Configuration
+The session is initialized in `ZezoLive._build_config()` (`main.py`):
 
 ```python
-def _build_config(self) -> types.LiveConnectConfig:
-    cfg = dict(
-        response_modalities=["AUDIO"],
-        output_audio_transcription={},
-        input_audio_transcription={},
-        system_instruction="\n".join(parts),
-        tools=[{"function_declarations": _all_decls}],
-        session_resumption=types.SessionResumptionConfig(handle=self._resume_handle),
-        context_window_compression=types.ContextWindowCompressionConfig(
-            sliding_window=types.SlidingWindow(),
-        ),
-        speech_config=types.SpeechConfig(
-            voice_config=types.VoiceConfig(
-                prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                    voice_name=get_voice()
-                )
+types.LiveConnectConfig(
+    response_modalities=["AUDIO"],
+    output_audio_transcription={},
+    input_audio_transcription={},
+    system_instruction="\n".join(parts),
+    tools=[{"function_declarations": _all_decls}],
+    session_resumption=types.SessionResumptionConfig(handle=self._resume_handle),
+    context_window_compression=types.ContextWindowCompressionConfig(
+        sliding_window=types.SlidingWindow()
+    ),
+    speech_config=types.SpeechConfig(
+        voice_config=types.VoiceConfig(
+            prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                voice_name=get_voice()  # Default: "Charon"
             )
-        ),
-    )
-    # ... optional proactivity and tuning ...
-    return types.LiveConnectConfig(**cfg)
+        )
+    ),
+)
 ```
 
-The session itself is created via `google.genai.Client.aio.live.connect()`:
-
-```python
-cm = cl.aio.live.connect(model=LIVE_MODEL, config=gtypes.LiveConnectConfig(**cfg))
-session = await asyncio.wait_for(cm.__aenter__(), 30)
-```
-
-### One-Shot Gemini Calls (Non-Live)
-
-**File:** `core/gemini.py`
-
-Used for: search, classification, extraction, code generation, image analysis
-
-```python
-from google import genai
-from google.genai import types as gtypes
-
-cl = genai.Client(api_key=key, http_options={"api_version": "v1beta"})
-# Live one-shot:
-cm = cl.aio.live.connect(model=_live_model(), config=gtypes.LiveConnectConfig(**kwargs))
-```
-
-## Session Lifecycle
-
-### 1. Session Creation
-
-```
-JarvisLive._build_config()
-    ↓
-types.LiveConnectConfig(**cfg)
-    ↓
-genai.Client.aio.live.connect(model, config)
-    ↓
-cm.__aenter__() → session
-    ↓
-session.send_client_content(turns=..., turn_complete=True)
-```
-
-### 2. Resumption Handle
-
-```
-The server sends session_resumption updates periodically
-    ↓
-self._resume_handle is updated
-    ↓
-On reconnect, the handle is passed back
-    ↓
-Session resumes with conversation intact
-```
-
-**Important:** The resumption handle is stored **only in RAM**, never written to disk. This prevents a fresh launch from continuing yesterday's conversation (which would break the session summary flow).
-
-### 3. Connection Drops and Reconnection
-
-**File:** `main.py`, `JarvisLive` class
-
-- A `_ReconnectSignal` exception is raised inside the `asyncio.TaskGroup`
-- This unwinds the task group, tearing down audio streams and the session
-- The `run()` method catches it and rebuilds the session
-- `keep_context=True` replays the resumption handle (conversation continues)
-- `keep_context=False` starts fresh (used for voice changes)
-
-### 4. Session Termination
-
-- `shutdown_jarvis` tool → saves session summary, calls `_os._exit(0)`
-- `close_camera` tool → stops camera stream
-- Application close → Qt cleanup
-
-## System Instructions
-
-### Construction
-
-**File:** `main.py`, `JarvisLive._build_config()` (line 952)
-
-The system instruction is built from four parts:
-
-```python
-parts = [
-    time_ctx,       # [CURRENT DATE & TIME]
-    identity_ctx,   # [IDENTITY]
-    mem_str,        # memory block (if any)
-    sys_prompt,     # core/prompt.txt with {tokens} filled in
-]
-system_instruction = "\n".join(parts)
-```
-
-### Token Filling
-
-```python
-sys_prompt = _render_prompt(sys_prompt, {
-    "assistant_name": self._asst_name,       # from config
-    "platform": f"{_platform.system()} {_platform.release()}",
-    "capabilities": _describe_tools(_all_decls),  # all discovered tools
-    "limits": _describe_limits(has_vision, has_mic),
-})
-```
-
-**File:** `core/prompt.txt` — the template with `{assistant_name}`, `{platform}`, `{capabilities}`, `{limits}` placeholders
-
-### What the System Prompt Contains
-
-1. **[SELF]** — Identity, body awareness, image labeling rules
-2. **[WHAT YOU CAN DO]** — Full tool list (dynamically generated)
-3. **[WHAT YOU CANNOT DO]** — Limitations (dynamically generated)
-4. **[JUDGEMENT]** — How to interpret requests
-5. **[VOICE]** — Speaking style rules
-6. **[ACKNOWLEDGE BEFORE A SILENCE]** — Anti-stalling rules
-7. **[LANGUAGE]** — Language rules
-8. **[EXECUTION]** — Tool calling rules
-9. **[TAGGED MESSAGES]** — Internal message tags
-10. **[SPEED]** — Latency rules
-
-## Tools and Function Calling
-
-### How Tools Are Defined
-
-Tools are declared as `function_declarations` in the LiveConnectConfig:
-
-```python
-tools=[{"function_declarations": _all_decls}]
-```
-
-Where `_all_decls` = `TOOL_DECLARATIONS` (inline) + `action_registry.get_tool_declarations()` + `plugin_registry.get_tool_declarations()`
-
-### How Gemini Discovers and Invokes Tools
-
-1. Gemini receives the system prompt + tool declarations
-2. When a tool is needed, Gemini outputs a function call in its response
-3. The response is parsed for function calls
-4. `_execute_tool()` dispatches to the appropriate handler
-5. The result is returned as a `FunctionResponse`
-6. Gemini processes the result and generates the next response
-
-### Tool Declaration Shape
-
-```python
-{
-    "name": "open_app",
-    "description": "Launches an application...",
-    "parameters": {"type": "OBJECT", "properties": {...}},
-    "behavior": "BLOCKING",  # or "NON_BLOCKING"
-    "scheduling": "WHEN_IDLE",  # optional
-}
-```
-
-### Tool Execution Flow
-
-```
-Gemini generates function call
-    ↓
-main.py:_execute_tool(fc)
-    ↓
-if name == "save_memory": → direct handler
-elif name == "recall_memory": → direct handler
-elif name == "screen_process": → direct handler
-elif name == "undo": → direct handler
-elif name == "shutdown_jarvis": → direct handler
-elif name == "manage_monitor": → direct handler
-elif name == "system_status": → direct handler
-elif name == "close_camera": → direct handler
-elif _action_registry.has(name): → action_registry.run()
-elif _plugin_registry.has(name): → plugin_registry.run()
-else: → "Unknown tool"
-    ↓
-Result returned as FunctionResponse
-    ↓
-Gemini processes result → final response
-```
-
-## Streaming
-
-### Audio Input Streaming
-
-```
-sounddevice.InputStream callback
-    ↓
-callback(indata, frames, time_info, status)
-    ↓
-Convert to bytes, put in out_queue
-    ↓
-_send_realtime() coroutine: session.send_realtime_input(audio=...)
-    ↓
-WebSocket → Google servers
-```
-
-### Audio Output Streaming
-
-```
-session.receive() async iterator
-    ↓
-For each response:
-    - server_content.output_transcription.text → transcript
-    - server_content.audio → TTS audio data
-    ↓
-Transcript → VisemeStream.feed_text() → avatar mouth shapes
-    ↓
-Audio → _play_audio() → sounddevice.OutputStream → speakers
-```
-
-### Transcript Handling
-
-```python
-async for resp in session.receive():
-    sc = getattr(resp, "server_content", None)
-    if sc and sc.output_transcription and sc.output_transcription.text:
-        chunks.append(sc.output_transcription.text)
-```
-
-**Deduplication:** `_is_repeat_chunk()` guards against the API re-sending transcript tails across multiple `turn_complete` events.
-
-## Input Handling
-
-### Audio Input
-- Microphone: 16kHz, mono, 16-bit int, 1024-frame chunks
-- Phone mic: routed through the same session when connected
-- Push-to-talk: blocks audio when chord not held
-- Wake word: blocks audio when sleeping (audio goes to detector only)
-
-### Text Input
-- Typed commands: `_on_text_command()` → `session.send_client_content(turns={"role":"user","parts":[{"text":text}]}, turn_complete=True)`
-- Plugin speech: `plugin_say()` → same mechanism
-- System commands: same mechanism
-
-### Image Input
-- Screenshot: `_capture_screen()` → base64 → injected into session
-- Camera: `_capture_camera()` → base64 → injected into session
-- Vision is on-demand only (not continuous)
-
-## Output Handling
-
-### Audio Output
-- Gemini Live produces audio directly (native audio model)
-- TTS audio is extracted from `server_content` in `session.receive()`
-- Played via `sounddevice.OutputStream` at 24kHz
-
-### Text Output
-- `output_audio_transcription` provides text transcription of the model's speech
-- This is used for: viseme extraction, activity log, transcript display
-
-### Transcript to Pipeline
-```
-Transcription received
-    ↓
-_clean_transcript() → strip control chars
-    ↓
-_is_repeat_chunk() → deduplicate
-    ↓
-_feed_text() → VisemeStream
-    ↓
-UI activity log → _on_text_command handling
-```
-
-## Model Ladder (for One-Shot Calls)
-
-**File:** `core/gemini.py`
-
-```python
-_LADDERS = {
-    "FAST":   ("LIVE", "gemini-3.6-flash", "gemini-3.5-flash",
-               "gemini-3-flash-preview", "gemini-3.7-flash", "gemini-flash-latest"),
-    "SMART":  ("LIVE", "gemini-3.6-flash", "gemini-3.5-flash",
-               "gemini-3-flash-preview", "gemini-3.7-flash", "gemini-3.8-flash",
-               "gemini-flash-latest"),
-    "SEARCH": ("gemini-3.6-flash", "gemini-3.5-flash", "gemini-3-flash-preview",
-               "gemini-flash-latest"),
-}
-```
-
-> **Single source:** every model name lives in `core/models.py`
-> (`GEMINI_LIVE_MODEL`, `GEMINI_FAST/SMART/SEARCH_MODELS`). `core/gemini.py`
-> builds `_LADDERS` from it, and `main.py`'s `LIVE_MODEL` comes from it too —
-> change a name there and the whole app follows. The old `gemini-2.5-*` / `2.0` /
-> `1.5` names are **404 for new keys**. Verify names live before editing.
-
-### Provider Health Check (`core/provider_health.py`)
-
-At startup (off the GUI thread, from `main.py:_bootstrap_deps`) ZEZO pings every
-configured model once:
-
-- **Gemini** — a cheap `client.models.get()` per ladder model + the Live model
-  (no generation, no quota spent). A `404` marks that model **retired** via
-  `core.gemini.mark_unavailable()`, so the one-shot ladder skips it.
-- **Groq** — `GET /openai/v1/models` (with a non-urllib `User-Agent`; Groq's edge
-  returns `403` to the default urllib agent).
-
-It logs a one-line summary (`Gemini 7/7 ok | Groq: reachable`) and stores the
-result in `get_status()`. It never blocks or raises into the caller.
-
-The Live model is always first because it draws on a different quota pool than text models. On the free tier, the text pool runs out; Live is unaffected.
-
-## Error Handling and Retries
-
-### Connection Errors
-- `_ReconnectSignal` for voluntary reconnects
-- Session resumption handles expired connections
-- Background threads handle reconnection transparently
-
-### API Errors (Quota)
-- `core/gemini.py` has cooldown system: models returning 429/RESOURCE_EXHAUSTED are skipped for 5 minutes
-- Ladder falls back to next model
-- `_LIVE_SLOTS` semaphore caps concurrent Live sessions (3 max)
-
-### Timeout
-- One-shot calls: 10 seconds minimum
-- Live sessions: no hard timeout (managed by TaskGroup)
-
-## Session Resumption Details
-
-```
-Server issues resumption handle every few seconds
-    ↓
-_handle captured in self._resume_handle
-    ↓
-On reconnect:
-    if keep_context=True:
-        session_resumption=types.SessionResumptionConfig(handle=self._resume_handle)
-    else:
-        session_resumption=types.SessionResumptionConfig(handle=None)  # fresh start
-```
-
-**Voice changes** use `keep_context=False` because resuming restores the server's session state (including voice), which would make the voice picker appear to do nothing.
-
-**Audio device changes** use `keep_context=True` because the conversation should survive device swaps.
-
-## Enhanced Live Features
-
-### Proactive Audio
-- `proactivity.proactive_audio=True` — Gemini stays silent when speech isn't addressed to it
-- Auto-disabled if the server rejects it
-- Controlled by `get_proactive_audio_enabled()` from config
-- **Default: disabled (`false`)** — the proactivity classifier hesitates/drops single utterances on multilingual speech, which made turns feel late
-
-### Turn Tuning
-- `AutomaticActivityDetection` with configurable `silence_ms`, `prefix_ms`, `end_sensitivity`, `start_sensitivity`
-- **Enabled by default** (`silence_ms=450`, `prefix_ms=100`, `end_sensitivity="high"`) so turns complete promptly on user silence
-- Controlled by `get_turn_tuning()` from config
-
-### Media Resolution
-- Screenshots and camera frames are tokenised at low/medium/high resolution
-- Default: "medium"
-- Controlled by `get_media_resolution()` from config
+### 2. Audio Pipeline & Push-to-Talk
+- **Inbound PCM Stream:** SoundDevice captures 16-bit 16kHz mono audio from the user's microphone in 1024-frame chunks, streaming to Gemini Live via `types.Blob(data=pcm_data, mime_type="audio/pcm;rate=16000")`.
+- **Push-to-Talk (PTT):** Strictly controlled via **`Ctrl+Alt`** chord detection. Uses Windows `GetAsyncKeyState` in a background thread to prevent key interception or conflicts with IDEs and system IMEs.
+- **EchoGuard:** Real-time acoustic energy subtraction prevents ZEZO's audio output from being re-ingested as user speech.
+- **Outbound Stream & Visemes:** Inbound 24kHz PCM chunks are routed to speakers and simultaneously analyzed for mouth viseme amplitudes, driving the 3D Avatar and Canvas reactions in the React frontend.
 
 ---
 
-## REST Fallback & Timeout Ladder (`core/gemini.py`)
+## 🪜 Dynamic Multi-Tier Model & Fallback Ladders
 
-When one-shot vision or text generation is executed via REST:
-- **Strict Attempt Timeout**: `MIN_TIMEOUT_MS = 5_000` (5.0s per model attempt).
-- If a model call stalls (e.g. cold start or hung socket), the attempt is aborted cleanly after 5.0 seconds and the ladder immediately falls back to the next model in the tier (`FAST` / `SMART` / `SEARCH`).
-- Models that fail with 429/503 are placed on a 5-minute cooldown.
-- When all vision models in the ladder time out or fail, the system falls back gracefully to deterministic OS ground-truth telemetry (L0 active window title/process) to prevent stalling the voice loop.
+ZEZO enforces strict fallback ladders across all operations so that transient 503 errors, rate limits, or quota exhaustion never stall the operating system:
+
+```mermaid
+flowchart TD
+    subgraph LiveVoice["🎙️ Conversational Voice Brain"]
+        GL["Google Gemini Live\n(models/gemini-3.1-flash-live-preview)"]
+    end
+
+    subgraph AgentLadder["🤖 Coding Agent Engine: Antigravity CLI"]
+        AG_HIGH["gemini-3.8-flash-high"]
+        AG_MED["gemini-3.8-flash-medium (Default)"]
+        AG_LOW["gemini-3.8-flash-low"]
+        AG_SONNET["claude-sonnet-4-6 (Thinking)"]
+        AG_OPUS["claude-opus-4-6-thinking"]
+        AG_GPT["gpt-oss-120b-medium"]
+        
+        AG_MED -->|Fallback| AG_HIGH
+        AG_HIGH -->|Fallback| AG_LOW
+        AG_LOW -->|Fallback| AG_SONNET
+        AG_SONNET -->|Fallback| AG_OPUS
+        AG_OPUS -->|Fallback| AG_GPT
+    end
+
+    subgraph OneShotLadder["⚡ Fast One-Shot REST Ladder (core/gemini.py)"]
+        R1["gemini-3-flash-preview"]
+        R2["gemini-3.6-flash"]
+        R3["gemini-flash-lite-latest"]
+        R4["gemini-3.5-flash"]
+        R5["gemini-flash-latest"]
+
+        R1 -->|503 / 429| R2
+        R2 -->|Failover| R3
+        R3 -->|Failover| R4
+        R4 -->|Failover| R5
+    end
+
+    subgraph FastCoprocessor["⚡ Free-Tier Coprocessor (Groq LPU)"]
+        GROQ_TXT["openai/gpt-oss-20b (Text/Code Synthesis)"]
+        GROQ_AUDIO["whisper-large-v3-turbo (Audio Transcription)"]
+    end
+```
+
+### 1. Antigravity CLI Coding Models (`gemini-3.8-flash-tiered`)
+Configured in `core/models.py`, the official Antigravity CLI (`actions/antigravity_agent.py`) executes multi-file autonomous synthesis using tiered models:
+- `gemini-3.8-flash-medium` — Primary balanced development engine (speed, reasoning, context).
+- `gemini-3.8-flash-high` — Escalated reasoning tier for complex cross-module dependencies.
+- `gemini-3.8-flash-low` — Low-latency tier for simple scripts.
+- **Cross-Provider Fallbacks:** `claude-sonnet-4-6`, `claude-opus-4-6-thinking`, and `gpt-oss-120b-medium`.
+
+### 2. Autonomous Agent Fleet Delegation
+- **OpenCode Agent (`actions/opencode_agent.py`):** OpenCode implementation engine for autonomous multi-file generation with full test suite verification.
+- **Kilo Code Agent (`actions/kilo_agent.py`):** Fast multi-file refactoring agent supporting StepFun and Gemini free tiers.
+- **Quick Snippet Engine (`actions/quick_snippet.py`):** 1-second inline code snippet generator and silent background terminal executor.
+
+### 3. Groq LPU Free-Tier Coprocessor
+- **Text & Routing:** `openai/gpt-oss-20b` generates fast intermediate text summaries, search synthesis, and code explanations with sub-500ms latency.
+- **Speech-to-Text:** `whisper-large-v3-turbo` transcribes audio extracted from Instagram Reels, TikTok videos, and YouTube clips (`actions/agent_reach.py`).
 
 ---
 
-## Autonomous Multi-Agent Fleet & Workspace Isolation
+## 🖥️ UI Integration: WebSocket Bridge to React 18
 
-```
-                   Voice / Text Command
-                           │
-                 fleet_control (Action)
-                           │
-              FleetManager (core/fleet_manager.py)
-                           │
-       ┌───────────────────┼───────────────────┐
-       ▼                   ▼                   ▼
-  Claude Code        Antigravity         OpenCode / Kilo
-(Git Worktree 1)   (Git Worktree 2)    (Git Worktree 3)
-       │                   │                   │
-       └───────────────────┼───────────────────┘
-                           │
-             Scranton Pixel Office Event Stream
-                  (frontend/office.html)
-```
-
-- **Thread-Safe Roster (`threading.RLock()`)**: Manages isolated autonomous coding agents.
-- **Git Worktree Isolation**: Spawns distinct temporary worktrees so multiple agents can modify the codebase in parallel without colliding or dirtying the active working directory.
-- **Scranton Pixel Office Visualizer**: Real-time push events (`agent_spawned`, `agent_status`, `agent_finished`, `task_created`) broadcast to `frontend/office.html` over WebSocket.
-- **Concurrency Limiter**: Background coding tasks are throttled by `MAX_CONCURRENT_CODING_TASKS = 2` in `core/task_manager.py`, queuing surplus tasks into a thread-safe FIFO queue to avoid CPU/memory starvation.
+ZEZO decouples the AI core from the presentation layer:
+- **Server:** `core/ui_server.py` hosts an asynchronous `aiohttp.web` server on `127.0.0.1:8765`.
+- **Client:** React 18 / Vite SPA (`frontend/src/`) maintains a persistent WebSocket connection to stream:
+  - Real-time agent status and pixel desk activity (`AutonomousOfficeScreen.tsx`).
+  - Assistant-UI chat threads with collapsible reasoning traces (`ZezoChatThread.tsx`).
+  - 3D Force-Directed Knowledge Graph nodes and edges (`MemoryGraphCanvas.tsx`).
+  - Background task progress, streaming logs, and cancellation signals (`TaskManagerModal.tsx`).
+  - Live clipboard watcher previews (`ClipPeekOverlay.tsx`).
 
 ---
 
-## Temporal Grounding & Zero-Overhead Local Time
+## ⚡ Executive Brevity & Zero-Spoken-Code Directive
 
-- Injected directly into the system prompt via `{temporal_context}`:
-  `[SYSTEM LOCAL DATE & TIME]: Today is Monday, Oct 03, 2026. Current machine time: 16:15:35.`
-- **Zero Tool Overhead**: Time and date queries are answered instantaneously from the injected prompt header without calling `reminder`, `web_search`, or Python subprocesses.
-- **Anti-Stale Facts**: Real-time queries regarding current entity versions or release dates must use `web_search` with exact user terms rather than training knowledge.
+1. **Executive Brevity:** For direct actions (launching apps, window changes, file modifications, reminders), ZEZO responds in **1 to 4 words** (e.g. "On it.", "Done.", "Khol diya.").
+2. **Zero Spoken Code:** ZEZO never vocalizes raw Python, JavaScript, HTML/CSS, JSON payloads, diffs, or system tokens. All syntax, diagrams, and reports are formatted in GitHub-flavored Markdown and displayed in the React frontend or written to Desktop files.
+3. **Conversational Summaries:** Complex multi-stage research workflows (analyzing YouTube, Reddit, GitHub, Hacker News) speak a single 1–2 sentence summary upon final completion.

@@ -1,5 +1,8 @@
 # ZEZO OS — Tactical HUD & Workspace Architecture
 
+> **Creator & Lead Architect:** Hamza Bukhari  
+> **Target OS:** Windows (Primary), macOS, Linux
+
 ## Overview
 
 The HUD (Heads-Up Display) is built with **PyQt6 QWebEngineView** hosting an ultra-responsive, GPU-accelerated tactical cockpit interface (`frontend/index.html`).
@@ -18,13 +21,32 @@ The HUD (Heads-Up Display) is built with **PyQt6 QWebEngineView** hosting an ult
 
 ---
 
-## Center Display & Fluid Vortex Core
+## Center Display, Avatar Engines & Unified Command Dock
 
-The center panel features the Fluid Vortex core (`frontend/download.gif`) and the **Unified Command Dock**:
-1. **Mic Mute / Unmute**: Hardware-level mic toggle.
-2. **2x3 Phosphor Matrix State Badge**: Real-time standby, listening, thinking, speaking status indicator.
-3. **Emergency Stop Button**: Instant abort and task interruption.
-4. **Sleep & Power Mode**: Instant voice loop pause and sleep mode.
+The center tactical panel houses the primary visual focal point—switchable between the **Fluid Vortex Core** and the **Three.js Qivi WebGL Point-Cloud Avatar Visualizer**—anchored above the **Unified Command Dock**:
+1. **Mic Mute / Unmute**: Hardware-level microphone toggle.
+2. **Push-to-Talk Indicator**: Displays `Ctrl+Alt` chord status (blocking mic audio unless held).
+3. **2x3 Phosphor Matrix State Badge**: Real-time standby, listening, thinking, speaking status indicator.
+4. **Emergency Stop Button**: Instant abort and running task tree interruption.
+5. **Sleep & Power Mode**: Instant voice loop pause and sleep mode.
+
+### Visualizer 1: Fluid Vortex Core (`VortexVisualizer.tsx`)
+- High-efficiency GPU-accelerated rotating vortex core with phosphor particle rings.
+- States: Smoothly modulates spin speed, particle dilation, and luminosity across `idle`, `listening`, `thinking`, and `speaking`.
+- Low CPU footprint: Automatically pauses background animation via `window._zezoAnimActive` and modal overlay gates (`openModal`/`closeModal`) to conserve hardware resources.
+
+### Visualizer 2: Three.js Qivi WebGL Point-Cloud Avatar (`QiviAvatarVisualizer.tsx`)
+- **Engine**: Powered by Three.js and `qivi-react` delivering an interactive 3D particle mesh and point-cloud avatar.
+- **Dynamic State Mapping**:
+  - `idle`: Neutral expression, `core` personality, base 0.5 intensity.
+  - `listening`: Curious expression, attentive geometry dilation, dynamic intensity reacting to input audio `Math.min(1.0, 0.6 + gatedAudio * 1.5)`.
+  - `thinking`: Analytical expression, rotational scanning sweep, `analyst` personality at 0.85 intensity.
+  - `speaking`: Joyful expression, acoustic pulse modulation, `spark` personality with intensity `Math.min(1.0, 0.75 + gatedAudio * 1.2)`.
+  - `sleeping` / Muted: Low-power dormant expression (`sleepy`/`guardian`) with reduced 0.2 intensity.
+- **Audio Noise Gating**: Gated at `audioLevel < 0.08` to filter out background room noise and prevent unnecessary continuous WebGL geometry recalculations.
+- **Geometry & Customization**: Supports multiple procedural 3D shapes (`blob`, `torus`, `sphere`), character presets (`qivi`, `spark`, etc.), custom scene lighting, and theme matching (`match_theme`).
+- **Quality Tiers**: Configurable render tiers (`auto`, `high`, `medium`, `low`, `static`) to adapt smoothly to lower-end hardware or battery-saving modes.
+- **Live Reactivity**: Subscribes to window event `zezo_avatar_settings_changed` and persists configuration directly to backend storage via `/api/config`.
 
 ---
 
