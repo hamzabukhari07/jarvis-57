@@ -353,7 +353,8 @@ def execute_silent_install(pkg_id: str, app_name: str, player=None) -> str:
         )
         try:
             from core.ui_server import get_ui_server
-            get_ui_server().broadcast("task_list", {"tasks": tm.list_tasks()})
+            all_t = tm.list_tasks()
+            get_ui_server().broadcast("task_list", {"tasks": [t for t in all_t if not t.get("parent_id")]})
         except Exception:
             pass
         return f"Installation of {app_name} started in the background (Task ID: {task_id}). You can see live progress in the Task Matrix."
@@ -738,6 +739,85 @@ def _format_open_confirmation(app_name: str, launch_attempted: bool = True) -> s
     return f"Opened {app_name}."
 
 
+def _fuzzy_match_desktop(raw_p: str) -> Optional[Path]:
+    """Inspect Path.home() / 'Desktop' and fuzzy-match directory names (e.g. stripe_frontend_clone matches stripe.com_rebuild)."""
+    try:
+        desktop = Path.home() / "Desktop"
+        if not desktop.exists():
+            return None
+
+        norm = str(raw_p).replace("\\", "/")
+        parts = [x for x in norm.split("/") if x]
+        parts_lower = [x.lower() for x in parts]
+
+        if "desktop" in parts_lower:
+            idx = parts_lower.index("desktop")
+            after = parts[idx + 1:]
+        else:
+            after = parts
+
+        if not after:
+            return desktop
+
+        folder_cand = after[0]
+        sub_path = Path(*after[1:]) if len(after) > 1 else None
+
+        # 1. Direct folder match under Desktop
+        direct = desktop / folder_cand
+        if direct.exists() and direct.is_dir():
+            if sub_path and (direct / sub_path).exists():
+                return direct / sub_path
+            if (direct / "index.html").exists():
+                return direct / "index.html"
+            return direct
+
+        # 2. Tokenize and fuzzy match against children of Desktop
+        stopwords = {
+            "clone", "rebuild", "frontend", "backend", "site", "website",
+            "project", "app", "com", "org", "net", "io", "dev", "new", "test"
+        }
+        tokens = set([w for w in re.findall(r"[a-zA-Z0-9]+", folder_cand.lower()) if w not in stopwords])
+        cand_norm = re.sub(r"[\s_\.\-]+", "", folder_cand.lower())
+
+        matches = []
+        for child in desktop.iterdir():
+            if not child.is_dir():
+                continue
+            child_lower = child.name.lower()
+            child_norm = re.sub(r"[\s_\.\-]+", "", child_lower)
+
+            score = 0
+            if cand_norm and (cand_norm == child_norm):
+                score = 100
+            elif cand_norm and (cand_norm in child_norm or child_norm in cand_norm):
+                score = 50
+            else:
+                c_tokens = set([w for w in re.findall(r"[a-zA-Z0-9]+", child_lower) if w not in stopwords])
+                overlap = tokens.intersection(c_tokens)
+                if overlap:
+                    score = len(overlap) * 10
+
+            if score > 0:
+                try:
+                    mtime = child.stat().st_mtime
+                except Exception:
+                    mtime = 0
+                matches.append((score, mtime, child))
+
+        if matches:
+            matches.sort(key=lambda x: (x[0], x[1]), reverse=True)
+            best_child = matches[0][2]
+            if sub_path and (best_child / sub_path).exists():
+                return best_child / sub_path
+            if (best_child / "index.html").exists():
+                return best_child / "index.html"
+            return best_child
+
+    except Exception as e:
+        print(f"[open_app] _fuzzy_match_desktop error: {e}")
+    return None
+
+
 def open_app(
     parameters=None,
     response=None,
@@ -747,11 +827,35 @@ def open_app(
     params = parameters or {}
     app_name = params.get("app_name", "").strip()
     action = params.get("action", "open").lower().strip()
-
-    if not app_name:
-        return "No application name provided."
+    path_arg = params.get("path") or params.get("target") or ""
 
     clean_token = re.sub(r"[\s_\-]+", "", (app_name or "").lower())
+
+    # If path is omitted or empty ("launch kr" / "open build" / "preview"), look up last active project
+    if not path_arg and (
+        not app_name
+        or clean_token in ("launchkr", "openbuild", "launch", "build", "preview", "rebuild", "browser")
+        or "build" in clean_token
+        or "launch" in clean_token
+    ):
+        try:
+            import core.repo_context as repo_ctx
+            last_repo = repo_ctx.get_last_repo()
+            if last_repo:
+                cand_idx = Path(last_repo) / "index.html"
+                path_arg = str(cand_idx) if cand_idx.exists() else str(last_repo)
+                if not app_name or clean_token in ("launchkr", "openbuild", "launch", "build", "preview", "rebuild"):
+                    app_name = "browser"
+                    clean_token = "browser"
+        except Exception as e:
+            print(f"[open_app] repo_context lookup error: {e}")
+
+    if not app_name:
+        if path_arg:
+            app_name = "browser"
+            clean_token = "browser"
+        else:
+            return "No application name provided."
 
     # ── Scranton Agent Office Screen Voice Navigation (Full Main Screen) ──
     if clean_token in ("officeview", "officefloor", "agentview", "agentsview", "agentviews", "fleet", "fleetdeck", "fleetview", "scrantonoffice", "scranton", "agents", "office"):
@@ -828,7 +932,8 @@ def open_app(
 
     normalized = _normalize(app_name)
 
-    path_arg = params.get("path") or params.get("target") or ""
+    if not path_arg:
+        path_arg = params.get("path") or params.get("target") or ""
     profile_arg = params.get("profile") or params.get("profile_directory") or ""
     clean_app = (app_name or "").lower().strip()
 
@@ -915,8 +1020,26 @@ def open_app(
                 else:
                     p = desk_cand
 
+        # If path does not exist on disk, check if it contains 'Desktop' and fuzzy-match directory names
+        if not p.exists() and ("desktop" in norm_p.lower() or "desktop" in str(p).lower()):
+            fuzzy_cand = _fuzzy_match_desktop(str(p) if p.is_absolute() else raw_p)
+            if fuzzy_cand and fuzzy_cand.exists():
+                p = fuzzy_cand
+
+        if p.is_dir() and (p / "index.html").exists():
+            p = p / "index.html"
+
         try:
             if _SYSTEM == "Windows":
+                # For HTML files on Windows, use os.startfile to launch directly in default browser
+                is_editor = normalized.lower() in ("code", "vscode", "vs code", "visual studio code", "notepad")
+                if p.suffix.lower() in (".html", ".htm") and not is_editor:
+                    os.startfile(str(p))
+                    time.sleep(0.5)
+                    if player:
+                        player.write_log(f"[open_app] {p.name} → default browser")
+                    return f"Opened {p.name} in default browser."
+
                 exe = _resolve_windows_launcher(normalized)
                 if exe:
                     proc = subprocess.Popen([exe, str(p)])
@@ -996,11 +1119,11 @@ TOOL = {
         "properties": {
             "app_name": {
                 "type": "STRING",
-                "description": "Exact name of the application (e.g. 'Spotify', 'Visual Studio Code', 'Notepad', 'Chrome', 'WhatsApp')"
+                "description": "Name of the application (e.g. 'Spotify', 'Visual Studio Code', 'Notepad', 'Chrome', 'browser'). Optional when path is provided."
             },
             "path": {
                 "type": "STRING",
-                "description": "Optional file or folder path to open directly in the app (e.g. 'C:/Users/Hamza/Desktop/in' or 'Desktop/in')"
+                "description": "Optional file or folder path to open directly in the app or default browser (e.g. 'C:/Users/Hamza/Desktop/stripe.com_rebuild/index.html' or 'Desktop/stripe.com_rebuild/index.html')"
             },
             "profile": {
                 "type": "STRING",
@@ -1012,9 +1135,7 @@ TOOL = {
                 "description": "Whether to 'open' (default), 'close', 'check' if the application is installed, or 'install' the application on the computer."
             }
         },
-        "required": [
-            "app_name"
-        ]
+        "required": []
     },
     "handler": open_app,
 }

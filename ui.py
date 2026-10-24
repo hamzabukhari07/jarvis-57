@@ -558,7 +558,10 @@ class MainWindow(QMainWindow):
         try:
             from core.task_manager import get_task_manager
             tasks = get_task_manager().list_tasks()
-            self._server.broadcast("task_list", {"tasks": tasks})
+            # Filter out child tasks (same as HTTP /api/tasks endpoint) to prevent
+            # double-card rendering caused by inconsistent data sources on the frontend
+            parent_tasks = [t for t in tasks if not t.get("parent_id")]
+            self._server.broadcast("task_list", {"tasks": parent_tasks})
         except Exception:
             pass
 

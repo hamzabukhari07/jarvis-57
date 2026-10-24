@@ -876,39 +876,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     {
       group: 'CORE',
       items: [
-        { id: 'general' as SectionId, label: 'General & Controls', icon: Sliders },
-        { id: 'audio' as SectionId, label: 'Audio Settings', icon: AudioWaveform },
-        { id: 'providers' as SectionId, label: 'Providers & Keys', icon: Key },
-        { id: 'persona' as SectionId, label: 'Assistant Persona', icon: Bot },
+        { id: 'general' as SectionId, label: 'General', keywords: ['general', 'controls', 'startup', 'brief', 'hotkey', 'push-to-talk', 'wake word'], icon: Sliders },
+        { id: 'audio' as SectionId, label: 'Audio', keywords: ['audio', 'mic', 'microphone', 'speaker', 'volume', 'sound'], icon: AudioWaveform },
+        { id: 'providers' as SectionId, label: 'API & Keys', keywords: ['providers', 'keys', 'gemini', 'groq', 'tavily', 'elevenlabs', 'api'], icon: Key },
+        { id: 'persona' as SectionId, label: 'Persona', keywords: ['persona', 'assistant', 'name', 'voice', 'language', 'hamza'], icon: Bot },
       ],
     },
     {
-      group: 'INTERFACE & RUNTIME',
+      group: 'WORKSPACE',
       items: [
-        { id: 'appearance' as SectionId, label: 'Appearance & Accents', icon: Palette },
-        { id: 'memory' as SectionId, label: 'Memory & Intelligence', icon: Atom },
-        { id: 'skills' as SectionId, label: 'Skills', icon: Sparkles },
+        { id: 'appearance' as SectionId, label: 'Appearance', keywords: ['appearance', 'theme', 'accent', 'color', 'dark', 'light', 'avatar'], icon: Palette },
+        { id: 'memory' as SectionId, label: 'Memory', keywords: ['memory', 'intelligence', 'graph', 'sqlite', 'vector', 'notes'], icon: Atom },
+        { id: 'skills' as SectionId, label: 'Skills', keywords: ['skills', 'plugins', 'tools', 'declarative'], icon: Sparkles },
       ],
     },
     {
       group: 'SYSTEM',
       items: [
-        { id: 'about' as SectionId, label: 'About ZEZO', icon: Info },
+        { id: 'about' as SectionId, label: 'About', keywords: ['about', 'zezo', 'version', 'architect', 'hamza bukhari'], icon: Info },
       ],
     },
   ]
 
-  // Filtered categories based on search
+  // Filtered categories based on robust keyword search
   const filteredNavGroups = useMemo(() => {
     if (!searchQuery.trim()) return navItems
-    const q = searchQuery.toLowerCase()
+    const q = searchQuery.toLowerCase().trim()
     return navItems
       .map((g) => ({
         ...g,
-        items: g.items.filter((item) => item.label.toLowerCase().includes(q)),
+        items: g.items.filter((item) =>
+          item.label.toLowerCase().includes(q) ||
+          item.keywords.some((kw) => kw.includes(q))
+        ),
       }))
       .filter((g) => g.items.length > 0)
-  }, [searchQuery])
+  }, [searchQuery, navItems])
 
   // Handle Escape key to return to desktop workspace
   useEffect(() => {
@@ -959,7 +962,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* Navigation Links */}
             <ScrollArea className="flex-1 pr-1.5">
               <div className="space-y-4 px-1 py-1">
-                {filteredNavGroups.map((group) => (
+                {filteredNavGroups.length === 0 ? (
+                  <div className="px-3 py-8 text-center text-xs text-muted-foreground font-mono">
+                    No matching settings.
+                  </div>
+                ) : (
+                  filteredNavGroups.map((group) => (
                   <div key={group.group}>
                     <div className="text-[10px] font-mono font-semibold tracking-wider text-muted-foreground/70 px-2.5 mb-1">
                       {group.group}
@@ -988,7 +996,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       })}
                     </div>
                   </div>
-                ))}
+                ))
+                )}
               </div>
             </ScrollArea>
           </div>

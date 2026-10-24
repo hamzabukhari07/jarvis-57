@@ -12,8 +12,8 @@
       "model_id": "llama-3.3-70b-versatile",
       "desk_x": 180,
       "desk_y": 160,
-      "worktree": "C:/Users/Hamza Bukhari/Desktop",
-      "active_worktree": "C:/Users/Hamza Bukhari/Desktop",
+      "worktree": null,
+      "active_worktree": null,
       "allowed_tools": [
         "web_search",
         "file_processor",
@@ -30,7 +30,9 @@
         "task_decomposition",
         "fleet_orchestration",
         "multi_agent_delegation"
-      ]
+      ],
+      "is_core": true,
+      "engine": ""
     },
     "VERVE": {
       "name": "Verve",
@@ -65,7 +67,9 @@
         "frontend_coding",
         "ui_refactor",
         "animations"
-      ]
+      ],
+      "is_core": false,
+      "engine": ""
     },
     "FLUX": {
       "name": "Flux",
@@ -101,7 +105,9 @@
         "ui_refactor",
         "animations",
         "overflow_balancer"
-      ]
+      ],
+      "is_core": false,
+      "engine": ""
     },
     "AHMAD": {
       "name": "Nexus",
@@ -137,7 +143,9 @@
         "api_development",
         "database_design",
         "auth_systems"
-      ]
+      ],
+      "is_core": false,
+      "engine": ""
     },
     "DWIGHT": {
       "name": "Dwight",
@@ -172,7 +180,9 @@
         "qa_testing",
         "security_audit",
         "complexity_reduction"
-      ]
+      ],
+      "is_core": false,
+      "engine": ""
     },
     "PAM": {
       "name": "Pam Beesly",
@@ -203,7 +213,9 @@
         "design_token_extraction",
         "palette_generation",
         "brand_identity"
-      ]
+      ],
+      "is_core": false,
+      "engine": ""
     },
     "KELLY": {
       "name": "Kelly Kapoor",
@@ -237,7 +249,9 @@
         "market_research",
         "web_scraping",
         "trend_analysis"
-      ]
+      ],
+      "is_core": false,
+      "engine": ""
     },
     "QUANTUM": {
       "name": "Quantum",
@@ -267,7 +281,9 @@
         "web_research",
         "media_extraction",
         "content_analysis"
-      ]
+      ],
+      "is_core": false,
+      "engine": ""
     },
     "DEVDYNAMO": {
       "name": "DevDynamo",
@@ -299,7 +315,9 @@
         "web_research",
         "media_extraction",
         "content_analysis"
-      ]
+      ],
+      "is_core": false,
+      "engine": ""
     },
     "DATAEINSTEIN": {
       "name": "InsightAI",
@@ -331,17 +349,19 @@
         "backend_architecture",
         "api_development",
         "database_design"
-      ]
+      ],
+      "is_core": false,
+      "engine": ""
     },
     "RECON": {
       "name": "Recon",
       "role": "Autonomous Deep Researcher & Intelligence Agent",
-      "specialty": "Multi-source web research, Tavily search, agent_reach multi-platform extraction, and executive synthesis",
+      "specialty": "agent_reach, web_scraper",
       "color": "#00f5ff",
       "avatar_pixel": "recon_pixel.png",
       "default_tool": "agent_reach",
       "risk_tier": "L0_READ_ONLY",
-      "prompt_prefix": "You are RECON, ZEZO's elite Deep Research & Intelligence Agent. You extract deep information from the web, GitHub, Reddit, YouTube, and multi-source endpoints to synthesize comprehensive executive reports.",
+      "prompt_prefix": "You are Recon, Autonomous Deep Researcher & Intelligence Agent.",
       "model_id": "gemini-3.7-flash-medium",
       "desk_x": 600,
       "desk_y": 400,
@@ -352,22 +372,20 @@
         "web_search",
         "web_read_page",
         "web_reader",
-        "file_processor",
         "fleet_control",
         "task_status"
       ],
       "allowed_skills": [
-        "social_research",
-        "web_scraper",
-        "web_research_pipeline",
-        "multi_agent_collaboration"
+        "web_scraper"
       ],
       "capabilities": [
         "deep_web_research",
         "multi_platform_extraction",
         "content_synthesis",
         "executive_reporting"
-      ]
+      ],
+      "is_core": false,
+      "engine": ""
     }
   }
 }

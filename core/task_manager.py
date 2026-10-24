@@ -472,6 +472,14 @@ class TaskManager:
             if len(s.logs) > 60:
                 s.logs = s.logs[-60:]
             self._terminate_pid(s.pid)
+            # Also cancel any active child subtasks
+            for child in self._tasks.values():
+                if child.parent_id == task_id and child.status not in (TaskStatus.DONE, TaskStatus.FAILED, TaskStatus.CANCELLED):
+                    child.cancel_event.set()
+                    child.status = TaskStatus.CANCELLED
+                    child.message = "Cancelled by parent task"
+                    child.finished_at = time.time()
+                    self._terminate_pid(child.pid)
             self._dequeue_next_coding_task()
             return True
 
@@ -484,11 +492,14 @@ class TaskManager:
 
     def get_unnotified_finished_tasks(self) -> list[TaskState]:
         with self._lock:
-            return [
-                s for s in self._tasks.values()
-                if s.status in (TaskStatus.DONE, TaskStatus.FAILED, TaskStatus.CANCELLED)
-                and not s.notified
-            ]
+            unnotified = []
+            for s in self._tasks.values():
+                if s.status in (TaskStatus.DONE, TaskStatus.FAILED, TaskStatus.CANCELLED) and not s.notified:
+                    if s.parent_id or (s.params and s.params.get("is_subtask")):
+                        s.notified = True
+                        continue
+                    unnotified.append(s)
+            return unnotified
 
     def get_group_tasks(self, group_id: str) -> list[TaskState]:
         with self._lock:

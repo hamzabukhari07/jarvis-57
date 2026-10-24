@@ -15,6 +15,11 @@ __pycache__/
 /get idea/
 # Reference repos kept locally only (never uploaded)
 /repos for inspirations/
+/References/rea/
+# Auto-cloned third-party engine (actions/website_cloner.py re-clones at runtime)
+/tools/uncage/
+# Generated clone/teardown output
+/workspace/
 # Auto-added ignore rules
 node_modules/
 .venv/

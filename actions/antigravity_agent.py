@@ -389,7 +389,10 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
     # 1. Resolve design if UI/Web task
     design_context = ""
     resolved_design = None
-    if is_ui_task(task):
+    # skip_design: callers rebuilding an existing design verbatim (e.g. the website cloner
+    # turning a captured page into a React app) must not have a Hamza Taste blueprint
+    # injected, which would restyle the source instead of reproducing it.
+    if is_ui_task(task) and not payload.get("skip_design"):
         resolved_design = resolve_design(task, session_memory=session_mem, repo_path=repo)
         if resolved_design and resolved_design.is_active():
             design_context = format_design_prompt(resolved_design)
@@ -848,8 +851,10 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
     if ctx.cancelled():
         return {"status": "cancelled", "repo": str(repo)}
 
-    # Automatically launch live preview in the user's default browser if index.html exists
-    if (repo / "index.html").exists():
+    # Automatically launch live preview in the user's default browser if index.html exists.
+    # skip_preview: callers that deliver their own preview suppress this - a Vite source tree's
+    # root index.html renders blank over file://, so opening it just looks like a broken build.
+    if not payload.get("skip_preview") and (repo / "index.html").exists():
         try:
             import webbrowser
             target_url = (repo / "index.html").resolve().as_uri()
@@ -915,6 +920,14 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
     # In-place execution for fleet tasks (eliminates phantom ZEZO CODER cards)
     run_in_place = bool(parameters.get("run_in_place", False))
     task_ctx = parameters.get("task_ctx")
+    # Opt-in worker flags. They must be forwarded explicitly: this function builds a fresh
+    # worker_params dict, so anything not copied here never reaches _run_worker.
+    #   skip_design  - reproduce an existing design verbatim instead of applying a blueprint
+    #   skip_preview - the caller serves its own preview (a Vite tree renders blank over file://)
+    extra_flags = {
+        "skip_design": bool(parameters.get("skip_design", False)),
+        "skip_preview": bool(parameters.get("skip_preview", False)),
+    }
 
     if run_in_place:
         worker_params = {
@@ -922,6 +935,7 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
             "task": task,
             "model": model,
             "session_memory": session_memory if isinstance(session_memory, dict) else {},
+            **extra_flags,
         }
         res = _run_worker(worker_params, ctx=task_ctx)
         return json.dumps(res) if isinstance(res, dict) else str(res)
@@ -935,6 +949,7 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
             "task": task,
             "model": model,
             "session_memory": session_memory if isinstance(session_memory, dict) else {},
+            **extra_flags,
         },
     )
 

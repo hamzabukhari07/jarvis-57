@@ -2296,6 +2296,7 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  <span className="truncate">FILES</span>
  </Button>
 
+ {selectedAgent.id !== 'MICHAEL' && (
  <Button
  variant="outline"
  size="sm"
@@ -2306,6 +2307,7 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  <Trash2 className="w-3 h-3 text-[var(--muted-foreground)] shrink-0" />
  <span className="hidden sm:inline">DISMISS</span>
  </Button>
+ )}
  </div>
 
  {/* 3. Collapsible "AGENT ENVIRONMENT & CONTROLS" Drawer */}

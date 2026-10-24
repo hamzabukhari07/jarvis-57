@@ -374,6 +374,13 @@ export function useZezoSocket() {
             case 'agent_task_completed':
               window.dispatchEvent(new CustomEvent('zezo_fleet_updated', { detail: d }))
               break
+
+            case 'teardown_progress':
+            case 'teardown_groq_ready':
+            case 'teardown_cli_progress':
+            case 'teardown_completed':
+              window.dispatchEvent(new CustomEvent(`zezo_${msgType}`, { detail: d }))
+              break
           }
         } catch (e) {
           console.warn('[ZezoWS] Parse error:', e)

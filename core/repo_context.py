@@ -69,6 +69,7 @@ def remember_repo(path: str) -> None:
     resolved_path = str(Path(path).resolve())
     data = _load()
     data[_STORE_KEY] = resolved_path
+    data["active_project"] = resolved_path
     _save(data)
     logger.info("repo_context: remembered %s", resolved_path)
     try:
@@ -82,8 +83,10 @@ def remember_repo(path: str) -> None:
 def forget_repo(path: Optional[str] = None) -> None:
     """Clear or reset the remembered repo path."""
     data = _load()
-    if not path or data.get(_STORE_KEY) == str(Path(path).resolve()):
+    if not path or data.get(_STORE_KEY) == str(Path(path).resolve()) or data.get("active_project") == str(Path(path).resolve()):
         data.pop(_STORE_KEY, None)
+        data.pop("active_project", None)
+        data.pop("active_file", None)
         _save(data)
         logger.info("repo_context: cleared remembered repo")
         try:
@@ -94,7 +97,8 @@ def forget_repo(path: Optional[str] = None) -> None:
 
 
 def get_last_repo() -> Optional[str]:
-    repo = _load().get(_STORE_KEY)
+    data = _load()
+    repo = data.get("active_project") or data.get(_STORE_KEY)
     if repo and is_zezo_source_dir(repo):
         return None
     return repo
@@ -314,6 +318,32 @@ def get_unique_clone_dir(domain_or_name: str) -> Path:
         counter += 1
 
 
+def get_unique_rebuild_dir(domain_or_name: str) -> Path:
+    """Generate a collision-safe Desktop/<domain>_cloned_app directory path (e.g. apple_cloned_app, apple_cloned_app_1).
+
+    Sibling of get_unique_clone_dir: the static clone and the code rebuild of the same
+    site must never share a folder, so the React/Next project gets its own directory.
+    """
+    import re
+    clean_name = re.sub(r"[^\w\-]", "_", (domain_or_name or "website").strip().lower())
+    clean_name = re.sub(r"_+", "_", clean_name).strip("_") or "website"
+    base_name = f"{clean_name}_cloned_app"
+
+    desktop = Path.home() / "Desktop"
+    desktop.mkdir(parents=True, exist_ok=True)
+
+    target = desktop / base_name
+    if not target.exists():
+        return target.resolve()
+
+    counter = 1
+    while True:
+        cand = desktop / f"{base_name}_{counter}"
+        if not cand.exists():
+            return cand.resolve()
+        counter += 1
+
+
 def register_clone(clone_path: str | Path) -> Path:
     """Register and persist a newly cloned website directory as the active workspace."""
     p = Path(clone_path).resolve()
@@ -321,4 +351,31 @@ def register_clone(clone_path: str | Path) -> Path:
     remember_repo(str(p))
     logger.info("repo_context: registered cloned workspace at %s", p)
     return p
+
+
+def register_rebuild(rebuild_path: str | Path, entrypoint: str = "index.html") -> Path:
+    """Register and persist a newly rebuilt project directory as the active workspace.
+
+    Saves active_project: str(rebuild_path) and active_file: entrypoint to memory/repo_context.json.
+    Sets runtime memory manager key active_project if available.
+    Returns the absolute Path.
+    """
+    p = Path(rebuild_path).resolve()
+    p.mkdir(parents=True, exist_ok=True)
+    resolved_path = str(p)
+    data = _load()
+    data["active_project"] = resolved_path
+    data["active_file"] = entrypoint
+    data[_STORE_KEY] = resolved_path
+    _save(data)
+    logger.info("repo_context: registered rebuild workspace at %s with entrypoint %s", resolved_path, entrypoint)
+    try:
+        from memory.memory_manager import remember
+        remember("active_project", resolved_path, category="projects")
+        if entrypoint:
+            remember("active_file", entrypoint, category="projects")
+    except Exception:
+        pass
+    return p
+
 

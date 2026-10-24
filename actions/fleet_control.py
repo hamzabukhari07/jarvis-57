@@ -37,6 +37,7 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
     agent_id = str(params.get("agent_id") or "").strip()
     task = str(params.get("task") or "").strip()
     model_id = str(params.get("model_id") or params.get("model") or "").strip() or None
+    target_path = str(params.get("path") or params.get("project_path") or "").strip() or None
     if not agent_id:
         return "Error: agent_id is required to dispatch a task. Available agents can be queried with action='list_agents'."
     if not task:
@@ -60,7 +61,7 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
                 agent_name = (fleet_manager.get_agent(agent_id) or type("Agent", (), {"name": agent_id})).name
                 return f"Task already dispatched to {agent_name} and in progress. Task ID: {existing_task_id}."
 
-    res = fleet_manager.dispatch_task(agent_id=agent_id, prompt=task, model_override=model_id)
+    res = fleet_manager.dispatch_task(agent_id=agent_id, prompt=task, path=target_path, model_override=model_id)
     if not res.get("success"):
         return f"Fleet dispatch failed: {res.get('error', 'Unknown error')}"
 
@@ -327,6 +328,14 @@ TOOL = {
             "task": {
                 "type": "STRING",
                 "description": "The precise coding, research, or analysis objective to assign.",
+            },
+            "path": {
+                "type": "STRING",
+                "description": (
+                    "Existing project folder the dispatched agent must work in (e.g. 'C:/Users/Hamza/Desktop/linear_cloned_app'). "
+                    "ALWAYS pass this when the user points the agent at a folder that already exists - for example continuing a "
+                    "failed website-clone rebuild. If omitted, the agent gets a brand-new folder instead."
+                ),
             },
             "upstream_deliverables": {
                 "type": "STRING",

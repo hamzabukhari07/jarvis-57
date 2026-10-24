@@ -21,11 +21,13 @@ OFFICE_DESK_COORDINATES: list[tuple[int, int]] = [
 ]
 
 VALID_RISK_TIERS: set[str] = {"L0_READ_ONLY", "L1_MUTATION", "L2_DESTRUCTIVE"}
+CORE_AGENT_IDS: set[str] = {"MICHAEL"}
 VALID_TOOLS: set[str] = {
     "opencode_run", "kilo_run", "quick_snippet", "code_helper",
     "antigravity_run", "groq", "extract_design_system", "agent_reach",
     "web_read_page", "web_reader", "web_search", "browser_control",
     "file_processor", "file_controller", "fleet_control", "task_status",
+    "reverse_engineer",
 }
 
 
@@ -86,6 +88,8 @@ class FleetAgent:
     allowed_tools: List[str] = field(default_factory=list)
     allowed_skills: List[str] = field(default_factory=list)
     capabilities: List[str] = field(default_factory=list)
+    is_core: bool = False
+    engine: str = ""
 
 
 class FleetManager:
@@ -140,6 +144,8 @@ class FleetManager:
                         allowed_tools=list(info.get("allowed_tools") or []),
                         allowed_skills=list(info.get("allowed_skills") or []),
                         capabilities=list(info.get("capabilities") or []),
+                        is_core=bool(info.get("is_core", uid in CORE_AGENT_IDS)),
+                        engine=str(info.get("engine", "")),
                     )
         except Exception as e:
             logger.error("[FleetManager] Failed to load fleet config: %s", e)
@@ -168,6 +174,8 @@ class FleetManager:
                         "allowed_tools": a.allowed_tools,
                         "allowed_skills": a.allowed_skills,
                         "capabilities": a.capabilities,
+                        "is_core": a.is_core or (a.id in CORE_AGENT_IDS),
+                        "engine": a.engine,
                     }
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(export, f, indent=2)
@@ -235,18 +243,16 @@ class FleetManager:
             "metrics": "OSCAR",
             "accountant": "OSCAR",
             "complexity": "OSCAR",
-            "researcher": "KELLY",
-            "research": "KELLY",
-            "scraper": "KELLY",
-            "youtube": "KELLY",
+            "developer": "DEVDYNAMO",
+            "scaffold": "DEVDYNAMO",
+            "rebuild": "DEVDYNAMO",
         }
         for alias, agent_id in role_map.items():
-            if re.search(rf"\b{re.escape(alias)}\b", low):
                 agent = self.get_agent(agent_id)
                 if agent:
                     return agent
                 if agent_id in ("OSCAR", "JIM", "STANLEY", "CREED", "ANGELA", "TOBY", "KELLY"):
-                    return FleetAgent(id=agent_id, name=agent_id.title(), role="Specialist", specialty="General", color="#eab308", avatar_pixel="pixel.png", default_tool="agent_reach" if agent_id == "KELLY" else "opencode_run", risk_tier="L0_READ_ONLY", prompt_prefix="")
+                    return FleetAgent(id=agent_id, name=agent_id.title(), role="Specialist", specialty="General", color="#eab308", avatar_pixel="pixel.png", default_tool="opencode_run", risk_tier="L0_READ_ONLY", prompt_prefix="")
 
         # 3. Domain Fallback Heuristics
         if any(w in low for w in ("token", "tokens", "palette", "design system", "extract design")):
@@ -431,6 +437,9 @@ class FleetManager:
                 return {"success": False, "error": f"Agent '{agent_id}' not found."}
 
             key = matched_key
+            if key in CORE_AGENT_IDS:
+                return {"success": False, "error": f"Cannot decommission core builtin agent '{key}'."}
+
             agent = self.agents[key]
             # Teardown any active worktree if present
             if agent.active_worktree:
@@ -591,7 +600,7 @@ class FleetManager:
         except Exception:
             pass
 
-    def dispatch_task(self, agent_id: str, prompt: str, path: Optional[str] = None, model_override: Optional[str] = None, is_subtask: bool = False) -> Dict[str, Any]:
+    def dispatch_task(self, agent_id: str, prompt: str, path: Optional[str] = None, model_override: Optional[str] = None, is_subtask: bool = False, group_id: Optional[str] = None) -> Dict[str, Any]:
         """Launch an autonomous task executed by this agent's designated tool."""
         # Check if Michael orchestrator should auto-decompose multi-faceted full-stack tasks
         if not is_subtask and agent_id.upper() in ("MICHAEL", "MANAGER") and any(w in prompt.lower() for w in ("full-stack", "fullstack", "entire app", "both frontend and backend")):
@@ -806,6 +815,20 @@ class FleetManager:
                         pass
                 raise
 
+        # If this is a subtask (e.g. Verve scaffolding after REA capture), inherit parent's group for UI merging
+        parent_group_id = None
+        parent_group_title = None
+        if is_subtask and group_id:
+            try:
+                from core.task_manager import get_task_manager
+                _tm = get_task_manager()
+                parent_state = _tm._tasks.get(group_id)
+                if parent_state:
+                    parent_group_id = parent_state.group_id or parent_state.id
+                    parent_group_title = parent_state.group_title or parent_state.group_id or "REA Capture"
+            except Exception:
+                pass
+
         submitted_id = tm.submit(
             tool_name=agent.default_tool,
             fn=_worker_fn,
@@ -816,8 +839,11 @@ class FleetManager:
                 "agent_name": agent.name,
                 "target_dir": target_dir,
                 "model_id": active_model,
+                "is_subtask": is_subtask,
             },
-            group_title=f"[{agent.name}] {prompt[:40]}...",
+            group_id=parent_group_id or group_id if is_subtask else None,
+            group_title=parent_group_title or (f"[{agent.name}] {prompt[:40]}..." if not is_subtask else None),
+            parent_id=group_id if is_subtask else None,
         )
 
         with self._lock:
@@ -934,6 +960,8 @@ class FleetManager:
                     "allowed_tools": a.allowed_tools,
                     "allowed_skills": a.allowed_skills,
                     "capabilities": a.capabilities,
+                    "is_core": a.is_core or (a.id in CORE_AGENT_IDS),
+                    "engine": a.engine,
                 })
             return state
 
@@ -966,6 +994,8 @@ class FleetManager:
             "allowed_tools": a.allowed_tools,
             "allowed_skills": a.allowed_skills,
             "capabilities": a.capabilities,
+            "is_core": a.is_core or (a.id in CORE_AGENT_IDS),
+            "engine": a.engine,
         }
 
 

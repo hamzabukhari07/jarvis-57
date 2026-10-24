@@ -774,16 +774,18 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <FrameTitle className="text-[11px] font-semibold text-[var(--foreground)]">Tasks</FrameTitle>
                     {(() => {
-                      const activeCount = tasks.filter((t) => {
+                      // Filter out child tasks (subtasks) for display in main list
+                      const parentTasks = tasks.filter((t) => !t.parent_id)
+                      const activeCount = parentTasks.filter((t) => {
                         const s = (t.status || '').toUpperCase()
                         return s === 'RUNNING' || s === 'IN_PROGRESS'
                       }).length
                       return (
                         <Badge
-                          variant={activeCount > 0 ? "running" : tasks.length > 0 ? "success" : "secondary"}
+                          variant={activeCount > 0 ? "running" : parentTasks.length > 0 ? "success" : "secondary"}
                           size="xs"
                         >
-                          {activeCount > 0 ? `${activeCount} ACTIVE` : tasks.length > 0 ? 'ALL DONE' : '0 ACTIVE'}
+                          {activeCount > 0 ? `${activeCount} ACTIVE` : parentTasks.length > 0 ? 'ALL DONE' : '0 ACTIVE'}
                         </Badge>
                       )
                     })()}
@@ -801,7 +803,8 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="space-y-2 pr-1.5 min-w-0">
-                      {tasks.map((t, idx) => {
+                      {/* Filter out child tasks (subtasks) - they appear nested in TaskManagerModal */}
+                      {tasks.filter((t) => !t.parent_id).map((t, idx) => {
                         const status = (t.status || 'QUEUED').toUpperCase()
                         const isRunning = status === 'IN_PROGRESS' || status === 'RUNNING'
                         const isDone = status === 'COMPLETED' || status === 'SUCCESS' || status === 'DONE'

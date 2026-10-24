@@ -256,7 +256,10 @@ class ZezoUIServer:
             from core.task_manager import get_task_manager
             tm = get_task_manager()
             tasks = tm.all_tasks()
-            return web.json_response({"status": "success", "tasks": tasks})
+            # Filter out child tasks (subtasks) from the main task list
+            parent_tasks = [t for t in tasks if not t.get('parent_id')]
+            logger.debug(f"[UI_SERVER] Tasks list: {len(tasks)} total, {len(parent_tasks)} parent tasks")
+            return web.json_response({"status": "success", "tasks": parent_tasks})
         except Exception as e:
             logger.exception("Error in /api/tasks handler: %s", e)
             return web.json_response({"status": "error", "message": str(e)}, status=500)
@@ -1879,6 +1882,8 @@ class ZezoUIServer:
                     logger.info("Opened URL in system browser: %s", url)
                 except Exception as e:
                     logger.warning("Failed to open browser for %s: %s", url, e)
+
+        elif msg_type == "sleep_toggle":
             sleeping = bool(payload.get("sleeping", False))
             if self.on_sleep_toggle:
                 try:

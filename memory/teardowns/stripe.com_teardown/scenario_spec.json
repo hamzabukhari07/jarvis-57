@@ -1,0 +1,55 @@
+{
+  "browser": {
+    "mode": "launch",
+    "executable_path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "headless": true
+  },
+  "start_url": {
+    "url": "https://stripe.com",
+    "query": []
+  },
+  "environment": {
+    "viewport": {
+      "width": 1440,
+      "height": 900,
+      "device_scale_factor": 1
+    },
+    "locale": "en-US",
+    "timezone": "UTC",
+    "color_scheme": "dark",
+    "reduced_motion": "reduce",
+    "service_workers": "block"
+  },
+  "actions": [
+    {
+      "step_id": "settle_step",
+      "action": "wait_for_timeout",
+      "duration_ms": 2500
+    }
+  ],
+  "storage": {
+    "cookies": [],
+    "local_storage": [],
+    "session_storage": []
+  },
+  "secrets": [],
+  "capture": {
+    "after_each_step": [],
+    "at_end": [
+      "url",
+      "dom",
+      "accessibility",
+      "storage"
+    ],
+    "events": [
+      "network",
+      "console",
+      "page-errors"
+    ],
+    "network": {
+      "request_body": true,
+      "response_body": true,
+      "header_values": true
+    }
+  }
+}

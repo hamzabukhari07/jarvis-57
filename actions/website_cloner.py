@@ -1,18 +1,21 @@
 """
-actions/website_cloner.py — Autonomous Website Cloner & Adaptive Redesigner for Zezo.
+actions/website_cloner.py - Autonomous Website Cloner & Capture Rebuilder for Zezo.
 
 Auto-discovered by core/action_loader.
-Clones full frontend websites into Desktop/<domain>_clone/ with offline assets,
-launches a local HTTP preview server (http://127.0.0.1:PORT), and provides
-seamless chaining to Antigravity Agent for React conversion or studio redesign.
+Clones a site's static frontend into Desktop/<domain>_clone/ with offline assets and launches a
+local HTTP preview server (http://127.0.0.1:PORT). With output_format=react/nextjs it then rebuilds
+the capture as a real React/Vite project in Desktop/<domain>_cloned_app via ZEZO's own coding engine.
 
 Architecture:
-- Tier 1: Playwright Headless Chromium (rendered DOM + React/Next.js/Webflow hydration)
-- Tier 2: Resilient HTTP Stream via urllib/requests + BeautifulSoup / Scrapling
-- Tier 3: Cross-platform HTTrack CLI (shutil.which) for explicit multi-page mirroring
-- Fault-tolerant asset localizer (partial success guard, size caps, relative path rewriter)
+- Engine: bundled Uncage CLI (tools/uncage) — stealth Playwright crawl, asset localization, static assembly
+- Strict completion check: a run counts as success only when the assembler finished
+  (asset-map.json + index.html present, captured-raw*.html gone) — see _uncage_result_ok
+- Self-tuned flags: explicit per-page --timeout, generous wall-clock budget, and a
+  degradation retry with --skip-deps when a heavy crawl is cut short
+- Post-clone asset integrity gate before the preview opens (verify_local_assets)
+- Optional React/Next rebuild performed by ZEZO itself via the local Antigravity CLI
 - Local ephemeral HTTP server (no CORS / no file:// path breakage)
-- Asynchronous TaskManager execution with 5-milestone progress reporting
+- Asynchronous TaskManager execution with milestone progress reporting
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ import logging
 import mimetypes
 import os
 import platform
+import queue
 import re
 import shutil
 import socket
@@ -55,7 +59,7 @@ try:
 except ImportError:
     SCRAPLING_AVAILABLE = False
 
-from core.repo_context import get_unique_clone_dir, register_clone
+from core.repo_context import get_unique_clone_dir, get_unique_rebuild_dir, register_clone, register_rebuild
 from core.task_manager import get_task_manager, TaskContext
 from core.undo import register_clone_snapshot
 
@@ -76,6 +80,23 @@ MAX_TOTAL_DIR_BYTES = 200 * 1024 * 1024     # 200 MB
 MAX_ASSET_WORKERS = 8
 MAX_PAGES_FULL_SITE = 50
 MAX_DEPTH_FULL_SITE = 2
+
+# Uncage auto-tuning. Two different timeouts exist and must not be conflated:
+#   * SINGLE/PER_PAGE/CRAWL_* below are ZEZO's WALL-CLOCK budget for the whole process
+#   * UNCAGE_PAGE_TIMEOUT_* feed uncage's own --timeout, its PER-PAGE navigation timeout
+# A heavy SPA can be killed inside uncage's unbounded JS module dependency scan, so the
+# wall-clock budget is generous and a killed crawl is retried with --skip-deps (see
+# run_uncage_exporter) rather than reported as a broken success.
+SINGLE_PAGE_TIMEOUT_SEC = 150
+PER_PAGE_TIMEOUT_SEC = 40
+CRAWL_BASE_SEC = 60
+MIN_CRAWL_TIMEOUT_SEC = 180
+MAX_CRAWL_TIMEOUT_SEC = 600          # stays under TaskManager.MAX_WALLCLOCK_SEC (1200)
+UNCAGE_PAGE_TIMEOUT_SINGLE_MS = 30000
+UNCAGE_PAGE_TIMEOUT_CRAWL_MS = 45000
+# Fidelity-first: PurgeCSS can drop classes that are only applied at runtime, which renders
+# a cloned page broken. Keeping every class costs file size but preserves the design.
+UNCAGE_NO_PURGE = True
 
 # Global Preview Server Pool
 _PREVIEW_SERVERS: Dict[int, http.server.ThreadingHTTPServer] = {}
@@ -293,19 +314,310 @@ def _ensure_uncage_browsers(uncage_root: Path, ctx: Optional[TaskContext] = None
         return False, f"Playwright browser re-check failed: {e}"
 
 
+# ── Uncage Result Validation & Post-Clone Integrity ────────────────────────
+
+def crawl_timeout_budget(max_pages: int) -> int:
+    """ZEZO's wall-clock budget for one uncage run, derived from crawl scope."""
+    if max_pages <= 1:
+        return SINGLE_PAGE_TIMEOUT_SEC
+    return min(
+        MAX_CRAWL_TIMEOUT_SEC,
+        max(MIN_CRAWL_TIMEOUT_SEC, CRAWL_BASE_SEC + max_pages * PER_PAGE_TIMEOUT_SEC),
+    )
+
+
+def _uncage_page_timeout_ms(max_pages: int) -> int:
+    """Uncage's --timeout is a PER-PAGE navigation timeout, not the crawl budget."""
+    return UNCAGE_PAGE_TIMEOUT_CRAWL_MS if max_pages > 1 else UNCAGE_PAGE_TIMEOUT_SINGLE_MS
+
+
+def _uncage_result_ok(raw_output_dir: Path, returncode: int) -> Tuple[bool, str]:
+    """
+    True only for a COMPLETED uncage run.
+
+    A killed or crashed run leaves a staging snapshot behind: `captured-raw*.html` is
+    written per route early in extraction (tools/uncage/src/extractor.ts:708), while
+    `asset-map.json` is the extractor's LAST write, after the JS module dependency scan
+    (src/extractor.ts:748), and the assembler deletes the raw snapshots when it finishes
+    (src/formats/html.ts:308-316). Requiring all three signals is what separates
+    "assembled" from "died halfway" — the distinction that was previously lost.
+    """
+    if returncode != 0:
+        return False, f"uncage exited with code {returncode}"
+    root = Path(raw_output_dir)
+    if not root.is_dir():
+        return False, "uncage wrote no output directory"
+
+    raws = sorted(p.name for p in root.glob("captured-raw*.html"))
+    has_index = (root / "index.html").is_file()
+    has_map = (root / "asset-map.json").is_file()
+
+    # A surviving raw snapshot means the consolidate/assemble stage never ran. That stage sits
+    # AFTER compile in the pipeline, so index.html + asset-map.json can both exist while the
+    # bundle is still un-assembled — accepting that state is the false success this guards.
+    if raws:
+        return False, (
+            "uncage stopped before assembly: the raw page snapshot "
+            f"({raws[0]}) was never consolidated into the final bundle"
+        )
+    if not has_map:
+        return False, "uncage produced no asset-map.json - extraction did not finish"
+    if not has_index:
+        return False, "uncage produced no assembled index.html"
+    return True, ""
+
+
+def _looks_like_partial_extraction(raw_output_dir: Path) -> bool:
+    """True when uncage wrote raw page snapshots but never completed extraction."""
+    try:
+        root = Path(raw_output_dir)
+        return root.is_dir() and any(root.glob("captured-raw*.html"))
+    except Exception:
+        return False
+
+
+_LOCAL_REF_RE = re.compile(r'(?:src|href)\s*=\s*["\']([^"\']+)["\']', re.I)
+_SKIP_REF_PREFIXES = ("http://", "https://", "//", "data:", "mailto:", "javascript:", "#")
+# Evidence: uncage localises stylesheets, scripts, fonts and images, but its asset pipeline does
+# not track <video>/<audio> sources at all - a real export's asset-map.json contained no .mp4 entry
+# while every image was fetched. A missing stylesheet/script/image means the page renders broken
+# (the reported defect), so that is fatal; a video uncage never tried to download is reported as a
+# caveat instead, because failing the clone would block every video-bearing site forever.
+_SKIP_MEDIA_EXT = (
+    ".mp4", ".webm", ".mov", ".m4v", ".ogv", ".avi", ".mkv",
+    ".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac",
+)
+# How much missing render-critical material means "broken clone" rather than "a few stragglers".
+# Both ends are measured, not guessed: the clone the user reported as broken resolved 0% of its
+# assets (the assets/ folder was never populated at all), while a healthy clone of a JS-heavy
+# marketing site resolved ~97% (a handful of lazy <img> and <video> sources uncage left behind).
+# 25% sits far from both, and the exact "renders unstyled" symptom is caught separately below by
+# the stylesheet/script rules, independent of any ratio.
+_MISSING_ASSET_FATAL_RATIO = 0.25
+
+
+def verify_local_assets(root: Path, max_files: int = 25) -> Tuple[bool, str]:
+    """
+    Verify that assets/... references in the exported HTML resolve on disk.
+
+    Scoped deliberately to the uncage asset namespace: a missing favicon, robots.txt or
+    a leftover CDN reference must never fail an otherwise-good clone.
+
+    Returns (ok, detail). `ok` is False only for wholesale breakage: most render-critical
+    references missing, or every stylesheet/script gone (which is the "पेज फटा हुआ" symptom
+    this gate exists to catch). Anything smaller is delivered with an explicit caveat, and
+    heavy media uncage never downloads is always a caveat rather than a failure.
+    """
+    root = Path(root)
+    missing: Set[str] = set()
+    missing_media: Set[str] = set()
+    critical: Set[str] = set()
+    css_refs: Set[str] = set()
+    css_ok: Set[str] = set()
+    js_refs: Set[str] = set()
+    js_ok: Set[str] = set()
+
+    for html in sorted(root.rglob("*.html"))[:max_files]:
+        try:
+            text = html.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+        for raw_ref in _LOCAL_REF_RE.findall(text):
+            ref = raw_ref.split("?", 1)[0].split("#", 1)[0].strip()
+            if not ref or ref.startswith(_SKIP_REF_PREFIXES):
+                continue
+            norm = ref.lstrip("./")
+            if not norm.startswith("assets/"):
+                continue
+            exists = (root / norm).exists()
+            if norm.lower().endswith(_SKIP_MEDIA_EXT):
+                if not exists:
+                    missing_media.add(norm)
+                continue
+            critical.add(norm)
+            if exists:
+                if norm.lower().endswith(".css"):
+                    css_ok.add(norm)
+                elif norm.lower().endswith((".js", ".mjs")):
+                    js_ok.add(norm)
+                continue
+            missing.add(norm)
+            if norm.lower().endswith(".css"):
+                css_refs.add(norm)
+            elif norm.lower().endswith((".js", ".mjs")):
+                js_refs.add(norm)
+
+    total = len(critical)
+    gone = len(missing)
+    example = ", ".join(sorted(missing)[:3]) or ", ".join(sorted(missing_media)[:3])
+
+    if total and (gone / total) >= _MISSING_ASSET_FATAL_RATIO:
+        return False, f"{gone} of {total} referenced asset(s) missing locally (e.g. {example})"
+    if css_refs and not css_ok:
+        return False, f"none of the page's {len(css_refs)} stylesheets were saved (e.g. {example})"
+    if js_refs and not js_ok:
+        return False, f"none of the page's {len(js_refs)} scripts were saved (e.g. {example})"
+
+    if not total:
+        detail = "no local asset references found"
+    elif gone:
+        detail = f"{gone} of {total} local asset reference(s) could not be saved (e.g. {example})"
+    else:
+        detail = f"all {total} local asset reference(s) resolve"
+    if missing_media:
+        detail += (
+            f"; {len(missing_media)} video/audio file(s) were not downloaded "
+            f"(e.g. {', '.join(sorted(missing_media)[:3])}) - the page will show those as empty"
+        )
+    return True, detail
+
+
+def _run_uncage_process(
+    cmd: List[str],
+    cwd: Path,
+    ctx: Optional[TaskContext],
+    timeout_sec: int,
+) -> Tuple[int, bool, List[str], List[str]]:
+    """
+    Run uncage with a wall-clock budget that can actually fire.
+
+    A reader thread feeds a queue so the deadline is evaluated while WAITING for output.
+    The previous `for line in iter(proc.stdout.readline, "")` loop only checked the clock
+    *after* a line arrived, so a silent stall hung the task forever.
+
+    Returns (returncode, killed_by_budget, error_lines, tail_lines).
+    """
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(cwd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+        **_WIN_HIDE,
+    )
+
+    out_queue: "queue.Queue[str]" = queue.Queue()
+    err_lines: List[str] = []
+    tail_lines: List[str] = []
+
+    def _pump() -> None:
+        try:
+            if proc.stdout:
+                for ln in iter(proc.stdout.readline, ""):
+                    out_queue.put(ln)
+        except Exception:
+            pass
+        finally:
+            out_queue.put("")   # sentinel: stream closed
+
+    threading.Thread(target=_pump, daemon=True, name="uncage-stdout").start()
+
+    start_t = time.time()
+    killed_by_budget = False
+
+    def _over_budget() -> bool:
+        if (time.time() - start_t) > timeout_sec:
+            proc.kill()
+            logger.warning("Uncage exceeded its %ds budget and was stopped", timeout_sec)
+            return True
+        return False
+
+    while True:
+        try:
+            line = out_queue.get(timeout=1.0)
+        except queue.Empty:
+            if _over_budget():
+                killed_by_budget = True
+                break
+            if proc.poll() is not None and out_queue.empty():
+                break
+            continue
+
+        if line == "":
+            break
+
+        line_str = line.strip()
+        if not line_str:
+            continue
+        logger.debug("[UNCAGE LIVE] %s", line_str)
+
+        # Unfiltered tail: uncage frequently fails with a plain line, and the keyword
+        # filter below would drop the only useful explanation.
+        tail_lines.append(line_str)
+        if len(tail_lines) > 12:
+            tail_lines.pop(0)
+
+        # Keep the last real error line so a failure can be explained to the user
+        # instead of a generic "extraction failed".
+        _low = line_str.lower()
+        if ("error" in _low or "executable doesn't exist" in _low
+                or "browsertype.launch" in _low or "cannot find module" in _low):
+            err_lines.append(line_str)
+
+        if "Reading robots.txt" in line_str or "Discovering sitemaps" in line_str:
+            _safe_report(ctx, 28, "[UNCAGE] Discovering sitemaps & crawl policy...")
+        elif "Launching stealth browser" in line_str:
+            _safe_report(ctx, 35, "[UNCAGE] Launching stealth browser engine...")
+        elif "Setting up global network interceptors" in line_str:
+            _safe_report(ctx, 45, "[UNCAGE] Intercepting network assets & DOM...")
+        elif "Crawling:" in line_str:
+            page_part = line_str.split("Crawling:", 1)[-1].strip()
+            _safe_report(ctx, 55, f"[UNCAGE] Crawling {page_part[:45]}...")
+        elif "Rewriting asset URLs" in line_str:
+            _safe_report(ctx, 70, "[UNCAGE] Localizing and rewriting asset URLs...")
+        elif "Purging and minifying" in line_str or "Optimizing CSS" in line_str:
+            _safe_report(ctx, 78, "[UNCAGE] Optimizing stylesheets...")
+        elif "Compiling Static HTML" in line_str:
+            _safe_report(ctx, 84, "[UNCAGE] Compiling static pages...")
+        elif "Finalizing Static HTML" in line_str or "Successfully exported" in line_str:
+            _safe_report(ctx, 90, "[UNCAGE] Bundle finalized successfully.")
+
+        if _over_budget():
+            killed_by_budget = True
+            break
+
+    if proc.stdout:
+        try:
+            proc.stdout.close()
+        except Exception:
+            pass
+
+    if proc.poll() is None:
+        try:
+            proc.wait(timeout=10)
+        except Exception:
+            try:
+                proc.kill()
+                proc.wait(timeout=5)
+            except Exception:
+                pass
+
+    rc = proc.returncode if proc.returncode is not None else -1
+    return rc, killed_by_budget, err_lines, tail_lines
+
+
 def run_uncage_exporter(
     url: str,
     output_dir: Path,
     ctx: Optional[TaskContext] = None,
     max_pages: int = 1,
     max_depth: Optional[int] = None,
-    timeout_sec: int = 180,
+    timeout_sec: Optional[int] = None,
+    priority_only: bool = False,
 ) -> Tuple[bool, str]:
     """
     Executes the self-contained Uncage CLI (tools/uncage/bin/uncage.js) with live streaming progress.
     Supports single-page extraction (max_pages=1, max_depth=0) or multi-page crawling.
-    Returns True if the bundle was successfully exported.
+
+    Uncage's own options are auto-selected here — the user is never asked about them.
+    Returns (ok, detail) where `ok` means the export was genuinely ASSEMBLED and
+    `detail` explains a failure in terms the user can act on.
     """
+    if timeout_sec is None:
+        timeout_sec = crawl_timeout_budget(max_pages)
     _safe_report(ctx, 15, f"[UNCAGE] Dispatching local Uncage engine for {url} (max_pages={max_pages})...")
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -368,76 +680,65 @@ def run_uncage_exporter(
             url,
             "-o", target_name,
             "--max-pages", str(max_pages),
+            # uncage's --timeout is a PER-PAGE navigation timeout; ZEZO always sets it
+            # explicitly rather than inheriting uncage's 30s default.
+            "--timeout", str(_uncage_page_timeout_ms(max_pages)),
         ]
         if max_depth is not None:
             cmd.extend(["--max-depth", str(max_depth)])
+        if UNCAGE_NO_PURGE:
+            cmd.append("--no-purge")
+        if priority_only and max_pages > 1:
+            cmd.append("--priority-only")
+        # Deliberately never auto-set: --ignore-robots (respecting robots.txt and its
+        # crawl delay is the safe default), --safe-mode (disables JS), --no-headless,
+        # --keep-analytics.
 
         _safe_report(ctx, 22, f"[UNCAGE] Initializing crawler (max_pages={max_pages})...")
 
-        proc = subprocess.Popen(
-            cmd,
-            cwd=str(uncage_root),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            bufsize=1,
-            **_WIN_HIDE,
+        rc, killed_by_budget, err_lines, tail_lines = _run_uncage_process(
+            cmd, uncage_root, ctx, timeout_sec
         )
+        ok, why = _uncage_result_ok(raw_output_dir, rc)
 
-        start_t = time.time()
-        err_lines: List[str] = []
-        if proc.stdout:
-            for line in iter(proc.stdout.readline, ""):
-                line_str = line.strip()
-                if not line_str:
-                    continue
-                logger.debug("[UNCAGE LIVE] %s", line_str)
-
-                # Keep the last real error line so a failure can be explained to
-                # the user instead of the old generic "extraction failed".
-                _low = line_str.lower()
-                if ("error" in _low or "executable doesn't exist" in _low
-                        or "browsertype.launch" in _low or "cannot find module" in _low):
-                    err_lines.append(line_str)
-
-                if "Reading robots.txt" in line_str or "Discovering sitemaps" in line_str:
-                    _safe_report(ctx, 28, "[UNCAGE] Discovering sitemaps & crawl policy...")
-                elif "Launching stealth browser" in line_str:
-                    _safe_report(ctx, 35, "[UNCAGE] Launching stealth browser engine...")
-                elif "Setting up global network interceptors" in line_str:
-                    _safe_report(ctx, 45, "[UNCAGE] Intercepting network assets & DOM...")
-                elif "Crawling:" in line_str:
-                    page_part = line_str.split("Crawling:", 1)[-1].strip()
-                    _safe_report(ctx, 55, f"[UNCAGE] Crawling {page_part[:45]}...")
-                elif "Rewriting asset URLs" in line_str:
-                    _safe_report(ctx, 70, "[UNCAGE] Localizing and rewriting asset URLs...")
-                elif "Purging and minifying" in line_str or "Optimizing CSS" in line_str:
-                    _safe_report(ctx, 78, "[UNCAGE] Optimizing and purging stylesheets...")
-                elif "Compiling Static HTML" in line_str:
-                    _safe_report(ctx, 84, "[UNCAGE] Compiling static pages...")
-                elif "Finalizing Static HTML" in line_str or "Successfully exported" in line_str:
-                    _safe_report(ctx, 90, "[UNCAGE] Bundle finalized successfully.")
-
-                if (time.time() - start_t) > timeout_sec:
-                    proc.kill()
-                    logger.warning("Uncage execution timed out after %ds", timeout_sec)
-                    break
-
-            proc.stdout.close()
-        proc.wait(timeout=10)
-
-        # Check output in Uncage's output directory
-        if not raw_output_dir.exists():
-            # Check if directory was created with sanitized name
+        # uncage may sanitize the output directory name slightly differently.
+        if not ok:
             for candidate in (uncage_root / "output").glob(f"*{target_name}*"):
-                if candidate.is_dir() and (list(candidate.rglob("*.html")) or (candidate / "assets").exists()):
-                    raw_output_dir = candidate
+                if candidate.is_dir() and _uncage_result_ok(candidate, rc)[0]:
+                    raw_output_dir, ok, why = candidate, True, ""
                     break
 
-        html_candidates = list(raw_output_dir.rglob("*.html")) if raw_output_dir.exists() else []
-        if raw_output_dir.exists() and (html_candidates or (raw_output_dir / "assets").exists()):
+        # Degradation retry: heavy SPA crawls die inside uncage's unbounded JS module
+        # dependency scan. With --skip-deps that scan is skipped, while asset-map.json,
+        # the asset rewrites and the assembler all still run — so the clone completes
+        # instead of being reported as a broken success. Only lazy-loaded route chunks
+        # stay remote.
+        degraded = False
+        if not ok and (killed_by_budget or _looks_like_partial_extraction(raw_output_dir)):
+            degraded = True
+            _safe_report(ctx, 22, "[UNCAGE] Crawl was cut short - retrying with the JS dependency scan disabled...")
+            logger.info("Retrying uncage with --skip-deps after an incomplete extraction")
+            if raw_output_dir.exists():
+                shutil.rmtree(raw_output_dir, ignore_errors=True)
+            rc2, killed2, err_lines2, tail_lines2 = _run_uncage_process(
+                cmd + ["--skip-deps"], uncage_root, ctx, timeout_sec
+            )
+            ok2, why2 = _uncage_result_ok(raw_output_dir, rc2)
+            if not ok2:
+                for candidate in (uncage_root / "output").glob(f"*{target_name}*"):
+                    if candidate.is_dir() and _uncage_result_ok(candidate, rc2)[0]:
+                        raw_output_dir, ok2, why2 = candidate, True, ""
+                        break
+            if ok2:
+                ok, why = True, ""
+                rc, killed_by_budget = rc2, killed2
+                err_lines, tail_lines = err_lines2, tail_lines2
+            else:
+                # Surface whichever attempt got furthest into explaining the problem.
+                rc, killed_by_budget = rc2, killed2
+                err_lines, tail_lines = err_lines2, tail_lines2
+
+        if ok:
             # Sync all exported files into output_dir
             for item in raw_output_dir.iterdir():
                 dest = output_dir / item.name
@@ -448,20 +749,27 @@ def run_uncage_exporter(
                 else:
                     shutil.copy2(item, dest)
 
-            # Ensure an index.html exists in root output_dir for preview server
+            # The assembler already produced index.html — the old "copy the first .html
+            # we find" fallback is gone, because that is what promoted a raw pre-assembly
+            # snapshot into the served page and made a broken clone look successful.
             if not (output_dir / "index.html").exists():
-                all_htmls = [p for p in output_dir.rglob("*.html") if p.is_file()]
-                if all_htmls:
-                    shutil.copy2(all_htmls[0], output_dir / "index.html")
+                return False, (
+                    "uncage reported success but no index.html reached the clone folder."
+                )
 
             file_count = len(list(output_dir.rglob("*")))
-            _safe_report(ctx, 92, f"[UNCAGE] Successfully extracted full bundle ({file_count} files/pages).")
+            suffix = " [degraded: JS dependency scan skipped]" if degraded else ""
+            _safe_report(ctx, 92, f"[UNCAGE] Successfully assembled bundle ({file_count} files/pages){suffix}")
             return True, ""
 
-        detail = err_lines[-1] if err_lines else (
-            f"Uncage exited with code {proc.returncode}." if proc.returncode
-            else "Uncage produced no output bundle.")
-        logger.warning("Uncage extraction failed (returncode=%s): %s", proc.returncode, detail)
+        last_output = err_lines[-1] if err_lines else (tail_lines[-1] if tail_lines else "")
+        if killed_by_budget:
+            detail = f"uncage exceeded its {timeout_sec}s budget and was stopped"
+        else:
+            detail = f"{why}." if why else f"uncage exited with code {rc}."
+        if last_output:
+            detail = f"{detail} Last output: {last_output[:200]}"
+        logger.warning("Uncage extraction failed (returncode=%s): %s", rc, detail)
         return False, detail
     except Exception as e:
         logger.warning("Uncage CLI execution error: %s", e)
@@ -2145,6 +2453,123 @@ def _faithful_cleanup(raw_html: str, url: str, clone_dir: Path, ctx=None) -> str
     return raw_html
 
 
+# ── ZEZO-native React/Next rebuild (no fleet agent involved) ─────────────────
+
+REACT_FORMATS = ("react", "nextjs")
+REBUILD_PROMPT_MAX_CHARS = 6000   # actions/antigravity_agent.py truncates the full prompt here
+
+
+def react_rebuild_prompt(url: str) -> str:
+    """Task prompt for the ZEZO-native React rebuild of a freshly captured clone.
+
+    It must satisfy the stack markers in actions/antigravity_agent.py: contain a
+    react/vite/jsx/tsx token, contain no static-HTML marker ("single html", "one index",
+    "no framework", ...) and no negated React phrasing - otherwise the engine builds a
+    static page instead of a React project. tests/test_website_cloner_suite.py asserts this.
+    """
+    return (
+        f"REBUILD THE CAPTURED SITE AS A REACT APP.\n\n"
+        f"The '_source' folder in this workspace is a faithful offline capture of {url}: "
+        f"'_source/index.html' plus its stylesheets, scripts, fonts and images under "
+        f"'_source/assets/'. It is the design reference and must stay exactly as it is - "
+        f"never edit or delete anything inside it. Put the runnable React + Vite project in "
+        f"this workspace root, as a sibling of '_source'.\n\n"
+        f"1. Open '_source/index.html' and study its structure, section order, colours, "
+        f"typography, spacing and images. Reproduce them 1:1. This is a faithful port, not a "
+        f"redesign: invent no extra sections, and bring in no outside visual style of your own.\n"
+        f"2. Split the page into small reusable components under src/components/ (Navbar, Hero, "
+        f"Features, Pricing, Footer, ...). src/App.tsx composes them in the captured order.\n"
+        f"3. Bring the captured styling across as-is: import the captured CSS (copy the files to "
+        f"src/styles/ if that is cleaner) or port the rules verbatim into the component styles. "
+        f"Reuse the captured fonts and images by copying them into public/ and referencing them "
+        f"by relative path. Keep every class name the capture depends on.\n"
+        f"4. Translate the markup into JSX: class -> className, for -> htmlFor, inline style "
+        f"strings -> style objects, void elements self-closed. Keep every text string, link URL "
+        f"and image from the capture verbatim; add state only for behaviour the capture had.\n"
+        f"5. Ship package.json (react, react-dom, vite, @vitejs/plugin-react), vite.config.ts, "
+        f"an index.html entry and src/main.tsx so that 'npm install' then 'npm run dev' runs it "
+        f"immediately. Do not run npm install, do not run npm run dev, do not start any server.\n"
+        f"6. End by writing the files themselves. Answering with a plan, a summary or a diff "
+        f"instead of real code counts as failure.\n"
+    )
+
+
+def _run_react_rebuild(url: str, clone_dir: Path, ctx: TaskContext) -> Tuple[bool, str, Optional[Path]]:
+    """Rebuild a completed clone as a React app using ZEZO's own coding engine.
+
+    Returns (ok, detail, app_dir). The engine call reuses the existing run_in_place seam in
+    actions/antigravity_agent.py, so the build reports into THIS task's card instead of
+    spawning a second task - and it is the same agy.exe invocation a fleet agent would make.
+
+    Success is decided here, by inspecting the folder, never by what the engine claims.
+    """
+    try:
+        app_dir = get_unique_rebuild_dir(_extract_domain(url))
+    except Exception as e:
+        return False, f"could not allocate a rebuild folder ({e})", None
+
+    source_dir = app_dir / "_source"
+    try:
+        app_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(
+            clone_dir, source_dir,
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns("antigravity_clone.html"),
+        )
+    except Exception as e:
+        return False, f"could not copy the captured bundle into {source_dir} ({e})", app_dir
+
+    _safe_report(ctx, 99, f"[REACT] ZEZO is rebuilding the captured design as a React app in {app_dir.name}...")
+    try:
+        from actions.antigravity_agent import antigravity_action
+        engine_out = antigravity_action(
+            {
+                "task": react_rebuild_prompt(url),
+                "project_path": str(app_dir),
+                "run_in_place": True,
+                "task_ctx": ctx,
+                # A clone must reproduce the captured design, so no Hamza Taste blueprint is
+                # injected here, and the engine's own file:// preview is left alone (a Vite
+                # source tree is not previewable without npm install; the clone preview is open).
+                "skip_design": True,
+                "skip_preview": True,
+            },
+            session_memory={},
+        )
+    except Exception as e:
+        return False, f"the coding engine crashed ({e})", app_dir
+
+    engine_status = ""
+    try:
+        parsed = json.loads(engine_out) if isinstance(engine_out, str) else engine_out
+        if isinstance(parsed, dict) and parsed.get("status") not in (None, "success"):
+            engine_status = str(parsed.get("error") or parsed.get("status"))
+    except Exception:
+        pass
+
+    # An engine that reports failure is taken at its word even if the folder looks plausible:
+    # it may have written a few files before dying, and a half-built app reported as finished
+    # is exactly the false success this tool must not produce.
+    if engine_status:
+        return False, f"the coding engine reported a failure ({engine_status[:120]})", app_dir
+
+    if not (app_dir / "package.json").exists():
+        return False, "the engine finished without a package.json", app_dir
+    if not ((app_dir / "src").is_dir() or (app_dir / "app").is_dir()):
+        return False, "the engine finished without a src/ or app/ folder", app_dir
+
+    components = 0
+    for sub in ("src", "app"):
+        d = app_dir / sub
+        if d.is_dir():
+            components = len(list(d.rglob("*.tsx"))) + len(list(d.rglob("*.jsx")))
+            break
+    if components == 0:
+        return False, "the engine produced no React component files (.jsx/.tsx)", app_dir
+
+    return True, f"{components} React component file(s) in {app_dir.name}", app_dir
+
+
 def _clone_worker(params: dict, ctx: TaskContext) -> dict:
     """
     Main asynchronous worker executing the website cloning pipeline with Multimodal Vision v2 + IR Responsive Delta Engine.
@@ -2172,14 +2597,8 @@ def _clone_worker(params: dict, ctx: TaskContext) -> dict:
     # 2. Register Undo Snapshot
     register_clone_snapshot(clone_dir, tool_label=f"Clone of {domain}")
 
-    # 3. User Intent & Component Framework Check
-    user_prompt = (params.get("task") or params.get("instruction") or params.get("prompt") or "").lower()
-    explicit_framework = (
-        output_format in ("react", "nextjs")
-        or any(k in user_prompt for k in ["react", "nextjs", "next.js", "vite", "vue", "svelte", "tailwind app"])
-    )
-    if explicit_framework:
-        _safe_report(ctx, 8, "[INTENT] User explicitly requested Component Framework project. Chaining to React/Next.js engine.")
+    # 3. Static clone is always delivered first; the optional React/Next rebuild runs at the
+    #    end of this worker (step 11) so a failed rebuild can never cost the captured bundle.
 
     # 4. Zero-Latency Tech Stack Fingerprinting (<200ms)
     _safe_report(ctx, 9, "[STACK] Fingerprinting target website tech stack...")
@@ -2212,19 +2631,37 @@ def _clone_worker(params: dict, ctx: TaskContext) -> dict:
     uncage_pages = 1 if mode == "single_page" else min(MAX_PAGES_FULL_SITE, 25)
     uncage_depth = 0 if mode == "single_page" else MAX_DEPTH_FULL_SITE
     _safe_report(ctx, 15, f"[UNCAGE] Dispatching Uncage static cloner for {url} (max_pages={uncage_pages})...")
-    uncage_ok, uncage_detail = run_uncage_exporter(url, clone_dir, ctx, max_pages=uncage_pages, max_depth=uncage_depth)
+    uncage_ok, uncage_detail = run_uncage_exporter(
+        url, clone_dir, ctx,
+        max_pages=uncage_pages,
+        max_depth=uncage_depth,
+        timeout_sec=crawl_timeout_budget(uncage_pages),
+        priority_only=bool(params.get("main_pages_only")),
+    )
 
-    if not uncage_ok or (not (clone_dir / "index.html").exists() and not list(clone_dir.rglob("*.html"))):
+    if not uncage_ok:
         reason = uncage_detail or "output bundle not found"
         _safe_report(ctx, 100, f"[UNCAGE ERROR] Uncage extraction failed for {url}: {reason}")
         raise RuntimeError(f"Uncage extraction failed for {url}: {reason}.")
 
-    if not (clone_dir / "index.html").exists():
-        all_htmls = [p for p in clone_dir.rglob("*.html") if p.is_file()]
-        if all_htmls:
-            shutil.copy2(all_htmls[0], clone_dir / "index.html")
+    _safe_report(ctx, 88, f"[UNCAGE] Bundle assembled successfully into {clone_dir.name}.")
 
-    _safe_report(ctx, 88, f"[UNCAGE] Bundle extracted successfully into {clone_dir.name}.")
+    # 6b. Asset integrity gate. A clone whose local assets 404 renders unstyled — that was
+    # the reported defect, so fail loudly here rather than opening a preview and calling a
+    # broken clone a success.
+    assets_ok, assets_msg = verify_local_assets(clone_dir)
+    if not assets_ok:
+        _safe_report(ctx, 100, f"[INTEGRITY ERROR] {assets_msg}")
+        raise RuntimeError(
+            f"Clone produced a page with unresolved local assets: {assets_msg}. "
+            f"Refusing to report success - partial output kept at {clone_dir}."
+        )
+    _safe_report(ctx, 89, f"[INTEGRITY] {assets_msg}.")
+    # Anything uncage failed to save is a caveat the user should hear, not a silent gap.
+    media_note = (
+        " Note: some images and video/audio files could not be downloaded, so a few spots show up empty."
+        if ("could not be saved" in assets_msg or "were not downloaded" in assets_msg) else ""
+    )
 
     # 7. Antigravity Master Reverse-Engineering (section-aware multimodal, with faithful fallback)
     _safe_report(ctx, 90, "[ANTIGRAVITY] Running reverse-engineering synthesis...")
@@ -2344,9 +2781,9 @@ def _clone_worker(params: dict, ctx: TaskContext) -> dict:
         pass
 
     total_files = len(list(clone_dir.rglob("*")))
-    _safe_report(ctx, 100, f"[DONE] Clone complete ({total_files} files in {clone_dir.name}).")
+    _safe_report(ctx, 98, f"[DONE] Static clone complete ({total_files} files in {clone_dir.name}).")
 
-    return {
+    result = {
         "status": "success",
         "url": url,
         "engine": engine_used,
@@ -2359,9 +2796,37 @@ def _clone_worker(params: dict, ctx: TaskContext) -> dict:
         "summary": (
             f"Cloning complete for '{url}'. Static bundle in '{clone_dir.name}' ({total_files} files); "
             f"Antigravity reverse-engineered standalone HTML saved as 'antigravity_clone.html'. "
-            f"Preview live at {antigravity_preview_url}."
+            f"Preview live at {antigravity_preview_url}.{media_note}"
         ),
     }
+
+    # 11. Optional ZEZO-native React/Next rebuild of the captured design
+    if output_format in REACT_FORMATS:
+        rebuild_ok, rebuild_detail, app_dir = _run_react_rebuild(url, clone_dir, ctx)
+        if not rebuild_ok:
+            # The static clone succeeded and its preview is open, but the user asked for a React
+            # project. Report the failure plainly instead of shipping a fake success, and keep
+            # the folder so a fleet agent can be pointed straight at it. The folder path leads
+            # the message because the failure notification ZEZO receives is cut at 150 chars.
+            kept = f"folder kept at {app_dir}" if app_dir else "no rebuild folder was created"
+            _safe_report(ctx, 100, f"[REACT ERROR] {rebuild_detail}")
+            raise RuntimeError(
+                f"React rebuild FAILED - {kept} ({rebuild_detail}). "
+                f"Static clone is intact at {clone_dir} and its preview is open at {antigravity_preview_url}."
+            )
+        result["app_dir"] = str(app_dir)
+        result["summary"] = (
+            f"Clone complete for '{url}' as a React project. Captured bundle in '{clone_dir.name}' "
+            f"(preview at {antigravity_preview_url}); React app in '{app_dir.name}' ({rebuild_detail}) - "
+            f"run 'npm install' then 'npm run dev' inside it.{media_note}"
+        )
+        try:
+            register_rebuild(app_dir, entrypoint="src/App.tsx")
+        except Exception as e:
+            logger.warning("Could not register rebuild workspace: %s", e)
+
+    _safe_report(ctx, 100, result["summary"])
+    return result
 
 
 # ── Action Entrypoint & Tool Schema ─────────────────────────────────────────
@@ -2374,17 +2839,71 @@ def clone_website_action(
 ) -> str:
     """
     Action handler called by core.action_loader.
-    Submits background worker task and returns immediate conversational confirmation.
+
+    Runs a two-step confirmation gate before submitting the background worker:
+      1. INTAKE  — ask only the values the user has not already given.
+      2. COMMIT  — read the plan back and require an explicit yes.
+    The read-back is also the last defence against a misheard URL or folder, which is
+    why it is never skipped even when the user supplied everything at once.
     """
     raw_url = parameters.get("url") or parameters.get("link") or parameters.get("target") or ""
     url = _normalize_url(raw_url)
-    mode = (parameters.get("mode") or "single_page").lower()
-    output_format = (parameters.get("output_format") or "static").lower()
 
     if not url:
         return "Please provide a valid website URL to clone."
 
     domain = _extract_domain(url)
+    mode = (parameters.get("mode") or "").strip().lower() or None
+    output_format = (parameters.get("output_format") or "").strip().lower() or None
+    target_dir = str(parameters.get("target_dir") or "").strip() or None
+    confirmed = parameters.get("confirmed") is True
+
+    default_dir = get_unique_clone_dir(domain)
+
+    # ── Two-step confirmation gate ─────────────────────────────────────────
+    # A parameter that is PRESENT means "the user said this"; absent means "still
+    # unknown". clone_website_action is the only submitter of the website_cloner tool
+    # anywhere in the codebase, so this handler is the complete enforcement surface.
+    #
+    # This gate is deliberately STATELESS — it reads only the parameters of this single
+    # call and remembers nothing between calls. That is a requirement, not a
+    # simplification: main.py never sets a session_id, so core/action_loader always
+    # resolves the session as "global", and main.py resets "global" on every new user
+    # utterance and every turn-complete. The user's answer IS a new utterance, so a
+    # stored "already asked" flag would be wiped before it could ever be read and the
+    # feature would ask forever. Do not make this stateful.
+    missing: List[str] = []
+    if not mode:
+        missing.append("- scope: only the landing page (single_page), or the whole site (full_site)?")
+    if not output_format:
+        missing.append("- output: one offline HTML file (static), or a React/Next.js project?")
+    if not target_dir:
+        missing.append(f"- folder: the default '{default_dir.name}', or a different folder?")
+
+    if missing:
+        return (
+            "CLONE NOT STARTED. Ask the user these questions out loud, in the user's own "
+            "language, then call clone_website again with the answers:\n" + "\n".join(missing)
+        )
+
+    if not confirmed:
+        scope = (
+            "only the landing page"
+            if mode == "single_page"
+            else f"the whole site (up to {min(MAX_PAGES_FULL_SITE, 25)} pages)"
+        )
+        fmt = (
+            "one offline HTML file with local assets"
+            if output_format in ("static", "clean_html")
+            else f"a {output_format} project, rebuilt from the capture (this one takes several minutes longer)"
+        )
+        folder = Path(target_dir).name if target_dir else default_dir.name
+        return (
+            "CLONE NOT STARTED. Read the plan back to the user in ONE short sentence and wait "
+            "for a clear yes, then call clone_website again with identical arguments plus "
+            f"confirmed=true. Plan: clone {url} - {scope}, as {fmt}, into '{folder}'."
+        )
+
     tm = get_task_manager()
 
     from core.models import DEFAULT_ANTIGRAVITY_MODEL
@@ -2398,20 +2917,26 @@ def clone_website_action(
     if player and hasattr(player, "show_content"):
         player.show_content(
             "WEBSITE CLONER",
-            f"URL: {url}\nMode: {mode}\nFormat: {output_format}\nTask ID: {task_id}\nTarget: Desktop/{domain}_clone",
+            f"URL: {url}\nMode: {mode}\nFormat: {output_format}\nTask ID: {task_id}\n"
+            f"Target: {Path(target_dir).name if target_dir else default_dir.name}",
         )
 
-    return f"Cloning {domain} (Task ID: {task_id}). A live preview will open in your browser once complete."
+    tail = (
+        "The clone lands first and its preview opens; the React rebuild runs after it."
+        if output_format in REACT_FORMATS
+        else "A live preview will open in your browser once complete."
+    )
+    return f"Cloning {domain} (Task ID: {task_id}). {tail}"
 
 
 TOOL = {
     "name": "clone_website",
     "description": (
-        "Clone, reverse-engineer, and recreate a website's frontend to a local folder on Desktop as a clean, 100% human-editable single-file HTML document (or React/Next.js project). "
-        "Extracts rendered DOM, design tokens (colors, fonts), and media assets, then synthesizes clean semantic HTML5, Flexbox/Grid CSS, and Vanilla JS interactions. "
-        "Starts a local preview server and opens the result automatically in your default browser. "
-        "Use mode='full_site' only if user explicitly asks for full mirror. "
-        "Use output_format='react' or 'nextjs' if user asks for React/Next.js components."
+        "Clone, mirror, or save an offline copy of a website's static HTML/CSS/JS frontend to a local Desktop folder. "
+        "Downloads rendered DOM, media assets, stylesheets, and fonts, serving an offline preview. "
+        "ONLY use this tool when the user explicitly asks to 'clone this website', 'save an offline copy', 'download HTML/CSS copy of this site', or 'mirror this site'. "
+        "DO NOT use for 'rebuild', 'rebuild frontend', 'scaffold', 'teardown', 'reverse engineer', 'inspect stack', 'x-ray', or 'architecture' requests — those MUST dispatch reverse_engineer instead. "
+        "Use mode='full_site' only if user explicitly asks for full mirror."
     ),
     "risk": "code_execution",
     "enabled": True,
@@ -2427,16 +2952,41 @@ TOOL = {
             "mode": {
                 "type": "STRING",
                 "enum": ["single_page", "full_site"],
-                "description": "Default: 'single_page' (fast, reverse-engineers target page). Use 'full_site' only if user asks for full multi-page mirror.",
+                "description": (
+                    "Crawl scope. Set this ONLY if the user explicitly stated the scope in their request. "
+                    "Otherwise OMIT it — ZEZO will ask the user. Never fill in a default yourself."
+                ),
             },
             "output_format": {
                 "type": "STRING",
-                "enum": ["static", "clean_html", "react", "nextjs", "redesign"],
-                "description": "Default: 'static' (clean, editable standalone HTML/CSS/JS). Use 'react' or 'nextjs' if user asks for React/Next.js.",
+                "enum": ["static", "clean_html", "react", "nextjs"],
+                "description": (
+                    "'static' (default answer) = ONE faithful offline HTML file with local assets. "
+                    "'react'/'nextjs' = ZEZO rebuilds the clone into a React/Vite project (slower). "
+                    "Set this ONLY if the user explicitly stated the format. Otherwise OMIT it — "
+                    "ZEZO will ask the user. Never fill in a default yourself."
+                ),
             },
             "target_dir": {
                 "type": "STRING",
-                "description": "Optional custom target directory. If omitted, defaults to Desktop/<domain>_clone.",
+                "description": (
+                    "Folder to save the clone into. Set this ONLY if the user explicitly named a folder. "
+                    "Otherwise OMIT it — ZEZO will offer the default Desktop/<domain>_clone and ask."
+                ),
+            },
+            "confirmed": {
+                "type": "BOOLEAN",
+                "description": (
+                    "Set true ONLY after ZEZO has read the plan back to the user AND the user said yes. "
+                    "Omit it on the first call — the runtime will not start a crawl without it."
+                ),
+            },
+            "main_pages_only": {
+                "type": "BOOLEAN",
+                "description": (
+                    "Optional refinement for mode='full_site': set true when the user asks for the main / "
+                    "important pages only rather than every page."
+                ),
             },
         },
         "required": ["url"],

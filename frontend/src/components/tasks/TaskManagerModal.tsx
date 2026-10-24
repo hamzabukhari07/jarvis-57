@@ -47,6 +47,7 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
  const [selectedTask, setSelectedTask] = useState<any | null>(null)
  const [isDetailOpen, setIsDetailOpen] = useState(false)
  const [copiedId, setCopiedId] = useState<string | null>(null)
+ const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
 
  // Keep tasks synced with live tasks passed from parent socket
  useEffect(() => {
@@ -97,37 +98,104 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
  return { running, queued, done, failed, total: tasks.length }
  }, [tasks])
 
+ // Group tasks by group_id for nested display
+ const groupedTasks = useMemo(() => {
+   const grouped = new Map<string, { parent: any; children: any[] }>()
+   
+   // Build a map of all parent-child relationships
+   tasks.forEach((t) => {
+     const groupId = t.group_id
+     
+     if (groupId) {
+       if (!grouped.has(groupId)) {
+         // Find the parent task
+         const parent = tasks.find(task => task.id === groupId)
+         if (parent) {
+           grouped.set(groupId, { parent, children: [] })
+         } else {
+           grouped.set(groupId, { parent: null, children: [] })
+         }
+       }
+       
+       // Add this task as a child if it has parent_id
+       if (t.parent_id === groupId) {
+         const group = grouped.get(groupId)
+         if (group) {
+           group.children.push(t)
+         }
+       }
+     }
+   })
+   
+   return grouped
+ }, [tasks])
+ 
  // Filter tasks
  const filteredTasks = useMemo(() => {
- return tasks.filter((t) => {
- const s = (t.status || '').toLowerCase()
-
- if (statusFilter === 'RUNNING' && s !== 'running') return false
- if (statusFilter === 'QUEUED' && s !== 'queued' && s !== 'created') return false
- if (statusFilter === 'DONE' && s !== 'done' && s !== 'completed') return false
- if (statusFilter === 'FAILED' && s !== 'failed' && s !== 'cancelled') return false
-
- if (searchQuery.trim()) {
- const q = searchQuery.toLowerCase()
- const matchTitle = (
- t.prompt ||
- t.description ||
- t.message ||
- t.group_title ||
- t.params?.taskTitle ||
- t.params?.task ||
- t.params?.target ||
- t.params?.query ||
- ''
- ).toLowerCase().includes(q)
- const matchId = (t.id || '').toLowerCase().includes(q)
- const matchTool = (t.tool || t.engine || '').toLowerCase().includes(q)
- return matchTitle || matchId || matchTool
- }
-
- return true
- })
- }, [tasks, searchQuery, statusFilter])
+   return tasks.filter((t) => {
+     const s = (t.status || "").toLowerCase()
+ 
+     // Apply status filter
+     if (statusFilter === "RUNNING" && s !== "running") return false
+     if (statusFilter === "QUEUED" && s !== "queued" && s !== "created") return false
+     if (statusFilter === "DONE" && s !== "done" && s !== "completed") return false
+     if (statusFilter === "FAILED" && s !== "failed" && s !== "cancelled") return false
+ 
+     // Hide child tasks that have parent - they will be shown nested
+     if (t.parent_id) {
+       const parent = tasks.find(task => task.id === t.parent_id)
+       if (parent) {
+         return false
+       }
+     }
+ 
+     if (searchQuery.trim()) {
+       const q = searchQuery.toLowerCase()
+       const matchTitle = (
+         t.prompt ||
+         t.description ||
+         t.message ||
+         t.group_title ||
+         t.params?.taskTitle ||
+         t.params?.task ||
+         t.params?.target ||
+         t.params?.query ||
+         ""
+       ).toLowerCase().includes(q)
+       const matchId = (t.id || "").toLowerCase().includes(q)
+       const matchTool = (t.tool || t.engine || "").toLowerCase().includes(q)
+       
+       if (matchTitle || matchId || matchTool) return true
+       
+       // Check if any child of this task matches search
+       if (groupedTasks.has(t.id)) {
+         const group = groupedTasks.get(t.id)
+         if (group?.children.some(child => {
+           const childTitle = (
+             child.prompt ||
+             child.description ||
+             child.message ||
+             child.group_title ||
+             child.params?.taskTitle ||
+             child.params?.task ||
+             child.params?.target ||
+             child.params?.query ||
+             ""
+           ).toLowerCase().includes(q)
+           const childId = (child.id || "").toLowerCase().includes(q)
+           const childTool = (child.tool || child.engine || "").toLowerCase().includes(q)
+           return childTitle || childId || childTool
+         })) {
+           return true
+         }
+       }
+       
+       return false
+     }
+ 
+     return true
+   })
+ }, [tasks, searchQuery, statusFilter, groupedTasks])
 
  const handleCopy = async (text: string, id: string) => {
  try {
@@ -294,6 +362,7 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
  const isRunning = st === 'running'
  const isDone = st === 'done' || st === 'completed'
  const progressVal = t.progress !== undefined ? t.progress : isDone ? 100 : isRunning ? 50 : 0
+ const children = groupedTasks.has(t.id) ? groupedTasks.get(t.id)?.children || [] : []
 
  return (
  <div
@@ -339,6 +408,47 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
  </div>
  <Progress value={progressVal} className="h-1.5" />
  </div>
+
+ {/* Nested child tasks (subtasks) - collapsible */}
+ {children.length > 0 && (
+ <div className="mt-2">
+ <button
+ onClick={() => setExpandedTasks(prev => {
+   const next = new Set(prev)
+   if (next.has(t.id)) { next.delete(t.id) } else { next.add(t.id) }
+   return next
+ })}
+ className="text-[10px] font-mono text-[var(--primary)] hover:underline mb-1.5 flex items-center gap-1"
+ >
+ {expandedTasks.has(t.id) ? '[-]' : '[+]'} {children.length} step{children.length > 1 ? 's' : ''}
+ </button>
+ {expandedTasks.has(t.id) && (
+ <div className="pl-3 border-l-2 border-[var(--primary)]/30 space-y-2">
+ {children.map((child) => {
+ const cSt = (child.status || '').toLowerCase()
+ const cIsDone = cSt === 'done' || cSt === 'completed'
+ const cProgress = child.progress !== undefined ? child.progress : cIsDone ? 100 : 0
+ return (
+ <div key={child.id} className="p-2 rounded bg-[var(--background)] border border-[var(--border)]/50 space-y-1.5">
+ <div className="flex items-center justify-between gap-2">
+ <Badge variant="outline" className="text-[9px] font-mono">{child.tool || 'AGENT_TASK'}</Badge>
+ <span className="text-[9px] font-mono text-[var(--muted-foreground)]">#{child.id}</span>
+ {getStatusBadge(child.status)}
+ </div>
+ <div className="text-[10px] text-[var(--foreground)] line-clamp-1">
+ {child.prompt || child.group_title || child.params?.taskTitle || 'Executing...'}
+ </div>
+ <div className="flex items-center gap-2">
+ <Progress value={cProgress} className="h-1 flex-1" />
+ <span className="text-[9px] font-mono text-[var(--muted-foreground)]">{cProgress}%</span>
+ </div>
+ </div>
+ )
+ })}
+ </div>
+ )}
+ </div>
+ )}
 
  {/* Metadata Footer */}
  <div className="pt-1 flex items-center justify-between text-[10px] font-mono text-[var(--muted-foreground)] border-t border-[var(--border)]/30">

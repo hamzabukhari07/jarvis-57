@@ -3,6 +3,214 @@
 # LEARNING JOURNAL (active — last 25 entries)
 # Older entries live in LEARNING_JOURNAL_ARCHIVE.md (grep by module/keyword).
 
+## [2026-10-24] — Website Cloner v5: Killed False Success, Uncage Auto-Tuning, Voice Confirmation Gate & ZEZO-Native React Rebuild
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause (the unstyled / "फाड़ रही थी" clone):** The clone reported **SUCCESS while shipping a half-extracted page.** Evidence from a real broken export (`tools/uncage/output/linear_app/`): it contained only `captured-raw.html` + `public/assets/**`. `captured-raw*.html` is written **per route during extraction** (`tools/uncage/src/extractor.ts:708`), while `asset-map.json` is the extractor's **last** write (`:748`, after the unbounded JS-module dependency scan). The export was **killed mid-extraction inside that scan**, so the compile/consolidate/assemble stages (`src/assembler.ts`, `src/formats/html.ts`) never ran at all. `md5(served index.html) == md5(captured-raw.html)` — the served page was the pre-assembly snapshot with absolute `/assets/...` refs while `clone_dir/assets/` did not exist, so every asset 404'd. Two Python code paths converted that into SUCCESS: one accepted *any* `.html` as proof of success, the other **promoted the raw capture to `index.html`**.
+- **Fix Applied:**
+  1. **Pure completion check** `_uncage_result_ok(raw_output_dir, returncode)` — success requires exit code 0 **and** `asset-map.json` **and** an `index.html` that is not a `captured-raw*` snapshot **and** no surviving `captured-raw*.html` (proof the assembler cleanup ran). Both fabricated-index fallbacks were **deleted**, so a stray `.html` can no longer revive a failed run.
+  2. **Silent-stall kill.** The old `readline()` loop could only check the wall clock *after* a line arrived. Replaced with a reader thread + `queue.Queue` so the deadline is evaluated while waiting, plus a guarded `proc.wait(timeout=10)`.
+  3. **Two distinct timeouts, previously conflated.** Python's `timeout_sec` is ZEZO's wall-clock kill (150 s single page; `min(600, max(180, 60 + pages*40))`, staying under `TaskManager.MAX_WALLCLOCK_SEC = 1200`); Uncage's `--timeout` is the **per-page navigation** budget and is now always passed explicitly (30 000 / 45 000 ms).
+  4. **Uncage auto-tuning** — only 3 of 14 CLI options were used before. Now: `--timeout` always, `--no-purge` always, `--priority-only` for `full_site` main-pages-only, and **`--skip-deps` as a degraded retry after a wall-clock kill** (this is the flag that would have saved the linear.app clone — it only skips discovery of transitively `import()`ed chunks; HTML, asset rewrites and the assembler still run). `--ignore-robots`, `--safe-mode`, `--no-headless`, `--keep-analytics` are **never** auto-set. ZEZO selects these itself; the user is not asked.
+  5. **Stateless two-step confirmation gate** in `clone_website_action` (the *only* submitter of the tool anywhere): INTAKE asks only the values the user did not state → COMMIT reads the plan back and requires an explicit yes → submit. `confirmed=true` is the only door in, so a model copying documented defaults can never start a crawl.
+  6. **Asset integrity gate** `verify_local_assets` — counts only refs that normalise into `assets/` (Uncage's namespace), so a missing `/favicon.ico` or `robots.txt` can never fail a good clone.
+  7. **React/Next rebuild done natively by ZEZO** via `antigravity_action(..., run_in_place=True, task_ctx=ctx)`, plus `core/repo_context.get_unique_rebuild_dir` → `Desktop/<domain>_cloned_app`.
+  8. **Failure escalation.** On rebuild failure the error names the folder first; `core/prompt.txt` tells ZEZO to say plainly that the clone is fine but the rebuild failed and to offer `fleet_control(action='dispatch', agent_id='VERVE', path='<that exact folder>')`. `actions/fleet_control.py` gained the `path` param on `dispatch` (it previously had none) so the agent continues **in the same folder**.
+- **Critical architectural context (traps — do not "improve" these away):**
+  - **The confirmation gate must stay stateless.** `main.py` never sets a `session_id`, so `core/action_loader` always resolves `"global"`, and `main.py` resets `"global"` on every user utterance and turn-complete. The user's answer *is* a new utterance, so a stored "already asked" flag is wiped before it can be read — a stateful gate would ask forever.
+  - **Uncage never tracks `<video>`/`<audio>`.** A real export's `asset-map.json` had **zero** `.mp4` entries while every image was fetched. So heavy media must be a *caveat*, never a failure — hence `_SKIP_MEDIA_EXT` and `_MISSING_ASSET_FATAL_RATIO = 0.25`. Calibrated on measured data: the broken clone scored 0% missing, a healthy JS-heavy clone ~97% present with 8/258 lazy `.avif` files listed in the map but never saved.
+  - **Failure notifications are truncated at 150 chars** (`main.py`: `str(task.error or summary or "Execution failed")[:150]`), so any failure message must **front-load the folder path**.
+  - **`antigravity_action`'s `run_in_place` branch re-builds `worker_params`.** A new flag added to the non-in-place dict is silently dropped on the in-place path. `skip_design`/`skip_preview` are now merged into **both** dicts (`extra_flags`); a regression test asserts the forwarding.
+  - **The rebuild must not receive a Hamza Taste blueprint** (`skip_design=True`) — observed contamination: a pre-fix heyclicky.com rebuild produced Hero copy reading "Dub Links" and `dub.sh` URLs because `Design resolved: Dub (reference_raw_html)` was injected. A clone must be *reproduced*, not restyled. `skip_preview=True` is also required — a Vite tree's root `index.html` renders blank over `file://`.
+  - **Never dispatch the rebuild to a fleet agent.** Both routes land in the same `_run_worker` → `agy.exe`, so the fleet only adds attribution, a second task card and office-deck animation to byte-identical codegen. The post-verify in `_run_react_rebuild` (not the engine's own claim) is authoritative: `package.json` + a `src/`-or-`app/` dir + ≥1 `.jsx`/`.tsx`, and a non-`success` engine status is fatal even if the folder looks plausible.
+- **Key files touched:** `actions/website_cloner.py`, `actions/antigravity_agent.py`, `actions/fleet_control.py`, `core/repo_context.py`, `core/prompt.txt`, `tests/test_website_cloner_suite.py`, `docs/WEBSITE_CLONER.md`, `docs/TOOLS.md`, `LEARNING_JOURNAL.md`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile actions/website_cloner.py actions/antigravity_agent.py actions/fleet_control.py core/repo_context.py` → passed with 0 errors.
+  - **Layer 2 (Runtime):** The four real export dirs are a permanent offline fixture — `_uncage_result_ok(linear_app, 0)` → `False` ("stopped before assembly"), `_uncage_result_ok(stripe_com, 0)` → `True`. Silent stall reproduced with a fake `Popen` whose stdout never yields. **Real clone of `https://www.heyclicky.com/`:** 227 files, preview HTTP 200, 5 served stylesheets all 200; integrity reported `8 of 87 local asset reference(s) could not be saved ...; 16 video/audio file(s) were not downloaded` and the summary carried the honest media caveat. **Real React rebuild:** `heyclicky_com_cloned_app/` with `package.json` + `src/{App,main}.tsx` + 4 components; `npm install` → 65 packages in 11 s, `npx vite` → ready in 219 ms, `GET /` 200 with a browser `Accept: text/html` and `GET /src/main.tsx` 200 with 2150 bytes of transformed JS.
+  - **Layer 3 (Regression):** `pytest tests/test_website_cloner_suite.py tests/test_reverse_engineer_suite.py tests/test_fleet_control_suite.py` → **62 passed**.
+  - **Known limitation (UNVERIFIED as fixed):** when the local `agy` CLI exits without deliverables, the direct Gemini REST fallback takes over and produces a *regenerated* app rather than a byte-faithful port — it did not carry the captured `assets/` across (no `public/`, so `/assets/favicon.ico` 404s) and it hits `APIError: 1011 ... exceeded your current quota` mid-plan while still completing.
+
+## [2026-10-23] — Fix: Restored `sleep_toggle` Message Handler in `core/ui_server.py` WebSocket Dispatcher
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** During recent UI server message handling updates, the `sleep_toggle` message handler branch was accidentally dropped/overwritten, causing incoming `sleep_toggle` messages from the frontend not to be handled correctly.
+- **Fix Applied:** Restored `sleep_toggle` as a distinct `elif msg_type == "sleep_toggle":` branch in `core/ui_server.py` alongside `open_browser`.
+- **Files touched:** `core/ui_server.py`, `LEARNING_JOURNAL.md`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile core/ui_server.py` → passed with 0 errors.
+  - **Layer 2 (Runtime):** Verified syntax and server message dispatch wiring.
+  - **Layer 3 (Regression):** `pytest tests/test_config_endpoints.py tests/test_workspace_picker.py` → passed successfully.
+
+## [2026-10-23] — Fix: Vite Localhost Dev Server Startup & High-Fidelity React Rebuild Scaffolding
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** 
+  1. The scaffolded project created by `scaffold_with_selected_engine` (`core/teardown_engine.py`) previously generated a static placeholder HTML file (`index.html`) rather than a fully wired React + Vite + Tailwind project (`src/App.tsx`, `src/main.tsx`, `vite.config.ts`), causing the user to see a basic card instead of a real dev app.
+  2. Running `npm run dev` failed with `'vite' is not recognized` because `vite` was missing from `devDependencies` in `package.json` and executed without `npx`.
+- **Fix Applied:**
+  1. Upgraded `scaffold_with_selected_engine` in `core/teardown_engine.py` to generate a complete, production-ready React 18 + Vite + Tailwind application structure (`src/App.tsx`, `src/main.tsx`, `src/index.css`, `vite.config.ts`, `tsconfig.json`) dynamically tailored to the target domain.
+  2. Added `vite` and `@vitejs/plugin-react` to `devDependencies` and configured scripts (`"dev": "npx vite --port 3000"`) in generated `package.json`.
+- **Files touched:** `core/teardown_engine.py`, `tests/test_reverse_engineer_suite.py`, `LEARNING_JOURNAL.md`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile core/teardown_engine.py` → passed with 0 errors.
+  - **Layer 2 (Runtime):** Tested end-to-end execution (`npm install && npm run dev`) in the generated workspace (`C:\Users\Hamza\Desktop\linear.app_rebuild`), confirming successful local dev server startup on `http://localhost:3000`.
+  - **Layer 3 (Regression):** `pytest tests/test_reverse_engineer_suite.py` → 8/8 tests passed successfully.
+
+## [2026-10-23] — Fix: AttributeError (`'dict' object has no attribute 'status'`) in REA Subtask Awaiting Loop
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** When `core/teardown_engine.py` awaited the fleet rebuild subtask (`antigravity_run`) via `tm.status(subtask_id)`, it attempted to access object attributes (`subtask_state.status`, `subtask_state.message`) on the returned dictionary (`dict`), raising an `AttributeError` and causing the parent REA task to fail.
+- **Fix Applied:** Updated `core/teardown_engine.py` to correctly query dictionary keys (`subtask_state.get("status")`, `subtask_state.get("message")`, `subtask_state.get("progress")`).
+- **Files touched:** `core/teardown_engine.py`, `LEARNING_JOURNAL.md`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile core/teardown_engine.py` → passed with 0 errors.
+  - **Layer 3 (Regression):** `pytest tests/test_reverse_engineer_suite.py` → 8/8 passed successfully.
+
+## [2026-10-23] — Fix: Premature Task Completion & Voice Announcement Synchronization for REA Fleet Pipeline
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** When running `reverse_engineer` (REA capture), the teardown engine previously dispatched the fleet rebuild task to Verve (`antigravity_run`) and returned immediately. This caused the parent `reverse_engineer` task to prematurely mark itself as `DONE`, triggering a premature voice notification ("The architectural capture of resend.com is ready...") while the agent was still actively rebuilding and launching the dev server. Once the rebuild finished, ZEZO spoke a second time. Additionally, subtasks could trigger separate unnotified finished task alerts.
+- **Fix Applied:**
+  1. Updated `core/teardown_engine.py` (`run_native_rea_capture`) to **await the fleet rebuild subtask completion**, tracking progress and ensuring the parent task only finishes when files are fully synthesized and the dev server is up.
+  2. Updated `core/task_manager.py` (`get_unnotified_finished_tasks`) to automatically mark subtasks (`parent_id` / `is_subtask`) as notified so they never trigger standalone rogue voice announcements.
+  3. Updated `core/task_manager.py` (`cancel`) to recursively cancel active child subtasks when a parent task is cancelled.
+  4. Updated `actions/reverse_engineer.py` (`_teardown_task_worker`) to report a unified end-to-end completion summary.
+- **Files touched:** `core/task_manager.py`, `core/teardown_engine.py`, `actions/reverse_engineer.py`, `LEARNING_JOURNAL.md`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile core/task_manager.py core/teardown_engine.py actions/reverse_engineer.py` → passed with 0 errors.
+  - **Layer 3 (Regression):** `pytest tests/test_reverse_engineer_suite.py` → 8/8 passed successfully.
+
+## [2026-10-23] — Fix: Double Task Cards in Frontend Tasks Widget
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** The WebSocket `_poll_tasks()` broadcast in `ui.py` was calling `get_task_manager().list_tasks()` and sending **all tasks** (parents + children with `parent_id` set) to the frontend. The HTTP `/api/tasks` endpoint correctly filtered child tasks before returning. This inconsistency between the two data sources caused the frontend's `tasks` state to oscillate — the HTTP poll would set `tasks=[parent_only]`, then the WebSocket would overwrite with `tasks=[parent, child]`, resulting in the child task appearing as a second top-level card.
+- **Why frontend filter wasn't catching it:** The frontend filter `tasks.filter(t => !t.parent_id)` in `App.tsx:807` is logically correct and DOES filter when `parent_id` is a non-empty string. However, due to timing races between the HTTP poll interval (4s) and the WebSocket broadcast interval, there were windows where the unfiltered WebSocket data would temporarily show both cards before the next HTTP poll. The safest fix is to make both sources consistent.
+- **Fix Applied:** Added `parent_id` filter in `_poll_tasks()` in `ui.py` to match the HTTP endpoint behavior: `parent_tasks = [t for t in tasks if not t.get("parent_id")]`. Also applied same filter to the one-time `task_list` broadcast in `actions/open_app.py` for consistency.
+- **Files touched:** `ui.py`, `actions/open_app.py`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile ui.py actions/open_app.py` → passed with 0 errors.
+
+## [2026-10-23] — Dynamic Stack Detection, Real Stack Execution & Multi-Target Routing for REA Fleet Pipeline
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Upgraded `core/teardown_engine.py` to support robust, production-grade clean-room rebuilding:
+  - **Dynamic Stack & Library Detection:** Inspected `evidence.json` and `ledger.json` to extract the actual target stack and libraries (frameworks, UI systems, GSAP, Three.js, Tailwind, Vanilla) rather than blindly assuming React/Tailwind.
+  - **Real Stack Execution (`npm run dev`):** Configured scaffolding engine to initialize appropriate dependencies and spawn background non-blocking `npm install && npm run dev` to launch live development servers.
+  - **Multi-Target Routing:** Added support for local folders, `.asar` files, and binaries by routing them to `rea analyze-javascript-application`, while web URLs route to `rea capture-browser-scenario`.
+  - **Adaptive Fleet Agent Dispatch:** Ensured Verve and DevDynamo receive task prompts customized with the exact extracted stack from the obligation ledger.
+- **Files touched:** `core/teardown_engine.py`, `actions/reverse_engineer.py`, `tests/test_reverse_engineer_suite.py`, `LEARNING_JOURNAL.md`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile core/teardown_engine.py actions/reverse_engineer.py core/fleet_manager.py` passed with 0 errors.
+  - **Layer 3 (Regression):** `pytest tests/test_reverse_engineer_suite.py -v` passed successfully (8/8 tests passed).
+
+## [2026-10-23] — External Desktop Workspace Isolation, Obligation Ledgers & Dynamic Focus Profiles for REA Pipeline
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Upgraded ZEZO's Reverse Engineering (REA) pipeline in `core/teardown_engine.py` and `actions/reverse_engineer.py`:
+  - **External Desktop Storage (`~/Desktop/ZEZO_Teardowns`):** Shifted teardowns and evidence storage out of the git repository (`memory/teardowns/`) to an external Desktop workspace to prevent version control pollution.
+  - **Dynamic Focus Mapping:** Upgraded `build_rea_scenario_spec()` to dynamically configure CDP scenarios based on user focus areas (`full`, `architecture`, `apis_network`, `shaders_webgl`, `animations`).
+  - **Reconstruction Obligation Ledger Generation:** Automated execution of `rea build-reconstruction-obligation-ledger` post-capture to generate verifiable `ledger.json` requirements.
+  - **Persistent Teardown Registry:** Maintained a centralized `registry.json` index in the desktop workspace tracking all historical teardowns.
+- **Files touched:** `core/teardown_engine.py`, `actions/reverse_engineer.py`, `tests/test_reverse_engineer_suite.py`, `LEARNING_JOURNAL.md`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile core/teardown_engine.py actions/reverse_engineer.py tests/test_reverse_engineer_suite.py` passed with 0 errors.
+  - **Layer 2 & 3 (Testing):** `pytest tests/test_reverse_engineer_suite.py -v` passed successfully (8/8 tests passed).
+
+## [2026-10-23] — Transitioning to Pure Native REA Execution (Removing Custom Teardown Abstractions)
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Completely removed custom mock component scaffolding, boilerplate code generation, blueprint synthesis, and heuristic parsers. Streamlined `core/teardown_engine.py` and `actions/reverse_engineer.py` to act as a pristine, native REA runner:
+  - **Native REA Execution (`core/teardown_engine.py`):** Directly invokes `rea capture-browser-scenario <scenario_spec.json> --format json`, captures the canonical REA evidence envelope (DOM snapshots, accessibility tree, network transaction logs, request/response headers and bodies, storage, console logs), and persists the raw JSON directly to `memory/teardowns/<domain>_teardown/evidence.json`.
+  - **Simplified Action Tool (`actions/reverse_engineer.py`):** Refactored the `reverse_engineer` action tool to execute pure REA captures and return the evidence envelope location with zero LLM API cost and zero custom mockup generation.
+- **Files touched:** `core/teardown_engine.py`, `actions/reverse_engineer.py`, `LEARNING_JOURNAL.md`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile core/teardown_engine.py actions/reverse_engineer.py` passed with 0 errors.
+  - **Layer 2 (Runtime):** Verified REA CLI integration executes deterministic browser captures and writes pristine JSON envelopes.
+
+## [2026-10-23] — Isolating REA Capture & Blueprint Analysis from AI Scaffolding
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Decoupled official REA browser scenario capture from AI code generation so developers can inspect and verify raw REA capture evidence and markdown blueprints prior to scaffolding:
+  - **Optional Scaffolding Flag (`core/teardown_engine.py` & `actions/reverse_engineer.py`):** Added a `scaffold` parameter (default `False`) to `run_parallel_teardown` and `reverse_engineer`. By default, running REA executes the official CLI capture, parses the full DOM/network envelope, persists `evidence.json` and `blueprint.md`, and returns detailed capture metrics without triggering AI code generation. Code scaffolding can be explicitly triggered by passing `scaffold=True`.
+- **Files touched:** `core/teardown_engine.py`, `actions/reverse_engineer.py`, `LEARNING_JOURNAL.md`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile core/teardown_engine.py actions/reverse_engineer.py` passed with 0 errors.
+  - **Layer 2 (Runtime):** Verified REA capture-only mode successfully generates `evidence.json` and `blueprint.md` with zero artificial overwrites.
+
+## [2026-10-23] — REA Envelope Parser Fix & Preventing Scaffold Overwrite by Static Boilerplate
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Fixed REA output envelope parsing mismatch, ensured scaffold generation preserves agent output, and integrated fleet developer agents:
+  - **REA Envelope Parser Update (`core/teardown_engine.py`):** Updated `_parse_rea_envelope()` to correctly extract rich DOM, canvas counts, frameworks, and events from `normalized_result.steps[1].artifacts.dom.value.text` and `normalized_result.events.items`.
+  - **Preserving Agent Output (`core/teardown_engine.py`):** Fixed a critical bug where `_write_rebuild_scaffold_files()` unconditionally overwrote the agent's generated code with hardcoded dummy template files. Now, static scaffolding files are used strictly as a fallback **only if** the agent/engine produces no `index.html`.
+  - **Fleet Developer Agent Assignment (`core/fleet_manager.py` & `core/teardown_engine.py`):** Added `developer` role mapping to `DEVDYNAMO` in `FleetManager`, prioritized developer agents in scaffolding engine resolution, and enriched scaffold prompts with real DOM metrics, script paths, API endpoints, and evidence JSON path.
+- **Files touched:** `core/teardown_engine.py`, `core/fleet_manager.py`, `frontend/dist/*`, `LEARNING_JOURNAL.md`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile core/teardown_engine.py core/fleet_manager.py` passed with 0 errors; Vite bundle built cleanly in 938ms.
+  - **Layer 2 (Runtime):** Verified `_parse_rea_envelope` correctly parses 763 KB DOM, Next.js framework, and 666 events from stripe.com evidence JSON.
+  - **Layer 3 (Regression):** Existing regression tests passed.
+
+## [2026-10-23] — Official REA CLI Integration, Standard Task Card UX & Configurable Fleet Scaffolding
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Integrated the official `rea` CLI engine (`rea-agents@6.7.0`) and eliminated redundant agent/modal layers:
+  - **Official REA Engine Integration (`core/teardown_engine.py`):** Replaced custom Playwright scraping with the official `rea capture-browser-scenario <spec.json> --format json` deterministic CLI command running with 0 LLM cost. Formulates strict scenario specifications adhering to REA's `browserScenarioSchema` with Chrome/Edge launch mode, DOM snapshots, accessibility tree, network headers/bodies, and storage capture.
+  - **Zero Redundant Agent Architecture:** Removed SPECTER as a separate fleet agent since REA operates as a deterministic tool. Action tool `actions/reverse_engineer.py` calls the REA engine directly and hands off canonical evidence to the developer agent in the fleet for code scaffolding.
+  - **Configurable Fleet Scaffolding Engine:** Implemented `get_configured_scaffolding_engine()` to dynamically read the user's selected developer agent engine (`antigravity_run`, `opencode_run`, `kilo_run`, or `groq`) and target model from the UI configuration. Dispatches code scaffolding through `actions/antigravity_agent.py`, `actions/opencode_agent.py`, `actions/kilo_agent.py`, or Groq without hardcoded fallback chains.
+  - **Clean UI/UX Task Matrix Integration:** Removed the separate top-bar eye icon button and unmounted `TeardownHUDModal` in `frontend/src/App.tsx`. Deleted obsolete `frontend/src/components/teardown/` folder. All teardown and rebuild steps stream directly into ZEZO's centralized Task Matrix cards (`ctx.report(pct, msg)`).
+  - **Desktop Rebuild Workspace & Launching:** Scaffolded code is created directly under `C:\Users\Hamza\Desktop\<domain>_rebuild\`, registered via `core.repo_context.register_rebuild()`, and launched with `open_app(path="Desktop/...")` via Windows `os.startfile`.
+- **Files touched:** `core/teardown_engine.py`, `actions/reverse_engineer.py`, `core/fleet_manager.py`, `frontend/src/components/office/AutonomousOfficeScreen.tsx`, `frontend/src/App.tsx`, `tests/test_reverse_engineer_suite.py`, `LEARNING_JOURNAL.md`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile core/teardown_engine.py actions/reverse_engineer.py core/repo_context.py actions/open_app.py tests/test_reverse_engineer_suite.py` passed with 0 errors.
+  - **Layer 2 (Runtime):** Verified `rea capture-browser-scenario` scenario spec generation and `get_configured_scaffolding_engine()` dynamic fleet engine resolution.
+  - **Layer 3 (Regression):** `pytest tests/test_reverse_engineer_suite.py` passed (8/8 tests).
+
+## [2026-10-23] — Active Project Persistence, Desktop Fuzzy Path Resolution & OS Browser Launching
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Implemented robust project registration, fuzzy Desktop path resolution, and default OS browser preview handling:
+  - **Active Workspace Registration (`core/repo_context.py`):** Added `register_rebuild(rebuild_path, entrypoint="index.html") -> Path` which persists `active_project`, `active_file`, and `last_active_repo` into `memory/repo_context.json` and synchronizes with runtime memory manager. Synchronized `remember_repo` and `forget_repo` to prevent stale project stickiness.
+  - **Fuzzy Desktop Path Resolution (`actions/open_app.py`):** Added `_fuzzy_match_desktop(raw_p)` to inspect `Path.home() / "Desktop"` when an absolute or relative path does not exist on disk, matching token overlaps and directory names (e.g. `stripe_frontend_clone` seamlessly resolves to `stripe.com_rebuild/index.html`).
+  - **Omitted Path & Intent Fallback (`actions/open_app.py`):** When `path` is omitted or empty (e.g. conversational triggers like "launch kr", "open build"), `open_app` automatically queries `core.repo_context.get_last_repo()` / `index.html`.
+  - **Direct OS Default Browser Launch (`actions/open_app.py`):** On Windows, launching `.html` files now invokes `os.startfile(str(target_path))` directly, opening in the user's default browser (Chrome/Edge/Brave) without command-line launcher ambiguities.
+  - **Gemini Live Directive Update (`core/prompt.txt`):** Removed `browser_control(url="file:///...")` instruction; instructed Gemini Live that viewing or previewing local HTML files / rebuild projects must invoke `open_app(path="Desktop/<project_name>/index.html")` or `open_app(app_name="browser", path="...")`. Never use `browser_control` for `file:///` schemes.
+- **Files touched:** `core/repo_context.py`, `actions/open_app.py`, `core/prompt.txt`, `LEARNING_JOURNAL.md`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile core/repo_context.py actions/open_app.py` passed with 0 errors.
+  - **Layer 2 (Runtime):** Tested `register_rebuild` JSON persistence and fuzzy Desktop directory resolution against live Desktop directories (`stripe_frontend_clone` -> `stripe.com_rebuild`).
+  - **Layer 3 (Regression):** `pytest tests/test_reverse_engineer_suite.py tests/test_website_cloner_suite.py tests/test_project_isolation_and_fleet_orchestrator_suite.py` passed (24/24 tests).
+
+
+## [2026-10-23] — SPECTER Engine 2 High-Fidelity Desktop Rebuild Pipeline & Tool Disambiguation
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Fixed tool collision, workspace pathing, and scaffold fidelity for REA (Reverse Engineer Anything):
+  - **Tool Disambiguation & Intent Routing (`core/prompt.txt`, `actions/website_cloner.py`, `actions/reverse_engineer.py`):** Added explicit negative constraints and schema routing rules. When users say "rebuild this just only frontend", "scaffold", "teardown", or "architecture", Gemini Live routes strictly to `reverse_engineer` (SPECTER), reserving `clone_website` purely for explicit offline page saving.
+  - **Conversational Regex URL Sanitizer (`actions/reverse_engineer.py`):** User sentences (e.g. "can you rebuild this just only frontend https://stripe.com") now cleanly extract domain and target URL via regex (`https?://...` or `domain.tld`), preventing conversational prompts from polluting output directory names.
+  - **Desktop Output Resolution (`core/teardown_engine.py`):** Target folders are generated directly on the user's Desktop (`Path.home() / "Desktop" / f"{domain}_rebuild"` and `Desktop/zezo_teardowns/`) instead of inside the project repository workspace.
+  - **High-Fidelity Code Generation Pipeline (`core/teardown_engine.py`):** Upgraded `scaffold_cli_background` from a basic placeholder into a multi-tier code generator that outputs:
+    - Standalone interactive `index.html` with real Tailwind CSS, Three.js 3D WebGL viewport, GSAP animations, and detected tech stack grid.
+    - Modular TypeScript components: `components/Navbar.tsx`, `components/Hero.tsx`, and `components/Scene3D.tsx`.
+    - `styles/globals.css`, `package.json`, and `README.md`.
+- **Files touched:** `core/prompt.txt`, `actions/reverse_engineer.py`, `actions/website_cloner.py`, `core/teardown_engine.py`, `tests/test_reverse_engineer_suite.py`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile actions/reverse_engineer.py actions/website_cloner.py core/teardown_engine.py core/fleet_manager.py` passed with 0 errors.
+  - **Layer 2 (Runtime / Tests):** `pytest tests/test_reverse_engineer_suite.py` passed (9/9 tests including conversational regex parsing and component generation).
+  - **Layer 3 (Regression):** `pytest tests/test_website_cloner_suite.py` passed (9/9 tests).
+
+
+## [2026-10-23] — REA (Reverse Engineer Anything): SPECTER Immutable Agent & Dual-Pane Teardown HUD
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Integrated deep architectural web teardown ("Reverse Engineer Anything") capabilities into ZEZO without interrupting live voice conversations:
+  - **Immutable Core Agent (`SPECTER`):** Added a dedicated built-in agent (`SPECTER` - X-Ray Analyst) to `config/fleet_agents.json` and `core/fleet_manager.py`. Protected with `CORE_AGENT_IDS` so it cannot be deleted or edited via UI, ensuring core system stability.
+  - **Parallel Dual-Engine Pipeline (`core/teardown_engine.py`):**
+    - Playwright CDP Headless inspection extracting JS globals (`React`, `Next.js`, `Vue`, `Svelte`, `THREE`), WebGL 1/2 contexts, shaders, GSAP `ScrollTrigger`, Lenis smooth scrolls, Tailwind tokens, and network APIs.
+    - **Engine 1 (Fast REST):** Groq API (`llama-3.3-70b-versatile`) producing senior architect blueprints in 1–2s.
+    - **Engine 2 (Uncapped Local CLI):** Antigravity CLI (`agy`) / `opencode` running headless background scaffolding in `workspace/teardowns/<domain>_rebuild/`.
+    - **Engine 3 (Zero-LLM Fallback):** Deterministic Python template generator translating CDP evidence into Markdown if offline.
+  - **Action Tool (`actions/reverse_engineer.py`):** Rule 4 compliant non-blocking action tool for assistant runtime.
+  - **Dual-Pane Teardown HUD (`TeardownHUDModal.tsx`):** Built high-tech ReUI modal with dual-pane layout: Left pane displays detected stack badges, WebGL shaders, network endpoints, and Markdown blueprint; Right pane renders live scaffold file tree and background CLI logs.
+  - **Assistant-UI In-Chat Integration:** Added `ReverseEngineerToolUI` to `frontend/src/components/assistant-ui/thread.tsx` with dynamic status pills and direct launcher to the Teardown HUD.
+- **Files touched:** `actions/reverse_engineer.py`, `core/teardown_engine.py`, `core/fleet_manager.py`, `config/fleet_agents.json`, `frontend/src/components/teardown/TeardownHUDModal.tsx`, `frontend/src/components/office/AutonomousOfficeScreen.tsx`, `frontend/src/components/assistant-ui/thread.tsx`, `frontend/src/hooks/useZezoSocket.ts`, `frontend/src/App.tsx`, `tests/test_reverse_engineer_suite.py`.
+- **Verification:**
+  - **Layer 1 (Static):** `python -m py_compile` passed for all Python files. `npm --prefix frontend run build` passed with 0 TypeScript/Vite errors.
+  - **Layer 2 (Runtime):** End-to-end test suite `tests/test_reverse_engineer_suite.py` (7/7 tests passed: immutability, keyword routing, Rule 4 declaration, deterministic blueprinting, Groq fallback, non-blocking dispatch).
+  - **Layer 3 (Regression):** Existing test suites `test_fleet_control_suite.py`, `test_website_cloner_suite.py`, and `test_dispatcher.py` all passed (24/24 tests).
+
+## [2026-10-23] — Settings Modal UX Redesign: Shorter Taxonomy & Robust Keyword Search
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What was built:** Redesigned the Settings modal sidebar based on expert product design principles:
+  - **Simplified & Shortened Sidebar Labels:** Streamlined verbose names into crisp, modern single-word/short nouns (*"General & Controls"* → *"General"*, *"Audio Settings"* → *"Audio"*, *"Providers & Keys"* → *"API & Keys"*, *"Assistant Persona"* → *"Persona"*, *"Appearance & Accents"* → *"Appearance"*, *"Memory & Intelligence"* → *"Memory"*, *"About ZEZO"* → *"About"*).
+  - **Robust Keyword Search Indexing:** Added deep keyword metadata arrays to navigation items so typing terms like *"mic"*, *"theme"*, *"gemini"*, or *"hotkey"* instantly filters and highlights the correct settings section, complete with a clean empty state.
+- **Files touched:** `frontend/src/components/settings/SettingsModal.tsx`.
+- **Verification:** Layer 1 (Static: TypeScript compilation `tsc -b`, Vite production build passed successfully in 933ms); Layer 2 (Runtime: test suites passed).
+
 ## [2026-10-23] — ClipPeek "Open in Browser" WebSocket Action Fix
 - **Creator & Lead Architect:** Hamza Bukhari
 - **What was built:** Fixed the "Open in Browser" button in the ClipPeek floating clipboard overlay not opening links:
