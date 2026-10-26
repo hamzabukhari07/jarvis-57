@@ -128,7 +128,8 @@ def extract_authentic_task(task: str) -> str:
     text = re.sub(r"═+.*═+", "", text, flags=re.DOTALL)
     text = re.sub(r"##\s*🛑\s*NON-NEGOTIABLE\s+ANTI-SLOP.*", "", text, flags=re.DOTALL | re.IGNORECASE)
     text = re.sub(r"<!--\s*\[Template content truncated.*?-->", "", text, flags=re.DOTALL | re.IGNORECASE)
-    text = re.sub(r"\[(?:Stack|Theme|Scope|Sections):[^\]]+\]", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\[(?:Stack|Theme|Scope|Sections|Entity/Content):[^\]]+\]", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"^\[[^\]]+\]\s*", "", text)
     return text.strip()
 
 
@@ -183,7 +184,11 @@ def _keyword_present(text: str, keyword: str) -> bool:
 
 def is_ui_task(task: str) -> bool:
     """Determine if a task involves Web/UI/Frontend development."""
-    t = task.lower()
+    if not task:
+        return False
+    clean_task = extract_authentic_task(task) or task
+    clean_task = re.sub(r"^\[[^\]]+\]\s*", "", clean_task).strip()
+    t = clean_task.lower()
     backend_keywords = [
         "fastapi", "django", "flask", "express", "postgres", "database",
         "backend", "api endpoint", "script", "cli tool", "algorithm",
