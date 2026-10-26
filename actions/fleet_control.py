@@ -63,9 +63,12 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
     # ── Stateless Greenfield Intake & Confirmation Gate for Fleet Builds ────
     is_web_agent = agent_id.upper() in ("VERVE", "FLUX")
     is_web_task = any(k in task.lower() for k in ("build website", "create website", "make a website", "make website", "build a website", "create a website", "build landing page", "create landing page", "build a landing page", "create a landing page", "build portfolio", "create portfolio", "build a portfolio", "create a portfolio", "make a portfolio", "new website", "new landing page", "new portfolio"))
-    if (is_web_agent or is_web_task) and not target_path:
+    confirmed = bool(params.get("confirmed", False))
+    if (is_web_agent or is_web_task) and not confirmed:
         from actions.antigravity_agent import check_greenfield_gate
         gate_params = dict(params)
+        gate_params.pop("path", None)
+        gate_params.pop("project_path", None)
         if entity_content:
             gate_params["entity_content"] = entity_content
         gate_msg = check_greenfield_gate(
