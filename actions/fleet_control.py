@@ -103,9 +103,9 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
     if agent_key in _RECENT_DISPATCHES:
         last_time, last_task, existing_task_id = _RECENT_DISPATCHES[agent_key]
         if (now - last_time) < 12.0:
-            # Check prompt similarity: identical, substring, or close length
+            # Check prompt similarity: exact duplicate prompt
             t1, t2 = task.lower().strip(), last_task.lower().strip()
-            if t1 == t2 or t1 in t2 or t2 in t1:
+            if t1 == t2:
                 logger.info(
                     "[FleetControl] Debounced duplicate dispatch to %s within %.1fs (existing task %s)",
                     agent_key,
