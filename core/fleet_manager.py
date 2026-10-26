@@ -770,12 +770,45 @@ class FleetManager:
         enriched_prompt = f"[{agent.name} • {agent.role}]\n{agent.prompt_prefix}{skills_context}\n\nTask: {prompt}"
         active_model = model_override or agent.model_id or None
 
+        from core.action_loader import discover_actions
+        reg = discover_actions(Path(__file__).parent.parent / "actions")
+        effective_tool = ""
+        if agent.engine and reg.has(f"{agent.engine}_run"):
+            effective_tool = f"{agent.engine}_run"
+        elif agent.default_tool and reg.has(agent.default_tool):
+            effective_tool = agent.default_tool
+        else:
+            if "code" in prompt.lower() or "build" in prompt.lower() or "app" in prompt.lower():
+                effective_tool = "opencode_run"
+            elif any(k in prompt.lower() for k in ("research", "transcript", "video", "youtube", "media", "search", "http")):
+                effective_tool = "agent_reach" if reg.has("agent_reach") else "web_search"
+            else:
+                effective_tool = "quick_snippet" if reg.has("quick_snippet") else "opencode_run"
+
         # Submit task to background TaskManager
         from core.task_manager import get_task_manager
         tm = get_task_manager()
 
         def _worker_fn(worker_params: dict, task_ctx: Any) -> dict:
-            wt_name = worker_params.get("worktree_name") or (worktree_name if worktree_path else None)
+            params = worker_params or {}
+            task_id = getattr(task_ctx, "task_id", None) or params.get("task_id") or submitted_id
+            w_agent_id = params.get("agent_id") or agent.id
+            w_agent = self.get_agent(w_agent_id) or agent
+            w_agent_name = params.get("agent_name") or w_agent.name
+            w_prompt = params.get("task") or prompt
+            w_enriched_prompt = params.get("enriched_prompt") or enriched_prompt
+            w_target_dir = params.get("target_dir") or target_dir
+            w_model = params.get("model_id") or active_model
+            wt_name = params.get("worktree_name") or (worktree_name if worktree_path else None)
+            wt_path = params.get("worktree_path") or worktree_path
+            w_tool = params.get("tool") or effective_tool
+            w_scope_type = params.get("scope_type") or scope_type
+            w_entity_content = params.get("entity_content") or entity_content
+            w_tech_stack = params.get("tech_stack") or tech_stack
+            w_color_theme = params.get("color_theme") or color_theme
+            w_key_sections = params.get("key_sections") or key_sections
+            w_confirmed = params.get("confirmed", confirmed)
+
             try:
                 # Wrap task_ctx.report to synchronize agent progress and activity logs
                 orig_report = getattr(task_ctx, "report", None)
@@ -789,43 +822,26 @@ class FleetManager:
                         except Exception:
                             pass
                     with self._lock:
-                        agent.task_progress = max(0, min(100, prog))
+                        w_agent.task_progress = max(0, min(100, prog))
                         if msg:
                             clean_msg = f"[{prog}%] {msg}"
-                            if not agent.recent_logs or agent.recent_logs[-1] != clean_msg:
-                                agent.recent_logs.append(clean_msg)
-                                if len(agent.recent_logs) > 30:
-                                    agent.recent_logs = agent.recent_logs[-30:]
+                            if not w_agent.recent_logs or w_agent.recent_logs[-1] != clean_msg:
+                                w_agent.recent_logs.append(clean_msg)
+                                if len(w_agent.recent_logs) > 30:
+                                    w_agent.recent_logs = w_agent.recent_logs[-30:]
                     self._broadcast_event("task_progress", {
-                        "task_id": submitted_id,
-                        "agent_id": agent.id,
-                        "agent": agent.name,
+                        "task_id": task_id,
+                        "agent_id": w_agent.id,
+                        "agent": w_agent_name,
                         "progress": prog,
                         "message": msg,
                     })
 
                 task_ctx.report = _reporting_wrapper
 
-                from core.action_loader import discover_actions
-                reg = discover_actions(Path(__file__).parent.parent / "actions")
-
                 # Extract URL or target query from prompt if present for specialized tools (agent_reach, web_reader, etc.)
-                url_match = re.search(r'https?://[^\s]+', prompt)
-                extracted_target = url_match.group(0) if url_match else prompt
-
-                # Determine effective tool to run
-                effective_tool = ""
-                if agent.engine and reg.has(f"{agent.engine}_run"):
-                    effective_tool = f"{agent.engine}_run"
-                elif agent.default_tool and reg.has(agent.default_tool):
-                    effective_tool = agent.default_tool
-                else:
-                    if "code" in prompt.lower() or "build" in prompt.lower() or "app" in prompt.lower():
-                        effective_tool = "opencode_run"
-                    elif any(k in prompt.lower() for k in ("research", "transcript", "video", "youtube", "media", "search", "http")):
-                        effective_tool = "agent_reach" if reg.has("agent_reach") else "web_search"
-                    else:
-                        effective_tool = "quick_snippet" if reg.has("quick_snippet") else "opencode_run"
+                url_match = re.search(r'https?://[^\s]+', w_prompt)
+                extracted_target = url_match.group(0) if url_match else w_prompt
 
                 call_params = {
                     "task": enriched_prompt,
@@ -988,6 +1004,7 @@ class FleetManager:
             params={
                 "task": prompt,
                 "taskTitle": prompt[:60],
+                "enriched_prompt": enriched_prompt,
                 "agent_id": agent.id,
                 "agent_name": agent.name,
                 "target_dir": target_dir,
@@ -995,6 +1012,13 @@ class FleetManager:
                 "is_subtask": is_subtask,
                 "worktree_name": worktree_name if worktree_path else None,
                 "worktree_path": worktree_path,
+                "tool": effective_tool,
+                "scope_type": scope_type,
+                "entity_content": entity_content,
+                "tech_stack": tech_stack,
+                "color_theme": color_theme,
+                "key_sections": key_sections,
+                "confirmed": confirmed,
             },
             group_id=parent_group_id or group_id if is_subtask else None,
             group_title=parent_group_title or (f"[{agent.name}] {prompt[:40]}..." if not is_subtask else None),
