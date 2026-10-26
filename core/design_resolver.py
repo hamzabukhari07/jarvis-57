@@ -541,17 +541,17 @@ def resolve_from_catalog(
 
     req_scope = _normalize_scope(scope)
     if not req_scope:
-        m_sc = re.search(r"\[Scope:\s*([a-zA-Z0-9_\-]+)\]", task_text, re.I)
+        m_sc = re.search(r"\[[^\]]*\bScope:\s*([^,\]\r\n]+)", task_text, re.I)
         if m_sc:
-            req_scope = _normalize_scope(m_sc.group(1))
+            req_scope = _normalize_scope(m_sc.group(1).strip())
     if not req_scope:
         req_scope = _infer_scope(task_clean)
 
     req_theme = _normalize_theme(theme)
     if not req_theme:
-        m_th = re.search(r"\[Theme:\s*([a-zA-Z0-9_\-]+)\]", task_text, re.I)
+        m_th = re.search(r"\[[^\]]*\bTheme:\s*([^,\]\r\n]+)", task_text, re.I)
         if m_th:
-            req_theme = _normalize_theme(m_th.group(1))
+            req_theme = _normalize_theme(m_th.group(1).strip())
     if not req_theme:
         req_theme = _infer_theme(task_clean)
 
@@ -733,15 +733,15 @@ def resolve_design(
     # 3. Priority 3: Deterministic Catalog & Semantic Category Match
     explicit_scope = _normalize_scope(scope)
     if not explicit_scope:
-        m_sc = re.search(r"\[Scope:\s*([a-zA-Z0-9_\-]+)\]", task, re.I)
+        m_sc = re.search(r"\[[^\]]*\bScope:\s*([^,\]\r\n]+)", task, re.I)
         if m_sc:
-            explicit_scope = _normalize_scope(m_sc.group(1))
+            explicit_scope = _normalize_scope(m_sc.group(1).strip())
 
     explicit_theme = _normalize_theme(theme)
     if not explicit_theme:
-        m_th = re.search(r"\[Theme:\s*([a-zA-Z0-9_\-]+)\]", task, re.I)
+        m_th = re.search(r"\[[^\]]*\bTheme:\s*([^,\]\r\n]+)", task, re.I)
         if m_th:
-            explicit_theme = _normalize_theme(m_th.group(1))
+            explicit_theme = _normalize_theme(m_th.group(1).strip())
 
     if explicit_scope or explicit_theme:
         cat_match = resolve_from_catalog(scope=explicit_scope, theme=explicit_theme, task_text=authentic_task)

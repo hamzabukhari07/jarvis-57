@@ -94,8 +94,7 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
     if entity_content:
         stack_info.append(f"Entity/Content: {entity_content}")
     if stack_info:
-        joined_info = ", ".join(stack_info)
-        task = f"{task}\n[{joined_info}]"
+        task = f"{task}\n" + "\n".join(f"[{item}]" for item in stack_info)
 
     # Debounce / deduplication check (12 seconds window for same agent and similar prompt)
     now = time.time()
