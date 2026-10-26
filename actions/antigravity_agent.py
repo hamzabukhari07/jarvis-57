@@ -298,6 +298,14 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
         repo = resolved_p or (Path.home() / "Desktop" / "website").resolve()
     else:
         repo = Path(repo_val).resolve()
+
+    agy_bin = _find_antigravity_bin()
+    if not agy_bin:
+        err_msg = "Antigravity CLI binary (agy) not found. Install the Antigravity CLI to use this engine."
+        logger.warning(err_msg)
+        ctx.on_fail(err_msg)
+        return {"status": "failed", "error": err_msg, "repo": str(repo)}
+
     repo.mkdir(parents=True, exist_ok=True)
     session_mem = payload.get("session_memory") or {}
     model_override = payload.get("model")
@@ -320,13 +328,6 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
             ctx.report(5, f"Planning architecture for '{repo.name}'...")
     else:
         ctx.report(5, f"Planning architecture for '{repo.name}'...")
-
-    agy_bin = _find_antigravity_bin()
-    if not agy_bin:
-        err_msg = "Antigravity CLI binary (agy) not found. Install the Antigravity CLI to use this engine."
-        logger.warning(err_msg)
-        ctx.on_fail(err_msg)
-        return {"status": "failed", "error": err_msg, "repo": str(repo)}
 
     resolved_model = _resolve_model(model_override)
     model_display = resolved_model or "default"
