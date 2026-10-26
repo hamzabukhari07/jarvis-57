@@ -694,8 +694,8 @@ def check_greenfield_gate(task: str, parameters: Dict[str, Any], caller_tool: st
     if missing:
         missing_str = ", ".join(missing)
         if scope_type == "portfolio":
-            return f"Portfolio build clarification required. Please provide: {missing_str}. For portfolio scope, please share your name, role, key projects, or attach your resume PDF."
-        return f"Greenfield build clarification required. Please provide: {missing_str}."
+            return f"Portfolio build clarification required. I need to know: {missing_str}. For portfolio scope, please share your name, role, key projects, or attach your resume PDF."
+        return f"Greenfield build clarification required. I need to know: {missing_str}."
 
     if not confirmed:
         plan_summary = f"1-sentence plan: Build a {scope_type or 'web application'} using {tech_stack or 'single_file_html'} with {color_theme or 'clean_minimal'} theme and sections [{key_sections}]."
