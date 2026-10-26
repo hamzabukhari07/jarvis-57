@@ -36,7 +36,7 @@ _SEMANTIC_ROUTES: list[tuple[list[str], str]] = [
     (["os", "operating system", "window", "desktop", "terminal", "desktop app", "workspace", "file manager"], "froma os "),
     (["image", "media", "art", "photo", "gallery", "generator", "video", "creator", "photo studio", "art studio", "photography", "visual", "film"], "image gen"),
     (["crazy", "creative", "agency", "bold", "dynamic", "vibrant", "design agency", "creative studio", "branding", "advertising", "showcase", "fashion showcase"], "Crazy UI landing page"),
-    (["hairline", "grid portfolio", "developer cv", "engineer portfolio", "minimal resume"], "Hairline Grid Portfolio"),
+    (["portfolio", "personal portfolio", "hairline", "grid portfolio", "developer cv", "engineer portfolio", "minimal resume"], "Hairline Grid Portfolio"),
     (["scrapbook", "scrapbook resume", "editorial portfolio", "visual resume"], "Scrapbook Resume"),
     (["nexus card", "matrix hardware", "matrix component", "nexus hardware", "futuristic matrix"], "nexus"),
     (["spatial", "skeuomorphic", "glass", "3d card", "spatial computing", "vision card", "neumorphism card"], "skeumorphic spatial component"),
