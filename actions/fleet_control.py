@@ -61,7 +61,9 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
         )
 
     # ── Stateless Greenfield Intake & Confirmation Gate for Fleet Builds ────
-    is_web_agent = agent_id.upper() in ("VERVE", "FLUX")
+    target_agent = fleet_manager.get_agent(agent_id)
+    canonical_agent_id = target_agent.id.upper() if target_agent else agent_id.upper()
+    is_web_agent = canonical_agent_id in ("VERVE", "FLUX") or agent_id.upper() in ("VERVE", "FLUX", "ALI", "HAIDER")
     is_web_task = any(k in task.lower() for k in ("build website", "create website", "make a website", "make website", "build a website", "create a website", "build landing page", "create landing page", "build a landing page", "create a landing page", "build portfolio", "create portfolio", "build a portfolio", "create a portfolio", "make a portfolio", "new website", "new landing page", "new portfolio"))
     confirmed = bool(params.get("confirmed", False))
     if (is_web_agent or is_web_task) and not confirmed:
