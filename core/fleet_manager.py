@@ -621,6 +621,21 @@ class FleetManager:
         if upstream_deliverables:
             handoff_header += f"\n--- UPSTREAM DELIVERABLE HANDOFF FROM {src} ---\n{upstream_deliverables.strip()}\n------------------------------------------------\n\n"
 
+        portfolio_specs = []
+        if scope_type:
+            portfolio_specs.append(f"Scope: {scope_type}")
+        if tech_stack:
+            portfolio_specs.append(f"Stack: {tech_stack}")
+        if color_theme:
+            portfolio_specs.append(f"Theme: {color_theme}")
+        if key_sections:
+            portfolio_specs.append(f"Sections: {key_sections}")
+        if entity_content:
+            portfolio_specs.append(f"Entity/Content: {entity_content}")
+
+        if portfolio_specs:
+            handoff_header += f"\n--- SPECIFICATIONS & CONTENT HANDOFF ---\n" + "\n".join(portfolio_specs) + "\n----------------------------------------\n\n"
+
         full_task_prompt = f"{handoff_header}Directive: {task}"
 
         logger.info("[FleetManager] P2P Delegation: %s -> %s (Chain: %s)", src, dst, " -> ".join(new_chain))

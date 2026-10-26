@@ -288,6 +288,12 @@ def _handle_peer_chat(params: Dict[str, Any]) -> str:
         task=message,
         upstream_deliverables=upstream,
         path=path,
+        scope_type=params.get("scope_type"),
+        entity_content=str(params.get("entity_content") or "").strip() or None,
+        tech_stack=params.get("tech_stack"),
+        color_theme=params.get("color_theme"),
+        key_sections=params.get("key_sections"),
+        confirmed=bool(params.get("confirmed", False)),
     )
     if not res.get("success"):
         return f"Peer delegation failed: {res.get('error', 'Unknown error')}"
