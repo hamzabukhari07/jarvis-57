@@ -661,48 +661,7 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
     )
 
 
-def check_greenfield_gate(task: str, parameters: Dict[str, Any], caller_tool: str = "antigravity_run") -> Optional[str]:
-    """Check greenfield gate for web/portfolio builds. Returns None if build can proceed, or a prompt message if clarification is needed."""
-    explicit_path = parameters.get("project_path") or parameters.get("path") or ""
-    run_in_place = bool(parameters.get("run_in_place", False))
-
-    if explicit_path or run_in_place:
-        return None
-
-    is_web = is_ui_task(task) or any(k in task.lower() for k in ("build website", "create website", "make website", "build landing page", "create landing page", "build portfolio", "create portfolio", "new website", "new landing page", "dashboard", "app"))
-    if not is_web:
-        return None
-
-    scope_type = parameters.get("scope_type")
-    tech_stack = parameters.get("tech_stack")
-    color_theme = parameters.get("color_theme")
-    key_sections = parameters.get("key_sections")
-    entity_content = parameters.get("entity_content")
-    confirmed = parameters.get("confirmed", False)
-
-    missing = []
-    if not scope_type:
-        missing.append("scope_type (e.g. landing_page, portfolio, business_site, dashboard, component)")
-    if scope_type == "portfolio" and not entity_content:
-        missing.append("entity_content (candidate name, role, key projects, or attached resume PDF)")
-    if not tech_stack:
-        missing.append("tech_stack (e.g. single_file_html, modular_html_css_js, react_vite, nextjs)")
-    if not color_theme:
-        missing.append("color_theme (e.g. dark_obsidian, clean_minimal, luxury_gold, cyber_matrix, custom)")
-    if not key_sections:
-        missing.append("key_sections (comma-separated section names)")
-
-    if missing:
-        missing_str = ", ".join(missing)
-        if scope_type == "portfolio":
-            return f"Portfolio build clarification required. I need to know: {missing_str}. For portfolio scope, please share your name, role, key projects, or attach your resume PDF."
-        return f"Greenfield build clarification required. I need to know: {missing_str}."
-
-    if not confirmed:
-        plan_summary = f"1-sentence plan: Build a {scope_type or 'web application'} using {tech_stack or 'single_file_html'} with {color_theme or 'clean_minimal'} theme and sections [{key_sections}]."
-        return f"{plan_summary} Please confirm by setting confirmed=true to proceed."
-
-    return None
+from core.design_resolver import check_greenfield_gate
 
 
 # ── Action Discovery TOOL Schema ─────────────────────────────────────────────

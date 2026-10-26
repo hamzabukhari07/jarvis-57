@@ -68,7 +68,7 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
 
     confirmed = bool(params.get("confirmed", False))
     if (is_web_agent or is_web_task) and not confirmed:
-        from actions.antigravity_agent import check_greenfield_gate
+        from core.design_resolver import check_greenfield_gate
         gate_params = dict(params)
         gate_params.pop("path", None)
         gate_params.pop("project_path", None)
