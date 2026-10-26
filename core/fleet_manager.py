@@ -841,13 +841,14 @@ class FleetManager:
 
                 # Extract URL or target query from prompt if present for specialized tools (agent_reach, web_reader, etc.)
                 url_match = re.search(r'https?://[^\s]+', w_prompt)
-                extracted_target = url_match.group(0) if url_match else w_prompt
+                extracted_url = url_match.group(0) if url_match else None
+                extracted_target = extracted_url or w_prompt
 
                 call_params = {
                     "task": enriched_prompt,
                     "prompt": enriched_prompt,
                     "target": extracted_target,
-                    "url": extracted_target,
+                    "url": extracted_url,
                     "query": extracted_target,
                     "project_path": target_dir,
                     "repo_path": target_dir,
