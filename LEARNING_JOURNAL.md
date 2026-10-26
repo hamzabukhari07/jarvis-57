@@ -1,6 +1,56 @@
 ---
 
 # LEARNING JOURNAL (active — last 25 entries)
+## [2026-10-27] — Multi-Agent Portfolio & Greenfield Pipeline Hardening (Batch 1 Complete Execution)
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  - A deep audit of a "build a portfolio" request traced through `fleet_control.py`, `fleet_manager.py`, `antigravity_agent.py`, and `design_resolver.py` revealed 16 critical blocking issues (Batch 1):
+    1. Keyword matching in `fleet_control.py` checked `"build portfolio"` without `"a"`, failing natural requests like `"build a portfolio"`.
+    2. Providing a path bypassed the discovery gate even when `confirmed=False`.
+    3. Agent aliases (`"ALI"`, `"HAIDER"`) bypassed the web agent check `in ("VERVE", "FLUX")`.
+    4. Plain `"portfolio"` keyword was missing from `_SEMANTIC_ROUTES` in `design_resolver.py`.
+    5. Template directory discovery in `design_resolver.py` assumed strict `3_portfolios` subdirectories and crashed if called with path strings.
+    6. Comma-separated bracket specs (`[Stack: React, Theme: dark]`) broke `design_resolver` regex matchers.
+    7. Injected agent bio personas caused `is_ui_task()` classifier false positives and false negatives.
+    8. `.gitignore` was written to disk before verifying `agy.exe` exists in `antigravity_agent.py`.
+    9. Background worker closed over leaky outer variables in `fleet_manager.py`.
+    10. Missing URL regex matches caused raw task strings to be assigned as URLs.
+    11. Portfolio parameters were silently discarded when dispatched to non-Antigravity CLI tools.
+    12. Peer delegation (`_handle_peer_chat`) dropped candidate resume content and design specifications.
+    13. Decomposed workflows dispatched all specialist agents into the identical directory concurrently without domain isolation.
+    14. False-alarm warnings were unconditionally logged for normal greenfield builds without existing folders.
+    15. Substring deduplication (`t1 in t2 or t2 in t1`) caused false-positive dispatch rejections.
+    16. Action modules cross-imported `check_greenfield_gate` directly from `actions/antigravity_agent.py`.
+- **Execution & Changes Applied:**
+  - Executed all 16 fixes atomically in exact dependency order with individual verification tests and git commits:
+    - **#33 (f70c2f4):** Added natural phrasing (`"build a portfolio"`, `"build a website"`, etc.) to `is_web_task`.
+    - **#34 (88ba479):** Enforced that greenfield gate requires `confirmed=True` regardless of provided `target_path`.
+    - **#1 (c83c340):** Resolved agent canonical IDs and aliases (`"ALI"` -> `"VERVE"`, `"HAIDER"` -> `"FLUX"`).
+    - **#28 (1dc9c58):** Added `"portfolio"` and `"personal portfolio"` to `_SEMANTIC_ROUTES`.
+    - **#31 (09ca03d):** Made `_find_template_file` accept strings, paths, and dicts, and added directory alias support across `References/new Designs`.
+    - **#2 (d20a2eb):** Sanitized comma-separated bracket formatting in `fleet_control.py` and updated regex patterns in `design_resolver.py`.
+    - **#3 (55a061c):** Stripped persona headers before evaluating `is_ui_task()`.
+    - **#23 (8743a33):** Verified `agy_bin` before directory creation or `.gitignore` writing.
+    - **#25 (a6911bd):** Safely unpacked all worker parameters in `_worker_fn` and passed complete task dictionaries in `tm.submit()`.
+    - **#27 (c258bbf):** Handled missing URL regex matches cleanly (`url = None`).
+    - **#40 (ca4d3d1):** Embedded specifications into prompts across all coding agents.
+    - **#37 (0a46692):** Forwarded resume and design specs in `_handle_peer_chat` and `delegate_peer_task`.
+    - **#38 (6170539):** Isolated decomposed workflow subtask directories (`frontend/`, `backend/`, `tests/`, `research/`).
+    - **#35 (7f7010c):** Silenced path warnings for greenfield website and portfolio projects.
+    - **#36 (07de58b):** Changed debounce similarity check to exact match (`t1 == t2`).
+    - **#41 (38e8e52):** Migrated `check_greenfield_gate` to `core/design_resolver.py` and updated actions to import cleanly without cross-action dependencies.
+- **Key Files Touched:**
+  - `actions/fleet_control.py`
+  - `actions/antigravity_agent.py`
+  - `core/fleet_manager.py`
+  - `core/design_resolver.py`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed for all touched files after every atomic fix.
+  - Layer 2 (Runtime): Verified each individual test command from `FIX_PLAN.md` against the live system.
+  - Layer 3 (Regression): 16 separate git commits verified via `git log`.
+
+
 ## [2026-10-26] — Fix: Missing `check_greenfield_gate` in `antigravity_agent.py` Causing Fleet Dispatch Import Errors
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Why this was built / Root Cause:**
