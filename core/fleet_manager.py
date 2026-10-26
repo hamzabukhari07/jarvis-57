@@ -857,13 +857,30 @@ class FleetManager:
                     "run_in_place": True,
                     "task_ctx": task_ctx,
                 }
-                if effective_tool in ("antigravity_run", "opencode_run", "kilo_run"):
-                    call_params["scope_type"] = scope_type
-                    call_params["entity_content"] = entity_content
-                    call_params["tech_stack"] = tech_stack
-                    call_params["color_theme"] = color_theme
-                    call_params["key_sections"] = key_sections
-                    call_params["confirmed"] = confirmed
+                spec_items = []
+                if w_scope_type and f"Scope: {w_scope_type}" not in w_enriched_prompt:
+                    spec_items.append(f"Scope: {w_scope_type}")
+                if w_tech_stack and f"Stack: {w_tech_stack}" not in w_enriched_prompt:
+                    spec_items.append(f"Stack: {w_tech_stack}")
+                if w_color_theme and f"Theme: {w_color_theme}" not in w_enriched_prompt:
+                    spec_items.append(f"Theme: {w_color_theme}")
+                if w_key_sections and f"Sections: {w_key_sections}" not in w_enriched_prompt:
+                    spec_items.append(f"Sections: {w_key_sections}")
+                if w_entity_content and f"Entity/Content: {w_entity_content}" not in w_enriched_prompt:
+                    spec_items.append(f"Entity/Content: {w_entity_content}")
+
+                if spec_items:
+                    spec_block = "\n[" + ", ".join(spec_items) + "]"
+                    call_params["task"] = w_enriched_prompt + spec_block
+                    call_params["prompt"] = call_params["task"]
+
+                if w_tool == "antigravity_run":
+                    call_params["scope_type"] = w_scope_type
+                    call_params["entity_content"] = w_entity_content
+                    call_params["tech_stack"] = w_tech_stack
+                    call_params["color_theme"] = w_color_theme
+                    call_params["key_sections"] = w_key_sections
+                    call_params["confirmed"] = w_confirmed
                 if effective_tool == "extract_design_system":
                     call_params["target_file"] = extracted_target
                     call_params["file_path"] = extracted_target
