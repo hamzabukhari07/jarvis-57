@@ -167,6 +167,21 @@ export const THEME_SYSTEMS: ThemeSystem[] = [
     description: 'Deep charcoal surface with vibrant electric amethyst and violet accents.',
     swatches: ['#1e1929', '#2d243d', '#8b5cf6', '#6366f1', '#faf5ff'],
   },
+  {
+    id: 'minimal',
+    name: 'Minimal',
+    tagline: 'Vercel & Linear Inspired Sleek Monochrome OKLCH',
+    badge: 'MINIMAL',
+    icon: Sliders,
+    previewBg: '#161618',
+    previewCard: '#1e1e24',
+    previewBorder: 'rgba(255, 255, 255, 0.15)',
+    previewAccent: '#ffffff',
+    textColor: '#f4f4f5',
+    defaultAccent: '#ffffff',
+    description: 'Ultra-clean Vercel and Linear inspired minimal aesthetic with razor-sharp borders and crisp typography.',
+    swatches: ['#161618', '#1e1e24', '#27272a', '#a1a1aa', '#ffffff'],
+  },
 ]
 
 const AVATAR_CHARACTERS = [

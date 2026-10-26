@@ -1,0 +1,450 @@
+{
+  "version": "1.0.0",
+  "templates": [
+    {
+      "id": "ai_landing_page",
+      "name": "Taskmuse AI Autopilot Landing",
+      "relative_path": "1_landing_pages/ai landing page.html",
+      "scope": "landing_page",
+      "theme": "clean_minimal",
+      "tags": [
+        "ai",
+        "autopilot",
+        "productivity",
+        "tasks",
+        "automation",
+        "assistant",
+        "saas",
+        "landing"
+      ],
+      "bg_mode": "light_warm",
+      "primary_color": "#141412"
+    },
+    {
+      "id": "dub",
+      "name": "Dub Links Marketing & Conversion",
+      "relative_path": "1_landing_pages/dub.html",
+      "scope": "landing_page",
+      "theme": "clean_minimal",
+      "tags": [
+        "marketing",
+        "links",
+        "conversion",
+        "analytics",
+        "shortener",
+        "growth",
+        "b2b",
+        "saas",
+        "clean"
+      ],
+      "bg_mode": "light_mono",
+      "primary_color": "#000000"
+    },
+    {
+      "id": "solvine",
+      "name": "Solvine Modern SaaS",
+      "relative_path": "1_landing_pages/solvine.html",
+      "scope": "landing_page",
+      "theme": "dark_obsidian",
+      "tags": [
+        "saas",
+        "software",
+        "cloud",
+        "api",
+        "b2b",
+        "developer",
+        "platform",
+        "scheduling"
+      ],
+      "bg_mode": "dark_obsidian",
+      "primary_color": "#3b82f6"
+    },
+    {
+      "id": "crazy_ui",
+      "name": "CrazyUI Bold Creative Agency",
+      "relative_path": "1_landing_pages/Crazy UI landing page.html",
+      "scope": "landing_page",
+      "theme": "creative_bold",
+      "tags": [
+        "agency",
+        "creative",
+        "design",
+        "figma",
+        "framer",
+        "bold",
+        "studio",
+        "ui",
+        "templates"
+      ],
+      "bg_mode": "light_warm",
+      "primary_color": "#0a0a0a"
+    },
+    {
+      "id": "clerk_auth",
+      "name": "Clerk Authentication & Identity",
+      "relative_path": "1_landing_pages/clerk clone.html",
+      "scope": "landing_page",
+      "theme": "dark_obsidian",
+      "tags": [
+        "auth",
+        "authentication",
+        "security",
+        "developer",
+        "api",
+        "infrastructure",
+        "identity",
+        "cloud"
+      ],
+      "bg_mode": "dark_obsidian",
+      "primary_color": "#6c47ff"
+    },
+    {
+      "id": "cut_paper_collective",
+      "name": "Commonfold Cut-Paper Collective",
+      "relative_path": "1_landing_pages/Cut-Paper Collective Site.html",
+      "scope": "landing_page",
+      "theme": "editorial_warm",
+      "tags": [
+        "editorial",
+        "paper",
+        "craft",
+        "design",
+        "collective",
+        "architecture",
+        "public",
+        "art",
+        "studio"
+      ],
+      "bg_mode": "editorial_paper",
+      "primary_color": "#161412"
+    },
+    {
+      "id": "sticker_landing",
+      "name": "Loudish Playful Studio",
+      "relative_path": "1_landing_pages/Sticker Landing.html",
+      "scope": "landing_page",
+      "theme": "creative_bold",
+      "tags": [
+        "playful",
+        "brand",
+        "studio",
+        "stickers",
+        "web3",
+        "creative",
+        "vibrant",
+        "consumer",
+        "agency"
+      ],
+      "bg_mode": "light_warm",
+      "primary_color": "#f5b3d3"
+    },
+    {
+      "id": "frewall",
+      "name": "Fernwell Health & Pharmacy",
+      "relative_path": "2_business_sites/frewall.html",
+      "scope": "business_site",
+      "theme": "clean_minimal",
+      "tags": [
+        "pharmacy",
+        "medical",
+        "health",
+        "wellness",
+        "clinic",
+        "healthcare",
+        "store",
+        "business",
+        "corporate"
+      ],
+      "bg_mode": "light_warm",
+      "primary_color": "#0e3a2c"
+    },
+    {
+      "id": "racquet_club",
+      "name": "Cirrus Racquet Club Luxury",
+      "relative_path": "2_business_sites/racquet club.html",
+      "scope": "business_site",
+      "theme": "luxury_light",
+      "tags": [
+        "club",
+        "sports",
+        "tennis",
+        "padel",
+        "luxury",
+        "hospitality",
+        "hotel",
+        "fitness",
+        "lifestyle",
+        "resort"
+      ],
+      "bg_mode": "light_warm",
+      "primary_color": "#1b2a1e"
+    },
+    {
+      "id": "arclune",
+      "name": "Arclune Engineering & Design Studio",
+      "relative_path": "2_business_sites/arclune.html",
+      "scope": "business_site",
+      "theme": "clean_minimal",
+      "tags": [
+        "engineering",
+        "agency",
+        "studio",
+        "consulting",
+        "software",
+        "product",
+        "design",
+        "corporate"
+      ],
+      "bg_mode": "light_mono",
+      "primary_color": "#f26522"
+    },
+    {
+      "id": "hairline_grid",
+      "name": "Hairline Grid Engineer Portfolio",
+      "relative_path": "3_portfolios/Hairline Grid Portfolio.html",
+      "scope": "portfolio",
+      "theme": "clean_minimal",
+      "tags": [
+        "portfolio",
+        "developer",
+        "engineer",
+        "designer",
+        "resume",
+        "minimal",
+        "grid",
+        "personal"
+      ],
+      "bg_mode": "light_mono",
+      "primary_color": "#09090b"
+    },
+    {
+      "id": "scrapbook_resume",
+      "name": "Tessa Marlowe Scrapbook Resume",
+      "relative_path": "3_portfolios/Scrapbook Resume.html",
+      "scope": "portfolio",
+      "theme": "editorial_warm",
+      "tags": [
+        "resume",
+        "portfolio",
+        "designer",
+        "editorial",
+        "visual",
+        "creative",
+        "scrapbook",
+        "bio"
+      ],
+      "bg_mode": "editorial_paper",
+      "primary_color": "#2343c4"
+    },
+    {
+      "id": "orbit_admin",
+      "name": "Orbit Ops Modern Analytics Admin",
+      "relative_path": "4_dashboards/orbit admin.html",
+      "scope": "dashboard",
+      "theme": "clean_minimal",
+      "tags": [
+        "admin",
+        "dashboard",
+        "analytics",
+        "metrics",
+        "ops",
+        "monitoring",
+        "saas",
+        "table",
+        "portal"
+      ],
+      "bg_mode": "light_mono",
+      "primary_color": "#111827"
+    },
+    {
+      "id": "standalone_ecosystem",
+      "name": "Dense Infrastructure Ecosystem Console",
+      "relative_path": "4_dashboards/Standalone Ecosystem.html",
+      "scope": "dashboard",
+      "theme": "dark_obsidian",
+      "tags": [
+        "infrastructure",
+        "ecosystem",
+        "network",
+        "cloud",
+        "backend",
+        "console",
+        "visualization",
+        "cluster"
+      ],
+      "bg_mode": "dark_void",
+      "primary_color": "#e48b59"
+    },
+    {
+      "id": "froma_os",
+      "name": "Forma OS Window Desktop Environment",
+      "relative_path": "4_dashboards/froma os .html",
+      "scope": "dashboard",
+      "theme": "editorial_warm",
+      "tags": [
+        "os",
+        "desktop",
+        "window",
+        "workspace",
+        "terminal",
+        "desktop_app",
+        "filesystem",
+        "retro"
+      ],
+      "bg_mode": "light_warm",
+      "primary_color": "#121110"
+    },
+    {
+      "id": "aura_frame",
+      "name": "Aura Spatial Glowing Luxury Frame",
+      "relative_path": "5_components/aura frame.html",
+      "scope": "component",
+      "theme": "dark_obsidian",
+      "tags": [
+        "aura",
+        "frame",
+        "luxury",
+        "glowing",
+        "spatial",
+        "hud",
+        "watch",
+        "jewelry",
+        "dark"
+      ],
+      "bg_mode": "dark_void",
+      "primary_color": "#ffffff"
+    },
+    {
+      "id": "autonomus",
+      "name": "Autonomus AI Agent Terminal Card",
+      "relative_path": "5_components/autonomus.html",
+      "scope": "component",
+      "theme": "dark_obsidian",
+      "tags": [
+        "ai",
+        "robotics",
+        "bot",
+        "assistant",
+        "agent",
+        "terminal",
+        "dark",
+        "vectors",
+        "node"
+      ],
+      "bg_mode": "dark_void",
+      "primary_color": "#06b6d4"
+    },
+    {
+      "id": "nexus",
+      "name": "Nexus Cyber HUD Inspiration Card",
+      "relative_path": "5_components/nexus.html",
+      "scope": "component",
+      "theme": "creative_bold",
+      "tags": [
+        "nexus",
+        "card",
+        "layout",
+        "inspiration",
+        "cyber",
+        "grid",
+        "purple",
+        "modern"
+      ],
+      "bg_mode": "light_clean",
+      "primary_color": "#fd6703"
+    },
+    {
+      "id": "skeumorphic_spatial",
+      "name": "Skeuomorphic Spatial Glass Card",
+      "relative_path": "5_components/skeumorphic spatial component.html",
+      "scope": "component",
+      "theme": "dark_obsidian",
+      "tags": [
+        "skeuomorphic",
+        "spatial",
+        "glass",
+        "3d",
+        "card",
+        "depth",
+        "neumorphism",
+        "dark"
+      ],
+      "bg_mode": "dark_void",
+      "primary_color": "#ff7a6e"
+    },
+    {
+      "id": "image_gen",
+      "name": "Image Gen Media Canvas & Prompt Bar",
+      "relative_path": "5_components/image gen.html",
+      "scope": "component",
+      "theme": "dark_obsidian",
+      "tags": [
+        "image",
+        "media",
+        "generator",
+        "canvas",
+        "prompt",
+        "ai",
+        "creator",
+        "dark"
+      ],
+      "bg_mode": "dark_void",
+      "primary_color": "#10b981"
+    },
+    {
+      "id": "saas_platform",
+      "name": "Hamza Taste SaaS B2B Platform",
+      "relative_path": "1_landing_pages/saas.html",
+      "scope": "landing_page",
+      "theme": "dark_obsidian",
+      "tags": [
+        "saas",
+        "b2b",
+        "enterprise",
+        "platform",
+        "software",
+        "features",
+        "dashboard",
+        "pricing"
+      ],
+      "bg_mode": "dark_obsidian",
+      "primary_color": "#6366f1"
+    },
+    {
+      "id": "blinq_landing",
+      "name": "Blinq Dynamic Conversion Landing",
+      "relative_path": "1_landing_pages/blinq.html",
+      "scope": "landing_page",
+      "theme": "clean_minimal",
+      "tags": [
+        "landing",
+        "conversion",
+        "startup",
+        "growth",
+        "clean",
+        "cards",
+        "marketing"
+      ],
+      "bg_mode": "light_warm",
+      "primary_color": "#2563eb"
+    },
+    {
+      "id": "nami_landing",
+      "name": "Nami Editorial Wave Landing",
+      "relative_path": "1_landing_pages/nami landing page.html",
+      "scope": "landing_page",
+      "theme": "editorial_warm",
+      "tags": [
+        "editorial",
+        "warm",
+        "landing",
+        "brand",
+        "typography",
+        "minimal",
+        "culture"
+      ],
+      "bg_mode": "warm_sand",
+      "primary_color": "#d97706"
+    }
+  ]
+}

@@ -502,6 +502,21 @@ class VaultEngine:
             if target_path.exists():
                 target_path.unlink()
                 return {"status": "success", "deleted": safe_name}
+
+            # Fallback: search by stem or frontmatter id
+            base_query = file_name.strip().replace(".md", "").lower()
+            for f in self.vault_dir.glob("*.md"):
+                if f.stem.lower() == base_query:
+                    f.unlink()
+                    return {"status": "success", "deleted": f.name}
+                try:
+                    meta, _ = self._parse_frontmatter(f.read_text(encoding="utf-8"))
+                    if str(meta.get("id", "")).strip().lower() == base_query:
+                        f.unlink()
+                        return {"status": "success", "deleted": f.name}
+                except Exception:
+                    pass
+
             return {"status": "error", "message": "File not found"}
 
     def get_graph(self) -> Dict[str, Any]:

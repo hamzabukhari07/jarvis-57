@@ -1,0 +1,20 @@
+**Hamza Bukhari – Data Science & Full‑Stack Developer (Internship)**  
+- **Contact:** Lahore, Pakistan | hamzabukhari.build@gmail.com | +92 328 1622225 | GitHub: github.com/fakexezo‑lgtm  
+- **Education:** B.S. in Data Science, University of Central Punjab (expected 2026)  
+
+**Core Technical Stack**  
+- Front‑end: React, Next.js, TypeScript, JavaScript (ES6+), HTML5/CSS3, Tailwind, shadcn/ui  
+- Back‑end & DB: Node.js, Express, Python (FastAPI basics), Electron, REST APIs, PostgreSQL, Supabase, JWT  
+- AI/LLM: LLM API integration (Groq, Gemini, Ollama), Prompt Engineering, Vector Search (FAISS, LanceDB), LangChain basics  
+- Tools: Git/GitHub, Vercel, Postman, VS Code, AI‑assisted dev (Cursor, Claude)  
+
+**Key Projects**  
+1. **ZEZO (Neural OS Foundation)** – Electron + React app that lets users control their PC via natural‑language commands, with long‑term memory via LanceDB and mobile integration.  
+2. **Penvox AI Engine** – Next.js + Supabase platform that turns YouTube videos into multi‑platform social‑media content; includes serverless LLM pipeline, auth, row‑level security, and subscription payments.  
+3. **Refract CRM** – Full‑stack CRM built with Next.js, PostgreSQL, Prisma, Tailwind; features role‑based access, optimized APIs, and end‑to‑end deployment.  
+
+**Internship Value**  
+- Proven shipping mindset: 3 live, end‑to‑end projects.  
+- Rapid learning using AI tools and deep dive into docs/code.  
+- Transparent skill level, eager for mentorship and code reviews.  
+- Comfortable with Git workflows, code reviews, and existing codebases.

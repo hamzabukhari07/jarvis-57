@@ -13,10 +13,12 @@ import {
   Maximize2,
   Minimize2,
   SlidersHorizontal,
+  Trash2,
 } from 'lucide-react'
 import { Badge } from '../reui/badge'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
+import { api } from '../../lib/api'
 
 // --- TYPES ---
 export interface GraphNode {
@@ -642,15 +644,35 @@ export const MemoryGraphCanvas: React.FC<MemoryGraphCanvasProps> = ({
                   <div
                     key={node.id}
                     onClick={() => onSelectNode(node)}
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer bg-[var(--card)] hover:border-[var(--primary)] ${
+                    className={`p-3.5 rounded-xl border transition-all cursor-pointer bg-[var(--card)] hover:border-[var(--primary)] group relative ${
                       selectedNodeId === node.id ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]/40 bg-[var(--primary)]/10' : 'border-[var(--border)]'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <span className="text-xs font-bold text-[var(--foreground)] tracking-tight">{node.label}</span>
-                      <span className="text-[10px] font-mono text-[var(--muted-foreground)]">
-                        {formatNodeDateTime(node)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-[var(--muted-foreground)]">
+                          {formatNodeDateTime(node)}
+                        </span>
+                        <button
+                          type="button"
+                          title="Delete memory note"
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            if (window.confirm(`Are you sure you want to delete memory "${node.label}"?`)) {
+                              try {
+                                await api.deleteMemoryNote(node.file || node.id)
+                                onRefresh()
+                              } catch (err) {
+                                console.error('Failed to delete memory note:', err)
+                              }
+                            }
+                          }}
+                          className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-60 group-hover:opacity-100"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                     {node.snippet && (
                       <p className="text-xs text-[var(--muted-foreground)] line-clamp-2 mt-1 font-mono leading-relaxed">

@@ -29,18 +29,12 @@ def _get_workspace_root() -> Path:
 
 def _get_ui_dirs() -> tuple[Path, Path, Path]:
     ws = _get_workspace_root()
-    ref_ui = ws / "skills" / "hamza_taste" / "references"
+    ref_ui = ws / "skills" / "website_build" / "references"
     if not ref_ui.exists() and (ws / "References" / "UI").exists():
         ref_ui = ws / "References" / "UI"
         
-    html_dir = ref_ui / "html"
-    
-    # Check for 'design md' with space, or fallback to 'design_md'
-    md_dir = ref_ui / "design md"
-    if not md_dir.exists() and (ref_ui / "design_md").exists():
-        md_dir = ref_ui / "design_md"
-    
-    html_dir.mkdir(parents=True, exist_ok=True)
+    html_dir = ref_ui
+    md_dir = ref_ui / "design_md"
     md_dir.mkdir(parents=True, exist_ok=True)
     return ref_ui, html_dir, md_dir
 
@@ -73,10 +67,10 @@ def _find_reference_file(query: str) -> tuple[Optional[Path], Optional[Path]]:
                     matched_md = p
                     break
 
-    # 2. Search in html/
-    if html_dir.exists():
-        for p in html_dir.iterdir():
-            if p.is_file() and p.suffix.lower() in (".html", ".htm"):
+    # 2. Search across references (recursively scanning all html files)
+    if ref_ui.exists():
+        for p in ref_ui.rglob("*.html"):
+            if p.is_file():
                 if norm_q == _norm_stem(p.name) or norm_q in _norm_stem(p.name):
                     matched_html = p
                     break

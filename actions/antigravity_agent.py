@@ -8,14 +8,13 @@ import platform
 import re
 import shutil
 import subprocess
-import sys
 import threading
 import time
 from ctypes import wintypes
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.design_resolver import is_ui_task, resolve_design, format_design_prompt
+from core.design_resolver import is_ui_task, resolve_design
 from core.repo_context import resolve, remember_repo, get_unique_project_dir
 from core.task_manager import get_task_manager, TaskContext
 from core.undo import capture_repo_snapshot, register_repo_undo
@@ -77,13 +76,6 @@ def _resolve_model(model: Optional[str]) -> str:
     return ""
 
 
-def _strip_fences(text: str) -> str:
-    text = (text or "").strip()
-    text = re.sub(r"^```[a-zA-Z]*\r?\n?", "", text)
-    text = re.sub(r"\r?\n?```\s*$", "", text)
-    return text.strip()
-
-
 def _is_root_dir(path: Path) -> bool:
     """Check if the path is Desktop root, Home root, or Drive root."""
     try:
@@ -143,19 +135,6 @@ def _tree_snapshot(repo: Path) -> dict[str, int]:
     return out
 
 
-# A rebuild / reverse-engineering task reproduces an EXISTING design, so injecting a Hamza
-# Taste blueprint would restyle it instead of reproducing it (Issue 7b). The clone's own
-# rebuild declares this (skip_design + prompt_mode="verbatim"); a fleet/agent hand-off states
-# it only in words, so the intent has to be detectable from the task text too.
-_REBUILD_MARKERS = (
-    "rebuild", "reverse engineer", "reverse-engineer", "reproduce",
-    "replicate", "clone this", "finish the rebuild", "same design as",
-)
-
-
-def _is_rebuild_task(task: str) -> bool:
-    low = (task or "").lower()
-    return any(m in low for m in _REBUILD_MARKERS)
 
 
 # ── Windows Job Object Throttling (Hardware-Enforced) ─────────────────────────
@@ -233,173 +212,6 @@ def _assign_pid_to_job(hJob, pid: int) -> bool:
     except Exception:
         return False
 
-
-# ── Python Gemini REST Fallback Functions ────────────────────────────────────
-
-def plan_antigravity_project(task: str, project_dir: Path, design_context: str = "") -> dict:
-    """Uses high-reasoning Gemini tier to plan multi-file architecture with resolved design tokens."""
-    from core import gemini
-    from core.design_resolver import is_redesign_or_explicit_request
-
-    existing_summary = []
-    if project_dir.exists():
-        for p in project_dir.rglob("*"):
-            if p.is_file() and not any(part in (".git", "node_modules", ".venv", "__pycache__") for part in p.parts):
-                try:
-                    rel = p.relative_to(project_dir).as_posix()
-                    size = p.stat().st_size
-                    preview = p.read_text(encoding="utf-8", errors="ignore")[:400].replace("\n", " ")
-                    existing_summary.append(f"• {rel} ({size} bytes): {preview}...")
-                except Exception:
-                    pass
-    existing_files_block = "\n".join(existing_summary[:10])
-
-    is_redesign = is_redesign_or_explicit_request(task)
-    if is_redesign:
-        preservation_directive = """CRITICAL REDESIGN & THEME OVERHAUL DIRECTIVE:
-The user explicitly requested to CHANGE THE DESIGN / THEME / REGENERATE. You MUST completely redesign and overhaul the layout, classes, color theme, typography, and styles to faithfully match the newly resolved design specification. Replace outdated CSS and HTML structure with the new design tokens while keeping the functional content."""
-    else:
-        preservation_directive = """CRITICAL PRESERVATION DIRECTIVE:
-If the target directory already contains existing files (e.g. index.html, style.css, hero section), DO NOT discard or break existing hero sections or custom styling. Plan how to extend the existing files and add the newly requested sections seamlessly while matching the active project design."""
-
-    prompt = f"""You are Antigravity, an elite agentic software engineer.
-Create an autonomous, production-ready project plan for this task:
-
-Task: {task}
-Target Directory: {project_dir}
-{design_context if design_context else ""}
-
-{f'''Existing Files in Target Directory:
-{existing_files_block}
-
-{preservation_directive}
-''' if existing_files_block else ""}
-
-Return ONLY valid JSON (no markdown formatting, no commentary):
-{{
-  "project_name": "project_name_here",
-  "summary": "High level description of architecture and visual design",
-  "files": [
-    {{
-      "path": "relative/path/filename.ext",
-      "description": "What this file implements and exports",
-      "imports": ["other.dependencies"]
-    }}
-  ],
-  "entry_point": "index.html",
-  "run_command": ""
-}}
-
-Rules:
-1. For Web/UI: Faithfully adopt the colors, typography, glass elevation, and component recipes from the design specification.
-2. For Web/UI Projects: List 'index.html' FIRST, followed by 'css/style.css' (or 'style.css'), so the CSS generator has complete visibility into the exact HTML structure and class names.
-3. For Existing Projects: Keep and build upon existing components/styles without clobbering existing hero sections or custom styling (unless user requested a redesign).
-4. For Python/Backend: Follow clean architecture with error handling and dependency injection.
-5. Keep file paths relative (e.g. "index.html", "css/style.css", "js/app.js", "main.py").
-6. For Web/UI tasks: ONLY generate functional web frontend files (HTML, CSS, JS, assets). NEVER plan repository governance or documentation files (such as AGENTS.md, decisions.md, FUTURE_UPGRADES.md) unless explicitly requested by the user.
-"""
-    resp = gemini.call(prompt, tier=gemini.SMART, timeout_ms=60000)
-    if resp is None or not resp.text:
-        raise RuntimeError("Gemini failed to generate Antigravity project plan.")
-
-    raw = _strip_fences(resp.text)
-    plan_dict = json.loads(raw)
-    
-    # Enforce index.html first for web projects
-    files = plan_dict.get("files", [])
-    html_files = [f for f in files if f.get("path", "").endswith(".html")]
-    css_files = [f for f in files if f.get("path", "").endswith(".css")]
-    other_files = [f for f in files if not f.get("path", "").endswith(".html") and not f.get("path", "").endswith(".css")]
-    
-    if html_files and css_files:
-        plan_dict["files"] = html_files + css_files + other_files
-
-    return plan_dict
-
-
-def write_antigravity_file(
-    file_info: dict,
-    task: str,
-    all_files: list,
-    project_dir: Path,
-    written_files: dict,
-    design_context: str = "",
-) -> str:
-    """Generate complete, high-quality, production-ready code for a file adhering to design tokens."""
-    from core import gemini
-    from core.design_resolver import is_redesign_or_explicit_request
-
-    file_path = file_info["path"]
-    file_desc = file_info.get("description", "")
-    
-    target_on_disk = project_dir / file_path
-    existing_file_content = ""
-    if target_on_disk.exists() and target_on_disk.is_file():
-        try:
-            existing_file_content = target_on_disk.read_text(encoding="utf-8", errors="ignore")
-        except Exception:
-            existing_file_content = ""
-
-    context_blocks = []
-    for rel_p, code_content in written_files.items():
-        context_blocks.append(f"--- File: {rel_p} ---\n{code_content}")
-    existing_context = "\n\n".join(context_blocks)
-
-    is_redesign = is_redesign_or_explicit_request(task)
-    if is_redesign:
-        file_rule = f"""CRITICAL REDESIGN RULE FOR '{file_path}':
-This is a theme redesign/regeneration task. Overwrite and update all styling, color variables, typography, radii, and container classes to 100% match the resolved design specification."""
-    else:
-        file_rule = f"""CRITICAL PRESERVATION & EXTENSION RULE:
-'{file_path}' already exists. You MUST keep and preserve all existing sections (such as existing hero sections, navbars, existing CSS classes, and variables) while appending and integrating the newly requested sections and styles."""
-
-    if existing_file_content and not is_redesign:
-        html_rule = "- Modify and update ONLY the requested section(s) (e.g. hero section) in 'index.html'. You MUST STRICTLY PRESERVE all other existing sections (navbar, features, testimonials, footer, custom content, and scripts). Do NOT delete or rewrite the rest of the landing page."
-        css_rule = "- Update or append CSS rules for the modified section(s) while keeping all existing stylesheet classes and variables intact."
-    else:
-        html_rule = "- Build a comprehensive, high-converting layout (Sticky/glass navbar, hero with badge pill, feature grid, interactive pricing cards, customer testimonials, contact form, structured footer).\n   - Use clean, semantic class names and link the stylesheet appropriately."
-        css_rule = "- Inspect the already-written 'index.html' carefully in 'Already Written Context'!\n   - You MUST write complete, dedicated CSS styling for EVERY single class, tag, and container used in 'index.html' so zero elements are unstyled.\n   - Constrain layouts: Define `.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }` so pages never stretch awkwardly across wide screens.\n   - Use CSS Grid: For cards and tiers, use `display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px;`.\n   - Visual Depth: Implement glass elevation (`backdrop-filter: blur(12px); border: 1px solid ...`), refined box-shadows, rounded corners, and micro-hover transitions on all interactive elements.\n   - Responsive Media Queries: Include `@media (max-width: 768px)` so it is 100% mobile responsive."
-
-    prompt = f"""You are Antigravity, crafting complete production-ready source code with studio-grade visual excellence.
-Overall Project Task: {task}
-File to write: {file_path}
-Description: {file_desc}
-{design_context if design_context else ""}
-
-{f'''Existing Content of '{file_path}' Before Modification:
-```
-{existing_file_content[:6000]}
-```
-
-{file_rule}
-''' if existing_file_content else ""}
-
-All Files in Project:
-{json.dumps(all_files, indent=2)}
-
-Already Written Context:
-{existing_context if existing_context else "(None - this is the first file)"}
-
-CRITICAL RULES:
-1. Output ONLY the raw source code for '{file_path}'. No markdown code blocks, no backticks, no explanations.
-2. Write 100% complete, fully implemented code. NEVER use placeholders, 'TODO', or ellipses (...).
-3. For Web HTML ('index.html'):
-   {html_rule}
-4. For Web CSS ('style.css'):
-   {css_rule}
-5. For Python: Write type-annotated, idiomatic code with robust error handling.
-"""
-    resp = gemini.call(prompt, tier=gemini.SMART, timeout_ms=90000)
-    if resp is None or not resp.text:
-        raise RuntimeError(f"Failed to generate code for {file_path}")
-
-    code = _strip_fences(resp.text)
-    full_path = project_dir / file_path
-    full_path.parent.mkdir(parents=True, exist_ok=True)
-    full_path.write_text(code, encoding="utf-8")
-    return code
-
-
 class _DummyTaskContext:
     def report(self, pct: int, msg: str = "") -> None:
         pass
@@ -409,8 +221,68 @@ class _DummyTaskContext:
         pass
     def on_fail(self, error: str) -> None:
         pass
-    def is_cancelled(self) -> bool:
+    def cancelled(self) -> bool:
         return False
+
+
+def _launch_static_preview(repo: Path) -> None:
+    """Launches local HTTP preview server on ports 9400-9480 with fallback to file://."""
+    import webbrowser
+    try:
+        from actions.website_cloner import start_local_preview_server
+        preview_url, _ = start_local_preview_server(repo)
+        webbrowser.open(preview_url)
+        logger.info("Preview server opened via HTTP on %s", preview_url)
+    except Exception as e:
+        logger.warning("Local HTTP preview server failed: %s; falling back to file://", e)
+        idx_file = repo / "index.html"
+        if idx_file.exists():
+            webbrowser.open(idx_file.resolve().as_uri())
+
+
+def _try_launch_react_preview(repo: Path) -> bool:
+    """Detects Vite / Next / React dev server and attempts background launch."""
+    pkg = repo / "package.json"
+    if not pkg.exists():
+        return False
+    try:
+        cmd = ["npx", "vite", "--open"] if platform.system() != "Windows" else ["cmd.exe", "/c", "npx", "vite", "--open"]
+        subprocess.Popen(
+            cmd,
+            cwd=str(repo),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0,
+        )
+        logger.info("Triggered React/Vite preview via npx vite --open in %s", repo)
+        return True
+    except Exception as e:
+        logger.warning("Failed to auto-launch React preview: %s", e)
+        return False
+
+
+def _launch_smart_preview(repo: Path) -> None:
+    """Routes preview intelligently based on project stack."""
+    pkg = repo / "package.json"
+    idx = repo / "index.html"
+
+    # 1. If React / Vite / Next app:
+    if pkg.exists():
+        launched = _try_launch_react_preview(repo)
+        if launched:
+            return
+        logger.info(
+            "React/Vite project generated at %s. Suppressed raw file:// launch (run 'npm install && npm run dev' to view).",
+            repo,
+        )
+        return
+
+    # 2. Static HTML / Vanilla Web
+    if idx.exists():
+        _launch_static_preview(repo)
+        return
+
+    logger.debug("No index.html or package.json found in %s; skipping preview launch.", repo)
 
 
 # ── Core Background Worker ───────────────────────────────────────────────────
@@ -429,537 +301,228 @@ def _run_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict:
     repo.mkdir(parents=True, exist_ok=True)
     session_mem = payload.get("session_memory") or {}
     model_override = payload.get("model")
-
-    # prompt_mode="verbatim": the caller supplied the COMPLETE prompt and the CLI must
-    # receive it unmodified. Appending ZEZO's own stack directives to it would hand the
-    # agent two contradicting instruction sets — e.g. a reverse-engineering prompt that
-    # says "one standalone HTML, reuse the real assets" plus ZEZO's "modular React +
-    # Tailwind project" directive. That is the same class of pollution skip_design
-    # guards against, so all local prompt scaffolding is bypassed in this mode.
+    skip_design = bool(payload.get("skip_design", False))
+    skip_preview = bool(payload.get("skip_preview", False))
     is_verbatim = str(payload.get("prompt_mode") or "").strip().lower() == "verbatim"
+    owns_task = bool(payload.get("owns_task", True))
 
-    # In verbatim or rebuild mode the workspace is a caller-owned reference (e.g. an uncage capture that
-    # must stay byte-identical or a separate rebuild folder), so ZEZO adds nothing of its own to that folder.
-    if not is_verbatim and not _is_rebuild_task(task):
+    if not is_verbatim:
         _ensure_gitignore(repo)
     snapshot = capture_repo_snapshot(repo)
 
-    
-    # 1. Resolve design if UI/Web task
-    design_context = ""
+    is_ui = is_ui_task(task) and not is_verbatim and not skip_design
     resolved_design = None
-    # skip_design: callers rebuilding an existing design verbatim (e.g. the website cloner
-    # turning a captured page into a React app) must not have a Hamza Taste blueprint
-    # injected, which would restyle the source instead of reproducing it.
-    if is_ui_task(task) and not is_verbatim and not _is_rebuild_task(task) and not payload.get("skip_design"):
+    if is_ui:
         resolved_design = resolve_design(task, session_memory=session_mem, repo_path=repo)
         if resolved_design and resolved_design.is_active():
-            design_context = format_design_prompt(resolved_design)
             ctx.report(5, f"Design resolved: {resolved_design.source_name} ({resolved_design.source_type})")
         else:
             ctx.report(5, f"Planning architecture for '{repo.name}'...")
     else:
         ctx.report(5, f"Planning architecture for '{repo.name}'...")
 
-    # 2. Check for native Antigravity CLI ('agy')
     agy_bin = _find_antigravity_bin()
+    if not agy_bin:
+        err_msg = "Antigravity CLI binary (agy) not found. Install the Antigravity CLI to use this engine."
+        logger.warning(err_msg)
+        ctx.on_fail(err_msg)
+        return {"status": "failed", "error": err_msg, "repo": str(repo)}
 
-    if agy_bin:
-        resolved_model = _resolve_model(model_override)
-        model_display = resolved_model or "default"
-        ctx.report(8, f"Launching Antigravity CLI ({model_display}) in {repo.name}...")
+    resolved_model = _resolve_model(model_override)
+    model_display = resolved_model or "default"
+    ctx.report(8, f"Launching Antigravity CLI ({model_display}) in {repo.name}...")
 
-        # Write the resolved Hamza Taste blueprint so the CLI agent can inspect it locally.
-        # If the reference has no raw HTML (spec-only design), write the extracted spec +
-        # anti-slop rules instead so the Hamza Taste reference is never silently lost.
-        design_blueprint_name = ""
-        if resolved_design and resolved_design.is_active():
-            try:
-                if resolved_design.raw_html:
-                    (repo / "DESIGN_BLUEPRINT.html").write_text(resolved_design.raw_html, encoding="utf-8")
-                    design_blueprint_name = "DESIGN_BLUEPRINT.html"
-                else:
-                    spec_text = f"{resolved_design.design_spec}\n\n{resolved_design.anti_slop_rules}".strip()
-                    if spec_text:
-                        (repo / "DESIGN_BLUEPRINT.md").write_text(spec_text, encoding="utf-8")
-                        design_blueprint_name = "DESIGN_BLUEPRINT.md"
-            except Exception:
-                design_blueprint_name = ""
-
-        # Check if project already has files on disk
-        existing_disk_files = []
+    reference_provisioned = False
+    if is_ui and resolved_design and resolved_design.is_active():
         try:
-            for p in repo.glob("*"):
-                if p.is_file() and p.name not in (".gitignore", "DESIGN_BLUEPRINT.html", "DESIGN_BLUEPRINT.md"):
-                    existing_disk_files.append(p.name)
+            ref_dst = repo / "reference.html"
+            if getattr(resolved_design, "source_path", None) and resolved_design.source_path.exists():
+                shutil.copy2(resolved_design.source_path, ref_dst)
+                reference_provisioned = True
+            elif getattr(resolved_design, "full_raw_html", None) and resolved_design.full_raw_html.strip():
+                ref_dst.write_text(resolved_design.full_raw_html, encoding="utf-8")
+                reference_provisioned = True
+            elif resolved_design.raw_html and resolved_design.raw_html.strip():
+                ref_dst.write_text(resolved_design.raw_html, encoding="utf-8")
+                reference_provisioned = True
+            if reference_provisioned:
+                ctx.report(8, f"Design reference placed at reference.html ({resolved_design.source_name})")
+        except Exception as e:
+            logger.warning("Failed to provision reference.html: %s", e)
+
+    prompt = task
+    scope_type = payload.get("scope_type")
+    entity_content = payload.get("entity_content")
+    tech_stack = payload.get("tech_stack")
+    color_theme = payload.get("color_theme")
+    key_sections = payload.get("key_sections")
+
+    pillar_instructions = []
+    if scope_type:
+        pillar_instructions.append(f"Scope Type: {scope_type}")
+    if tech_stack:
+        pillar_instructions.append(f"Tech Stack: {tech_stack}")
+    if color_theme:
+        pillar_instructions.append(f"Color Theme: {color_theme}")
+    if key_sections:
+        pillar_instructions.append(f"Key Sections: {key_sections}")
+    if scope_type == "portfolio" and entity_content:
+        pillar_instructions.append(f"Entity/Candidate Content & Projects: {entity_content}")
+
+    if pillar_instructions:
+        prompt = f"{prompt}\n\nBuild Specifications:\n" + "\n".join(f"- {p}" for p in pillar_instructions)
+
+    if not is_verbatim and is_ui and reference_provisioned:
+        prompt = (
+            f"{prompt}\n\n"
+            "Design Reference: A curated template has been placed at 'reference.html'. "
+            "Inspect it as your read-only source of truth for styles, typography, and layout, and synthesize 'index.html' with authentic content."
+        )
+
+    before_tree = _tree_snapshot(repo)
+
+    cmd = [agy_bin, "-p", prompt, "--add-dir", str(repo), "--dangerously-skip-permissions"]
+    if resolved_model:
+        cmd.extend(["--model", resolved_model])
+
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(repo),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+        bufsize=1,
+        **_WIN_HIDE,
+    )
+
+    ctx.set_pid(proc.pid)
+
+    import psutil
+    total_cores = psutil.cpu_count(logical=True) or 4
+    cap_cores = max(2, total_cores // 2) if total_cores > 4 else total_cores
+    cores = list(range(cap_cores))
+    mask = (1 << cap_cores) - 1
+
+    hJob = None
+    hJob = _create_throttled_job(mask, 0x00000040)
+    if hJob:
+        _assign_pid_to_job(hJob, proc.pid)
+
+    start_time = time.time()
+    stdout_lines = []
+
+    def _reader():
+        try:
+            for line in iter(proc.stdout.readline, ""):
+                if not line:
+                    break
+                txt = line.rstrip()
+                if txt:
+                    stdout_lines.append(txt)
         except Exception:
             pass
-        is_existing_project = bool(existing_disk_files and ("index.html" in existing_disk_files or "main.py" in existing_disk_files))
 
-        # Build clean, bounded prompt for CLI to prevent Windows 32KB command-line overflow
-        prompt_parts = [
-            f"Task: {task}",
-            f"Target Workspace Directory: {repo.as_posix()}",
-        ]
+    reader_thread = threading.Thread(target=_reader, daemon=True)
+    reader_thread.start()
 
-        from core.design_resolver import is_redesign_or_explicit_request
-
-        task_l = task.lower()
-
-        # Explicit static / single-file HTML stack request (user overrides framework inference)
-        _static_markers = (
-            "single html", "single-html", "single file html", "single-file html",
-            "one html file", "one index.html", "one index", "single index",
-            "static html", "static site", "vanilla html", "plain html", "html only",
-            "html/css/js", "html css js", "no react", "without react", "not react",
-            "no framework", "no frameworks", "no build step", "no bundler",
-        )
-        is_static_html = any(m in task_l for m in _static_markers)
-
-        # React/Next only when explicitly requested, not negated, and not overridden by static intent
-        _react_markers = ("react", "vite", "nextjs", "next.js", "next 15", "jsx", "tsx")
-        _react_negated = re.search(
-            r"\b(?:no|not|without|avoid|skip|instead of)\b(?:\s+\w+){0,3}\s+\b(?:react|vite|nextjs|next\.?js|jsx|tsx)\b",
-            task_l,
-        )
-        is_react_or_next = (
-            not is_static_html
-            and any(k in task_l for k in _react_markers)
-            and not _react_negated
-        )
-
-        # Full rebuild/stack-change intent overrides existing-project preservation
-        wants_new_build = is_static_html or any(
-            m in task_l
-            for m in (
-                "entirely new", "from scratch", "start fresh", "start over", "brand new",
-                "rebuild", "re-build", "recreate", "re-create", "convert to", "convert into",
-                "one index", "single index", "single page",
-            )
-        )
-        is_redesign = is_redesign_or_explicit_request(task) or wants_new_build
-
-        # Shared Hamza Taste directive (Direction + anti-slop Filter) applied to EVERY branch
-        design_directive = ""
-        if resolved_design and resolved_design.is_active():
-            if design_blueprint_name:
-                design_directive = (
-                    f"Reference Blueprint Template: A complete master design template has been placed at {design_blueprint_name} in your workspace directory.\n"
-                    "CRITICAL DESIGN DIRECTIVE: Read and inspect it first, then faithfully adopt its authentic visual styling, exact color theme, CSS gradients, typography, hero section, card structures, and keyframe animations. Do NOT substitute generic default colors or plain templates."
-                )
-            else:
-                design_directive = (
-                    "CRITICAL HAMZA TASTE DESIGN SPECIFICATION:\n"
-                    f"{resolved_design.design_spec[:1800]}"
-                )
-            if resolved_design.anti_slop_rules:
-                design_directive += f"\n\n{resolved_design.anti_slop_rules}"
-
-        if is_react_or_next:
-            if design_directive:
-                prompt_parts.append(design_directive)
-            prompt_parts.append(
-                "CRITICAL REACT / NEXT.JS MODULAR SYNTHESIS DIRECTIVE:\n"
-                "1. Build a clean, modular React + Tailwind CSS project with Vite or Next.js architecture.\n"
-                "2. Decompose the page into separate reusable component files under src/components/ (e.g. Navbar.tsx, Hero.tsx, Features.tsx, Footer.tsx, Card.tsx).\n"
-                "3. Provide package.json with standard modern dependencies (react, react-dom, lucide-react, tailwindcss, vite), tailwind.config.js, tsconfig.json, and entrypoint.\n"
-                "4. Convert all HTML attributes to valid JSX (class -> className, style strings -> style objects, for -> htmlFor).\n"
-                "5. Ensure code is 100% human-readable, modular, typed, and directly runnable via `npm run dev`."
-            )
-        elif is_static_html:
-            if design_directive:
-                prompt_parts.append(design_directive)
-            prompt_parts.append(
-                "CRITICAL SINGLE-FILE HTML DIRECTIVE (user explicitly requested a static single-file HTML stack):\n"
-                "1. Generate EXACTLY ONE self-contained file named index.html in the workspace root.\n"
-                "2. Put ALL CSS inside one <style> tag and ALL JavaScript inside one <script> tag. No external framework, no React/Vue/Next.js/Tailwind, no node_modules, no build step, no bundler.\n"
-                "3. Local media/assets referenced from an assets/ subfolder are allowed.\n"
-                "4. Output complete, production-ready, responsive HTML5 with CSS animations and micro-interactions.\n"
-                "5. Do NOT scaffold package.json, vite, tailwind, or a React project of any kind."
-            )
-        elif is_redesign and is_existing_project:
-            if design_directive:
-                prompt_parts.append(design_directive)
-            prompt_parts.append(
-                "CRITICAL LOCAL FOLDER REDESIGN DIRECTIVE:\n"
-                "1. Inspect existing project files (index.html, style.css) to extract authentic content, headings, copy, and visual elements.\n"
-                "2. Apply the studio aesthetic from the design blueprint/specification above (or Hamza Taste presets: dark obsidian glassmorphism, animated mesh gradients, tactile pill CTAs, typography scale).\n"
-                "3. Rebuild the frontend modernizing the layout, visual hierarchy, and CSS animations while strictly preserving all real user content and headings.\n"
-                "4. Output complete, production-ready files (index.html, style.css, js/app.js) directly inside the workspace."
-            )
-        elif is_existing_project and not is_redesign:
-            if design_directive:
-                prompt_parts.append(design_directive)
-            prompt_parts.append(
-                f"CRITICAL TARGETED UPDATE DIRECTIVE:\n"
-                f"1. The workspace '{repo.name}' already contains existing project files: {', '.join(existing_disk_files[:6])}.\n"
-                f"2. Read and inspect the existing files (e.g. index.html, style.css) first.\n"
-                f"3. ONLY update or modify the specific section(s) or component(s) requested in the task (e.g. hero section).\n"
-                f"4. You MUST STRICTLY PRESERVE all other existing sections (navbars, features, testimonials, pricing, footers, custom content, and scripts). Do NOT delete or rewrite the rest of the landing page from scratch."
-            )
-        else:
-            if design_directive:
-                prompt_parts.append(design_directive)
-            prompt_parts.append(
-                f"CRITICAL EXECUTION DIRECTIVE: Build complete, production-ready source code files (index.html, style.css, js/app.js) "
-                f"directly inside the workspace directory {repo.as_posix()}."
-            )
-        
-        if is_verbatim:
-            # Caller owns the entire prompt; no ZEZO directives, no truncation. The cap
-            # below exists to stop ZEZO's own assembled scaffolding overflowing Windows'
-            # 32KB command line, which does not apply to a caller-authored prompt.
-            full_prompt = task
-        else:
-            full_prompt = "\n\n".join(prompt_parts)
-            if len(full_prompt) > 6000:
-                full_prompt = full_prompt[:6000]
-
-        # Snapshot taken BEFORE the CLI runs: the diff computed after it exits then counts
-        # only files this run actually wrote, instead of every file already in the folder.
-        before_tree = _tree_snapshot(repo)
-
-        cmd = [
-            agy_bin,
-            "-p", full_prompt,
-            "--add-dir", str(repo),
-            "--dangerously-skip-permissions",
-        ]
-        if resolved_model:
-            cmd.extend(["--model", resolved_model])
-
-        env = os.environ.copy()
-        env["PYTHONIOENCODING"] = "utf-8"
-
-        proc = subprocess.Popen(
-            cmd,
-            cwd=str(repo),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=env,
-            bufsize=1,
-            **_WIN_HIDE,
-        )
-
-        ctx.set_pid(proc.pid)
-
-        # Hardware throttling (Job Object + CPU Affinity)
-        import psutil
-        total_cores = psutil.cpu_count(logical=True) or 4
-        cap_cores = max(2, total_cores // 2) if total_cores > 4 else total_cores
-        cores = list(range(cap_cores))
-        mask = (1 << cap_cores) - 1
-
-        hJob = _create_throttled_job(mask, 0x00000040)
-        if hJob:
-            _assign_pid_to_job(hJob, proc.pid)
-
-        def _throttle_proc_tree(parent_pid: int) -> None:
-            try:
-                parent = psutil.Process(parent_pid)
-                procs = [parent] + parent.children(recursive=True)
-                for p in procs:
+    try:
+        while proc.poll() is None:
+            if ctx.cancelled():
+                if hJob:
                     try:
-                        p.cpu_affinity(cores)
-                        p.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+                        ctypes.WinDLL("kernel32", use_last_error=True).TerminateJobObject(hJob, 1)
                     except Exception:
                         pass
-            except Exception:
-                pass
-
-        _throttle_proc_tree(proc.pid)
-
-        start_time = time.time()
-        tail = []
-        stdout_lines = []
-
-        def _reader():
-            try:
-                for line in iter(proc.stdout.readline, ""):
-                    if not line:
-                        break
-                    txt = line.rstrip()
-                    if txt:
-                        stdout_lines.append(txt)
-                        tail.append(txt)
-                        if len(tail) > 40:
-                            tail.pop(0)
-            except Exception:
-                pass
-
-        reader_thread = threading.Thread(target=_reader, daemon=True)
-        reader_thread.start()
-
-        last_throttle_time = time.time()
-        last_reported_pct = 10
-
-        try:
-            while proc.poll() is None:
-                if ctx.cancelled():
-                    proc.terminate()
-                    return {"status": "cancelled", "repo": str(repo)}
-
-                time.sleep(1.0)
-                now = time.time()
-                elapsed = now - start_time
-
-                # CPU Throttling maintenance
-                if now - last_throttle_time >= 5.0:
-                    last_throttle_time = now
-                    _throttle_proc_tree(proc.pid)
-
-                # Check on-disk file discoveries
-                disk_files = []
-                try:
-                    for p in repo.glob("*"):
-                        if p.is_file() and p.name not in (".gitignore", "DESIGN_BLUEPRINT.html", "DESIGN_BLUEPRINT.md"):
-                            disk_files.append(p.name)
-                except Exception:
-                    pass
-
-                # Dynamic asymptotic progress estimation & status messages
-                if disk_files:
-                    pct = min(90, max(last_reported_pct, 75 + len(disk_files) * 5))
-                    status_msg = f"Generating files: {', '.join(disk_files[:3])}"
-                elif elapsed < 6:
-                    pct = int(10 + (elapsed / 6) * 15)  # 10% -> 25%
-                    status_msg = f"Planning architecture & design tokens for '{repo.name}'..."
-                elif elapsed < 18:
-                    pct = int(25 + ((elapsed - 6) / 12) * 25)  # 25% -> 50%
-                    status_msg = f"Synthesizing layout, hero section & components ({model_display})..."
-                elif elapsed < 35:
-                    pct = int(50 + ((elapsed - 18) / 17) * 25)  # 50% -> 75%
-                    status_msg = "Generating CSS animations, glass depth & responsive styling..."
                 else:
-                    pct = min(92, int(75 + ((elapsed - 35) / 25) * 17))  # 75% -> 92%
-                    status_msg = "Writing and verifying production source code..."
-
-                last_reported_pct = pct
-                ctx.report(pct, status_msg)
-        finally:
-            try:
-                proc.wait(timeout=10)
-            except Exception:
-                try:
-                    proc.kill()
-                except Exception:
-                    pass
-
-        # Check if task was cancelled before checking deliverables or falling back
-        if ctx.cancelled():
-            return {"status": "cancelled", "repo": str(repo)}
-
-        # A signed-OUT `agy` is a distinct, user-fixable state - not a build outcome. It runs,
-        # writes 0 bytes and exits, so without this check its silence is either misread as
-        # success (before FIX-03) or silently replaced by the REST fallback, and a retry is
-        # pointless until the user signs in. Raise a separate, actionable error instead.
-        cli_output = "\n".join(stdout_lines)
-        if "not logged into Antigravity" in cli_output:
-            raise RuntimeError(
-                "Antigravity CLI is not signed in, so it produced no files. "
-                "Sign in to the agy CLI and re-run the build - the workspace was "
-                f"{repo}."
-            )
-
-        # Inspect generated files in repo. This is a before/after diff against the snapshot
-        # taken before Popen: only files this run actually created or rewrote count, so a CLI
-        # that exits having written nothing is reported as a failure, not a success (Issue 3).
-        after_tree = _tree_snapshot(repo)
-        created_list = [rel for rel, mt in after_tree.items() if before_tree.get(rel) != mt]
-        entry_point = "index.html" if (repo / "index.html").exists() else "main.py"
-
-        # If repo is missing key files, check and rescue from CLI scratch directories
-        if not created_list or not (repo / "index.html").exists():
-            scratch_candidates = [
-                Path.home() / ".gemini" / "antigravity-cli" / "scratch",
-                Path.home() / "AppData" / "Local" / "agy" / "scratch",
-            ]
-            for s_dir in scratch_candidates:
-                if s_dir.exists() and s_dir.is_dir():
-                    for f in s_dir.glob("*"):
-                        if f.is_file() and f.suffix in (".html", ".css", ".js", ".py", ".json", ".md"):
-                            try:
-                                if time.time() - f.stat().st_mtime < 180:
-                                    target_dest = repo / f.name
-                                    shutil.copy2(f, target_dest)
-                                    if f.name not in created_list:
-                                        created_list.append(f.name)
-                            except Exception:
-                                pass
-
-        # Check if real deliverables exist (excluding .gitignore and DESIGN_BLUEPRINT.*)
-        real_files = [
-            p for p in created_list
-            if p not in (".gitignore", "DESIGN_BLUEPRINT.html", "DESIGN_BLUEPRINT.md")
-        ]
-        has_entry = (repo / "index.html").exists() or (repo / "main.py").exists() or (repo / "src").exists()
-
-        if not real_files or not has_entry:
-            if ctx.cancelled():
+                    proc.terminate()
                 return {"status": "cancelled", "repo": str(repo)}
-            logger.warning(
-                "[Antigravity] CLI exited without creating valid project deliverables in %s (found: %s). Falling back to direct Gemini REST pipeline...",
-                repo.name,
-                created_list,
-            )
-            ctx.report(30, "CLI completed without generating deliverable files. Triggering direct AI generation fallback...")
-            # Fall through to REST pipeline below
-        else:
-            ctx.report(95, "Finalizing project build...")
 
-            # Register Undo snapshot
+            time.sleep(1.0)
+            disk_files = []
             try:
-                changed_count = register_repo_undo(repo, snapshot, "Antigravity Agent")
-                if changed_count > 0 and created_list:
-                    first_file = Path(created_list[0]).name
-                    from memory.memory_manager import remember
-                    remember("active_file", first_file, category="projects")
-            except Exception as e:
-                logger.debug("Antigravity undo registration failed: %s", e)
+                for p in repo.glob("*"):
+                    if p.is_file() and p.name not in (".gitignore", "reference.html", "TASK_SPEC.md"):
+                        disk_files.append(p.name)
+            except Exception:
+                pass
 
-            # Cleanup temporary design blueprint if the build generated real files
-            if (repo / "index.html").exists():
-                try:
-                    for bp_name in ("DESIGN_BLUEPRINT.html", "DESIGN_BLUEPRINT.md"):
-                        bp = repo / bp_name
-                        if bp.exists():
-                            bp.unlink()
-                except Exception:
-                    pass
+            if disk_files:
+                pct = min(90, max(20, 50 + len(disk_files) * 5))
+                status_msg = f"Building files: {', '.join(disk_files[:3])}"
+            else:
+                status_msg = f"Running Antigravity CLI ({model_display})..."
+                pct = 30
+            ctx.report(pct, status_msg)
+    finally:
+        try:
+            proc.wait(timeout=10)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        if hJob:
+            try:
+                ctypes.WinDLL("kernel32", use_last_error=True).CloseHandle(hJob)
+            except Exception:
+                pass
 
-            # Automatically launch live preview in the user's default browser if index.html exists.
-            # Honours skip_preview like the fallback path below: a caller that serves its own
-            # preview must not also get this one opened over it. In the reverse-engineering flow
-            # the workspace is the capture folder, so an unguarded open here would pop uncage's
-            # own index.html - the raw snapshot - on top of the caller's rebuilt page.
-            if not payload.get("skip_preview") and (repo / "index.html").exists():
-                try:
-                    import webbrowser
-                    target_url = (repo / "index.html").resolve().as_uri()
-                    webbrowser.open(target_url)
-                    print(f"[Antigravity] 🌐 Launched live preview in browser: {target_url}")
-                except Exception as e:
-                    logger.debug("Failed to auto-open browser: %s", e)
-
-            result_payload = {
-                "status": "success",
-                "repo": str(repo),
-                "project_name": repo.name,
-                "files": created_list,
-                "entry_point": entry_point,
-                "summary": f"Successfully created {len(created_list)} project files in '{repo.name}'.",
-                "design_source": resolved_design.source_name if resolved_design else None,
-            }
-            # A caller that supplied its own task_ctx owns that card's lifecycle (it may still
-            # have to verify the artifact afterwards); completing it here would flip the clone's
-            # card to DONE mid-pipeline. Issue 4.
-            if payload.get("owns_task", True):
-                ctx.on_complete(result_payload)
-            return result_payload
-
-    # 3. Fallback: Python Gemini REST Generation
     if ctx.cancelled():
         return {"status": "cancelled", "repo": str(repo)}
 
-    try:
-        plan = plan_antigravity_project(task, repo, design_context=design_context)
-    except Exception as e:
-        ctx.on_fail(f"Antigravity planning failed: {e}")
-        return {"status": "failed", "error": str(e), "repo": str(repo)}
+    cli_output = "\n".join(stdout_lines)
+    if "not logged into Antigravity" in cli_output or "not logged in" in cli_output.lower():
+        err_msg = "Antigravity CLI is not signed in. Please sign in to the Antigravity CLI and retry."
+        logger.warning(err_msg)
+        ctx.on_fail(err_msg)
+        return {"status": "failed", "error": err_msg, "repo": str(repo)}
 
-    project_name = plan.get("project_name", repo.name)
-    files = plan.get("files", [])
-    summary = plan.get("summary", "")
-    entry_point = plan.get("entry_point", "")
+    after_tree = _tree_snapshot(repo)
+    created_list = [rel for rel, mt in after_tree.items() if before_tree.get(rel) != mt]
+    entry_point = "index.html" if (repo / "index.html").exists() else "main.py"
 
-    if not files:
-        ctx.on_fail("Antigravity generated an empty file plan.")
-        return {"status": "failed", "error": "empty_plan", "repo": str(repo)}
+    real_files = [p for p in created_list if p not in (".gitignore", "reference.html")]
+    has_entry = (repo / "index.html").exists() or (repo / "main.py").exists() or (repo / "src").exists()
 
-    design_tag = f" [{resolved_design.source_name}]" if resolved_design and resolved_design.is_active() else ""
-    ctx.report(15, f"Plan ready: {len(files)} files for '{project_name}'{design_tag}")
-
-    written = {}
-    created_list = []
-    total_files = len(files)
-
-    for idx, f_info in enumerate(files, 1):
+    if not real_files or not has_entry:
         if ctx.cancelled():
             return {"status": "cancelled", "repo": str(repo)}
-
-        rel_p = f_info["path"]
-        progress_pct = int(15 + (idx / total_files) * 75)
-        ctx.report(progress_pct, f"Generating [{idx}/{total_files}]: {rel_p}")
-
-        try:
-            code = write_antigravity_file(f_info, task, files, repo, written, design_context=design_context)
-            written[rel_p] = code
-            created_list.append(rel_p)
-        except Exception as e:
-            logger.warning("Error writing %s: %s", rel_p, e)
-            created_list.append(f"{rel_p} (error: {e})")
-
-    # Syntax verification on python files if any
-    py_files = [p for p in created_list if p.endswith(".py") and "(" not in p]
-    for py_rel in py_files:
-        py_full = repo / py_rel
-        try:
-            import py_compile
-            py_compile.compile(str(py_full), doraise=True)
-        except Exception:
-            pass
+        err_msg = f"Antigravity CLI exited without creating valid project deliverables in {repo.name} (found: {created_list})."
+        logger.warning(err_msg)
+        ctx.on_fail(err_msg)
+        return {"status": "failed", "error": err_msg, "repo": str(repo)}
 
     ctx.report(95, "Finalizing project build...")
 
-    # Cleanup temporary design blueprint if the build generated real files
-    if (repo / "index.html").exists():
-        try:
-            for bp_name in ("DESIGN_BLUEPRINT.html", "DESIGN_BLUEPRINT.md"):
-                bp = repo / bp_name
-                if bp.exists():
-                    bp.unlink()
-        except Exception:
-            pass
-
-    # Register Undo snapshot
     try:
         changed_count = register_repo_undo(repo, snapshot, "Antigravity Agent")
         if changed_count > 0 and created_list:
-            first_file = Path(created_list[0].split()[0]).name
+            first_file = Path(created_list[0]).name
             from memory.memory_manager import remember
             remember("active_file", first_file, category="projects")
     except Exception as e:
         logger.debug("Antigravity undo registration failed: %s", e)
 
-    if ctx.cancelled():
-        return {"status": "cancelled", "repo": str(repo)}
-
-    # Automatically launch live preview in the user's default browser if index.html exists.
-    # skip_preview: callers that deliver their own preview suppress this - a Vite source tree's
-    # root index.html renders blank over file://, so opening it just looks like a broken build.
-    if not payload.get("skip_preview") and (repo / "index.html").exists():
-        try:
-            import webbrowser
-            target_url = (repo / "index.html").resolve().as_uri()
-            webbrowser.open(target_url)
-            print(f"[Antigravity] 🌐 Launched live preview in browser: {target_url}")
-        except Exception as e:
-            logger.debug("Failed to auto-open browser: %s", e)
+    if not skip_preview:
+        _launch_smart_preview(repo)
 
     result_payload = {
         "status": "success",
         "repo": str(repo),
-        "project_name": project_name,
+        "project_name": repo.name,
         "files": created_list,
         "entry_point": entry_point,
-        "summary": summary,
+        "summary": f"Successfully created {len(created_list)} project files in '{repo.name}'.",
         "design_source": resolved_design.source_name if resolved_design else None,
     }
-    if payload.get("owns_task", True):
+    if owns_task:
         ctx.on_complete(result_payload)
     return result_payload
 
@@ -970,6 +533,10 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
     if not task:
         return "Please tell me the coding task or application you want Antigravity to build."
 
+    gate_msg = check_greenfield_gate(task, parameters, caller_tool="antigravity_run")
+    if gate_msg:
+        return gate_msg
+
     explicit_path = parameters.get("project_path") or parameters.get("path") or ""
     if not explicit_path:
         # Extract folder hints from task prompt if explicitly mentioned
@@ -978,17 +545,19 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
             cand = folder_match.group(1).strip().strip("\"'")
             if not any(cand.lower().endswith(ext) for ext in (".html", ".css", ".js", ".py", ".md", ".json")):
                 explicit_path = cand
-    # Project isolation: if brand-new project build without explicit path, allocate isolated unique directory
-    low_task = task.lower()
-    is_new = any(kw in low_task for kw in ("build", "create", "make", "develop", "scaffold", "new website", "new app", "landing page", "portfolio", "store", "clone", "dashboard"))
-    is_edit = any(kw in low_task for kw in ("edit", "fix", "update", "modify", "refactor", "change", "add to existing"))
-    is_brand_new = is_new and not is_edit and not explicit_path
+    # In-place execution for fleet tasks (eliminates phantom ZEZO CODER cards)
+    run_in_place = bool(parameters.get("run_in_place", False))
 
-    if is_brand_new:
+    if explicit_path:
+        repo, source = resolve(explicit=explicit_path)
+    elif run_in_place:
+        resolved_p, _ = resolve()
+        repo = resolved_p or (Path.home() / "Desktop" / "website").resolve()
+        # used by non-in-place HUD badge
+        source = "run_in_place"
+    else:
         repo = get_unique_project_dir(task)
         source = "new_project"
-    else:
-        repo, source = resolve(explicit=explicit_path)
 
     if repo is None:
         return (
@@ -1005,8 +574,6 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
 
     model = _resolve_model(parameters.get("model") or parameters.get("model_id"))
 
-    # In-place execution for fleet tasks (eliminates phantom ZEZO CODER cards)
-    run_in_place = bool(parameters.get("run_in_place", False))
     task_ctx = parameters.get("task_ctx")
     # Opt-in worker flags. They must be forwarded explicitly: this function builds a fresh
     # worker_params dict, so anything not copied here never reaches _run_worker.
@@ -1020,6 +587,12 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
         "skip_preview": bool(parameters.get("skip_preview", False)),
         "prompt_mode": str(parameters.get("prompt_mode") or "").strip(),
         "owns_task": not bool(parameters.get("task_ctx")),
+        "scope_type": parameters.get("scope_type"),
+        "entity_content": parameters.get("entity_content"),
+        "tech_stack": parameters.get("tech_stack"),
+        "color_theme": parameters.get("color_theme"),
+        "key_sections": parameters.get("key_sections"),
+        "confirmed": parameters.get("confirmed", False),
     }
 
     if run_in_place:
@@ -1087,6 +660,50 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
     )
 
 
+def check_greenfield_gate(task: str, parameters: Dict[str, Any], caller_tool: str = "antigravity_run") -> Optional[str]:
+    """Check greenfield gate for web/portfolio builds. Returns None if build can proceed, or a prompt message if clarification is needed."""
+    explicit_path = parameters.get("project_path") or parameters.get("path") or ""
+    run_in_place = bool(parameters.get("run_in_place", False))
+
+    if explicit_path or run_in_place:
+        return None
+
+    is_web = is_ui_task(task) or any(k in task.lower() for k in ("build website", "create website", "make website", "build landing page", "create landing page", "build portfolio", "create portfolio", "new website", "new landing page", "dashboard", "app"))
+    if not is_web:
+        return None
+
+    scope_type = parameters.get("scope_type")
+    tech_stack = parameters.get("tech_stack")
+    color_theme = parameters.get("color_theme")
+    key_sections = parameters.get("key_sections")
+    entity_content = parameters.get("entity_content")
+    confirmed = parameters.get("confirmed", False)
+
+    missing = []
+    if not scope_type:
+        missing.append("scope_type (e.g. landing_page, portfolio, business_site, dashboard, component)")
+    if scope_type == "portfolio" and not entity_content:
+        missing.append("entity_content (candidate name, role, key projects, or attached resume PDF)")
+    if not tech_stack:
+        missing.append("tech_stack (e.g. single_file_html, modular_html_css_js, react_vite, nextjs)")
+    if not color_theme:
+        missing.append("color_theme (e.g. dark_obsidian, clean_minimal, luxury_gold, cyber_matrix, custom)")
+    if not key_sections:
+        missing.append("key_sections (comma-separated section names)")
+
+    if missing:
+        missing_str = ", ".join(missing)
+        if scope_type == "portfolio":
+            return f"Portfolio build clarification required. Please provide: {missing_str}. For portfolio scope, please share your name, role, key projects, or attach your resume PDF."
+        return f"Greenfield build clarification required. Please provide: {missing_str}."
+
+    if not confirmed:
+        plan_summary = f"1-sentence plan: Build a {scope_type or 'web application'} using {tech_stack or 'single_file_html'} with {color_theme or 'clean_minimal'} theme and sections [{key_sections}]."
+        return f"{plan_summary} Please confirm by setting confirmed=true to proceed."
+
+    return None
+
+
 # ── Action Discovery TOOL Schema ─────────────────────────────────────────────
 TOOL = {
     "name": "antigravity_run",
@@ -1118,6 +735,33 @@ TOOL = {
             "model": {
                 "type": "STRING",
                 "description": "Optional Antigravity CLI model (e.g. 'gemini-3.7-flash-medium', 'claude-sonnet-4-6', 'gemini-3.8-flash-medium', 'claude-opus-4-6-thinking').",
+            },
+            "scope_type": {
+                "type": "STRING",
+                "enum": ["landing_page", "portfolio", "business_site", "dashboard", "component"],
+                "description": "Scope type of the web build. Set ONLY if user explicitly stated. Otherwise OMIT — ZEZO will ask.",
+            },
+            "entity_content": {
+                "type": "STRING",
+                "description": "User profile/bio/projects for portfolio or personal sites. Set ONLY if user explicitly stated. Otherwise OMIT — ZEZO will ask.",
+            },
+            "tech_stack": {
+                "type": "STRING",
+                "enum": ["single_file_html", "modular_html_css_js", "react_vite", "nextjs"],
+                "description": "Desired tech stack. Set ONLY if user explicitly stated. Otherwise OMIT — ZEZO will ask.",
+            },
+            "color_theme": {
+                "type": "STRING",
+                "enum": ["dark_obsidian", "clean_minimal", "luxury_gold", "cyber_matrix", "custom"],
+                "description": "Color theme. Set ONLY if user explicitly stated. Otherwise OMIT — ZEZO will ask.",
+            },
+            "key_sections": {
+                "type": "STRING",
+                "description": "Comma-separated section names. Set ONLY if user explicitly stated. Otherwise OMIT — ZEZO will ask.",
+            },
+            "confirmed": {
+                "type": "BOOLEAN",
+                "description": "True only after user hears the 1-sentence read-back and says yes. Set ONLY if user explicitly stated. Otherwise OMIT — ZEZO will ask.",
             },
         },
         "required": ["task"],

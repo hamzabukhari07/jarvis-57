@@ -1,0 +1,1893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dub Links – Link management for modern marketing teams</title>
+<meta name="description" content="Dub Links is the modern link management platform for entrepreneurs, creators, and marketing teams.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f[]=rowan@300,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gb:#e5e5e5;
+  --gw:1080px;
+  --n50:#fafafa;--n100:#f5f5f5;--n200:#e5e5e5;--n300:#d4d4d4;--n400:#a3a3a3;
+  --n500:#737373;--n600:#525252;--n700:#404040;--n800:#262626;--n900:#171717;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{
+  margin:0;background:#fff;color:var(--n900);
+  font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:16px;line-height:1.5;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+img{max-width:100%;display:block;border:0}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+ul{list-style:none;margin:0;padding:0}
+h1,h2,h3,h4,p{margin:0}
+.font-display{font-family:Rowan,Inter,Georgia,serif;font-weight:400;letter-spacing:-.015em}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ---------- layout ---------- */
+.section{position:relative;overflow:hidden;padding:0 16px;border-bottom:1px solid var(--gb)}
+.inner{position:relative;z-index:0;max-width:var(--gw);margin:0 auto;border-left:1px solid var(--gb);border-right:1px solid var(--gb)}
+.pad{padding-left:16px;padding-right:16px}
+@media(min-width:640px){.pad{padding-left:48px;padding-right:48px}}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid transparent;
+  padding:8px 20px;font-size:14px;font-weight:500;line-height:1.25;border-radius:8px;
+  box-shadow:0 1px 2px rgba(0,0,0,.05);transition:background-color .15s,border-color .15s,box-shadow .15s,color .15s;white-space:nowrap}
+.btn-primary{background:#000;color:#fff;border-color:#000}
+.btn-primary:hover{background:var(--n800);box-shadow:0 0 0 4px var(--n200)}
+.btn-secondary{background:#fff;color:var(--n800);border-color:var(--n200)}
+.btn-secondary:hover{border-color:var(--n400);box-shadow:0 0 0 4px var(--n200)}
+.btn-sm{padding:6px 12px;font-size:14px}
+.btn-outline{display:inline-flex;align-items:center;gap:6px;background:#fff;color:var(--n900);
+  border:1px solid var(--n300);border-radius:8px;padding:8px 12px;font-size:14px;font-weight:500;line-height:1;
+  transition:background-color .1s,border-color .1s}
+.btn-outline:hover{background:var(--n50)}
+
+/* ---------- typography ---------- */
+.h1{font-size:2.25rem;line-height:1.1}
+.h2{font-size:1.875rem;line-height:1.15}
+.h3{font-size:1.5rem;line-height:1.2}
+@media(min-width:640px){.h1{font-size:3rem;line-height:1.15}.h2{font-size:2.25rem}}
+@media(min-width:768px){.h2{font-size:3rem}}
+.lead{font-size:1rem;color:var(--n600);text-wrap:pretty}
+@media(min-width:640px){.lead{font-size:1.25rem}}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:1rem;font-weight:500;color:var(--n500)}
+
+/* ---------- header ---------- */
+.site-header{position:sticky;top:0;z-index:30;width:100%;background:#fff}
+.site-header::after{content:"";position:absolute;inset:auto 0 0 0;height:1px;background:transparent}
+.header-inner{max-width:1024px;margin:0 auto;height:56px;padding:0 12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+@media(min-width:1024px){.header-inner{padding:0 16px}}
+.logo{display:block;padding:8px 8px 8px 0}
+.logo svg{height:24px;width:auto;color:#000}
+.main-nav{display:none;align-items:center;position:absolute;left:50%;transform:translateX(-50%)}
+@media(min-width:1024px){.main-nav{display:flex}}
+.main-nav a,.main-nav button{display:flex;align-items:center;height:32px;padding:0 12px;font-size:14px;font-weight:500;
+  color:var(--n700);border-radius:8px;transition:color .15s,background-color .15s}
+.main-nav a:hover,.main-nav button:hover{color:var(--n900)}
+.main-nav .active{background:rgba(23,23,23,.05)}
+.main-nav svg{margin-left:6px;width:9px;height:9px;color:var(--n700)}
+.header-actions{display:none;align-items:center;gap:8px}
+@media(min-width:1024px){.header-actions{display:flex}}
+.header-actions .login{font-size:14px;font-weight:500;color:var(--n700);padding:6px 10px;border-radius:8px}
+.header-actions .login:hover{color:var(--n900);background:var(--n100)}
+.menu-toggle{display:flex;align-items:center;justify-content:center;padding:8px;border-radius:9999px;color:var(--n600)}
+.menu-toggle:hover{background:var(--n200)}
+@media(min-width:1024px){.menu-toggle{display:none}}
+.mobile-nav{display:none;background:#fff;border-top:1px solid var(--n200);padding:8px 20px 24px}
+.mobile-nav.open{display:block}
+.mobile-nav li{border-bottom:1px solid var(--n200);padding:12px 0}
+.mobile-nav li:last-child{border-bottom:0}
+.mobile-nav a,.mobile-nav button{display:flex;width:100%;justify-content:space-between;align-items:center;
+  font-size:15px;font-weight:600;color:var(--n800)}
+
+/* ---------- hero ---------- */
+.hero{border-top:0}
+.hero .inner{padding:64px 16px 40px}
+@media(min-width:640px){.hero .inner{padding-left:48px;padding-right:48px}}
+.hero-bg{position:absolute;inset:0;pointer-events:none;overflow:hidden;
+  -webkit-mask-image:linear-gradient(transparent,black);mask-image:linear-gradient(transparent,black);opacity:.8}
+.hero-bg .gridpat{position:absolute;left:50%;transform:translateX(-50%);bottom:0;width:var(--gw);height:600px;
+  background-image:linear-gradient(to right,var(--gb) 1px,transparent 1px),linear-gradient(to bottom,var(--gb) 1px,transparent 1px);
+  background-size:60px 60px;background-position:-1px 0}
+.hero-glow{position:absolute;left:-25%;top:0;height:100%;width:150%;opacity:.15;pointer-events:none;
+  background:linear-gradient(90deg,#F4950C,#EB5C0C);
+  -webkit-mask-image:linear-gradient(transparent 25%,black);mask-image:linear-gradient(transparent 25%,black)}
+.hero-copy{position:relative;max-width:32rem;margin:0 auto;display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 16px}
+.badge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--n200);border-radius:9999px;
+  padding:6px 12px;font-size:12px;font-weight:500;line-height:1.25;color:var(--n600)}
+.badge .ico{display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;background:#fb923c;color:#7c2d12}
+.hero-copy h1{margin-top:20px}
+.hero-copy p{margin-top:20px}
+.hero-cta{position:relative;margin:40px auto 0;display:flex;justify-content:center;gap:16px}
+.hero-form-wrap{margin-top:64px}
+.shortener{max-width:561px;margin:0 auto;border-radius:12px;background:rgba(0,0,0,.02);padding:12px;border:1px solid rgba(23,23,23,.05)}
+.shortener-box{display:flex;flex-direction:column;align-items:flex-start;overflow:hidden;border:1px solid var(--n200);
+  border-radius:12px;background:#fff;padding:8px 8px 8px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1);transition:box-shadow .15s,border-color .15s}
+.shortener-box:focus-within{border-color:#c2410c;box-shadow:0 0 0 3px rgba(249,115,22,.3)}
+@media(min-width:640px){.shortener-box{flex-direction:row;align-items:center;padding:0 12px 0 16px}}
+.shortener-field{display:flex;width:100%;align-items:center}
+.shortener-field svg{width:20px;height:20px;flex:0 0 auto;color:var(--n800)}
+.shortener-field input{width:100%;height:48px;border:0;outline:none;padding:0 12px;font-size:16px;background:transparent;color:var(--n900)}
+.shortener-field input::placeholder{color:var(--n400)}
+@media(min-width:640px){.shortener-field input{height:56px}}
+.shortener-submit{display:flex;width:100%;justify-content:center;padding-top:4px}
+@media(min-width:640px){.shortener-submit{width:auto;padding:0 0 0 4px}}
+.shortener-submit button{display:flex;height:32px;width:100%;align-items:center;justify-content:center;gap:6px;
+  border-radius:8px;padding:0 12px;font-size:14px;font-weight:500;color:#fff;background:#f97316;transition:background-color .15s}
+.shortener-submit button:hover{background:#ea580c}
+@media(min-width:640px){.shortener-submit button{width:auto}}
+.shortener-extra{margin-top:12px;min-height:76px}
+
+/* ---------- logo flipper ---------- */
+.logos{overflow:hidden}
+.logo-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;align-items:center;padding:40px 16px;height:192px}
+@media(min-width:640px){.logo-grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:768px){.logo-grid{grid-template-columns:repeat(5,1fr)}}
+.logo-cell{position:relative;height:48px}
+.logo-flip{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transition:opacity .5s,transform .5s}
+.logo-flip img{max-height:24px;width:auto;object-fit:contain;opacity:.9}
+.logo-flip .tag{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);white-space:nowrap;
+  background:var(--n100);color:var(--n500);border-radius:9999px;padding:2px 4px;font-size:8px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.03em;opacity:0;transition:opacity .2s}
+.logo-cell:hover .tag{opacity:1}
+
+/* ---------- generic centered section head ---------- */
+.sec-head{display:flex;flex-direction:column;align-items:center;padding:0 16px;text-align:center}
+.sec-head h2{margin-top:12px;max-width:32rem;text-wrap:pretty}
+.sec-head p{margin-top:12px;max-width:36rem;color:var(--n500);text-wrap:pretty}
+@media(min-width:640px){.sec-head p{font-size:1.125rem}}
+
+/* ---------- app mockup card ---------- */
+.mock-card{border:1px solid var(--n200);border-radius:12px;background:#fff;box-shadow:0 98px 64px 0 rgba(0,0,0,.06);overflow:hidden}
+.mock-top{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--n200);gap:8px}
+.mock-crumb{display:flex;align-items:center;gap:4px;min-width:0}
+.folder-chip{display:flex;align-items:center;gap:8px;padding:4px 6px;min-width:0}
+.folder-icon{width:26px;height:26px;border-radius:6px;background:#dcfce7;border:1px solid #bbf7d0;display:flex;align-items:center;justify-content:center;color:#166534}
+.folder-chip span{font-size:14px;font-weight:600;color:var(--n800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mock-domain{display:flex;align-items:center;gap:8px;min-width:0}
+.mock-domain img{width:20px;height:20px;border-radius:9999px;filter:blur(1.5px)}
+.mock-domain span{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mock-close{color:var(--n500);display:none}
+@media(min-width:768px){.mock-close{display:block}}
+.mock-body{display:grid;grid-template-columns:1fr;gap:24px}
+@media(min-width:768px){.mock-body{grid-template-columns:2fr 1fr}}
+.mock-left{padding:16px 24px;display:flex;flex-direction:column;gap:32px}
+.mock-right{padding:12px 16px 24px}
+@media(min-width:768px){.mock-right{padding-left:0;padding-right:16px}}
+.field-label{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;color:var(--n700)}
+.field-label svg{width:16px;height:16px;color:var(--n500)}
+.field-input,.field-textarea{display:block;width:100%;margin-top:8px;border:1px solid var(--n300);border-radius:6px;
+  padding:8px 12px;font-size:14px;color:var(--n900);background:#fff;outline:none;font-family:inherit}
+.field-input::placeholder,.field-textarea::placeholder{color:var(--n400)}
+.field-input:focus,.field-textarea:focus{border-color:var(--n500);box-shadow:0 0 0 1px var(--n500)}
+.field-textarea{min-height:64px;resize:vertical}
+.combo{display:flex;margin-top:4px}
+.combo-prefix{display:flex;align-items:center;gap:6px;width:130px;padding:0 10px;border:1px solid var(--n300);border-right:0;
+  border-radius:6px 0 0 6px;background:var(--n50);font-size:14px;color:var(--n800);white-space:nowrap}
+@media(min-width:640px){.combo-prefix{width:160px}}
+.combo-prefix svg{width:16px;height:16px}
+.combo input{border-radius:0 6px 6px 0;margin-top:0}
+.tag-btn{display:flex;align-items:flex-start;gap:8px;width:100%;margin-top:4px;padding:6px 10px;border:1px solid var(--n300);
+  border-radius:8px;background:#fff;color:var(--n400);font-size:14px}
+.tag-btn svg{width:16px;height:16px;color:var(--n500);margin-top:3px}
+.side-panel{position:relative}
+.side-panel-bg{position:absolute;inset:0;border:1px solid var(--n200);border-radius:12px;background:var(--n50);
+  -webkit-mask-image:linear-gradient(to bottom,black,transparent);mask-image:linear-gradient(to bottom,black,transparent)}
+.side-panel-inner{position:relative;display:flex;flex-direction:column;gap:24px;padding:12px 16px}
+.side-title{font-size:14px;font-weight:500;color:var(--n700);margin-bottom:4px}
+.folder-row{display:flex;align-items:center;gap:8px;height:32px;border:1px solid var(--n200);border-radius:6px;padding:4px 8px 4px 4px}
+.folder-row .folder-icon{width:22px;height:22px;border-radius:5px}
+.folder-row span{font-size:14px;font-weight:500;color:var(--n900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qr-box{position:relative;margin-top:8px;height:96px;border:1px solid var(--n300);border-radius:6px;overflow:hidden;
+  display:flex;align-items:center;justify-content:center}
+.qr-box svg{width:64px;height:64px;filter:blur(1.5px);opacity:.45}
+.mini-title{font-size:14px;font-weight:500;color:var(--n700)}
+.preview-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.preview-btn{display:flex;align-items:center;justify-content:center;height:28px;border:1px solid var(--n300);border-radius:8px;color:var(--n800);background:transparent}
+.preview-btn.on{border-color:var(--n400);background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.preview-box{margin-top:8px;border:1px solid var(--n300);border-radius:6px;height:120px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:8px;color:var(--n700);font-size:12px;text-align:center}
+.preview-box svg{width:20px;height:20px;color:var(--n700)}
+
+/* ---------- feature 2x2 ---------- */
+.fgrid{display:grid;grid-template-columns:1fr;border-top:1px solid var(--gb)}
+@media(min-width:768px){.fgrid{grid-template-columns:1fr 1fr}}
+.fcell{position:relative;display:flex;flex-direction:column;gap:40px;padding:24px 16px}
+@media(min-width:640px){.fcell{padding:56px 40px}}
+@media(min-width:768px){.fcell:nth-child(odd){border-right:1px solid var(--gb)}}
+.fcell + .fcell{border-top:1px solid var(--gb)}
+@media(min-width:768px){.fcell:nth-child(2){border-top:0}}
+.fvis{position:relative;height:288px;overflow:hidden}
+.ftext h3{font-size:16px;font-weight:600;color:var(--n700)}
+.ftext .desc{margin-top:4px;color:var(--n500);font-size:16px}
+.ftext .desc a{font-weight:500;color:var(--n600);text-decoration:underline dotted;text-underline-offset:2px}
+.ftext .desc a:hover{color:var(--n800)}
+.ftext .btn-outline{margin-top:12px}
+
+/* preview panel */
+.panel{border:1px solid var(--n200);border-radius:12px;background:#fff;padding:16px;display:flex;flex-direction:column;gap:24px;
+  box-shadow:0 20px 20px 0 rgba(0,0,0,.09);transform:scale(.9);transform-origin:top center}
+@media(min-width:1024px){.panel{transform:scale(.75)}}
+.panel-head{display:flex;align-items:center;justify-content:space-between}
+.panel-head h3{font-size:16px;font-weight:500}
+.kbd{display:flex;width:24px;height:24px;align-items:center;justify-content:center;border:1px solid var(--n200);border-radius:6px;font-size:12px;color:var(--n900)}
+.panel-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.panel-row span{font-size:14px;font-weight:500;color:var(--n800)}
+.panel-row .icons{display:flex;align-items:center;gap:12px;color:var(--n500)}
+.panel-thumb{margin-top:8px;aspect-ratio:1200/630;border:1px solid var(--n300);border-radius:6px;overflow:hidden;background:var(--n50)}
+.panel-thumb img{width:100%;height:100%;object-fit:cover;filter:blur(1.5px)}
+.panel-text{margin-top:4px;border:1px solid var(--n300);border-radius:8px;padding:4px 8px;font-size:12px;color:var(--n800)}
+
+/* domain list */
+.domain-stack{display:flex;flex-direction:column;gap:10px;justify-content:center;height:100%}
+.domain-card{display:flex;align-items:center;gap:12px;border:1px solid var(--n200);border-radius:12px;background:#fff;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.domain-card .fav{flex:0 0 auto;border:1px solid var(--n200);border-radius:9999px;padding:8px;background:linear-gradient(to top,var(--n100),#fff)}
+.domain-card .fav img{width:24px;height:24px;border-radius:9999px;filter:blur(1.5px)}
+.domain-card .name{font-size:16px;font-weight:500;color:var(--n900)}
+.pill{display:inline-flex;align-items:center;gap:4px;margin-left:8px;border:1px solid var(--n200);background:var(--n50);
+  border-radius:6px;padding:3px 8px;font-size:14px;color:var(--n500)}
+.pill svg{width:16px;height:16px}
+.pill.primary{border-color:#dbeafe;background:#eff6ff;color:#2563eb}
+.free-domain{position:absolute;right:0;top:0;transform:translateY(-50%);display:flex;align-items:center;gap:8px;
+  border:1px solid rgba(22,163,74,.15);background:linear-gradient(to right,#ecfccb,#d1fae5);border-radius:8px;
+  padding:6px 12px;font-size:14px;font-weight:500;color:var(--n800)}
+
+/* utm */
+.utm-url{border:1px solid var(--n300);background:var(--n50);border-radius:8px;padding:8px 10px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:var(--n500);word-break:break-all}
+.utm-card{margin-top:12px;border:1px solid var(--n200);border-radius:8px;background:#fff;padding:16px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1);display:flex;flex-direction:column;gap:12px}
+.utm-row{display:flex}
+.utm-key{display:flex;align-items:center;gap:6px;min-width:112px;padding:6px 12px;border:1px solid var(--n300);border-right:0;
+  border-radius:6px 0 0 6px;background:var(--n50);color:var(--n700);font-size:14px}
+.utm-key svg{width:16px;height:16px}
+.utm-row input{flex:1;min-width:0;border:1px solid var(--n300);border-radius:0 6px 6px 0;padding:6px 10px;font-size:14px;color:var(--n900);background:#fff;outline:none}
+
+/* deep link diagram */
+.deep-visual{position:relative;width:100%;height:100%}
+.deep-visual svg{width:120%;height:120%;transform:translate(-10%,-15%)}
+.deep-visual path,.deep-visual rect,.deep-visual circle,.deep-visual text{}
+
+/* ---------- 4-col cards ---------- */
+.cards4{display:grid;grid-template-columns:1fr;gap:1px;background:var(--gb);border-top:1px solid var(--gb);border-bottom:1px solid var(--gb)}
+@media(min-width:640px){.cards4{grid-template-columns:1fr 1fr}}
+@media(min-width:1024px){.cards4{grid-template-columns:repeat(4,1fr)}}
+.card4{display:flex;flex-direction:column;align-items:flex-start;gap:8px;background:#fff;padding:32px;text-align:left}
+@media(min-width:1024px){.card4{padding:40px 36px}}
+.card4 svg{width:16px;height:16px;flex:0 0 auto;color:#ea580c}
+.card4 h3{font-size:16px;font-weight:500}
+.card4 p{color:var(--n500);font-size:14px;max-width:20rem;text-wrap:pretty}
+.card4 .btn-outline{margin-top:12px}
+
+/* ---------- testimonial ---------- */
+.quote-sec .inner{padding:96px 16px}
+.quote-inner{display:flex;flex-direction:column;align-items:center;text-align:center}
+.quote-logo{position:relative;height:24px;width:100%;margin-bottom:24px;padding:8px 0}
+.quote-logo img{position:absolute;inset:0;margin:auto;height:100%;object-fit:contain}
+.quote-text{max-width:42rem;font-size:1.125rem;line-height:1.5;text-align:center;text-wrap:balance;
+  background:linear-gradient(to bottom,var(--n600),var(--n800));-webkit-background-clip:text;background-clip:text;color:transparent;padding:8px 0}
+@media(min-width:640px){.quote-text{font-size:1.25rem}}
+@media(min-width:768px){.quote-text{font-size:1.5rem}}
+.quote-text strong{font-weight:500;color:var(--n700);-webkit-text-fill-color:var(--n700)}
+.quote-avatar{margin-top:12px;width:48px;height:48px;border-radius:9999px;filter:blur(1.5px)}
+.quote-name{margin-top:16px;font-size:14px;font-weight:600;color:var(--n600)}
+.quote-role{margin-top:4px;font-size:14px;font-weight:500;color:var(--n500)}
+
+/* ---------- analytics ---------- */
+.analytics .inner{padding-top:80px;padding-bottom:40px}
+.analytics-cta{margin-top:32px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.dash-wrap{width:100%;background:linear-gradient(to bottom,#fff,var(--n50));padding:48px 16px 0;margin-top:48px}
+.dash{max-width:768px;margin:0 auto;border:1px solid var(--n200);border-radius:12px;background:#fff;overflow:hidden;
+  -webkit-mask-image:linear-gradient(black 80%,transparent);mask-image:linear-gradient(black 80%,transparent)}
+.dash-tabs{display:flex;justify-content:space-between;border-bottom:1px solid var(--n200);overflow-x:auto}
+.dash-tabs-inner{display:grid;grid-template-columns:repeat(3,1fr);flex:0 0 auto}
+.dash-tab{position:relative;padding:12px 16px;min-width:110px;text-align:left}
+@media(min-width:640px){.dash-tab{padding:24px 32px;min-width:240px}}
+.dash-tab .label{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--n600)}
+.dash-tab .dot{width:8px;height:8px;border-radius:2px;background:currentColor;box-shadow:inset 0 0 0 1px rgba(0,0,0,.1)}
+.dash-tab .val{margin-top:4px;font-size:20px;font-weight:500}
+@media(min-width:640px){.dash-tab .val{font-size:24px}}
+.dash-tab .bar{position:absolute;left:0;bottom:0;height:2px;width:100%;background:#000;transform:translateY(3px)}
+.dash-tab.active .bar{transform:translateY(0)}
+.dash-chart{height:420px;width:100%;padding:16px;display:flex;align-items:flex-end;gap:6px}
+.bar-col{flex:1;background:linear-gradient(to top,#171717,#525252);border-radius:3px 3px 0 0;opacity:.85}
+
+/* ---------- analytics features ---------- */
+.afgrid{display:grid;grid-template-columns:1fr;border-top:1px solid var(--gb)}
+@media(min-width:768px){.afgrid{grid-template-columns:1fr 1fr}}
+.afcell{position:relative;display:flex;flex-direction:column;gap:40px;padding:24px 16px}
+@media(min-width:640px){.afcell{padding:56px 40px}}
+@media(min-width:768px){.afcell:nth-child(odd){border-right:1px solid var(--gb)}}
+.afcell + .afcell{border-top:1px solid var(--gb)}
+@media(min-width:768px){.afcell:nth-child(2){border-top:0}}
+.afvis{position:relative;height:288px;overflow:hidden}
+.afvis img{border-radius:12px;border-left:1px solid var(--n200);border-top:1px solid var(--n200);object-fit:cover;object-position:left top;filter:blur(1.5px);width:100%;height:100%}
+
+.stat-stack{position:relative;width:70%;transform:rotateX(-18deg) rotateY(23deg);transform-style:preserve-3d}
+.stat-card{position:absolute;left:0;top:0;width:100%;border:1px solid var(--n200);border-radius:16px;background:#fff;padding:16px}
+.stat-card.first{position:relative;opacity:.35}
+.stat-card .head{display:flex;align-items:center;gap:8px}
+.stat-card .head .ico{display:flex;align-items:center;justify-content:center;border:1px solid var(--n200);border-radius:8px;padding:6px}
+.stat-card .head span{font-size:14px;font-weight:500;color:var(--n600)}
+.stat-list{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.stat-row{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px}
+.stat-row .fill{position:absolute;left:0;top:0;height:100%;border-radius:6px;background:rgba(0,0,0,.05)}
+.stat-row .lbl{display:flex;align-items:center;gap:8px;position:relative}
+.stat-row .lbl svg,.stat-row .lbl img{width:16px;height:16px;color:var(--n800)}
+.stat-row .lbl span{font-size:14px;color:var(--n600)}
+.stat-row .num{font-size:14px;color:var(--n500);position:relative}
+.stat-more{min-height:1000px;border-radius:16px;border:1px solid var(--n200);background:#fff;padding:16px}
+
+/* video thumb */
+.video-thumb{position:relative;width:100%;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:var(--n100);display:block}
+.video-thumb img{width:100%;height:100%;object-fit:cover;filter:blur(1.5px)}
+.video-play{position:absolute;bottom:32px;left:32px;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--n200);
+  border-radius:9999px;padding:8px 16px;box-shadow:0 10px 15px -3px rgba(0,0,0,.1);transition:transform .3s,box-shadow .3s}
+.video-thumb:hover .video-play{transform:scale(1.05);box-shadow:0 20px 25px -5px rgba(0,0,0,.15)}
+.video-play svg{width:14px;height:14px;color:#111}
+.video-play span{font-size:14px;font-weight:500;color:#111}
+
+/* ---------- 3 col ---------- */
+.cards3{display:grid;grid-template-columns:1fr;gap:1px;background:var(--gb);border-top:1px solid var(--gb);border-bottom:1px solid var(--gb)}
+@media(min-width:1024px){.cards3{grid-template-columns:repeat(3,1fr)}}
+.card3{display:flex;flex-direction:column;align-items:flex-start;gap:8px;background:#fff;padding:32px;text-align:left}
+@media(min-width:1024px){.card3{padding:40px 36px}}
+.card3 svg{width:16px;height:16px;color:#ea580c}
+.card3 h3{font-size:16px;font-weight:500}
+.card3 p{color:var(--n500);font-size:14px;text-wrap:pretty}
+.card3 .btn-outline{margin-top:12px}
+
+/* ---------- integrations ---------- */
+.integrations{background:var(--n50)}
+.integrations .inner{min-height:440px}
+.int-visual{position:absolute;inset:0;overflow:hidden}
+.int-canvas{position:absolute;left:-590px;width:1600px;height:480px;top:50%;transform:translateY(-50%)}
+@media(max-width:767px){
+  .int-canvas{left:-590px;bottom:0;top:auto;transform:none;height:360px;
+    -webkit-mask-image:linear-gradient(black 80%,transparent);mask-image:linear-gradient(black 80%,transparent)}
+}
+.int-grid-bg{position:absolute;inset:0;
+  background-image:linear-gradient(to right,var(--n200) 1px,transparent 1px),linear-gradient(to bottom,var(--n200) 1px,transparent 1px);
+  background-size:60px 60px;
+  -webkit-mask-image:linear-gradient(90deg,transparent,black 70%,transparent);mask-image:linear-gradient(90deg,transparent,black 70%,transparent)}
+.tile{position:absolute;width:61px;height:61px;border-radius:8px;background:linear-gradient(to bottom,var(--n100),#fff);
+  box-shadow:0 4px 6px -1px rgba(0,0,0,.1);transition:transform .15s,box-shadow .15s;background-repeat:no-repeat;
+  background-size:900% 100%}
+.tile::after{content:"";position:absolute;inset:0;border-radius:inherit;border:1px solid rgba(0,0,0,.2)}
+.tile.ghost{opacity:.3;box-shadow:inset 0 2px 6px 0 rgba(0,0,0,.2)}
+.tile:hover{transform:translateY(-2px) scale(1.025);box-shadow:0 20px 25px -5px rgba(0,0,0,.15);z-index:10}
+.int-copy{position:relative;padding:56px 16px 32px}
+@media(min-width:768px){.int-copy{padding:112px 40px}}
+.int-copy h2{max-width:24rem}
+.int-copy p{margin-top:12px;max-width:24rem;color:var(--n500)}
+@media(min-width:640px){.int-copy p{font-size:1.125rem}}
+.int-copy .btn{margin-top:32px;pointer-events:auto;padding:10px 20px;color:var(--n900)}
+.int-spacer{height:360px}
+@media(min-width:768px){.int-spacer{display:none}}
+
+/* ---------- API section ---------- */
+.api-sec .inner{padding-top:80px;padding-bottom:40px}
+.code-wrap{margin-top:48px;border-top:1px solid var(--gb);border-bottom:1px solid var(--gb);background:var(--n50);padding:48px 16px 40px}
+.marquee-stage{position:relative;max-width:768px;margin:0 auto;height:300px;overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent,black 20%,black 80%,transparent);mask-image:linear-gradient(90deg,transparent,black 20%,black 80%,transparent);
+  display:flex;flex-direction:column;justify-content:center;gap:8px}
+.marquee-row{display:flex;overflow:hidden}
+.marquee-track{display:flex;gap:8px;padding-left:8px;min-width:max-content;animation:marquee 60s linear infinite}
+.marquee-track.rev{animation-direction:reverse}
+@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+.endpoint{display:flex;align-items:center;gap:6px;border:1px solid var(--n200);background:#fff;border-radius:4px;
+  padding:4px 8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--n900);white-space:nowrap}
+.method{border-radius:9999px;padding:2px 8px;line-height:1;font-size:11px;font-weight:600}
+.m-post{background:#dbeafe;color:#2563eb}
+.m-patch{background:#ffedd5;color:#ea580c}
+.m-put{background:#fef9c3;color:#ca8a04}
+.m-delete{background:#fee2e2;color:#dc2626}
+.m-get{background:#dcfce7;color:#16a34a}
+
+.sdk-block{margin-top:48px;max-width:768px;margin-left:auto;margin-right:auto}
+.sdk-tabs{display:flex;gap:8px;justify-content:center;background:var(--n200);border-radius:9999px;padding:6px;width:max-content;margin:0 auto}
+.sdk-tab{height:32px;border-radius:9999px;padding:0 14px;display:flex;align-items:center;justify-content:center;color:var(--n700)}
+.sdk-tab.active{background:#000;color:#fff}
+.sdk-tab svg{width:16px;height:16px}
+.sdk-window{margin-top:8px;max-width:36rem;margin-left:auto;margin-right:auto}
+.sdk-card{border:1px solid rgba(0,0,0,.2);border-radius:16px 16px 0 0;background:#fff;box-shadow:0 0 0 4px rgba(0,0,0,.1);overflow:hidden}
+.sdk-head{display:grid;grid-template-columns:1fr 1fr;align-items:center;height:48px;padding:0 10px;border-bottom:1px solid var(--n200);font-size:14px;color:var(--n500)}
+@media(min-width:640px){.sdk-head{grid-template-columns:1fr 1fr 1fr}}
+.sdk-dots{display:none;gap:8px;padding:0 8px}
+@media(min-width:640px){.sdk-dots{display:flex}}
+.sdk-dots i{width:8px;height:8px;border-radius:9999px;border:1px solid rgba(0,0,0,.7);display:block}
+.sdk-title{text-align:left;padding:0 8px;white-space:nowrap}
+@media(min-width:640px){.sdk-title{text-align:center}}
+.sdk-body{padding:20px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.7;color:var(--n800);white-space:pre-wrap;overflow-x:hidden}
+
+.api-cards{margin-top:48px;max-width:768px;margin-left:auto;margin-right:auto;display:grid;grid-template-columns:1fr;gap:24px 40px}
+@media(min-width:640px){.api-cards{grid-template-columns:repeat(3,1fr)}}
+.api-card{position:relative;display:flex;flex-direction:column;padding-left:24px;text-align:left;font-size:14px;color:var(--n900)}
+.api-card::before{content:"";position:absolute;left:0;top:0;height:100%;width:1px;background:var(--n200)}
+.api-card svg{width:16px;height:16px}
+.api-card .t{margin-top:8px;font-weight:500}
+.api-card p{margin-top:12px;color:var(--n500)}
+.api-card .lm{margin-top:16px;display:inline-flex;align-items:center;gap:2px;font-size:14px;font-weight:500;color:#ea580c}
+.api-card .lm svg{width:16px;height:16px}
+.api-card.dim{opacity:.5}
+
+/* ---------- dark CTA ---------- */
+.cta-dark{position:relative;background:var(--n900);padding:0 16px;color:#fff;overflow:hidden}
+.cta-dark::before{content:"";position:absolute;inset:-40px;pointer-events:none;opacity:.3;mix-blend-mode:overlay;
+  background:conic-gradient(from -81deg,#3A8BFD -72deg,#855AFC 33deg,#F00 70deg,#EAB308 136deg,#5CFF80 214deg,#00FFF9 259deg,#3A8BFD 288deg,#855AFC 393deg);
+  filter:blur(30px)}
+.cta-inner{position:relative;max-width:var(--gw);margin:0 auto}
+.cta-bg-lines{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.cta-bg-lines .bx{position:absolute;inset:0;border-left:1px solid rgba(255,255,255,.05);border-right:1px solid rgba(255,255,255,.05);
+  -webkit-mask-image:linear-gradient(black,transparent);mask-image:linear-gradient(black,transparent)}
+.cta-bg-lines .gpat{position:absolute;top:0;bottom:0;left:50%;width:1200px;transform:translateX(-50%);
+  background-image:linear-gradient(to right,rgba(255,255,255,.15) 1px,transparent 1px),linear-gradient(to bottom,rgba(255,255,255,.15) 1px,transparent 1px);
+  background-size:60px 60px;
+  -webkit-mask-image:linear-gradient(black,transparent),radial-gradient(black,transparent);
+  mask-image:linear-gradient(black,transparent),radial-gradient(black,transparent);
+  -webkit-mask-composite:source-in;mask-composite:intersect}
+.cta-tab{position:relative;z-index:0;margin:0 auto;display:flex;height:64px;max-width:min(700px,calc(100vw - 2rem));
+  align-items:flex-start;justify-content:center;transform:translateY(-1px);color:#fff}
+.cta-tab svg{height:100%;width:auto;flex:0 0 auto;overflow:visible}
+.cta-tab .line{position:relative;z-index:10;height:calc(100% + 1px);min-width:0;flex:1;background:currentColor}
+.cta-content{position:relative;display:flex;flex-direction:column;align-items:center;padding:96px 16px 128px;text-align:center}
+.cta-badge{display:inline-flex;align-items:center;gap:8px;border-radius:9999px;background:rgba(255,255,255,.07);
+  padding:6px 12px;font-size:12px;font-weight:500;line-height:1.25;color:#fff;margin-bottom:24px}
+.cta-content h2{max-width:32rem;color:var(--n50);text-wrap:balance}
+.cta-content .sub{margin-top:24px;max-width:560px;font-size:1.125rem;font-weight:500;color:var(--n400);text-wrap:pretty}
+@media(min-width:640px){.cta-content .sub{font-size:1.25rem}}
+.cta-buttons{margin-top:40px;display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+.cta-buttons .w{display:flex;height:40px;align-items:center;justify-content:center;border-radius:8px;padding:0 20px;font-size:14px;font-weight:500;transition:box-shadow .15s}
+.cta-buttons .w1{background:#fff;color:var(--n900);border:1px solid var(--n200)}
+.cta-buttons .w1:hover{box-shadow:0 0 0 3px rgba(255,255,255,.2)}
+.cta-buttons .w2{background:rgba(255,255,255,.2);color:#fff;border:1px solid transparent;backdrop-filter:blur(4px)}
+.cta-buttons .w2:hover{box-shadow:0 0 0 3px rgba(255,255,255,.1)}
+.cta-reviews{margin-top:40px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:32px}
+.review{display:flex;align-items:center;gap:10px}
+.review .badge-ico{display:flex;width:24px;height:24px;align-items:center;justify-content:center;border-radius:9999px;background:rgba(255,255,255,.15);transition:transform .2s}
+.review:hover .badge-ico{transform:scale(1.1)}
+.review .stars{display:flex;align-items:center;color:rgba(255,255,255,.85)}
+.review .stars svg{width:16px;height:16px}
+
+/* ---------- footer ---------- */
+.site-footer{padding:64px 12px 0;max-width:1024px;margin:0 auto}
+@media(min-width:1024px){.site-footer{padding-left:16px;padding-right:16px}}
+.footer-grid{display:grid;grid-template-columns:1fr;gap:32px}
+@media(min-width:1280px){.footer-grid{grid-template-columns:repeat(3,1fr)}}
+.footer-brand{display:flex;flex-direction:column;gap:24px}
+.footer-brand svg{height:32px;width:auto;color:var(--n800)}
+.socials{display:flex;align-items:center;gap:12px}
+.socials a{padding:4px;border-radius:9999px;color:var(--n900);transition:color .1s}
+.socials a:hover{color:var(--n600)}
+.socials svg{width:16px;height:16px}
+.footer-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(min-width:1280px){.footer-cols{grid-column:span 2;margin-top:0}}
+.footer-col-group{display:grid;gap:32px}
+@media(min-width:768px){.footer-col-group{grid-template-columns:1fr 1fr}}
+.footer-col h3{font-size:14px;font-weight:500;color:var(--n900)}
+.footer-col ul{margin-top:10px;display:flex;flex-direction:column;gap:14px}
+.footer-col a,.footer-col button{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--n500);transition:color .1s}
+.footer-col a:hover,.footer-col button:hover{color:var(--n700)}
+.footer-col .chip{display:flex;width:16px;height:16px;align-items:center;justify-content:center;border-radius:4px;border:1px solid rgba(0,0,0,.05)}
+.footer-col .chip svg{width:10px;height:10px}
+.chip-purple{background:#c084fc;color:#581c87}
+.chip-green{background:#4ade80;color:#14532d}
+.chip-orange{background:#fb923c;color:#7c2d12}
+.chip-neutral{background:#a3a3a3;color:#171717}
+.footer-bottom{margin-top:48px;display:grid;grid-template-columns:1fr;align-items:center;gap:32px}
+@media(min-width:640px){.footer-bottom{grid-template-columns:repeat(3,1fr)}}
+.status-pill{display:flex;align-items:center;gap:8px;border:1px solid var(--n200);background:#fff;border-radius:8px;
+  padding:8px 10px;width:max-content;transition:background-color .15s}
+.status-pill:hover{background:var(--n50)}
+.status-pill .dot{width:8px;height:8px;border-radius:9999px;background:var(--n200)}
+.status-pill p{font-size:12px;font-weight:500;color:var(--n600);line-height:1}
+.soc2{display:flex;justify-content:center}
+.soc2 img{height:32px;width:auto}
+.copyright{font-size:12px;color:var(--n500)}
+@media(min-width:640px){.copyright{text-align:right}}
+.footer-spacer{height:64px}
+
+/* animations */
+@keyframes slideUpFade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.anim{animation:slideUpFade 1s both}
+.anim-2{animation-delay:.1s}
+.anim-3{animation-delay:.2s}
+.anim-4{animation-delay:.3s}
+.anim-5{animation-delay:.4s}
+@media(prefers-reduced-motion:reduce){.anim{animation:none}}
+</style>
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<header class="site-header">
+  <div class="header-inner">
+    <a class="logo" href="#" aria-label="Dub home">
+      <svg width="46" height="24" viewBox="0 0 46 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M11 2H14V13.9332L14.0003 13.9731L14.0003 14C14.0003 14.0223 14.0002 14.0445 14 14.0668V21H11V19.7455C9.86619 20.5362 8.48733 21 7.00016 21C3.13408 21 0 17.866 0 14C0 10.134 3.13408 7 7.00016 7C8.48733 7 9.86619 7.46375 11 8.25452V2ZM7 17.9998C9.20914 17.9998 11 16.209 11 13.9999C11 11.7908 9.20914 10 7 10C4.79086 10 3 11.7908 3 13.9999C3 16.209 4.79086 17.9998 7 17.9998ZM32 2H35V8.25474C36.1339 7.46383 37.5128 7 39.0002 7C42.8662 7 46.0003 10.134 46.0003 14C46.0003 17.866 42.8662 21 39.0002 21C35.1341 21 32 17.866 32 14V2ZM39 17.9998C41.2091 17.9998 43 16.209 43 13.9999C43 11.7908 41.2091 10 39 10C36.7909 10 35 11.7908 35 13.9999C35 16.209 36.7909 17.9998 39 17.9998ZM19 7H16V14C16 14.9192 16.1811 15.8295 16.5329 16.6788C16.8846 17.5281 17.4003 18.2997 18.0503 18.9497C18.7003 19.5997 19.472 20.1154 20.3213 20.4671C21.1706 20.8189 22.0809 21 23.0002 21C23.9194 21 24.8297 20.8189 25.679 20.4671C26.5283 20.1154 27.3 19.5997 27.95 18.9497C28.6 18.2997 29.1157 17.5281 29.4675 16.6788C29.8192 15.8295 30.0003 14.9192 30.0003 14H30V7H27V14C27 15.0608 26.5785 16.0782 25.8284 16.8283C25.0783 17.5784 24.0609 17.9998 23 17.9998C21.9391 17.9998 20.9217 17.5784 20.1716 16.8283C19.4215 16.0782 19 15.0608 19 14V7Z" fill="currentColor"/>
+      </svg>
+    </a>
+
+    <nav class="main-nav" aria-label="Main">
+      <button class="active">Product
+        <svg viewBox="0 0 9 9" fill="none" xmlns="http://www.w3.org/2000/svg"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7.278 3.389 4.5 6.167 1.722 3.389"/></svg>
+      </button>
+      <button>Solutions
+        <svg viewBox="0 0 9 9" fill="none" xmlns="http://www.w3.org/2000/svg"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7.278 3.389 4.5 6.167 1.722 3.389"/></svg>
+      </button>
+      <button>Resources
+        <svg viewBox="0 0 9 9" fill="none" xmlns="http://www.w3.org/2000/svg"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7.278 3.389 4.5 6.167 1.722 3.389"/></svg>
+      </button>
+      <a href="#">Customers</a>
+      <a href="#">Pricing</a>
+    </nav>
+
+    <div class="header-actions">
+      <a class="login" href="#">Log in</a>
+      <a class="btn btn-primary btn-sm" href="#">Sign Up</a>
+    </div>
+
+    <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;color:#525252">
+        <line x1="4" x2="20" y1="12" y2="12"></line><line x1="4" x2="20" y1="6" y2="6"></line><line x1="4" x2="20" y1="18" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+
+  <nav class="mobile-nav" id="mobileNav">
+    <ul>
+      <li><button>Product <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;color:#737373"><path d="m6 9 6 6 6-6"/></svg></button></li>
+      <li><button>Solutions <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;color:#737373"><path d="m6 9 6 6 6-6"/></svg></button></li>
+      <li><button>Resources <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;color:#737373"><path d="m6 9 6 6 6-6"/></svg></button></li>
+      <li><a href="#">Customers</a></li>
+      <li><a href="#">Pricing</a></li>
+      <li><a href="#">Enterprise</a></li>
+      <li><a href="#">Startups</a></li>
+      <li><a href="#">Log in</a></li>
+      <li><a href="#">Sign Up</a></li>
+    </ul>
+  </nav>
+</header>
+
+<!-- ============ HERO ============ -->
+<section class="section hero">
+  <div class="inner">
+    <div class="hero-bg">
+      <div class="gridpat"></div>
+    </div>
+    <div class="hero-glow"></div>
+
+    <div class="hero-copy">
+      <div class="badge anim">
+        <span class="ico">
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="10" fill="none" viewBox="0 0 11 10"><path stroke="currentColor" stroke-linecap="round" stroke-width="3.333" d="M5.5 5.667v-4M5.5 5.667l-3.333 2M5.5 5.667l3.333 2"/></svg>
+        </span>
+        Dub Links
+      </div>
+      <h1 class="h1 font-display anim anim-2">Short links with superpowers</h1>
+      <p class="lead anim anim-3">The modern link management platform for entrepreneurs, creators, and growth teams.</p>
+    </div>
+
+    <div class="hero-cta anim anim-4">
+      <a class="btn btn-primary" href="#">Start for free</a>
+      <a class="btn btn-secondary" href="#">Get a demo</a>
+    </div>
+
+    <div class="hero-form-wrap anim anim-5">
+      <div class="shortener">
+        <form onsubmit="return false">
+          <div class="shortener-box">
+            <label class="shortener-field">
+              <span class="sr-only">Destination URL</span>
+              <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                <g fill="currentColor">
+                  <path d="M5.75,7.25v-2.25c0-1.795,1.455-3.25,3.25-3.25h0c1.795,0,3.25,1.455,3.25,3.25v2.25" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+                  <path d="M5.75,10.75v2.25c0,1.795,1.455,3.25,3.25,3.25h0c1.795,0,3.25-1.455,3.25-3.25v-2.25" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+                  <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" x1="9" x2="9" y1="11.25" y2="6.75"/>
+                </g>
+              </svg>
+              <input placeholder="Shorten any link..." autocomplete="off" name="url">
+            </label>
+            <div class="shortener-submit">
+              <button type="submit">Shorten link</button>
+            </div>
+          </div>
+        </form>
+        <div class="shortener-extra"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LOGO FLIPPER ============ -->
+<section class="section logos">
+  <div class="inner" style="border-left:1px solid var(--gb);border-right:1px solid var(--gb)">
+    <div class="logo-grid" id="logoGrid">
+      <div class="logo-cell">
+        <a class="logo-flip" href="#"><img src="https://assets.dub.co/companies/twilio.svg" alt="twilio"></a>
+      </div>
+      <div class="logo-cell">
+        <a class="logo-flip" href="#"><img src="https://assets.dub.co/companies/superhuman.svg" alt="superhuman" style="width:75%"></a>
+      </div>
+      <div class="logo-cell">
+        <a class="logo-flip" href="#"><img src="https://assets.dub.co/companies/perplexity.svg" alt="perplexity"></a>
+      </div>
+      <div class="logo-cell">
+        <a class="logo-flip" href="#"><img src="https://assets.dub.co/companies/vercel.svg" alt="vercel" style="height:65%"></a>
+      </div>
+      <div class="logo-cell">
+        <a class="logo-flip" href="#"><img src="https://assets.dub.co/companies/framer.svg" alt="framer"></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BRANDED SHORT LINKS ============ -->
+<section class="section">
+  <div class="inner" style="padding-top:80px;padding-bottom:40px">
+    <div class="sec-head">
+      <span class="eyebrow">
+        <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style="width:20px;height:20px">
+          <g fill="currentColor">
+            <path d="M12.188,16.484c-1.097,0-2.192-.417-3.026-1.252l-2.175-2.175c-1.671-1.671-1.671-4.39,0-6.061,.356-.356,.753-.637,1.19-.846,.371-.18,.82-.021,1,.354,.179,.374,.021,.821-.354,1-.283,.135-.541,.318-.766,.543-1.096,1.096-1.096,2.863-.01,3.95l2.175,2.175c1.086,1.085,2.853,1.086,3.939,0,1.096-1.096,1.096-2.863,.01-3.949l-.931-.931c-.293-.293-.293-.768,0-1.061s.768-.293,1.061,0l.931,.931c1.671,1.671,1.671,4.389,0,6.06-.842,.842-1.944,1.262-3.044,1.262Z"/>
+            <path d="M9.501,11.923c-.28,0-.548-.157-.677-.427-.179-.374-.021-.821,.354-1,.283-.135,.541-.318,.766-.543,1.096-1.096,1.096-2.863,.01-3.95l-2.175-2.175c-1.085-1.085-2.853-1.086-3.939,0-1.096,1.096-1.096,2.863-.01,3.949l.931,.931c.293,.293,.293,.768,0,1.061s-.768,.293-1.061,0l-.931-.931c-1.671-1.671-1.671-4.389,0-6.06,1.682-1.681,4.4-1.682,6.07-.01l2.175,2.175c1.671,1.671,1.671,4.39,0,6.061-.356,.356-.753,.637-1.19,.846-.104,.05-.214,.073-.323,.073Z"/>
+          </g>
+        </svg>
+        Branded Short Links
+      </span>
+      <h2 class="h2 font-display">Branded short links that stand out</h2>
+      <p class="lead">Customize your short links, organize your campaigns, and track what truly matters, all in one place.</p>
+    </div>
+
+    <div style="display:none" class="mobile-spacer"></div>
+
+    <div style="background:linear-gradient(to bottom,#fff,#fafafa);padding:0 16px;margin-top:48px" class="hide-mobile">
+      <div style="padding:48px 0">
+        <div style="margin:0 auto;height:500px;max-width:940px;-webkit-mask-image:linear-gradient(black 50%,transparent);mask-image:linear-gradient(black 50%,transparent)">
+          <div class="mock-card" style="transform:scale(.85);transform-origin:top center">
+            <div class="mock-top">
+              <div class="mock-crumb">
+                <div class="folder-chip">
+                  <div class="folder-icon">
+                    <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style="width:16px;height:16px">
+                      <g fill="none" stroke="#166534" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                        <path d="M2.25,8.75V4.75c0-1.105,.895-2,2-2h1.951c.607,0,1.18,.275,1.56,.748l.603,.752h5.386c1.105,0,2,.895,2,2v2.844"/>
+                        <path d="M4.25,6.75H13.75c1.105,0,2,.895,2,2v4.5c0,1.105-.895,2-2,2H4.25c-1.105,0-2-.895-2-2v-4.5c0-1.105,.895-2,2-2Z"/>
+                      </g>
+                    </svg>
+                  </div>
+                  <span>Links</span>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:#737373"><path d="m9 18 6-6-6-6"/></svg>
+                <div class="mock-domain">
+                  <img src="https://www.google.com/s2/favicons?sz=64&domain_url=dub.co" alt="dub.co">
+                  <span>dub.sh/about-dub</span>
+                </div>
+              </div>
+              <button class="mock-close" type="button" aria-label="Close">
+                <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" viewBox="0 0 24 24" width="14" height="14" style="width:20px;height:20px"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            <div class="mock-body">
+              <div class="mock-left">
+                <div>
+                  <div class="field-label">Destination URL
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+                  </div>
+                  <input class="field-input" value="https://dub.co/about">
+                </div>
+
+                <div>
+                  <div class="field-label">Short Link
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+                  </div>
+                  <div class="combo">
+                    <div class="combo-prefix">
+                      dub.sh
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:auto"><path d="m6 9 6 6 6-6"/></svg>
+                    </div>
+                    <input class="field-input" value="about-dub">
+                  </div>
+                </div>
+
+                <div>
+                  <div class="field-label">Tags
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+                  </div>
+                  <button class="tag-btn" type="button">
+                    <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                      <g fill="none" stroke="#737373" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                        <path d="M3.25,2.25h4.922c.53,0,1.039,.211,1.414,.586l5.75,5.75c.781,.781,.781,2.047,0,2.828l-3.922,3.922c-.781,.781-2.047,.781-2.828,0L2.836,9.586c-.375-.375-.586-.884-.586-1.414V3.25c0-.552,.448-1,1-1Z"/>
+                        <circle cx="6.25" cy="6.25" fill="#737373" r="1.25" stroke="none"/>
+                      </g>
+                    </svg>
+                    <span style="color:#737373">Select tags...</span>
+                  </button>
+                </div>
+
+                <div>
+                  <div class="field-label">Comments
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+                  </div>
+                  <textarea class="field-textarea" placeholder="Add comments"></textarea>
+                </div>
+              </div>
+
+              <div class="mock-right">
+                <div class="side-panel">
+                  <div class="side-panel-bg"></div>
+                  <div class="side-panel-inner">
+                    <div>
+                      <h2 class="side-title">Folder</h2>
+                      <div class="folder-row">
+                        <div class="folder-icon">
+                          <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style="width:12px;height:12px">
+                            <g fill="none" stroke="#166534" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                              <path d="M2.25,8.75V4.75c0-1.105,.895-2,2-2h1.951c.607,0,1.18,.275,1.56,.748l.603,.752h5.386c1.105,0,2,.895,2,2v2.844"/>
+                              <path d="M4.25,6.75H13.75c1.105,0,2,.895,2,2v4.5c0,1.105-.895,2-2,2H4.25c-1.105,0-2-.895-2-2v-4.5c0-1.105,.895-2,2-2Z"/>
+                            </g>
+                          </svg>
+                        </div>
+                        <span>Links</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div class="panel-row" style="align-items:center;justify-content:space-between;display:flex">
+                        <h2 class="mini-title" style="font-weight:500">QR Code</h2>
+                        <button type="button" aria-label="Customize QR" style="color:#525252">
+                          <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style="width:16px;height:16px">
+                            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                              <line x1="10.547" x2="13.578" y1="4.422" y2="7.453"/>
+                              <path d="M2.75,15.25s3.599-.568,4.546-1.515c.947-.947,7.327-7.327,7.327-7.327,.837-.837,.837-2.194,0-3.03-.837-.837-2.194-.837-3.03,0,0,0-6.38,6.38-7.327,7.327s-1.515,4.546-1.515,4.546h0Z"/>
+                            </g>
+                          </svg>
+                        </button>
+                      </div>
+                      <div class="qr-box">
+                        <svg viewBox="0 0 29 29" xmlns="http://www.w3.org/2000/svg">
+                          <rect width="29" height="29" fill="#fff"/>
+                          <g fill="#000">
+                            <path d="M0 0h7v1H0zM9 0h1v1H9zM14 0h2v1H14zM17 0h2v1H17zM22 0h7v1H22zM0 1h1v1H0zM6 1h1v1H6zM10 1h6v1H10zM17 1h3v1H17zM22 1h1v1H22zM28 1h1v1H28zM0 2h1v1H0zM2 2h3v1H2zM6 2h1v1H6zM12 2h1v1H12zM14 2h2v1H14zM18 2h3v1H18zM22 2h1v1H22zM24 2h3v1H24zM28 2h1v1H28zM0 3h1v1H0zM2 3h3v1H2zM6 3h1v1H6zM11 3h1v1H11zM13 3h2v1H13zM17 3h2v1H17zM22 3h1v1H22zM24 3h3v1H24zM28 3h1v1H28zM0 4h1v1H0zM2 4h3v1H2zM6 4h1v1H6zM12 4h2v1H12zM16 4h4v1H16zM22 4h1v1H22zM24 4h3v1H24zM28 4h1v1H28zM0 5h1v1H0zM6 5h1v1H6zM12 5h3v1H12zM18 5h1v1H18zM20 5h1v1H20zM22 5h1v1H22zM28 5h1v1H28zM0 6h7v1H0zM10 6h1v1H10zM12 6h1v1H12zM14 6h1v1H14zM16 6h1v1H16zM18 6h1v1H18zM20 6h1v1H20zM22 6h7v1H22zM11 7h4v1H11zM16 7h1v1H16zM18 7h2v1H18zM3 8h2v1H3zM6 8h2v1H6zM10 8h2v1H10zM13 8h4v1H13zM18 8h3v1H18zM25 8h2v1H25zM0 9h1v1H0zM2 9h4v1H2zM8 9h3v1H8zM14 9h1v1H14zM16 9h4v1H16zM21 9h1v1H21zM23 9h2v1H23zM27 9h1v1H27zM1 11h2v1H1zM7 11h1v1H7zM20 11h1v1H20zM28 11h1v1H28zM0 12h2v1H0zM3 12h2v1H3zM6 12h1v1H6zM8 12h2v1H8zM19 12h1v1H19zM21 12h2v1H21zM25 12h1v1H25zM27 12h1v1H27zM0 13h1v1H0zM5 13h1v1H5zM7 13h1v1H7zM9 13h1v1H9zM22 13h1v1H22zM24 13h1v1H24zM26 13h1v1H26zM28 13h1v1H28zM0 14h1v1H0zM2 14h1v1H2zM4 14h6v1H4zM19 14h1v1H19zM22 14h2v1H22zM25 14h1v1H25zM28 14h1v1H28zM3 15h1v1H3zM5 15h1v1H5zM7 15h2v1H7zM21 15h2v1H21zM24 15h4v1H24zM2 16h2v1H2zM5 16h2v1H5zM8 16h2v1H8zM20 16h1v1H20zM23 16h1v1H23zM25 16h1v1H25zM27 16h1v1H27zM0 17h3v1H0zM4 17h2v1H4zM8 17h1v1H8zM19 17h3v1H19zM24 17h3v1H24zM0 18h3v1H0zM5 18h2v1H5zM8 18h2v1H8zM19 18h1v1H19zM23 18h1v1H23zM28 18h1v1H28zM0 19h2v1H0zM3 19h2v1H3zM7 19h1v1H7zM13 19h1v1H13zM15 19h1v1H15zM17 19h1v1H17zM21 19h2v1H21zM24 19h1v1H24zM26 19h1v1H26zM0 20h2v1H0zM3 20h1v1H3zM6 20h3v1H6zM10 20h2v1H10zM14 20h1v1H14zM16 20h1v1H16zM20 20h8v1H20zM8 21h1v1H8zM10 21h2v1H10zM14 21h1v1H14zM16 21h1v1H16zM20 21h1v1H20zM24 21h4v1H24zM0 22h7v1H0zM8 22h4v1H8zM13 22h1v1H13zM16 22h1v1H16zM18 22h3v1H18zM22 22h1v1H22zM24 22h1v1H24zM26 22h1v1H26zM0 23h1v1H0zM6 23h1v1H6zM9 23h2v1H9zM12 23h3v1H12zM16 23h1v1H16zM19 23h2v1H19zM24 23h2v1H24zM0 24h1v1H0zM2 24h3v1H2zM6 24h1v1H6zM8 24h2v1H8zM14 24h2v1H14zM18 24h7v1H18zM0 25h1v1H0zM2 25h3v1H2zM6 25h1v1H6zM8 25h2v1H8zM11 25h3v1H11zM17 25h2v1H17zM23 25h1v1H23zM25 25h3v1H25zM0 26h1v1H0zM2 26h3v1H2zM6 26h1v1H6zM9 26h4v1H9zM18 26h1v1H18zM20 26h2v1H20zM23 26h2v1H23zM27 26h2v1H27zM0 27h1v1H0zM6 27h1v1H6zM10 27h1v1H10zM13 27h1v1H13zM15 27h2v1H15zM18 27h1v1H18zM21 27h2v1H21zM24 27h3v1H24zM28 27h1v1H28zM0 28h7v1H0zM10 28h1v1H10zM13 28h5v1H13zM20 28h2v1H20zM23 28h2v1H23z"/>
+                          </g>
+                        </svg>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h2 class="mini-title" style="font-weight:500">Custom Link Preview</h2>
+                      <div class="preview-grid">
+                        <button class="preview-btn on" type="button" aria-label="Default">
+                          <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style="width:16px;height:16px">
+                            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                              <path d="M9.926,16.11c-.461,.092-.938,.14-1.426,.14-4.004,0-7.25-3.246-7.25-7.25S4.496,1.75,8.5,1.75s7.25,3.246,7.25,7.25c0,.264-.014,.524-.041,.78"/>
+                              <path d="M11.126,10.768l5.94,2.17c.25,.091,.243,.448-.011,.529l-2.719,.87-.87,2.719c-.081,.254-.438,.261-.529,.011l-2.17-5.94c-.082-.223,.135-.44,.359-.359Z"/>
+                              <path d="M15.75,9c0-1.657-3.246-3-7.25-3S1.25,7.343,1.25,9c0,1.646,3.205,2.983,7.175,3"/>
+                              <path d="M11.486,8.293c-.147-3.672-1.428-6.543-2.986-6.543-1.657,0-3,3.246-3,7.25s1.343,7.25,3,7.25"/>
+                            </g>
+                          </svg>
+                        </button>
+                        <button class="preview-btn" type="button" aria-label="Facebook">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14222 14222" style="width:16px;height:16px">
+                            <circle cx="7111" cy="7112" r="7111" fill="currentColor"/>
+                            <path d="M9879 9168l315-2056H8222V5778c0-562 275-1111 1159-1111h897V2917s-814-139-1592-139c-1624 0-2686 984-2686 2767v1567H4194v2056h1806v4969c362 57 733 86 1111 86s749-30 1111-86V9168z" fill="#fff"/>
+                          </svg>
+                        </button>
+                        <button class="preview-btn" type="button" aria-label="LinkedIn">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="width:16px;height:16px">
+                            <path fill="currentColor" d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+                          </svg>
+                        </button>
+                        <button class="preview-btn" type="button" aria-label="X">
+                          <svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg" style="width:16px;height:16px">
+                            <path stroke="currentColor" fill="none" d="M178.57 127.15 290.27 0h-26.46l-97.03 110.38L89.34 0H0l117.13 166.93L0 300.25h26.46l102.4-116.59 81.8 116.59h89.34M36.01 19.54H76.66l187.13 262.13h-40.66"/>
+                          </svg>
+                        </button>
+                      </div>
+                      <div class="preview-box">
+                        <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                          <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                            <path d="M4,14.75l5.836-5.836c.781-.781,2.047-.781,2.828,0l3.586,3.586"/>
+                            <rect height="11.5" width="14.5" rx="2" ry="2" x="1.75" y="3.25"/>
+                            <circle cx="5.75" cy="7.25" fill="currentColor" r="1.25" stroke="none"/>
+                          </g>
+                        </svg>
+                        <p style="max-width:8rem">Enter a link to generate a preview</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- feature 2x2 -->
+  <div class="fgrid" style="max-width:var(--gw);margin:0 auto;border-left:1px solid var(--gb);border-right:1px solid var(--gb)">
+
+    <!-- Link preview -->
+    <div class="fcell">
+      <div class="fvis">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Link Preview</h3>
+            <div class="kbd">D</div>
+          </div>
+          <div>
+            <div class="panel-row">
+              <span>Image</span>
+              <div class="icons">
+                <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style="width:16px;height:16px">
+                  <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                    <path d="M5.75,7.25v-2.25c0-1.795,1.455-3.25,3.25-3.25h0c1.795,0,3.25,1.455,3.25,3.25v2.25"/>
+                    <path d="M5.75,10.75v2.25c0,1.795,1.455,3.25,3.25,3.25h0c1.795,0,3.25-1.455,3.25-3.25v-2.25"/>
+                    <line x1="9" x2="9" y1="11.25" y2="6.75"/>
+                  </g>
+                </svg>
+                <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" style="width:12px;height:12px">
+                  <path d="M10 9V0h12v9H10zm12 5h10v18H0V14h10v9h12v-9z" fill="currentColor" fill-rule="nonzero"/>
+                </svg>
+              </div>
+            </div>
+            <div class="panel-thumb">
+              <img src="https://assets.dub.co/home/link-preview-image.jpg" alt="Dub thumbnail image">
+            </div>
+          </div>
+          <div>
+            <span style="font-size:14px;font-weight:500;color:#262626">Title</span>
+            <div class="panel-text">Dub.co - Link Management for Modern Marketing Teams</div>
+          </div>
+        </div>
+      </div>
+      <div class="ftext">
+        <h3>Boost click-through rates with custom link previews</h3>
+        <div class="desc">
+          <p>Get up to 30% higher click-through rates by <a href="#">customizing how your links show up</a> on social platforms like X, LinkedIn, as well as in messaging apps like WhatsApp and Discord.</p>
+        </div>
+        <a class="btn-outline" href="#">Learn more</a>
+      </div>
+    </div>
+
+    <!-- Custom domains -->
+    <div class="fcell">
+      <div class="fvis">
+        <div class="domain-stack">
+          <div class="domain-card" style="margin-left:5%">
+            <div class="fav"><img src="https://www.google.com/s2/favicons?sz=64&domain_url=dub.co" alt="dub.co"></div>
+            <span class="name">acme.link</span>
+            <div class="pill">
+              <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                  <path d="M8.095,7.778l7.314,2.51c.222,.076,.226,.388,.007,.47l-3.279,1.233c-.067,.025-.121,.079-.146,.146l-1.233,3.279c-.083,.219-.394,.215-.47-.007l-2.51-7.314c-.068-.197,.121-.385,.318-.318Z"/>
+                  <line x1="12.031" x2="16.243" y1="12.031" y2="16.243"/>
+                  <line x1="7.75" x2="7.75" y1="1.75" y2="3.75"/>
+                  <line x1="11.993" x2="10.578" y1="3.507" y2="4.922"/>
+                  <line x1="3.507" x2="4.922" y1="11.993" y2="10.578"/>
+                  <line x1="1.75" x2="3.75" y1="7.75" y2="7.75"/>
+                  <line x1="3.507" x2="4.922" y1="3.507" y2="4.922"/>
+                </g>
+              </svg>
+              15.6K<span style="margin-left:4px" class="hide-xs">clicks</span>
+            </div>
+            <div class="pill primary">
+              <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                  <path d="M3.75,3.25h7.5c.552,0,1,.448,1,1v5H3.75"/>
+                  <path d="M12.25,5.75h2c.552,0,1,.448,1,1v4c0,.552-.448,1-1,1h-3.5c-.552,0-1-.448-1-1v-1.5"/>
+                  <line x1="10.043" x2="12.25" y1="11.457" y2="9.25"/>
+                  <line x1="3.75" x2="3.75" y1="1.75" y2="16.25"/>
+                </g>
+              </svg>
+              Primary
+            </div>
+          </div>
+
+          <div class="domain-card" style="margin-left:10%">
+            <div class="fav"><img src="https://www.google.com/s2/favicons?sz=64&domain_url=dub.co" alt="dub.co"></div>
+            <span class="name">go.acme.com</span>
+            <div class="pill">
+              <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                  <path d="M8.095,7.778l7.314,2.51c.222,.076,.226,.388,.007,.47l-3.279,1.233c-.067,.025-.121,.079-.146,.146l-1.233,3.279c-.083,.219-.394,.215-.47-.007l-2.51-7.314c-.068-.197,.121-.385,.318-.318Z"/>
+                  <line x1="12.031" x2="16.243" y1="12.031" y2="16.243"/>
+                </g>
+              </svg>
+              3.7K<span style="margin-left:4px" class="hide-xs">clicks</span>
+            </div>
+          </div>
+
+          <div class="domain-card" style="margin-left:15%">
+            <div class="fav"><img src="https://www.google.com/s2/favicons?sz=64&domain_url=dub.co" alt="dub.co"></div>
+            <span class="name">ac.me</span>
+            <div class="pill">
+              <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                  <path d="M8.095,7.778l7.314,2.51c.222,.076,.226,.388,.007,.47l-3.279,1.233c-.067,.025-.121,.079-.146,.146l-1.233,3.279c-.083,.219-.394,.215-.47-.007l-2.51-7.314c-.068-.197,.121-.385,.318-.318Z"/>
+                </g>
+              </svg>
+              2.4K<span style="margin-left:4px" class="hide-xs">clicks</span>
+            </div>
+          </div>
+        </div>
+        <div class="free-domain">
+          <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style="width:16px;height:16px;color:#166534">
+            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+              <path d="M8.5,6.827c-.352,.168-.682,.398-.973,.69l-.01,.01c-1.381,1.381-1.381,3.619,0,5l2.175,2.175c1.381,1.381,3.619,1.381,5,0l.01-.01c1.381-1.381,1.381-3.619,0-5l-.931-.931"/>
+              <path d="M9.5,11.173c.352-.168,.682-.398,.973-.69l.01-.01c1.381-1.381,1.381-3.619,0-5l-2.175-2.175c-1.381-1.381-3.619-1.381-5,0l-.01,.01c-1.381,1.381-1.381,3.619,0,5l.931,.931"/>
+              <line x1="12.25" x2="13" y1="3.75" y2="1.5"/>
+              <line x1="14.25" x2="16.5" y1="5.75" y2="5"/>
+              <line x1="3.75" x2="1.5" y1="12.25" y2="13"/>
+              <line x1="5.75" x2="5" y1="14.25" y2="16.5"/>
+            </g>
+          </svg>
+          Claim a free <strong>.link</strong> domain
+        </div>
+      </div>
+      <div class="ftext">
+        <h3>Seamlessly integrate your own custom domains</h3>
+        <div class="desc">
+          <p>Shorten your links with your own custom domain to enhance trust and <a href="#">increase click-through rates</a>. Paid plans also include a <a href="#">complimentary custom domain</a>.</p>
+        </div>
+        <a class="btn-outline" href="#">Learn more</a>
+      </div>
+    </div>
+
+    <!-- UTM builder -->
+    <div class="fcell">
+      <div class="fvis">
+        <div style="padding:0 16px;-webkit-mask-image:linear-gradient(black 70%,transparent);mask-image:linear-gradient(black 70%,transparent);height:100%">
+          <div class="utm-url">https://dub.co?utm_source=google&amp;utm_medium=cpc&amp;utm_campaign=summer+sale</div>
+          <div class="utm-card">
+            <div class="panel-head">
+              <h3 style="font-size:16px;font-weight:500">UTM Builder</h3>
+              <div class="kbd">U</div>
+            </div>
+            <div style="display:grid;gap:12px">
+              <div class="utm-row">
+                <div class="utm-key">
+                  <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                    <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                      <path d="M9.926,16.11c-.461,.092-.938,.14-1.426,.14-4.004,0-7.25-3.246-7.25-7.25S4.496,1.75,8.5,1.75s7.25,3.246,7.25,7.25c0,.264-.014,.524-.041,.78"/>
+                      <path d="M15.75,9c0-1.657-3.246-3-7.25-3S1.25,7.343,1.25,9c0,1.646,3.205,2.983,7.175,3"/>
+                    </g>
+                  </svg>
+                  Source
+                </div>
+                <input value="google" readonly>
+              </div>
+              <div class="utm-row">
+                <div class="utm-key">
+                  <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                    <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                      <line x1="8" x2="10" y1="10" y2="8"/>
+                      <path d="M10.25,4.75c1.657,0,3,1.343,3,3"/>
+                      <path d="M10.25,1.75c3.314,0,6,2.686,6,6"/>
+                      <path d="M12.419,14.419c-2.441,2.441-6.398,2.441-8.839,0s-2.441-6.398,0-8.839L12.419,14.419Z"/>
+                    </g>
+                  </svg>
+                  Medium
+                </div>
+                <input value="cpc" readonly>
+              </div>
+              <div class="utm-row">
+                <div class="utm-key">
+                  <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                    <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                      <path d="M3.75,3c1.784-.232,3.073,.092,4.021,.625,1.641,.922,1.87,2.249,3.5,3.125,1.254,.674,2.66,.719,3.979,.5-2.075,2.554-3.703,3.051-4.833,3-1.433-.064-2.359-1.021-4.125-.792-1.13,.147-1.995,.701-2.542,1.135"/>
+                      <line x1="3.75" x2="3.75" y1="1.75" y2="16.25"/>
+                    </g>
+                  </svg>
+                  Campaign
+                </div>
+                <input value="summer sale" readonly>
+              </div>
+              <div class="utm-row">
+                <div class="utm-key">
+                  <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+                    <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                      <path d="M8.25,13.25H3.75c-1.105,0-2-.895-2-2V6.75c0-1.105,.895-2,2-2H14.25c1.105,0,2,.895,2,2v1.5"/>
+                      <circle cx="13" cy="12" r="2.25"/>
+                      <line x1="14.59" x2="16.25" y1="13.59" y2="15.25"/>
+                    </g>
+                  </svg>
+                  Term
+                </div>
+                <input placeholder="running shoes" readonly>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ftext">
+        <h3>Streamline your UTM campaigns with reusable templates</h3>
+        <div class="desc">
+          <p>Create standardized, trackable links with our <a href="#">UTM builder</a> and <a href="#">reusable templates</a> to ensure tracking consistency.</p>
+        </div>
+        <a class="btn-outline" href="#">Learn more</a>
+      </div>
+    </div>
+
+    <!-- Deep links -->
+    <div class="fcell">
+      <div class="fvis" style="padding:0;-webkit-mask-image:linear-gradient(black 50%,transparent);mask-image:linear-gradient(black 50%,transparent)">
+        <div class="deep-visual">
+          <svg viewBox="0 0 800 444" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <g clip-path="url(#dlclip)">
+              <path d="M400 157V197C400 210.255 389.255 221 376 221H193.5" stroke="#D4D4D4" stroke-width="1.5"/>
+              <path d="M400 157V197C400 210.255 410.745 221 424 221H607" stroke="#D4D4D4" stroke-width="1.5"/>
+              <path d="M150.5 264.5V298C150.5 311.255 161.245 322 174.5 322H282" stroke="#BBB" stroke-width="1.5"/>
+              <path d="M650.5 265V298.5C650.5 311.755 639.755 322.5 626.5 322.5H522.5" stroke="#BBB" stroke-width="1.5"/>
+              <path d="M400 133.5V294.5" stroke="#D4D4D4" stroke-width="1.5"/>
+
+              <g mask="url(#dlmaskleft)">
+                <circle r="70" fill="url(#dlblue)">
+                  <animateMotion path="M308.167 322.063H174.404C161.202 322.063 150.5 311.361 150.5 298.159V220.968L376.096 220.968C389.298 220.968 400 210.266 400 197.064V103.879" dur="4s" repeatCount="indefinite" rotate="auto" keyPoints="1;0" keyTimes="0;1"/>
+                </circle>
+              </g>
+              <g>
+                <animateMotion path="M308.167 322.063H174.404C161.202 322.063 150.5 311.361 150.5 298.159V220.968L376.096 220.968C389.298 220.968 400 210.266 400 197.064V103.879" dur="4s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1"/>
+                <circle opacity="0.2" r="8" fill="#229DF3"/>
+                <circle r="4" fill="#229DF3"/>
+              </g>
+
+              <g mask="url(#dlmaskright)">
+                <circle r="70" fill="url(#dlgreen)">
+                  <animateMotion path="M492.201 322.5H626.5C639.755 322.5 650.5 311.755 650.5 298.5V221L424 221C410.745 221 400 210.255 400 197V103.441" dur="4s" begin="2.66s" repeatCount="indefinite" rotate="auto" keyPoints="1;0" keyTimes="0;1"/>
+                </circle>
+              </g>
+              <g>
+                <animateMotion path="M492.201 322.5H626.5C639.755 322.5 650.5 311.755 650.5 298.5V221L424 221C410.745 221 400 210.255 400 197V103.441" dur="4s" begin="2.66s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1"/>
+                <circle opacity="0.2" r="8" fill="#3EA45A"/>
+                <circle r="4" fill="#3EA45A"/>
+              </g>
+
+              <g mask="url(#dlmaskmid)">
+                <circle r="70" fill="url(#dldark)">
+                  <animateMotion path="M400 120V740" dur="4s" begin="1.33s" repeatCount="indefinite" rotate="auto"/>
+                </circle>
+              </g>
+              <g>
+                <animateMotion path="M400 120V740" dur="4s" begin="1.33s" repeatCount="indefinite"/>
+                <circle opacity="0.2" r="8" fill="#5E5E5E"/>
+                <circle r="4" fill="#5E5E5E"/>
+              </g>
+
+              <g>
+                <path d="M283 318C283 304.745 293.745 294 307 294H497C510.255 294 521 304.745 521 318V444H283V318Z" fill="#171717"/>
+                <path d="M497 293.25C510.669 293.25 521.75 304.331 521.75 318V444.75H282.25V318C282.25 304.331 293.331 293.25 307 293.25H497Z" stroke="black" stroke-width="1.5"/>
+              </g>
+              <rect x="283" y="403" width="238" height="41" fill="#F5F5F5"/>
+              <path d="M308 357.5H496C502.351 357.5 507.5 362.649 507.5 369V443.5H296.5V369C296.5 362.649 301.649 357.5 308 357.5Z" fill="white" stroke="#D4D4D4"/>
+              <circle cx="308.54" cy="332.46" r="4.54" fill="#FAFAFA"/>
+              <path d="M310.542 319H318.666L326.392 337H318.268L310.542 319Z" fill="#FAFAFA"/>
+              <path d="M437.75 334.75L433.639 330.639" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="429.75" cy="326.75" r="5.5" stroke="#FAFAFA" stroke-width="1.5" fill="none"/>
+              <path d="M467.75 331.75C466.645 331.75 465.75 330.855 465.75 329.75V325.5C465.75 322.877 463.623 320.75 461 320.75C458.377 320.75 456.25 322.877 456.25 325.5V329.75C456.25 330.855 455.355 331.75 454.25 331.75H467.75Z" stroke="#FAFAFA" stroke-width="1.5" fill="none"/>
+              <path d="M484.25 328H497.75" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"/>
+              <path d="M484.25 322.75H497.75" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"/>
+              <path d="M484.25 333.25H497.75" stroke="#FAFAFA" stroke-width="1.5" stroke-linecap="round"/>
+              <text fill="#525252" font-family="Inter" font-size="12" font-weight="600"><tspan x="306" y="381.364">My Projects</tspan></text>
+              <rect x="307" y="392" width="88" height="70" rx="8" fill="#E5E5E5"/>
+              <rect x="406" y="392" width="88" height="70" rx="8" fill="#E5E5E5"/>
+
+              <g>
+                <path d="M281 85C281 75.6112 288.611 68 298 68H501C510.389 68 518 75.6112 518 85V117C518 126.389 510.389 134 501 134H298C288.611 134 281 126.389 281 117V85Z" fill="white"/>
+                <path d="M298 68.75H501C509.975 68.75 517.25 76.0254 517.25 85V117C517.25 125.975 509.975 133.25 501 133.25H298C289.025 133.25 281.75 125.975 281.75 117V85C281.75 76.0254 289.025 68.75 298 68.75Z" stroke="#E5E5E5" stroke-width="1.5"/>
+                <rect x="297" y="84" width="34" height="34" rx="17" fill="#111"/>
+                <path d="M304 101C304 95.4772 308.477 91 314 91C319.523 91 324 95.4772 324 101C324 106.523 319.523 111 314 111C308.477 111 304 106.523 304 101Z" fill="black"/>
+                <circle cx="310.629" cy="102.898" r="2.34" fill="white"/>
+                <path d="M311.663 95.9453H315.859L319.85 105.242H315.654L311.663 95.9453Z" fill="white"/>
+                <text fill="#171717" font-family="Inter" font-size="14" font-weight="600"><tspan x="343" y="106.091">getacme.link/app-page</tspan></text>
+              </g>
+
+              <g>
+                <path d="M606 194C606 184.611 613.611 177 623 177H677C686.389 177 694 184.611 694 194V248C694 257.389 686.389 265 677 265H623C613.611 265 606 257.389 606 248V194Z" fill="white"/>
+                <path d="M623 177.75H677C685.975 177.75 693.25 185.025 693.25 194V248C693.25 256.975 685.975 264.25 677 264.25H623C614.025 264.25 606.75 256.975 606.75 248V194C606.75 185.025 614.025 177.75 623 177.75Z" stroke="#E5E5E5" stroke-width="1.5"/>
+                <path d="M652.147 219.988L633.169 239.871C633.383 240.626 633.765 241.323 634.289 241.907C634.813 242.492 635.463 242.949 636.19 243.244C636.917 243.538 637.702 243.663 638.485 243.608C639.268 243.553 640.028 243.319 640.707 242.925L662.06 230.764L652.147 219.988Z" fill="#EA4335"/>
+                <path d="M671.336 216.609L662.102 211.32L651.708 220.441L662.145 230.736L671.308 225.504C672.12 225.079 672.8 224.44 673.274 223.656C673.749 222.872 674 221.973 674 221.057C674 220.14 673.749 219.241 673.274 218.457C672.8 217.673 672.12 217.034 671.308 216.609H671.336Z" fill="#FBBC04"/>
+                <path d="M633.17 202.141C633.055 202.565 632.998 203.002 633 203.442V238.568C633.001 239.007 633.058 239.445 633.17 239.869L652.798 220.496L633.17 202.141Z" fill="#4285F4"/>
+                <path d="M652.288 221.005L662.102 211.318L640.777 199.1C639.975 198.63 639.063 198.381 638.133 198.379C637.01 198.377 635.917 198.742 635.021 199.418C634.125 200.095 633.475 201.046 633.169 202.126L652.288 221.005Z" fill="#34A853"/>
+              </g>
+
+              <g>
+                <path d="M106 194C106 184.611 113.611 177 123 177H177C186.389 177 194 184.611 194 194V248C194 257.389 186.389 265 177 265H123C113.611 265 106 257.389 106 248V194Z" fill="white"/>
+                <path d="M123 177.75H177C185.975 177.75 193.25 185.025 193.25 194V248C193.25 256.975 185.975 264.25 177 264.25H123C114.025 264.25 106.75 256.975 106.75 248V194C106.75 185.025 114.025 177.75 123 177.75Z" stroke="#E5E5E5" stroke-width="1.5"/>
+                <path d="M149.913 203.622L151.249 201.313C152.074 199.87 153.913 199.383 155.356 200.208C156.799 201.032 157.285 202.871 156.461 204.314L143.589 226.595H152.898C155.917 226.595 157.607 230.141 156.296 232.598H129.002C127.336 232.598 126 231.262 126 229.597C126 227.931 127.336 226.595 129.002 226.595H136.654L146.45 209.617L143.391 204.306C142.566 202.863 143.053 201.041 144.496 200.2C145.939 199.375 147.761 199.862 148.602 201.305L149.913 203.622ZM138.336 235.69L135.45 240.696C134.625 242.139 132.786 242.625 131.343 241.801C129.9 240.976 129.414 239.137 130.238 237.694L132.382 233.983C134.807 233.233 136.778 233.81 138.336 235.69ZM163.189 226.612H170.998C172.664 226.612 174 227.947 174 229.613C174 231.279 172.664 232.615 170.998 232.615H166.661L169.588 237.694C170.413 239.137 169.926 240.96 168.483 241.801C167.04 242.625 165.218 242.139 164.377 240.696C159.446 232.145 155.743 225.746 153.286 221.483C150.771 217.145 152.569 212.791 154.342 211.315C156.312 214.696 159.256 219.8 163.189 226.612Z" fill="url(#dlpaint6)"/>
+              </g>
+            </g>
+            <defs>
+              <mask id="dlmaskleft"><path d="M308.167 322.063H174.404C161.202 322.063 150.5 311.361 150.5 298.159V220.968L376.096 220.968C389.298 220.968 400 210.266 400 197.064V103.879" fill="none" stroke="white" stroke-width="1.5"/></mask>
+              <mask id="dlmaskright"><path d="M492.201 322.5H626.5C639.755 322.5 650.5 311.755 650.5 298.5V221L424 221C410.745 221 400 210.255 400 197V103.441" fill="none" stroke="white" stroke-width="1.5"/></mask>
+              <mask id="dlmaskmid"><path d="M400 120V740" fill="none" stroke="white" stroke-width="1.5"/></mask>
+              <radialGradient id="dlblue"><stop offset="0%" stop-opacity="1" stop-color="#229DF3"/><stop offset="100%" stop-opacity="0" stop-color="#229DF3"/></radialGradient>
+              <radialGradient id="dlgreen"><stop offset="0%" stop-opacity="1" stop-color="#34A853"/><stop offset="100%" stop-opacity="0" stop-color="#34A853"/></radialGradient>
+              <radialGradient id="dldark"><stop offset="0%" stop-opacity="1" stop-color="#5E5E5E"/><stop offset="100%" stop-opacity="0" stop-color="#5E5E5E"/></radialGradient>
+              <linearGradient id="dlpaint6" x1="150" y1="199.799" x2="150" y2="242.201" gradientUnits="userSpaceOnUse"><stop stop-color="#19BCFB"/><stop offset="1" stop-color="#2076F3"/></linearGradient>
+              <clipPath id="dlclip"><rect width="800" height="444" fill="white"/></clipPath>
+            </defs>
+          </svg>
+        </div>
+      </div>
+      <div class="ftext">
+        <h3>Built-in deep links support for iOS and Android</h3>
+        <div class="desc">
+          <p>Redirect users to a specific page within your app with <a href="#">deferred deep linking</a> and <a href="#">mobile attribution support</a>.</p>
+        </div>
+        <a class="btn-outline" href="#">Learn more</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 cards -->
+  <div class="cards4" style="max-width:var(--gw);margin:0 auto">
+    <div class="card4">
+      <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+          <path d="M2.25,8.75V4.75c0-1.105,.895-2,2-2h1.951c.607,0,1.18,.275,1.56,.748l.603,.752h5.386c1.105,0,2,.895,2,2v2.844"/>
+          <path d="M4.25,6.75H13.75c1.105,0,2,.895,2,2v4.5c0,1.105-.895,2-2,2H4.25c-1.105,0-2-.895-2-2v-4.5c0-1.105,.895-2,2-2Z"/>
+        </g>
+      </svg>
+      <h3>Folders and tags</h3>
+      <p>Keep all your short links organized with <a href="#" style="text-decoration:underline dotted">folders</a> and <a href="#" style="text-decoration:underline dotted">tags</a>, and filter your analytics as needed.</p>
+      <a class="btn-outline" href="#">Learn more</a>
+    </div>
+    <div class="card4">
+      <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+          <circle cx="9" cy="9" r="7.25"/>
+          <line x1="9" x2="9" y1="7" y2="4.75"/>
+          <line x1="11" x2="13.25" y1="9" y2="9"/>
+          <line x1="9" x2="9" y1="11" y2="13.25"/>
+          <line x1="7" x2="4.75" y1="9" y2="9"/>
+        </g>
+      </svg>
+      <h3>Geo and device-targeting</h3>
+      <p>Dynamically redirect your users based on their <a href="#" style="text-decoration:underline dotted">location</a> or <a href="#" style="text-decoration:underline dotted">device</a> on the fly to maximize conversion rates.</p>
+      <a class="btn-outline" href="#">Learn more</a>
+    </div>
+    <div class="card4">
+      <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+          <rect height="5" width="5" rx="1" ry="1" x="2.75" y="2.75"/>
+          <rect height="5" width="5" rx="1" ry="1" x="10.25" y="2.75"/>
+          <rect height="5" width="5" rx="1" ry="1" x="2.75" y="10.25"/>
+        </g>
+      </svg>
+      <h3>Branded QR codes</h3>
+      <p>Create QR codes that match your brand, automatically generated with each short link.</p>
+      <a class="btn-outline" href="#">Learn more</a>
+    </div>
+    <div class="card4">
+      <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+          <line x1="5.068" x2="12.932" y1="11.25" y2="11.25"/>
+          <line x1="5.75" x2="12.25" y1="1.75" y2="1.75"/>
+          <path d="M7.25,1.75V7l-3.628,7.065c-.513,.998,.212,2.185,1.334,2.185H13.044c1.122,0,1.847-1.187,1.334-2.185l-3.628-7.065V1.75"/>
+        </g>
+      </svg>
+      <h3>A/B Tests</h3>
+      <p>Run A/B tests with short links to find what drives more clicks, signups, or sales — no extra tools required.</p>
+      <a class="btn-outline" href="#">Learn more</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TESTIMONIAL 1 ============ -->
+<section class="section quote-sec">
+  <div class="inner">
+    <div class="quote-inner">
+      <div class="quote-logo">
+        <img src="https://assets.dub.co/companies/hubermanlab.svg" alt="Scicomm Media logo">
+      </div>
+      <div class="quote-text">
+        <p>“What you all have built is fantastic. I've used platforms like Bitly for years, and <strong>Dub is hands down the best.</strong>”</p>
+      </div>
+      <img class="quote-avatar" src="https://assets.dub.co/testimonials/people/ian-mackey.jpeg" alt="Ian Mackey" width="48" height="48">
+      <span class="quote-name">Ian Mackey</span>
+      <span class="quote-role">Vice President, Scicomm Media</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ANALYTICS ============ -->
+<section class="section analytics">
+  <div class="inner">
+    <div class="sec-head">
+      <span class="eyebrow">
+        <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style="width:20px;height:20px">
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" stroke="currentColor">
+            <path d="M2.75 10.75L6.396 7.10401C6.591 6.90901 6.908 6.90901 7.103 7.10401L10.396 10.397C10.591 10.592 10.908 10.592 11.103 10.397L15.249 6.25101"/>
+            <path d="M2.75 2.75V12.75C2.75 13.855 3.645 14.75 4.75 14.75H15.25"/>
+          </g>
+        </svg>
+        Powerful Analytics
+      </span>
+      <h2 class="h2 font-display">Success at a glance</h2>
+      <p class="lead">With our powerful real-time analytics, you can focus on what truly matters for your marketing attribution.</p>
+      <div class="analytics-cta">
+        <a class="btn btn-primary" href="#">Learn more</a>
+        <a class="btn btn-secondary" href="#">Live Demo ↗</a>
+      </div>
+    </div>
+
+    <div class="dash-wrap" style="margin-left:-16px;margin-right:-16px;width:calc(100% + 32px)">
+      <div class="dash">
+        <div class="dash-tabs">
+          <div class="dash-tabs-inner">
+            <div class="dash-tab active">
+              <div class="bar"></div>
+              <div class="label"><span class="dot" style="color:#3b82f6"></span>Clicks</div>
+              <div class="val">111,452</div>
+            </div>
+            <div class="dash-tab">
+              <div class="label"><span class="dot" style="color:#7c3aed"></span>Leads</div>
+              <div class="val">2,370</div>
+            </div>
+            <div class="dash-tab">
+              <div class="label"><span class="dot" style="color:#2dd4bf"></span>Sales</div>
+              <div class="val">$9,413</div>
+            </div>
+          </div>
+        </div>
+        <div class="dash-chart" id="dashChart"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- analytics features -->
+  <div class="afgrid" style="max-width:var(--gw);margin:0 auto;border-left:1px solid var(--gb);border-right:1px solid var(--gb)">
+    <div class="afcell">
+      <div class="afvis">
+        <a class="video-thumb" href="#">
+          <img src="https://assets.dub.co/cms/introducing-dub-conversions-4.jpg" alt="Watch demo">
+          <span class="video-play">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+            <span>Play demo</span>
+          </span>
+        </a>
+      </div>
+      <div class="ftext">
+        <h3>Conversion tracking</h3>
+        <div class="desc"><p>Track how your clicks convert to signups and sales to understand your marketing return on investment (ROI).</p></div>
+        <a class="btn-outline" href="#">Learn more</a>
+      </div>
+    </div>
+
+    <div class="afcell">
+      <div class="afvis">
+        <div class="stat-stack">
+          <div class="stat-card first">
+            <div class="stat-more">
+              <div class="head">
+                <div class="ico">
+                  <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style="width:16px;height:16px;color:#262626">
+                    <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                      <rect height="14.5" width="10.5" rx="2" ry="2" x="3.75" y="1.75"/>
+                      <polyline points="7.75 1.75 7.75 2.75 10.25 2.75 10.25 1.75"/>
+                      <circle cx="9" cy="13" r="1" fill="currentColor" stroke="none"/>
+                    </g>
+                  </svg>
+                </div>
+                <span>Devices</span>
+              </div>
+              <div class="stat-list">
+                <div class="stat-row"><div class="fill" style="width:100%"></div><div class="lbl"><svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke="#262626" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><rect height="9.5" width="14.5" rx="2" x="1.75" y="2.75"/><path d="M13.25,15.5c-.924-.337-2.4-.75-4.25-.75s-3.326,.413-4.25,.75"/></g></svg><span>Desktop</span></div><span class="num">1.6K</span></div>
+                <div class="stat-row"><div class="fill" style="width:73%"></div><div class="lbl"><svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke="#262626" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><rect height="14.5" width="10.5" rx="2" x="3.75" y="1.75"/><circle cx="9" cy="13" r="1" fill="#262626" stroke="none"/></g></svg><span>Mobile</span></div><span class="num">1.2K</span></div>
+                <div class="stat-row"><div class="fill" style="width:60%"></div><div class="lbl"><svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke="#262626" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><rect height="5.5" width="8.5" rx="1.5" x="8.25" y="9.25"/></g></svg><span>Tablet</span></div><span class="num">983</span></div>
+                <div class="stat-row"><div class="fill" style="width:36%"></div><div class="lbl"><svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke="#262626" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M9,11.25h2.752c.533,0,1.044,.213,1.419,.591l2.392,2.409s1.745-.34,1.388-2.915-2.07-6.538-2.07-6.538c-.429-.867-1.022-1.047-3.231-1.047h-2.651c-2.209,0-2.802,.179-3.231,1.047,0,0-1.714,3.963-2.07,6.538s1.388,2.915,1.388,2.915l2.392-2.409c.375-.378,.886-.591,1.419-.591h2.752Z"/></g></svg><span>Console</span></div><span class="num">592</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ftext">
+        <h3>Detailed geo and device-specific data</h3>
+        <div class="desc"><p>Analyze performance of your short links based on cities, countries, browsers, devices, and more.</p></div>
+        <a class="btn-outline" href="#">Learn more</a>
+      </div>
+    </div>
+
+    <div class="afcell">
+      <div class="afvis">
+        <img src="https://assets.dub.co/home/customer-page.png" alt="Customer page demo">
+      </div>
+      <div class="ftext">
+        <h3>Customer insights</h3>
+        <div class="desc"><p>Track your customer journey from first click to conversion, with detailed events and insights.</p></div>
+        <a class="btn-outline" href="#">Learn more</a>
+      </div>
+    </div>
+
+    <div class="afcell">
+      <div class="afvis">
+        <img src="https://assets.dub.co/solutions/events-table.jpg" alt="Events table demo">
+      </div>
+      <div class="ftext">
+        <h3>Real-time events stream</h3>
+        <div class="desc"><p>Gain insights into every click, lead, and sales events as they happen in real time.</p></div>
+        <a class="btn-outline" href="#">Learn more</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 cards -->
+  <div class="cards3" style="max-width:var(--gw);margin:0 auto">
+    <div class="card3">
+      <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+          <path d="M2.75,10.75v2.5c0,1.105,.895,2,2,2H15.25"/>
+          <path d="M15,6h-4c-2.347,0-4.25,1.903-4.25,4.25h0"/>
+          <polyline points="12 2.75 15.25 6 12 9.25"/>
+        </g>
+      </svg>
+      <h3>Analytics dashboard sharing</h3>
+      <p>Share real-time analytics dashboards with your advertisers/partners with one click.</p>
+      <a class="btn-outline" href="#">Learn more</a>
+    </div>
+    <div class="card3">
+      <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+          <line x1="4.664" x2="7.586" y1="7.586" y2="4.664"/>
+          <line x1="10.414" x2="13.336" y1="4.664" y2="7.586"/>
+          <line x1="13.336" x2="10.414" y1="10.414" y2="13.336"/>
+          <line x1="7.586" x2="4.664" y1="13.336" y2="10.414"/>
+          <circle cx="9" cy="3.25" r="2"/>
+          <circle cx="3.25" cy="9" r="2"/>
+          <circle cx="9" cy="14.75" r="2"/>
+          <circle cx="14.75" cy="9" r="2"/>
+        </g>
+      </svg>
+      <h3>Powerful integrations</h3>
+      <p>Native integrations with your existing analytics stack (Segment, GTM).</p>
+      <a class="btn-outline" href="#">View integrations</a>
+    </div>
+    <div class="card3">
+      <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+          <path d="M16.25,8.75h-2.297c-.422,0-.798,.265-.941,.661l-1.647,4.575c-.12,.334-.594,.328-.706-.008L7.341,4.022c-.112-.336-.586-.342-.706-.008l-1.647,4.575c-.143,.397-.519,.661-.941,.661H1.75"/>
+        </g>
+      </svg>
+      <h3>Build customizable reports</h3>
+      <p>Build custom reports with flexible date ranges and granular filters.</p>
+      <a class="btn-outline" href="#">Learn more</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ INTEGRATIONS ============ -->
+<section class="section integrations">
+  <div class="inner">
+    <div class="int-visual">
+      <div class="int-canvas">
+        <div class="int-grid-bg"></div>
+        <div style="position:absolute;inset:0">
+          <div class="tile" style="top:239px;left:599px;background-position-x:200%"></div>
+          <div class="tile" style="top:119px;left:659px;background-position-x:700%"></div>
+          <div class="tile" style="top:359px;left:719px;background-position-x:900%"></div>
+          <div class="tile" style="top:59px;left:779px;background-position-x:600%"></div>
+          <div class="tile" style="top:179px;left:779px;background-position-x:100%"></div>
+          <div class="tile" style="top:299px;left:839px;background-position-x:500%"></div>
+          <div class="tile" style="top:239px;left:899px;background-position-x:800%"></div>
+          <div class="tile" style="top:119px;left:1019px;background-position-x:400%"></div>
+          <div class="tile" style="top:359px;left:1079px;background-position-x:300%"></div>
+          <div class="tile ghost" style="top:119px;left:539px"></div>
+          <div class="tile ghost" style="top:359px;left:599px"></div>
+          <div class="tile ghost" style="top:299px;left:659px"></div>
+          <div class="tile ghost" style="top:119px;left:899px"></div>
+          <div class="tile ghost" style="top:359px;left:959px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="int-copy">
+      <h2 class="h2 font-display">Connect with your favorite tools</h2>
+      <p>Extend Dub, streamline workflows, and connect your favorite tools, with new integrations added constantly.</p>
+      <a class="btn btn-secondary" href="#">Explore integrations</a>
+    </div>
+    <div class="int-spacer"></div>
+  </div>
+</section>
+
+<!-- ============ API / ENTERPRISE ============ -->
+<section class="section api-sec">
+  <div class="inner">
+    <div class="sec-head">
+      <span class="eyebrow">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px">
+          <rect width="7" height="7" x="14" y="3" rx="1"/>
+          <path d="M10 21V8a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H3"/>
+        </svg>
+        Enterprise-grade infrastructure
+      </span>
+      <h2 class="h2 font-display">Scalable programmatic link management</h2>
+      <p class="lead">Integrate Dub's enterprise-grade link infrastructure into your existing workflows to scale your link management efforts.</p>
+    </div>
+
+    <div class="code-wrap">
+      <div class="marquee-stage">
+        <div class="marquee-row">
+          <div class="marquee-track">
+            <a class="endpoint" href="#"><span class="method m-post">POST</span>Create a link</a>
+            <a class="endpoint" href="#"><span class="method m-patch">PATCH</span>Update a link</a>
+            <a class="endpoint" href="#"><span class="method m-put">PUT</span>Upsert a link</a>
+            <a class="endpoint" href="#"><span class="method m-delete">DELETE</span>Delete a link</a>
+          </div>
+          <div class="marquee-track" aria-hidden="true">
+            <a class="endpoint" href="#"><span class="method m-post">POST</span>Create a link</a>
+            <a class="endpoint" href="#"><span class="method m-patch">PATCH</span>Update a link</a>
+            <a class="endpoint" href="#"><span class="method m-put">PUT</span>Upsert a link</a>
+            <a class="endpoint" href="#"><span class="method m-delete">DELETE</span>Delete a link</a>
+          </div>
+        </div>
+        <div class="marquee-row">
+          <div class="marquee-track rev">
+            <a class="endpoint" href="#"><span class="method m-get">GET</span>Retrieve a link</a>
+            <a class="endpoint" href="#"><span class="method m-get">GET</span>Retrieve links count</a>
+            <a class="endpoint" href="#"><span class="method m-get">GET</span>Retrieve a list of links</a>
+            <a class="endpoint" href="#"><span class="method m-get">GET</span>Retrieve analytics</a>
+          </div>
+          <div class="marquee-track rev" aria-hidden="true">
+            <a class="endpoint" href="#"><span class="method m-get">GET</span>Retrieve a link</a>
+            <a class="endpoint" href="#"><span class="method m-get">GET</span>Retrieve links count</a>
+            <a class="endpoint" href="#"><span class="method m-get">GET</span>Retrieve a list of links</a>
+            <a class="endpoint" href="#"><span class="method m-get">GET</span>Retrieve analytics</a>
+          </div>
+        </div>
+        <div class="marquee-row">
+          <div class="marquee-track">
+            <a class="endpoint" href="#"><span class="method m-get">GET</span>Retrieve a list of events</a>
+            <a class="endpoint" href="#"><span class="method m-post">POST</span>Create a folder</a>
+            <a class="endpoint" href="#"><span class="method m-patch">PATCH</span>Update a folder</a>
+            <a class="endpoint" href="#"><span class="method m-delete">DELETE</span>Delete a folder</a>
+          </div>
+          <div class="marquee-track" aria-hidden="true">
+            <a class="endpoint" href="#"><span class="method m-get">GET</span>Retrieve a list of events</a>
+            <a class="endpoint" href="#"><span class="method m-post">POST</span>Create a folder</a>
+            <a class="endpoint" href="#"><span class="method m-patch">PATCH</span>Update a folder</a>
+            <a class="endpoint" href="#"><span class="method m-delete">DELETE</span>Delete a folder</a>
+          </div>
+        </div>
+        <div class="marquee-row">
+          <div class="marquee-track rev">
+            <a class="endpoint" href="#"><span class="method m-get">GET</span>Retrieve a list of folders</a>
+            <a class="endpoint" href="#"><span class="method m-post">POST</span>Create a tag</a>
+            <a class="endpoint" href="#"><span class="method m-patch">PATCH</span>Update a tag</a>
+            <a class="endpoint" href="#"><span class="method m-get">GET</span>Retrieve a list of tags</a>
+          </div>
+          <div class="marquee-track rev" aria-hidden="true">
+            <a class="endpoint" href="#"><span class="method m-get">GET</span>Retrieve a list of folders</a>
+            <a class="endpoint" href="#"><span class="method m-post">POST</span>Create a tag</a>
+            <a class="endpoint" href="#"><span class="method m-patch">PATCH</span>Update a tag</a>
+            <a class="endpoint" href="#"><span class="method m-get">GET</span>Retrieve a list of tags</a>
+          </div>
+        </div>
+        <div class="marquee-row">
+          <div class="marquee-track">
+            <a class="endpoint" href="#"><span class="method m-post">POST</span>Bulk create links</a>
+            <a class="endpoint" href="#"><span class="method m-patch">PATCH</span>Bulk update links</a>
+            <a class="endpoint" href="#"><span class="method m-delete">DELETE</span>Bulk delete links</a>
+            <a class="endpoint" href="#"><span class="method m-post">POST</span>Create a link</a>
+          </div>
+          <div class="marquee-track" aria-hidden="true">
+            <a class="endpoint" href="#"><span class="method m-post">POST</span>Bulk create links</a>
+            <a class="endpoint" href="#"><span class="method m-patch">PATCH</span>Bulk update links</a>
+            <a class="endpoint" href="#"><span class="method m-delete">DELETE</span>Bulk delete links</a>
+            <a class="endpoint" href="#"><span class="method m-post">POST</span>Create a link</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sdk-block">
+      <div class="sdk-tabs">
+        <button class="sdk-tab active" type="button" aria-label="TypeScript">
+          <svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M6 0h116a6 6 0 0 1 6 6v116a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6V6a6 6 0 0 1 6-6Zm68.262 113.494V99.468c2.535 2.133 5.288 3.733 8.26 4.799 2.97 1.067 5.971 1.6 9.001 1.6 1.778 0 3.329-.161 4.654-.482 1.326-.321 2.433-.767 3.322-1.337.888-.57 1.551-1.242 1.988-2.016a5.04 5.04 0 0 0 .655-2.52c0-1.228-.349-2.323-1.049-3.287-.699-.965-1.653-1.856-2.862-2.674-1.209-.818-2.644-1.607-4.304-2.367-1.66-.76-3.452-1.534-5.375-2.323-4.895-2.045-8.543-4.544-10.947-7.495C75.202 78.415 74 74.85 74 70.672c0-3.273.656-6.085 1.966-8.438a16.732 16.732 0 0 1 5.354-5.807c2.257-1.52 4.872-2.637 7.844-3.353C92.135 52.358 95.28 52 98.603 52c3.263 0 6.154.197 8.674.592 2.52.394 4.843 1 6.97 1.819v13.105a21.071 21.071 0 0 0-3.43-1.929 27.158 27.158 0 0 0-3.824-1.38 29.09 29.09 0 0 0-3.911-.811 27.607 27.607 0 0 0-3.693-.263c-1.602 0-3.059.153-4.37.46-1.31.307-2.418.738-3.32 1.293-.904.555-1.603 1.22-2.098 1.994-.496.775-.743 1.644-.743 2.608 0 1.052.276 1.995.83 2.827.553.833 1.34 1.622 2.36 2.367 1.02.745 2.257 1.476 3.714 2.192a84.756 84.756 0 0 0 4.938 2.213c2.506 1.052 4.756 2.17 6.752 3.353 1.995 1.183 3.707 2.52 5.134 4.01a15.632 15.632 0 0 1 3.278 5.107c.757 1.914 1.136 4.142 1.136 6.684 0 3.506-.663 6.45-1.988 8.831a16.179 16.179 0 0 1-5.397 5.786c-2.273 1.476-4.916 2.535-7.932 3.178-3.015.643-6.198.964-9.548.964-3.438 0-6.708-.292-9.81-.877-3.103-.584-5.79-1.461-8.063-2.629ZM69 64.554H50.703V116H36.208V64.554H18V53h51v11.554Z"/></svg>
+        </button>
+        <button class="sdk-tab" type="button" aria-label="Go">
+          <svg viewBox="0 0 207 78" xmlns="http://www.w3.org/2000/svg" style="width:24px;height:16px"><path fill="currentColor" d="M16.2 24.1c-.4 0-.5-.2-.3-.5l2.1-2.7c.2-.3.7-.5 1.1-.5h35.7c.4 0 .5.3.3.6l-1.7 2.6c-.2.3-.7.6-1 .6l-36.2-.1ZM1.1 33.3c-.4 0-.5-.2-.3-.5l2.1-2.7c.2-.3.7-.5 1.1-.5h45.6c.4 0 .6.3.5.6l-.8 2.4c-.1.4-.5.6-.9.6l-47.3.1ZM25.3 42.5c-.4 0-.5-.3-.3-.6l1.4-2.5c.2-.3.6-.6 1-.6h20c.4 0 .6.3.6.7l-.2 2.4c0 .4-.4.7-.7.7l-21.8-.1Z"/><path fill="currentColor" d="M129.1 22.3c-6.3 1.6-10.6 2.8-16.8 4.4-1.5.4-1.6.5-2.9-1-1.5-1.7-2.6-2.8-4.7-3.8-6.3-3.1-12.4-2.2-18.1 1.5-6.8 4.4-10.3 10.9-10.2 19 .1 8 5.6 14.6 13.5 15.7 6.8.9 12.5-1.5 17-6.6.9-1.1 1.7-2.3 2.7-3.7H90.3c-2.1 0-2.6-1.3-1.9-3 1.3-3.1 3.7-8.3 5.1-10.9.3-.6 1-1.6 2.5-1.6h36.4c-.2 2.7-.2 5.4-.6 8.1-1.1 7.2-3.8 13.8-8.2 19.6-7.2 9.5-16.6 15.4-28.5 17-9.8 1.3-18.9-.6-26.9-6.6-7.4-5.6-11.6-13-12.7-22.2-1.3-10.9 1.9-20.7 8.5-29.3C71.1 9.6 80.5 3.7 92 1.6c9.4-1.7 18.4-.6 26.5 4.9 5.3 3.5 9.1 8.3 11.6 14.1.6.9.2 1.4-1 1.7Z"/></svg>
+        </button>
+        <button class="sdk-tab" type="button" aria-label="Python">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 112 113" style="width:16px;height:16px"><path fill="currentColor" d="M54.919 0c-4.584.022-8.961.413-12.813 1.095C30.76 3.099 28.7 7.295 28.7 15.032v10.219h26.813v3.406H18.637c-7.792 0-14.615 4.684-16.75 13.594-2.461 10.213-2.57 16.586 0 27.25 1.906 7.938 6.458 13.594 14.25 13.594h9.22v-12.25c0-8.85 7.656-16.657 16.75-16.657h26.78c7.456 0 13.407-6.138 13.407-13.625v-25.53c0-7.267-6.13-12.726-13.406-13.938C64.28.328 59.502-.02 54.918 0Zm-14.5 8.22c2.77 0 5.031 2.298 5.031 5.125 0 2.816-2.262 5.093-5.031 5.093-2.78 0-5.031-2.277-5.031-5.093 0-2.827 2.251-5.125 5.03-5.125Z"/><path fill="currentColor" d="M85.638 28.657v11.906c0 9.231-7.826 17-16.75 17H42.106c-7.336 0-13.406 6.279-13.406 13.625V96.72c0 7.266 6.319 11.54 13.406 13.625 8.488 2.495 16.627 2.946 26.782 0 6.75-1.955 13.406-5.888 13.406-13.625V86.5H55.513v-3.405H95.7c7.793 0 10.696-5.436 13.406-13.594 2.8-8.399 2.681-16.476 0-27.25-1.925-7.758-5.604-13.594-13.406-13.594H85.638ZM70.575 93.313c2.78 0 5.031 2.278 5.031 5.094 0 2.827-2.251 5.125-5.03 5.125-2.77 0-5.032-2.298-5.032-5.125 0-2.816 2.261-5.094 5.031-5.094Z"/></svg>
+        </button>
+        <button class="sdk-tab" type="button" aria-label="Ruby">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 199 198" style="width:16px;height:16px"><path fill="#911209" d="M153.5 130.41 40.38 197.58l146.469-9.939L198.13 39.95l-44.63 90.46Z"/><path fill="#911209" d="M187.089 187.54 174.5 100.65l-34.291 45.28 46.88 41.61Z"/><path fill="#871101" d="M41 197.41 64.04 121.93 13.34 132.77 41 197.41Z"/><path fill="#A80D00" d="M140.2 146.18 119 63.14 58.33 120.01l81.87 26.17Z"/><path fill="#A80D00" d="M193.32 64.31 135.97 17.47 120 69.1l73.32-4.79Z"/><path fill="#BF0905" d="M166.5.77 132.77 19.41 111.49.52l55.01.25Z"/><path fill="#BF190B" d="M0 158.09l14.13-25.77-11.43-30.7L0 158.09Z"/><path fill="#fff" d="M1.94 100.65l11.5 32.62 49.97-11.211 57.05-53.02 16.1-51.139L111.209 0l-43.1 16.13c-13.58 12.63-39.93 37.62-40.88 38.09-.94.48-17.4 31.59-25.29 46.43Z"/></svg>
+        </button>
+      </div>
+
+      <div class="sdk-window">
+        <div class="sdk-card">
+          <div class="sdk-head">
+            <div class="sdk-dots"><i></i><i></i><i></i></div>
+            <div class="sdk-title" id="sdkTitle">Dub TypeScript SDK</div>
+            <div></div>
+          </div>
+          <div class="sdk-body">import { Dub } from "dub";
+
+const dub = new Dub({
+    token: "DUB_API_KEY",
+});
+
+const { shortLink } = await dub.links.create({
+    url: "https://google.com",
+});</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="api-cards">
+      <button class="api-card" type="button">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/></svg>
+        <span class="t">Powerful REST API</span>
+        <p>Manage links and resources with our REST API.</p>
+        <span class="lm">Learn more
+          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"/></svg>
+        </span>
+      </button>
+      <button class="api-card dim" type="button">
+        <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+          <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+            <polyline points="13.983 5.53 8 9 2.017 5.53"/>
+            <line x1="8" x2="8" y1="15.938" y2="9"/>
+            <circle cx="13.75" cy="13.75" r="1.75"/>
+            <path d="M14.25,8.06v-1.533c0-.713-.38-1.372-.997-1.73l-4.25-2.465c-.621-.36-1.386-.36-2.007,0L2.747,4.797c-.617,.358-.997,1.017-.997,1.73v4.946c0,.713,.38,1.372,.997,1.73l4.25,2.465c.603,.35,1.341,.353,1.951,.023"/>
+          </g>
+        </svg>
+        <span class="t">Multi-language SDKs</span>
+        <p>Integrate with Dub using your framework of choice.</p>
+        <span class="lm" style="color:#737373">Learn more
+          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"/></svg>
+        </span>
+      </button>
+      <button class="api-card dim" type="button">
+        <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+          <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+            <path d="M3.804,13.278l3.721-6.444c-.91-.515-1.524-1.492-1.524-2.613,0-1.657,1.343-3,3-3s3,1.343,3,3c0,.08-.003,.159-.009,.237"/>
+            <path d="M14.246,13.25H6.805c.009,1.046-.53,2.065-1.5,2.626-1.435,.828-3.27,.337-4.098-1.098s-.337-3.27,1.098-4.098c.069-.04,.139-.077,.21-.11"/>
+            <path d="M9,4.222l3.72,6.444c.901-.531,2.054-.574,3.025-.014,1.435,.828,1.927,2.663,1.098,4.098s-2.663,1.927-4.098,1.098c-.069-.04-.136-.082-.2-.126"/>
+          </g>
+        </svg>
+        <span class="t">Real-time webhooks</span>
+        <p>Keep your systems up-to-date, instantly.</p>
+        <span class="lm" style="color:#737373">Learn more
+          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z"/></svg>
+        </span>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TESTIMONIAL 2 ============ -->
+<section class="section quote-sec">
+  <div class="inner">
+    <div class="quote-inner">
+      <div class="quote-logo">
+        <img src="https://assets.dub.co/companies/whop.svg" alt="Whop logo">
+      </div>
+      <div class="quote-text">
+        <p>“Dub's link infrastructure is incredibly reliable – we've been using them in production at Whop for years now, creating thousands of links per month with sub-150ms request latency.”</p>
+      </div>
+      <img class="quote-avatar" src="https://assets.dub.co/testimonials/people/jack-sharkey.jpg" alt="Jack Sharkey" width="48" height="48">
+      <span class="quote-name">Jack Sharkey</span>
+      <span class="quote-role">CTO, Whop</span>
+    </div>
+  </div>
+</section>
+
+<!-- small spacer section -->
+<section class="section">
+  <div class="inner" style="height:48px">
+    <div style="position:absolute;inset:0;border-left:1px solid var(--gb);border-right:1px solid var(--gb);-webkit-mask-image:linear-gradient(black,transparent);mask-image:linear-gradient(black,transparent)"></div>
+  </div>
+</section>
+
+<!-- ============ DARK CTA ============ -->
+<div class="cta-dark">
+  <div class="cta-inner">
+    <div class="cta-bg-lines">
+      <div class="bx"></div>
+      <div class="gpat"></div>
+    </div>
+
+    <div class="cta-tab">
+      <svg viewBox="0 0 85 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="85" height="1" fill="currentColor" transform="translate(0,-1)"/>
+        <path d="M50 45C57.3095 56.6952 71.2084 63.9997 85 64V0H0C13.7915 0 26.6905 7.30481 34 19L50 45Z" fill="currentColor"/>
+      </svg>
+      <div class="line"></div>
+      <svg viewBox="0 0 85 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="transform:translateX(-1px) scaleX(-1)">
+        <rect x="0" y="0" width="85" height="1" fill="currentColor" transform="translate(0,-1)"/>
+        <path d="M50 45C57.3095 56.6952 71.2084 63.9997 85 64V0H0C13.7915 0 26.6905 7.30481 34 19L50 45Z" fill="currentColor"/>
+      </svg>
+    </div>
+
+    <div class="cta-content">
+      <div class="cta-badge">
+        <span class="ico" style="display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;background:#fb923c;color:#7c2d12">
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="10" fill="none" viewBox="0 0 11 10"><path stroke="currentColor" stroke-linecap="round" stroke-width="3.333" d="M5.5 5.667v-4M5.5 5.667l-3.333 2M5.5 5.667l3.333 2"/></svg>
+        </span>
+        Dub Links
+      </div>
+
+      <h2 class="h2 font-display">Short links with super powers</h2>
+      <p class="sub">Dub is the modern link attribution platform for short links, conversion tracking, and affiliate programs.</p>
+
+      <div class="cta-buttons">
+        <a class="w w1" href="#">Start for free</a>
+        <a class="w w2" href="#">Get a demo</a>
+      </div>
+
+      <div class="cta-reviews">
+        <a class="review" href="#" title="G2">
+          <div class="badge-ico">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 61 63" style="height:12px;width:auto;color:#fff"><path fill="currentColor" d="M54.5 18.429h-9.362c.252-1.484 1.162-2.315 3.004-3.257l1.72-.886c3.081-1.595 4.725-3.401 4.725-6.348 0-1.85-.712-3.312-2.126-4.364S49.38 2 47.429 2a7.7 7.7 0 0 0-4.264 1.23c-1.282.797-2.236 1.827-2.828 3.112l2.707 2.747c1.053-2.149 2.577-3.201 4.583-3.201 1.699 0 2.74.886 2.74 2.116 0 1.03-.504 1.883-2.455 2.88l-1.108.543c-2.4 1.23-4.066 2.636-5.031 4.232-.965 1.595-1.436 3.6-1.436 6.026v.665H54.5zm-1.25 8.441h-15.5L30 40.43h15.5L53.25 54 61 40.43z"/><path fill="currentColor" d="M31.472 49.505c-9.914 0-17.989-8.082-17.989-18.005s8.075-18.005 17.989-18.005L37.629.606A31.5 31.5 0 0 0 31.473 0C14.089 0 0 14.102 0 31.5S14.089 63 31.472 63A31.26 31.26 0 0 0 50 56.958l-6.808-11.82a17.93 17.93 0 0 1-11.72 4.367"/></svg>
+          </div>
+          <div class="stars">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+        </a>
+        <a class="review" href="#" title="Product Hunt">
+          <div class="badge-ico">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 50 60" style="height:12px;width:auto;color:#fff"><path fill="currentColor" d="M29 30H12V12h17a9 9 0 0 1 0 18m0-30H0v60h12V42h17c11.598 0 21-9.402 21-21S40.598 0 29 0"/></svg>
+          </div>
+          <div class="stars">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+        </a>
+        <a class="review" href="#" title="Trustpilot">
+          <div class="badge-ico">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 80 76" style="height:12px;width:auto;color:#fff"><path fill="currentColor" fill-rule="evenodd" d="M49.358 28.99h30.515L55.193 46.87l9.394 28.99-24.679-17.938L15.23 75.86l9.449-28.99L0 28.934l30.515.055L39.964 0zm-9.394 28.933 17.342-4.498-2.112-6.554z" clip-rule="evenodd"/></svg>
+          </div>
+          <div class="stars">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.8 5.8 21 7 14.1 2 9.3l7-1L12 2"/></svg>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ FOOTER ============ -->
+<div class="site-footer">
+  <footer>
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div>
+          <a href="#" aria-label="Dub Logo" style="display:block;max-width:fit-content">
+            <svg width="46" height="24" viewBox="0 0 46 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="height:32px;width:auto;color:#262626">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M11 2H14V13.9332L14.0003 13.9731L14.0003 14C14.0003 14.0223 14.0002 14.0445 14 14.0668V21H11V19.7455C9.86619 20.5362 8.48733 21 7.00016 21C3.13408 21 0 17.866 0 14C0 10.134 3.13408 7 7.00016 7C8.48733 7 9.86619 7.46375 11 8.25452V2ZM7 17.9998C9.20914 17.9998 11 16.209 11 13.9999C11 11.7908 9.20914 10 7 10C4.79086 10 3 11.7908 3 13.9999C3 16.209 4.79086 17.9998 7 17.9998ZM32 2H35V8.25474C36.1339 7.46383 37.5128 7 39.0002 7C42.8662 7 46.0003 10.134 46.0003 14C46.0003 17.866 42.8662 21 39.0002 21C35.1341 21 32 17.866 32 14V2ZM39 17.9998C41.2091 17.9998 43 16.209 43 13.9999C43 11.7908 41.2091 10 39 10C36.7909 10 35 11.7908 35 13.9999C35 16.209 36.7909 17.9998 39 17.9998ZM19 7H16V14C16 14.9192 16.1811 15.8295 16.5329 16.6788C16.8846 17.5281 17.4003 18.2997 18.0503 18.9497C18.7003 19.5997 19.472 20.1154 20.3213 20.4671C21.1706 20.8189 22.0809 21 23.0002 21C23.9194 21 24.8297 20.8189 25.679 20.4671C26.5283 20.1154 27.3 19.5997 27.95 18.9497C28.6 18.2997 29.1157 17.5281 29.4675 16.6788C29.8192 15.8295 30.0003 14.9192 30.0003 14H30V7H27V14C27 15.0608 26.5785 16.0782 25.8284 16.8283C25.0783 17.5784 24.0609 17.9998 23 17.9998C21.9391 17.9998 20.9217 17.5784 20.1716 16.8283C19.4215 16.0782 19 15.0608 19 14V7Z" fill="currentColor"/>
+            </svg>
+          </a>
+        </div>
+        <div class="socials">
+          <a href="#" aria-label="Twitter">
+            <svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg"><path stroke="currentColor" fill="none" d="M178.57 127.15 290.27 0h-26.46l-97.03 110.38L89.34 0H0l117.13 166.93L0 300.25h26.46l102.4-116.59 81.8 116.59h89.34M36.01 19.54H76.66l187.13 262.13h-40.66"/></svg>
+          </a>
+          <a href="#" aria-label="LinkedIn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+          </a>
+          <a href="#" aria-label="GitHub">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          </a>
+          <a href="#" aria-label="YouTube">
+            <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><path fill="currentColor" d="M88.119 23.338c-1.035-3.872-4.085-6.922-7.957-7.957C73.144 13.5 45 13.5 45 13.5s-28.144 0-35.162 1.881c-3.872 1.035-6.922 4.085-7.957 7.957C0 30.356 0 45 0 45s0 14.644 1.881 21.662c1.035 3.872 4.085 6.922 7.957 7.957C16.856 76.5 45 76.5 45 76.5s28.144 0 35.162-1.881c3.872-1.035 6.922-4.085 7.957-7.957C90 59.644 90 45 90 45S90 30.356 88.119 23.338zM36 58.5v-27L59.382 45 36 58.5z" transform="scale(2.84)"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <div class="footer-cols">
+        <div class="footer-col-group">
+          <div class="footer-col">
+            <h3>Product</h3>
+            <ul>
+              <li><a href="#"><span class="chip chip-purple"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor"><circle cx="27" cy="16" r="5"/><circle cx="5" cy="16" r="5"/><circle cx="16" cy="27" r="5"/><circle cx="16" cy="5" r="5"/></svg></span>Dub Partners</a></li>
+              <li><a href="#"><span class="chip chip-green"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-width="3.333" d="M2.333 6.333v2M7.667 1.667v6.666"/></svg></span>Dub Analytics</a></li>
+              <li><a href="#"><span class="chip chip-orange"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 10" fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-width="3.333" d="M5.5 5.667v-4M5.5 5.667l-3.333 2M5.5 5.667l3.333 2"/></svg></span>Dub Links</a></li>
+              <li><a href="#"><span class="chip chip-neutral"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="currentColor"><path d="M7.311 2.624a1.126 1.126 0 0 1 1.506-.077l.086.077 1.519 1.52.18.199a2.626 2.626 0 0 1-.18 3.514L8.903 9.375l-.086.078a1.126 1.126 0 0 1-1.506-1.669l1.52-1.52.048-.058a.38.38 0 0 0 0-.412l-.048-.06-1.52-1.518-.077-.086a1.126 1.126 0 0 1 .077-1.506M3.183 2.547A1.126 1.126 0 0 1 4.766 4.13l-.078.086-1.52 1.519a.375.375 0 0 0 0 .53l1.52 1.52.078.085a1.125 1.125 0 0 1-1.583 1.583l-.086-.078-1.519-1.518a2.626 2.626 0 0 1 0-3.713l1.519-1.52z"/></svg></span>Dub API</a></li>
+            </ul>
+          </div>
+          <div class="footer-col" style="margin-top:40px">
+            <h3>Solutions</h3>
+            <ul>
+              <li><a href="#">Marketing attribution</a></li>
+              <li><a href="#">Content creators</a></li>
+              <li><a href="#">Affiliate management</a></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="footer-col-group">
+          <div class="footer-col">
+            <h3>Resources</h3>
+            <ul>
+              <li><a href="#">Docs</a></li>
+              <li><a href="#">Help Center</a></li>
+              <li><a href="#">Enterprise</a></li>
+              <li><a href="#">Startups</a></li>
+              <li><a href="#">Integrations</a></li>
+              <li><a href="#">Pricing</a></li>
+              <li><a href="#">Affiliates
+                <svg height="18" width="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style="width:14px;height:14px">
+                  <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+                    <path d="M2.75,10.75v2.5c0,1.105,.895,2,2,2H15.25"/>
+                    <path d="M15,6h-4c-2.347,0-4.25,1.903-4.25,4.25h0"/>
+                    <polyline points="12 2.75 15.25 6 12 9.25"/>
+                  </g>
+                </svg>
+              </a></li>
+              <li><button>Tools
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="m6 9 6 6 6-6"/></svg>
+              </button></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-cols">
+        <div class="footer-col-group">
+          <div class="footer-col">
+            <h3>Company</h3>
+            <ul>
+              <li><a href="#">About</a></li>
+              <li><a href="#">Blog</a></li>
+              <li><a href="#">Careers</a></li>
+              <li><a href="#">Changelog</a></li>
+              <li><a href="#">Customers</a></li>
+              <li><a href="#">Brand</a></li>
+              <li><a href="#">Contact</a></li>
+              <li><a href="#">Privacy</a></li>
+              <li><button>Legal
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="m6 9 6 6 6-6"/></svg>
+              </button></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="footer-col-group">
+          <div class="footer-col">
+            <h3>Compare</h3>
+            <ul>
+              <li><a href="#"><span class="chip chip-purple"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor"><circle cx="27" cy="16" r="5"/><circle cx="5" cy="16" r="5"/><circle cx="16" cy="27" r="5"/><circle cx="16" cy="5" r="5"/></svg></span>Rewardful</a></li>
+              <li><a href="#"><span class="chip chip-purple"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor"><circle cx="27" cy="16" r="5"/><circle cx="5" cy="16" r="5"/><circle cx="16" cy="27" r="5"/><circle cx="16" cy="5" r="5"/></svg></span>PartnerStack</a></li>
+              <li><a href="#"><span class="chip chip-purple"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor"><circle cx="27" cy="16" r="5"/><circle cx="5" cy="16" r="5"/><circle cx="16" cy="27" r="5"/><circle cx="16" cy="5" r="5"/></svg></span>FirstPromoter</a></li>
+              <li><a href="#"><span class="chip chip-orange"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 10" fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-width="3.333" d="M5.5 5.667v-4M5.5 5.667l-3.333 2M5.5 5.667l3.333 2"/></svg></span>Bitly</a></li>
+              <li><a href="#"><span class="chip chip-orange"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 10" fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-width="3.333" d="M5.5 5.667v-4M5.5 5.667l-3.333 2M5.5 5.667l3.333 2"/></svg></span>Rebrandly</a></li>
+              <li><a href="#"><span class="chip chip-orange"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 10" fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-width="3.333" d="M5.5 5.667v-4M5.5 5.667l-3.333 2M5.5 5.667l3.333 2"/></svg></span>Short.io</a></li>
+              <li><a href="#"><span class="chip chip-orange"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 10" fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-width="3.333" d="M5.5 5.667v-4M5.5 5.667l-3.333 2M5.5 5.667l3.333 2"/></svg></span>Bl.ink</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <a class="status-pill" href="#">
+        <span class="dot"></span>
+        <p>Loading status...</p>
+      </a>
+      <a class="soc2" href="#"><img src="https://assets.dub.co/misc/soc2.svg" alt="AICPA SOC 2 Type II Certified"></a>
+      <p class="copyright">© 2026 Dub Technologies, Inc.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // mobile nav
+  var toggle = document.getElementById('menuToggle');
+  var nav = document.getElementById('mobileNav');
+  if(toggle && nav){
+    toggle.addEventListener('click', function(){
+      nav.classList.toggle('open');
+    });
+  }
+
+  // analytics chart bars
+  var chart = document.getElementById('dashChart');
+  if(chart){
+    var heights = [18,22,30,26,35,42,38,50,46,58,52,64,60,72,66,78,70,84,76,88,80,92,86,96,90,98,94,100,96,88,82,74,70,62,56,50];
+    heights.forEach(function(h){
+      var b = document.createElement('div');
+      b.className = 'bar-col';
+      b.style.height = h + '%';
+      chart.appendChild(b);
+    });
+  }
+
+  // logo flipper
+  var grid = document.getElementById('logoGrid');
+  if(grid){
+    var pools = [
+      ['https://assets.dub.co/companies/twilio.svg','https://assets.dub.co/companies/raycast.svg','https://assets.dub.co/companies/wisprflow.svg','https://assets.dub.co/companies/chatbase.svg','https://assets.dub.co/companies/polymarket.svg'],
+      ['https://assets.dub.co/companies/superhuman.svg','https://assets.dub.co/companies/framer.svg','https://assets.dub.co/companies/flora.svg','https://assets.dub.co/companies/anything.svg','https://assets.dub.co/companies/granola.svg'],
+      ['https://assets.dub.co/companies/perplexity.svg','https://assets.dub.co/companies/zillow.svg','https://assets.dub.co/companies/beehiiv.svg','https://assets.dub.co/companies/copper.svg','https://assets.dub.co/companies/hedra.svg'],
+      ['https://assets.dub.co/companies/vercel.svg','https://assets.dub.co/companies/buffer.svg','https://assets.dub.co/companies/superpower.svg','https://assets.dub.co/companies/tella.svg','https://assets.dub.co/companies/jobber.svg'],
+      ['https://assets.dub.co/companies/framer.svg','https://assets.dub.co/companies/twilio.svg','https://assets.dub.co/companies/perplexity.svg','https://assets.dub.co/companies/vercel.svg','https://assets.dub.co/companies/superhuman.svg']
+    ];
+    var cells = grid.querySelectorAll('.logo-cell');
+    var idx = 0;
+    setInterval(function(){
+      idx++;
+      cells.forEach(function(cell, i){
+        var img = cell.querySelector('img');
+        if(!img) return;
+        var pool = pools[i % pools.length];
+        var next = pool[idx % pool.length];
+        img.style.opacity = '0';
+        img.style.transform = 'rotateX(90deg)';
+        setTimeout(function(){
+          img.src = next;
+          img.style.opacity = '.9';
+          img.style.transform = 'rotateX(0deg)';
+        }, 250);
+      });
+    }, 3000);
+    cells.forEach(function(cell){
+      var img = cell.querySelector('img');
+      if(img){
+        img.style.transition = 'opacity .5s ease, transform .5s ease';
+      }
+    });
+  }
+
+  // SDK tab titles
+  var titles = ['Dub TypeScript SDK','Dub Go SDK','Dub Python SDK','Dub Ruby SDK'];
+  var tabs = document.querySelectorAll('.sdk-tab');
+  var titleEl = document.getElementById('sdkTitle');
+  tabs.forEach(function(tab, i){
+    tab.addEventListener('click', function(){
+      tabs.forEach(function(t){ t.classList.remove('active'); });
+      tab.classList.add('active');
+      if(titleEl) titleEl.textContent = titles[i] || titles[0];
+    });
+  });
+
+  // analytics tabs
+  var dashTabs = document.querySelectorAll('.dash-tab');
+  var values = [
+    ['111,452','2,370','$9,413'],
+    ['111.5K','2.4K','$9.4K']
+  ];
+  dashTabs.forEach(function(tab, i){
+    tab.addEventListener('click', function(){
+      dashTabs.forEach(function(t){ t.classList.remove('active'); });
+      tab.classList.add('active');
+    });
+  });
+})();
+</script>
+
+<style>
+@media(max-width:767px){
+  .hide-mobile{display:none !important}
+}
+@media(max-width:639px){
+  .hide-xs{display:none}
+}
+</style>
+</body>
+</html>

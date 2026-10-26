@@ -87,6 +87,10 @@ class ZezoUIServer:
         self._attached: list[dict[str, Any]] = []
         self._attached_lock = threading.Lock()
 
+        # Filesystem modification tracking for dynamic reload
+        self._skills_dir_mtime: float = 0.0
+        self._fleet_config_mtime: float = 0.0
+
         # Callbacks from main.py / engine
         self.on_text_command: Callable[[str], None] | None = None
         self.on_interrupt: Callable[[], None] | None = None
@@ -943,9 +947,25 @@ class ZezoUIServer:
             return web.FileResponse(frontend_dist_idx)
         return web.Response(text="<h1>Scranton Office Deck</h1><p>Open via ZEZO React Desktop Workstation.</p>", content_type="text/html")
 
+    def _reload_fleet_if_modified(self, fleet_mgr: Any) -> None:
+        """Check file mtime of config/fleet_agents.json. If changed on disk, reload fleet manager state."""
+        config_file = getattr(fleet_mgr, "config_path", None)
+        if config_file and Path(config_file).exists():
+            try:
+                mtime = Path(config_file).stat().st_mtime
+                if mtime != self._fleet_config_mtime:
+                    if hasattr(fleet_mgr, "_load_fleet"):
+                        fleet_mgr._load_fleet()
+                    elif hasattr(fleet_mgr, "reload"):
+                        fleet_mgr.reload()
+                    self._fleet_config_mtime = mtime
+            except OSError:
+                pass
+
     async def _fleet_state_handler(self, request: web.Request) -> web.Response:
         try:
             from core.fleet_manager import fleet_manager
+            self._reload_fleet_if_modified(fleet_manager)
             return web.json_response({
                 "status": "success",
                 "fleet": fleet_manager.get_fleet_deck_state()
@@ -957,6 +977,7 @@ class ZezoUIServer:
         agent_id = request.query.get("id", "").strip()
         try:
             from core.fleet_manager import fleet_manager
+            self._reload_fleet_if_modified(fleet_manager)
             res = fleet_manager.get_agent_full_profile(agent_id)
             return web.json_response(res)
         except Exception as e:
@@ -997,6 +1018,60 @@ class ZezoUIServer:
         except Exception as e:
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
+    @staticmethod
+    def _is_actionable_task(text: str) -> bool:
+        """Detect whether incoming direct chat message is an actionable coding/creation directive."""
+        t = (text or "").strip().lower()
+        if not t:
+            return False
+
+        conceptual_starters = (
+            "what is", "what are", "what was", "what were", "what do", "what does",
+            "what can", "what would", "how does", "how do i", "how can i", "how should i",
+            "how to", "why is", "why does", "why do", "why would",
+            "who is", "who are", "who made", "who created",
+            "tell me about", "explain", "describe", "can you explain",
+            "do you know", "is it possible", "should i",
+        )
+        if any(t.startswith(cs) for cs in conceptual_starters):
+            return False
+
+        strong_phrases = (
+            "create website", "create a website", "build website", "build a website",
+            "make website", "make a website", "make landing page", "make a landing page",
+            "build landing page", "create landing page", "generate app", "generate an app",
+            "create app", "build app", "make app", "scaffold", "clone website", "clone the website"
+        )
+        if any(sp in t for sp in strong_phrases):
+            return True
+
+        action_verbs = {
+            "build", "create", "make", "generate", "scaffold", "develop",
+            "implement", "code", "write", "fix", "refactor", "redesign",
+            "clone", "craft", "deploy", "setup"
+        }
+        code_targets = {
+            "website", "web", "site", "landing page", "landing", "page",
+            "app", "application", "component", "ui", "frontend", "backend",
+            "dashboard", "api", "server", "script", "code", "repo",
+            "project", "feature", "button", "modal", "view", "bug",
+            "issue", "error", "database", "endpoint", "pipeline", "portfolio",
+            "saas", "store", "ecommerce", "shop", "blog"
+        }
+
+        words = set(re.findall(r"[a-z]+", t))
+        has_verb = bool(words & action_verbs)
+        has_target = bool(words & code_targets)
+
+        if has_verb and has_target:
+            return True
+
+        tokens = t.split()
+        if tokens and tokens[0] in ("build", "create", "scaffold", "generate", "redesign", "refactor", "implement") and len(tokens) > 1:
+            return True
+
+        return False
+
     async def _fleet_chat_handler(self, request: web.Request) -> web.Response:
         """Interactive real-time conversational chat response from a fleet agent."""
         try:
@@ -1025,6 +1100,32 @@ class ZezoUIServer:
                 specialty = getattr(agent, "specialty", "") or ""
                 active_engine = (engine_override or agent.default_tool or "antigravity_run").strip()
                 active_model = (model_override or agent.model_id or "").strip()
+
+            # Bridge actionable coding/creation requests directly to fleet background execution
+            if self._is_actionable_task(prompt):
+                target_agent_id = agent.id if agent else "VERVE"
+                logger.info("[FleetChat] Actionable task detected for %s: %s", target_agent_id, prompt[:60])
+                dispatch_res = fleet_manager.dispatch_task(target_agent_id, prompt)
+                self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
+                task_id = dispatch_res.get("task_id") if isinstance(dispatch_res, dict) else None
+                if not task_id and isinstance(dispatch_res, dict) and dispatch_res.get("tasks"):
+                    tasks = dispatch_res.get("tasks")
+                    if isinstance(tasks, list) and len(tasks) > 0:
+                        task_id = tasks[0].get("task_id")
+
+                if task_id:
+                    reply_text = f"I have started building that for you in the background! (Task ID: {task_id}). You can follow my live progress on my desk monitor or ask for status."
+                else:
+                    reply_text = "I have started building that for you in the background! You can follow my live progress on my desk monitor or ask for status."
+
+                return web.json_response({
+                    "success": True,
+                    "agent_id": agent.name if agent else name,
+                    "reply": reply_text,
+                    "task_id": task_id,
+                    "engine": active_engine,
+                    "model": active_model,
+                })
 
             sys_prompt = (
                 f"{soul_prompt}\n"
@@ -1108,7 +1209,7 @@ class ZezoUIServer:
 
             return web.json_response({
                 "success": True,
-                "agent_id": agent.name,
+                "agent_id": agent.name if agent else name,
                 "reply": response_text.strip(),
                 "engine": active_engine,
                 "model": active_model,
@@ -1228,8 +1329,16 @@ class ZezoUIServer:
         """Return list of discovered declarative skills, optionally filtered by domain."""
         domain = request.query.get("domain")
         try:
-            from core.skill_loader import get_skill_registry
+            from core.skill_loader import get_skill_registry, SKILLS_DIR
             reg = get_skill_registry()
+
+            # Check filesystem mtime of the skills/ directory. If changed since last scan, reload dynamically.
+            skills_dir = getattr(reg, "_dir", SKILLS_DIR)
+            current_mtime = reg.get_mtime() if hasattr(reg, "get_mtime") else (skills_dir.stat().st_mtime if skills_dir.exists() else 0.0)
+            if current_mtime != self._skills_dir_mtime:
+                reg.reload()
+                self._skills_dir_mtime = current_mtime
+
             skills = reg.list_skills(domain=domain)
             domains = reg.list_domains()
             return web.json_response({"status": "success", "skills": skills, "domains": domains})
@@ -1391,6 +1500,8 @@ class ZezoUIServer:
             ok, msg = reg.install_skill(source, target_domain=domain)
             if not ok:
                 return web.json_response({"status": "error", "message": msg}, status=400)
+            if hasattr(reg, "get_mtime"):
+                self._skills_dir_mtime = reg.get_mtime()
             return web.json_response({"status": "success", "message": msg, "skills": reg.list_skills()})
         except Exception as e:
             logger.exception("Error in /api/skills/install handler: %s", e)
@@ -1421,6 +1532,8 @@ class ZezoUIServer:
             )
             if not ok:
                 return web.json_response({"status": "error", "message": msg}, status=400)
+            if hasattr(reg, "get_mtime"):
+                self._skills_dir_mtime = reg.get_mtime()
             return web.json_response({"status": "success", "message": msg, "skills": reg.list_skills()})
         except Exception as e:
             logger.exception("Error in /api/skills/save handler: %s", e)
@@ -1436,6 +1549,8 @@ class ZezoUIServer:
             ok, msg = reg.delete_skill(name)
             if not ok:
                 return web.json_response({"status": "error", "message": msg}, status=404)
+            if hasattr(reg, "get_mtime"):
+                self._skills_dir_mtime = reg.get_mtime()
             return web.json_response({"status": "success", "message": msg, "skills": reg.list_skills()})
         except Exception as e:
             logger.exception("Error in /api/skills/delete handler: %s", e)
@@ -2188,6 +2303,7 @@ class ZezoUIServer:
         elif msg_type == "get_fleet_state":
             try:
                 from core.fleet_manager import fleet_manager
+                self._reload_fleet_if_modified(fleet_manager)
                 await ws.send_str(json.dumps({
                     "type": "fleet_state",
                     "data": {"fleet": fleet_manager.get_fleet_deck_state()}

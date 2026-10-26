@@ -2157,7 +2157,25 @@ class ZezoLive:
 
                     def _resampling_cb(indata, frames, time_info, status):
                         mono = indata[:, 0] if (indata.ndim > 1 and indata.shape[1] > 1) else indata.reshape(-1)
-                        mono_16k = mono[::step]
+                        try:
+                            import scipy.signal
+                            import numpy as np
+                            import math
+                            up = SEND_SAMPLE_RATE
+                            down = native_sr
+                            g = math.gcd(up, down)
+                            up //= g
+                            down //= g
+                            resampled = scipy.signal.resample_poly(mono.astype(np.float32), up, down).astype(np.int16)
+                            target_len = len(mono) * SEND_SAMPLE_RATE // native_sr
+                            if len(resampled) > target_len:
+                                resampled = resampled[:target_len]
+                            elif len(resampled) < target_len:
+                                resampled = np.pad(resampled, (0, target_len - len(resampled)))
+                            mono_16k = resampled
+                        except Exception:
+                            step = max(1, native_sr // SEND_SAMPLE_RATE)
+                            mono_16k = mono[::step]
                         callback(mono_16k.reshape(-1, 1), len(mono_16k), time_info, status)
 
                     return sd.InputStream(

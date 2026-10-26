@@ -103,6 +103,51 @@ from ctypes import wintypes
 
 logger = logging.getLogger("zezo.opencode")
 
+MAX_CLI_PROMPT_LEN = 4000
+
+
+def _prepare_cli_task(task: str, repo_path: Path) -> str:
+    """
+    Ensure the CLI prompt does not exceed safe command-line buffer limits
+    (Windows CreateProcess limit is 32,767 chars; cmd.exe limit is 8,191 chars).
+    If the prompt exceeds MAX_CLI_PROMPT_LEN or contains raw HTML blueprints,
+    write the full task specification to TASK_SPEC.md in the repo workspace
+    and return an instruction pointing OpenCode to that file.
+    """
+    if not task:
+        return ""
+
+    task_lower = task.lower()
+    is_large = len(task) > MAX_CLI_PROMPT_LEN
+    has_raw_html = "```html" in task_lower or "<html" in task_lower or "<!doctype" in task_lower
+
+    if not (is_large or has_raw_html):
+        return task
+
+    try:
+        repo_path.mkdir(parents=True, exist_ok=True)
+        spec_file = repo_path / "TASK_SPEC.md"
+        spec_file.write_text(task, encoding="utf-8")
+        logger.info(
+            "Task prompt (%d chars, has_raw_html=%s) exceeds safe CLI limit (%d). "
+            "Wrote specifications to %s",
+            len(task),
+            has_raw_html,
+            MAX_CLI_PROMPT_LEN,
+            spec_file,
+        )
+        return (
+            "Execute the coding task defined in TASK_SPEC.md. "
+            "Read TASK_SPEC.md in the workspace first, then implement all specifications, "
+            "requirements, and guidelines exactly as described."
+        )
+    except Exception as e:
+        logger.warning(
+            "Failed writing TASK_SPEC.md (%s); falling back to truncated prompt for CLI safety",
+            e,
+        )
+        return task[:MAX_CLI_PROMPT_LEN]
+
 # ── Windows Job Object Throttling (Hardware-Enforced) ─────────────────────────
 
 def _create_throttled_job(mask: int, priority: int = 0x00000040):
@@ -183,7 +228,6 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
     """Runs in the background thread. Streams progress, respects cancel."""
     repo_val = params.get("repo") or params.get("project_path") or params.get("repo_path")
     if not repo_val:
-        from core.repo_context import resolve
         resolved_p, _ = resolve()
         repo = str(resolved_p or (Path.home() / "Desktop" / "website").resolve())
     else:
@@ -193,22 +237,21 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
     model = params.get("model") or get_opencode_model()
     opencode_bin = params.get("bin") or _find_opencode_bin()
 
-    _ensure_gitignore(Path(repo))
+    repo_path = Path(repo)
+    _ensure_gitignore(repo_path)
     snapshot = capture_repo_snapshot(repo)
-
 
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
-    env["NODE_OPTIONS"] = "--max-old-space-size=1024 --v8-pool-size=2"
-    env["UV_THREADPOOL_SIZE"] = "2"
-    env["OMP_NUM_THREADS"] = "2"
-    env["V8_NUM_THREADS"] = "2"
-    env["PISCINA_THREADS"] = "2"
-    env["GOTO_NUM_THREADS"] = "2"
-    env["OPENBLAS_NUM_THREADS"] = "2"
-    env["MKL_NUM_THREADS"] = "2"
 
-    cmd = [opencode_bin, "run", task, "--model", model, "--auto"]
+    if not opencode_bin:
+        err_msg = "OpenCode CLI binary not found"
+        if ctx and hasattr(ctx, "on_fail"):
+            ctx.on_fail(err_msg)
+        return {"status": "failed", "error": err_msg, "repo": repo, "model": model}
+
+    cli_task = _prepare_cli_task(task, repo_path)
+    cmd = [opencode_bin, "run", cli_task, "--model", model, "--auto"]
 
     if ctx and hasattr(ctx, "report"):
         ctx.report(2, f"launching OpenCode in {Path(repo).name}")
@@ -241,48 +284,25 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
     cores = list(range(cap))
     mask = (1 << cap) - 1
 
-    # 1. Hardware Job Object Assignment
-    hJob = _create_throttled_job(mask, 0x00000040)  # IDLE_PRIORITY_CLASS
+    hJob = None
+    hJob = _create_throttled_job(mask, 0x00000040)
     if hJob:
         _assign_pid_to_job(hJob, proc.pid)
 
-    # 2. psutil process tree throttle
-    def _throttle_proc_tree(parent_pid: int) -> None:
-        try:
-            parent = psutil.Process(parent_pid)
-            procs = [parent] + parent.children(recursive=True)
-            for p in procs:
-                try:
-                    p.cpu_affinity(cores)
-                    p.nice(psutil.IDLE_PRIORITY_CLASS)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-    _throttle_proc_tree(proc.pid)
-
-    # Diagnostic log at startup
-    try:
-        p_diag = psutil.Process(proc.pid)
-        ch_pids = [c.pid for c in p_diag.children(recursive=True)]
-        print(
-            f"[OpenCode Diagnostic] PID={proc.pid} | affinity={p_diag.cpu_affinity()} | "
-            f"nice={p_diag.nice()} | children={ch_pids} | job_assigned={bool(hJob)}"
-        )
-    except Exception:
-        pass
-
     tail: list[str] = []
     line_count = 0
-    import time
-    last_diag_time = time.time()
 
     try:
         assert proc.stdout is not None
         for line in proc.stdout:
             if ctx and hasattr(ctx, "cancelled") and ctx.cancelled():
-                proc.terminate()
+                if hJob:
+                    try:
+                        ctypes.WinDLL("kernel32", use_last_error=True).TerminateJobObject(hJob, 1)
+                    except Exception:
+                        pass
+                else:
+                    proc.terminate()
                 return {"status": "cancelled", "lines": line_count}
             text = line.rstrip()
             if not text:
@@ -291,25 +311,6 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
             tail.append(text)
             if len(tail) > 30:
                 tail.pop(0)
-
-            # Per-process monitoring & diagnostics every 5 seconds
-            now = time.time()
-            if now - last_diag_time >= 5.0:
-                last_diag_time = now
-                _throttle_proc_tree(proc.pid)
-                try:
-                    p = psutil.Process(proc.pid)
-                    ch_info = []
-                    total_proc_cpu = p.cpu_percent(interval=None)
-                    for c in p.children(recursive=True):
-                        c_cpu = c.cpu_percent(interval=None)
-                        total_proc_cpu += c_cpu
-                        ch_info.append(f"{c.name()}({c.pid})={c_cpu:.1f}%[aff={c.cpu_affinity()},nice={c.nice()}]")
-                    
-                    tid = getattr(ctx, "task_id", "inline") if ctx else "inline"
-                    print(f"[Task {tid}] PID={proc.pid} total_proc_cpu={total_proc_cpu:.1f}% | {' '.join(ch_info)}")
-                except Exception:
-                    pass
 
             # coarse progress: first 90% based on line count heuristic
             pct = min(90, 5 + line_count)
@@ -321,6 +322,12 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
         except Exception:
             try:
                 proc.kill()
+            except Exception:
+                pass
+
+        if hJob:
+            try:
+                ctypes.WinDLL("kernel32", use_last_error=True).CloseHandle(hJob)
             except Exception:
                 pass
 
@@ -399,8 +406,32 @@ def opencode_agent(parameters: dict, player=None, speak=None) -> str:
     if is_ui_task(task):
         resolved_design = resolve_design(task, repo_path=repo)
         if resolved_design and resolved_design.is_active():
-            design_prompt = format_design_prompt(resolved_design)
-            task_with_design = f"{task}\n\n{design_prompt}"
+            reference_provisioned = False
+            try:
+                repo.mkdir(parents=True, exist_ok=True)
+                ref_dst = repo / "reference.html"
+                if getattr(resolved_design, "source_path", None) and resolved_design.source_path.exists():
+                    import shutil
+                    shutil.copy2(resolved_design.source_path, ref_dst)
+                    reference_provisioned = True
+                elif getattr(resolved_design, "full_raw_html", None) and resolved_design.full_raw_html.strip():
+                    ref_dst.write_text(resolved_design.full_raw_html, encoding="utf-8")
+                    reference_provisioned = True
+                elif resolved_design.raw_html and resolved_design.raw_html.strip():
+                    ref_dst.write_text(resolved_design.raw_html, encoding="utf-8")
+                    reference_provisioned = True
+            except Exception as e:
+                logger.warning("Failed to provision reference.html for OpenCode: %s", e)
+
+            if reference_provisioned:
+                design_directive = (
+                    "Design Reference: A curated template has been placed at 'reference.html'. "
+                    "Inspect it as your read-only source of truth for styles, typography, and layout, and synthesize 'index.html' with authentic content."
+                )
+                task_with_design = f"{task}\n\n{design_directive}"
+            else:
+                design_prompt = format_design_prompt(resolved_design)
+                task_with_design = f"{task}\n\n{design_prompt}"
 
     # In-place execution for fleet tasks (eliminates phantom ZEZO CODER cards)
     run_in_place = bool(parameters.get("run_in_place", False))
@@ -443,12 +474,11 @@ def opencode_agent(parameters: dict, player=None, speak=None) -> str:
     task_info = tm.status(task_id) or {}
     is_queued = task_info.get("status") == "queued"
 
-
     if player and hasattr(player, "show_content"):
         badge = "ZEZO CODER (QUEUED)" if is_queued else "ZEZO CODER"
         player.show_content(
             badge,
-            f"Task: {task}\nRepo: {repo}\nID: {task_id}\nSource: {source}\nStatus: {task_info.get('status', 'running')}",
+            f"Task: {task[:200] + ('...' if len(task) > 200 else '')}\nRepo: {repo}\nID: {task_id}\nSource: {source}\nStatus: {task_info.get('status', 'running')}",
         )
 
     if is_queued:
@@ -503,5 +533,4 @@ TOOL = {
     "handler": opencode_agent,
 }
 
-# Alias matching tool declaration name
 opencode_run = opencode_agent

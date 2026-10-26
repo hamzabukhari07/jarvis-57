@@ -184,61 +184,57 @@ export default function App() {
     const text = (transcriptStream.text || '').trim()
     const isDone = Boolean(transcriptStream.done)
 
-    // Case 1: Empty text with done signal -> seal active live turn without wiping content
-    if (isDone && !text) {
-      setChatMessages((prev) => {
-        const last = prev[prev.length - 1]
-        if (last && last.role === speaker && last.id.startsWith(`live-${speaker}`)) {
-          return [
-            ...prev.slice(0, -1),
-            { ...last, id: `done-${speaker}-${Date.now()}` },
-          ]
+    setChatMessages((prev) => {
+      // Find any existing live message for this speaker
+      const liveIdx = prev.findIndex(
+        (m) => m.role === speaker && m.id.startsWith(`live-${speaker}`)
+      )
+
+      if (isDone && !text) {
+        if (liveIdx !== -1) {
+          const updated = [...prev]
+          updated[liveIdx] = { ...updated[liveIdx], id: `done-${speaker}-${Date.now()}` }
+          return updated
         }
         return prev
-      })
-      return
-    }
+      }
 
-    if (!text) return
+      if (!text) return prev
 
-    setChatMessages((prev) => {
-      const last = prev[prev.length - 1]
-
-      // If the last message is from the same speaker and was in-progress, update it
-      if (last && last.role === speaker && last.id.startsWith(`live-${speaker}`)) {
+      // If there is an active live message for this speaker, update/seal it
+      if (liveIdx !== -1) {
+        const target = prev[liveIdx]
         let updatedText = text
-        // If incoming text is a partial delta chunk that doesn't start with or include last.text, append it
-        if (last.text && !text.startsWith(last.text) && !last.text.includes(text)) {
-          updatedText = `${last.text} ${text}`.trim()
+        if (target.text && !text.startsWith(target.text) && !target.text.includes(text)) {
+          updatedText = `${target.text} ${text}`.trim()
         }
-        return [
-          ...prev.slice(0, -1),
-          {
-            id: isDone ? `done-${speaker}-${Date.now()}` : last.id,
-            role: speaker,
-            text: updatedText,
-            createdAt: last.createdAt || new Date(),
-          },
-        ]
+        const updated = [...prev]
+        updated[liveIdx] = {
+          ...target,
+          id: isDone ? `done-${speaker}-${Date.now()}` : target.id,
+          text: updatedText,
+        }
+        return updated
       }
 
-      // Deduplication guard: ignore an incoming turn that duplicates an existing user bubble
-      if (speaker === 'user' && last && last.role === 'user') {
+      // If no live message, check if the last message is from the same speaker
+      const last = prev[prev.length - 1]
+      if (last && last.role === speaker) {
         const normLast = last.text.trim().toLowerCase()
-        const normText = text.trim().toLowerCase()
-        if (normLast === normText) {
-          return prev
-        }
-        // Partial-dictation overlap: incoming finalized text contains the prior bubble
-        if (normText.length >= normLast.length && normText.includes(normLast) && normLast.length > 0) {
-          return [
-            ...prev.slice(0, -1),
-            { ...last, id: isDone ? `done-${speaker}-${Date.now()}` : last.id, text, createdAt: last.createdAt || new Date() },
-          ]
+        const normText = text.toLowerCase()
+        if (normLast === normText || normText.includes(normLast)) {
+          const updated = [...prev]
+          updated[updated.length - 1] = {
+            ...last,
+            id: isDone ? `done-${speaker}-${Date.now()}` : last.id,
+            text,
+            createdAt: last.createdAt || new Date(),
+          }
+          return updated
         }
       }
 
-      // Start a new live turn
+      // Start a new turn (live or done)
       return [
         ...prev,
         {

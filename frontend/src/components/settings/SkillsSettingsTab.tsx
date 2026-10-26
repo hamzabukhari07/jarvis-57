@@ -41,8 +41,8 @@ export interface SkillItem {
 
 const DEFAULT_SKILLS: SkillItem[] = [
  {
- id: 'hamza_taste',
- name: 'Hamza Taste (Studio UI)',
+ id: 'website_build',
+ name: 'Website Build (Studio UI)',
  type: 'skill',
  category: 'design',
  version: '2.5.0',
@@ -50,10 +50,10 @@ const DEFAULT_SKILLS: SkillItem[] = [
  description: 'Master Studio UI Anti-Slop Directive & Reference-First Design Protocol for autonomous web generation and frontend agents.',
  enabled: true,
  tags: ['Design System', 'Anti-Slop', 'Tailwind', 'ReUI'],
- markdownDoc: `# 🎨 Hamza Taste — Studio UI Anti-Slop Directive
+ markdownDoc: `# 🌐 Master Studio Website Creation Protocol (\`website_build\`)
 
 > **Lead Architect & Creator:** Hamza Bukhari 
-> **Target Audience:** Google Antigravity Agent, OpenCode, Kilo Code, and all Autonomous Coding Agents 
+> **Target Audience:** Google Antigravity Agent, OpenCode, Kilo Code, Autonomous Office Fleet, and all Autonomous Coding Agents 
 > **Core Principle:** Anti-Slop is a **FILTER** (what to reject), while **Reference HTML Templates** supply 100% of the **DIRECTION**.
 
 ---
@@ -272,38 +272,73 @@ export const SkillsSettingsTab: React.FC = () => {
  try {
  const parsed = JSON.parse(saved)
  if (Array.isArray(parsed) && parsed.length > 0) {
- return parsed.filter((s: SkillItem) => s.id !== 'custom_skill_10')
+ const cleaned = parsed.filter((s: SkillItem) => s && s.id && s.id !== 'custom_skill_10' && s.id !== 'hamza_taste')
+ if (cleaned.length !== parsed.length) {
+ localStorage.setItem('zezo_skills_state', JSON.stringify(cleaned))
+ }
+ return cleaned
  }
  } catch {}
  }
- return DEFAULT_SKILLS.filter((s: SkillItem) => s.id !== 'custom_skill_10')
+ return DEFAULT_SKILLS.filter((s: SkillItem) => s.id !== 'custom_skill_10' && s.id !== 'hamza_taste')
  })
 
- // Load real skills dynamically from backend /api/skills
+ // Reconcile frontend cache with live backend /api/skills
  useEffect(() => {
  const loadRealSkills = async () => {
  try {
  const res = await api.getSkills()
  if (res && res.skills && Array.isArray(res.skills) && res.skills.length > 0) {
- const serverSkills: SkillItem[] = res.skills
- .filter((s: any) => s.name !== 'custom_skill_10')
- .map((s: any) => ({
+ // Canonical backend skills present on disk
+ const validBackendSkills = res.skills.filter(
+ (s: any) => s && s.name && s.name !== 'custom_skill_10' && s.name !== 'hamza_taste'
+ )
+ const validBackendIdSet = new Set(validBackendSkills.map((s: any) => s.name))
+
+ // Read cached skills from localStorage
+ const savedStr = localStorage.getItem('zezo_skills_state')
+ const localSkillsMap: Record<string, Partial<SkillItem>> = {}
+ if (savedStr) {
+ try {
+ const parsed = JSON.parse(savedStr)
+ if (Array.isArray(parsed)) {
+ parsed.forEach((item: SkillItem) => {
+ // Only retain cached info for skills that exist on the backend
+ if (item && item.id && validBackendIdSet.has(item.id)) {
+ localSkillsMap[item.id] = item
+ }
+ })
+ }
+ } catch {}
+ }
+
+ // Reconcile: ONLY valid backend skills on disk, automatically evicting orphaned IDs
+ const reconciledSkills: SkillItem[] = validBackendSkills.map((s: any) => {
+ const cached = localSkillsMap[s.name]
+ return {
  id: s.name,
  name: s.display_name || s.name.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
  type: 'skill' as const,
- category: (s.domain || 'coding') as any,
- version: s.version || '1.0.0',
- author: s.author || (['hamza_taste', 'antigravity_agent', 'make_plan', 'web_research_pipeline', 'multi_agent_collaboration'].includes(s.name) ? 'Hamza Bukhari' : 'ZEZO Core'),
- description: s.description || '',
- enabled: !s.disabled,
- tags: s.tags || [s.domain || 'System'],
- markdownDoc: s.instructions || `# ${s.name}\n\n${s.description || ''}`,
- }))
- setSkills(serverSkills)
- localStorage.setItem('zezo_skills_state', JSON.stringify(serverSkills))
+ category: (s.domain || cached?.category || 'coding') as any,
+ version: s.version || cached?.version || '1.0.0',
+ author: s.author || cached?.author || (['website_build', 'antigravity_agent', 'make_plan', 'web_research_pipeline', 'multi_agent_collaboration'].includes(s.name) ? 'Hamza Bukhari' : 'ZEZO Core'),
+ description: s.description || cached?.description || '',
+ enabled: s.disabled !== undefined ? !s.disabled : (cached?.enabled ?? true),
+ tags: s.tags || cached?.tags || [s.domain || 'System'],
+ markdownDoc: s.instructions || cached?.markdownDoc || `# ${s.name}\n\n${s.description || ''}`,
+ }
+ })
+
+ setSkills(reconciledSkills)
+ localStorage.setItem('zezo_skills_state', JSON.stringify(reconciledSkills))
  }
  } catch (e) {
- console.debug('Using cached skills:', e)
+ console.debug('Failed to fetch backend skills, using sanitized cache:', e)
+ setSkills((prev) => {
+ const cleaned = prev.filter((s) => s.id !== 'custom_skill_10' && s.id !== 'hamza_taste')
+ localStorage.setItem('zezo_skills_state', JSON.stringify(cleaned))
+ return cleaned
+ })
  }
  }
  loadRealSkills()
@@ -322,6 +357,7 @@ export const SkillsSettingsTab: React.FC = () => {
  const persistSkills = (updatedSkills: SkillItem[]) => {
  setSkills(updatedSkills)
  localStorage.setItem('zezo_skills_state', JSON.stringify(updatedSkills))
+ window.dispatchEvent(new CustomEvent('zezo_skills_updated'))
  }
 
  // Toggle single skill and synchronize with backend disk registry

@@ -37,6 +37,7 @@ def _infer_agent_defaults(role: str, specialty: str) -> Dict[str, Any]:
 
     if any(k in text for k in ("research", "web", "scrape", "transcript", "video", "youtube", "media", "search")):
         return {
+            "engine": "",
             "default_tool": "agent_reach",
             "allowed_tools": ["agent_reach", "web_search", "web_read_page", "web_reader", "file_processor"],
             "allowed_skills": ["web_scraper", "social_research", "web_research_pipeline"],
@@ -44,19 +45,22 @@ def _infer_agent_defaults(role: str, specialty: str) -> Dict[str, Any]:
         }
     if any(k in text for k in ("frontend", "ui", "design", "css", "tailwind", "layout", "animation", "react", "html")):
         return {
+            "engine": "antigravity",
             "default_tool": "antigravity_run",
             "allowed_tools": ["antigravity_run", "extract_design_system", "browser_control", "file_processor", "file_controller"],
-            "allowed_skills": ["hamza_taste", "multi_agent_collaboration", "make_plan"],
+            "allowed_skills": ["website_build", "multi_agent_collaboration", "make_plan"],
             "capabilities": ["web_design", "frontend_coding", "ui_refactor", "animations"],
         }
     if any(k in text for k in ("refactor", "qa", "test", "audit", "clean code", "bug hunt")):
         return {
+            "engine": "kilo",
             "default_tool": "kilo_run",
             "allowed_tools": ["kilo_run", "quick_snippet", "file_processor", "file_controller"],
             "allowed_skills": ["kilo_code", "multi_agent_collaboration", "make_plan", "git_workflow"],
             "capabilities": ["code_refactor", "qa_testing", "security_audit", "complexity_reduction"],
         }
     return {
+        "engine": "opencode",
         "default_tool": "opencode_run",
         "allowed_tools": ["opencode_run", "quick_snippet", "file_processor", "file_controller"],
         "allowed_skills": ["opencode", "multi_agent_collaboration", "make_plan", "git_workflow"],
@@ -99,7 +103,21 @@ class FleetManager:
         self._lock = threading.RLock()
         self.config_path = config_path or (Path(__file__).parent.parent / "config" / "fleet_agents.json")
         self.agents: Dict[str, FleetAgent] = {}
+        self._last_mtime: float = 0.0
         self._load_fleet()
+
+    def refresh_if_modified(self) -> bool:
+        """Reload fleet config if fleet_agents.json was modified on disk."""
+        if not self.config_path.exists():
+            return False
+        try:
+            mtime = self.config_path.stat().st_mtime
+            if mtime != self._last_mtime:
+                self._load_fleet()
+                return True
+        except OSError:
+            pass
+        return False
 
     def _allocate_desk(self, existing: Optional[FleetAgent], req_x: int, req_y: int) -> Tuple[int, int]:
         """Allocate next available workstation desk on the office floor."""
@@ -120,6 +138,7 @@ class FleetManager:
         if not self.config_path.exists():
             return
         try:
+            self._last_mtime = self.config_path.stat().st_mtime
             with open(self.config_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             fleet_data = data.get("fleet", {})
@@ -186,10 +205,17 @@ class FleetManager:
 
     def get_agent(self, name_or_id: str) -> Optional[FleetAgent]:
         key = name_or_id.upper().strip()
+        alias_map = {"ALI": "VERVE", "HAIDER": "FLUX"}
+        lookup_key = alias_map.get(key, key)
         with self._lock:
+            self.refresh_if_modified()
+            if lookup_key in self.agents:
+                return self.agents[lookup_key]
             if key in self.agents:
                 return self.agents[key]
             for a in self.agents.values():
+                if lookup_key == a.name.upper() or lookup_key.startswith(a.name.upper()) or lookup_key in a.name.upper().split():
+                    return a
                 if key == a.name.upper() or a.name.upper().startswith(key) or key in a.name.upper().split():
                     return a
         return None
@@ -212,6 +238,7 @@ class FleetManager:
         # 1. Direct Name / ID match in words (e.g. 'Ali', 'Ahmad', 'Dwight', 'Pam', 'Oscar', 'Kelly', 'Michael', 'Jim')
         stop_words = {"agent", "agents", "app", "file", "task", "tasks", "tool", "tools", "the", "a", "an", "is", "for", "to", "in", "on", "and", "or", "not"}
         with self._lock:
+            self.refresh_if_modified()
             for w in words:
                 if w.lower() in stop_words:
                     continue
@@ -248,6 +275,7 @@ class FleetManager:
             "rebuild": "DEVDYNAMO",
         }
         for alias, agent_id in role_map.items():
+            if re.search(r"\b" + re.escape(alias) + r"\b", low):
                 agent = self.get_agent(agent_id)
                 if agent:
                     return agent
@@ -320,14 +348,53 @@ class FleetManager:
 
         inferred = _infer_agent_defaults(role_str, specialty_str)
 
-        tool = str(data.get("default_tool") or data.get("engine") or "").strip().lower()
+        engine_to_tool = {
+            "antigravity": "antigravity_run",
+            "opencode": "opencode_run",
+            "kilo": "kilo_run",
+        }
+        tool_to_engine = {
+            "antigravity_run": "antigravity",
+            "opencode_run": "opencode",
+            "kilo_run": "kilo",
+        }
+
+        raw_engine = str(data.get("engine") or "").strip().lower()
+        raw_tool = str(data.get("default_tool") or "").strip().lower()
+
+        if raw_engine in tool_to_engine:
+            if not raw_tool:
+                raw_tool = raw_engine
+            raw_engine = tool_to_engine[raw_engine]
+
+        if raw_tool in engine_to_tool:
+            if not raw_engine:
+                raw_engine = raw_tool
+            raw_tool = engine_to_tool[raw_tool]
+
+        tool = raw_tool
         if tool not in VALID_TOOLS and not tool.endswith("_run") and not tool.endswith("_agent"):
             tool = ""
 
         with self._lock:
             existing = self.agents.get(clean_id)
+            engine = raw_engine
+            if not engine:
+                engine = inferred.get("engine", "")
+                if not engine and tool in tool_to_engine:
+                    engine = tool_to_engine[tool]
+                elif existing and existing.engine:
+                    engine = existing.engine
+                else:
+                    engine = ""
+
             if not tool:
-                tool = existing.default_tool if existing else inferred["default_tool"]
+                if engine and engine in engine_to_tool:
+                    tool = engine_to_tool[engine]
+                elif existing and existing.default_tool:
+                    tool = existing.default_tool
+                else:
+                    tool = inferred["default_tool"]
 
             risk_tier = str(data.get("risk_tier") or (existing.risk_tier if existing else "")).upper().strip()
             if risk_tier not in VALID_RISK_TIERS:
@@ -391,6 +458,8 @@ class FleetManager:
                 allowed_tools=allowed_tools,
                 allowed_skills=allowed_skills,
                 capabilities=capabilities,
+                is_core=existing.is_core if existing else (clean_id in CORE_AGENT_IDS),
+                engine=engine,
             )
             self.agents[clean_id] = agent
             ok = self._save_fleet()
@@ -508,6 +577,12 @@ class FleetManager:
         upstream_deliverables: Optional[str] = None,
         path: Optional[str] = None,
         call_chain: Optional[List[str]] = None,
+        scope_type: Optional[str] = None,
+        entity_content: Optional[str] = None,
+        tech_stack: Optional[str] = None,
+        color_theme: Optional[str] = None,
+        key_sections: Optional[str] = None,
+        confirmed: bool = False,
     ) -> Dict[str, Any]:
         """
         Executes a peer-to-peer delegation from one specialist agent to another with circular loop detection.
@@ -549,7 +624,17 @@ class FleetManager:
         full_task_prompt = f"{handoff_header}Directive: {task}"
 
         logger.info("[FleetManager] P2P Delegation: %s -> %s (Chain: %s)", src, dst, " -> ".join(new_chain))
-        res = self.dispatch_task(agent_id=dst, prompt=full_task_prompt, path=path)
+        res = self.dispatch_task(
+            agent_id=dst,
+            prompt=full_task_prompt,
+            path=path,
+            scope_type=scope_type,
+            entity_content=entity_content,
+            tech_stack=tech_stack,
+            color_theme=color_theme,
+            key_sections=key_sections,
+            confirmed=confirmed,
+        )
         res["peer_session_id"] = session_id
         res["call_chain"] = new_chain
         res["from_agent"] = src
@@ -600,7 +685,21 @@ class FleetManager:
         except Exception:
             pass
 
-    def dispatch_task(self, agent_id: str, prompt: str, path: Optional[str] = None, model_override: Optional[str] = None, is_subtask: bool = False, group_id: Optional[str] = None) -> Dict[str, Any]:
+    def dispatch_task(
+        self,
+        agent_id: str,
+        prompt: str,
+        path: Optional[str] = None,
+        model_override: Optional[str] = None,
+        is_subtask: bool = False,
+        group_id: Optional[str] = None,
+        scope_type: Optional[str] = None,
+        entity_content: Optional[str] = None,
+        tech_stack: Optional[str] = None,
+        color_theme: Optional[str] = None,
+        key_sections: Optional[str] = None,
+        confirmed: bool = False,
+    ) -> Dict[str, Any]:
         """Launch an autonomous task executed by this agent's designated tool."""
         # Check if Michael orchestrator should auto-decompose multi-faceted full-stack tasks
         if not is_subtask and agent_id.upper() in ("MICHAEL", "MANAGER") and any(w in prompt.lower() for w in ("full-stack", "fullstack", "entire app", "both frontend and backend")):
@@ -622,17 +721,21 @@ class FleetManager:
                 agent = flux
 
         # Capability check via Circuit Breaker
-        can_run, block_reason = circuit_breaker.can_execute(agent.default_tool)
+        check_tool = agent.default_tool
+        if not check_tool and agent.engine:
+            check_tool = f"{agent.engine}_run"
+        can_run, block_reason = circuit_breaker.can_execute(check_tool)
         if not can_run:
-            return {"success": False, "error": f"Circuit breaker tripped for {agent.default_tool}: {block_reason}"}
+            return {"success": False, "error": f"Circuit breaker tripped for {check_tool}: {block_reason}"}
 
         import uuid
         task_id = uuid.uuid4().hex[:8]
+        worktree_name = f"{agent.id.lower()}_{task_id}"
         worktree_path = None
 
         # Worktree sandboxing for destructive actions
         if agent.risk_tier == "L2_DESTRUCTIVE" or agent.default_tool in ("opencode_run", "kilo_run"):
-            wt = git_sandbox.create_worktree(f"{agent.id.lower()}_{task_id}")
+            wt = git_sandbox.create_worktree(worktree_name)
             if wt.success:
                 worktree_path = str(wt.worktree_path)
 
@@ -647,7 +750,24 @@ class FleetManager:
         except Exception as e:
             logger.warning("[FleetManager] Could not ensure directory %s: %s", target_dir, e)
 
-        enriched_prompt = f"[{agent.name} • {agent.role}]\n{agent.prompt_prefix}\n\nTask: {prompt}"
+        # Resolve active procedural skills from agent.allowed_skills
+        skills_context = ""
+        try:
+            from core.skill_loader import get_skill_registry
+            registry = get_skill_registry()
+            for sk in (agent.allowed_skills or []):
+                skill_obj = getattr(registry, "get_skill", lambda s: getattr(registry, "_skills", {}).get(s))(sk)
+                if not skill_obj and hasattr(registry, "_skills"):
+                    for k, s in registry._skills.items():
+                        if k.lower() == str(sk).lower():
+                            skill_obj = s
+                            break
+                if skill_obj and getattr(skill_obj, "instructions", None):
+                    skills_context += f"\n\n[ACTIVE SKILL: {skill_obj.name}]\n{skill_obj.instructions}\n"
+        except Exception as e:
+            logger.debug("[FleetManager] Skill resolution error: %s", e)
+
+        enriched_prompt = f"[{agent.name} • {agent.role}]\n{agent.prompt_prefix}{skills_context}\n\nTask: {prompt}"
         active_model = model_override or agent.model_id or None
 
         # Submit task to background TaskManager
@@ -655,6 +775,7 @@ class FleetManager:
         tm = get_task_manager()
 
         def _worker_fn(worker_params: dict, task_ctx: Any) -> dict:
+            wt_name = worker_params.get("worktree_name") or (worktree_name if worktree_path else None)
             try:
                 # Wrap task_ctx.report to synchronize agent progress and activity logs
                 orig_report = getattr(task_ctx, "report", None)
@@ -693,8 +814,12 @@ class FleetManager:
                 extracted_target = url_match.group(0) if url_match else prompt
 
                 # Determine effective tool to run
-                effective_tool = agent.default_tool
-                if effective_tool in ("none", "", None) or not reg.has(effective_tool):
+                effective_tool = ""
+                if agent.engine and reg.has(f"{agent.engine}_run"):
+                    effective_tool = f"{agent.engine}_run"
+                elif agent.default_tool and reg.has(agent.default_tool):
+                    effective_tool = agent.default_tool
+                else:
                     if "code" in prompt.lower() or "build" in prompt.lower() or "app" in prompt.lower():
                         effective_tool = "opencode_run"
                     elif any(k in prompt.lower() for k in ("research", "transcript", "video", "youtube", "media", "search", "http")):
@@ -715,6 +840,19 @@ class FleetManager:
                     "run_in_place": True,
                     "task_ctx": task_ctx,
                 }
+                if effective_tool in ("antigravity_run", "opencode_run", "kilo_run"):
+                    call_params["scope_type"] = scope_type
+                    call_params["entity_content"] = entity_content
+                    call_params["tech_stack"] = tech_stack
+                    call_params["color_theme"] = color_theme
+                    call_params["key_sections"] = key_sections
+                    call_params["confirmed"] = confirmed
+                if effective_tool == "extract_design_system":
+                    call_params["target_file"] = extracted_target
+                    call_params["file_path"] = extracted_target
+                    call_params["path"] = extracted_target
+                    call_params["output_path"] = target_dir
+
                 if active_model:
                     call_params["model"] = active_model
                     call_params["model_id"] = active_model
@@ -723,7 +861,7 @@ class FleetManager:
 
                 # Check if task was cancelled during action execution
                 if hasattr(task_ctx, "cancelled") and task_ctx.cancelled():
-                    self.complete_task(agent.id, submitted_id)
+                    self.complete_task(agent.id, submitted_id, merge_changes=False, worktree_id=wt_name)
                     self._broadcast_event("task_cancelled", {
                         "task_id": submitted_id,
                         "agent_id": agent.id,
@@ -732,7 +870,7 @@ class FleetManager:
                     self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
                     if worktree_path:
                         try:
-                            git_sandbox.safe_teardown(f"{agent.id.lower()}_{task_id}")
+                            git_sandbox.safe_teardown(wt_name or worktree_name)
                         except Exception:
                             pass
                     return {"status": "cancelled"}
@@ -745,7 +883,7 @@ class FleetManager:
                         is_error = True
                         err_msg = str(res.get("error") or res.get("message") or "Task execution failed")
                     elif res.get("status") == "cancelled":
-                        self.complete_task(agent.id, submitted_id)
+                        self.complete_task(agent.id, submitted_id, merge_changes=False, worktree_id=wt_name)
                         self._broadcast_event("task_cancelled", {
                             "task_id": submitted_id,
                             "agent_id": agent.id,
@@ -754,7 +892,7 @@ class FleetManager:
                         self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
                         if worktree_path:
                             try:
-                                git_sandbox.safe_teardown(f"{agent.id.lower()}_{task_id}")
+                                git_sandbox.safe_teardown(wt_name or worktree_name)
                             except Exception:
                                 pass
                         return {"status": "cancelled"}
@@ -767,7 +905,7 @@ class FleetManager:
                 if is_error:
                     if hasattr(task_ctx, "on_fail"):
                         task_ctx.on_fail(err_msg)
-                    self.complete_task(agent.id, submitted_id)
+                    self.complete_task(agent.id, submitted_id, merge_changes=False, worktree_id=wt_name)
                     self._broadcast_event("task_failed", {
                         "task_id": submitted_id,
                         "agent_id": agent.id,
@@ -777,13 +915,13 @@ class FleetManager:
                     self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
                     if worktree_path:
                         try:
-                            git_sandbox.safe_teardown(f"{agent.id.lower()}_{task_id}")
+                            git_sandbox.safe_teardown(wt_name or worktree_name)
                         except Exception:
                             pass
                     return {"status": "error", "error": err_msg}
 
                 _reporting_wrapper(100, "Completed successfully")
-                self.complete_task(agent.id, submitted_id)
+                self.complete_task(agent.id, submitted_id, merge_changes=True, worktree_id=wt_name)
                 self._broadcast_event("task_done", {
                     "task_id": submitted_id,
                     "agent_id": agent.id,
@@ -793,14 +931,14 @@ class FleetManager:
                 self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
                 if worktree_path:
                     try:
-                        git_sandbox.safe_teardown(f"{agent.id.lower()}_{task_id}")
+                        git_sandbox.safe_teardown(wt_name or worktree_name)
                     except Exception:
                         pass
                 return {"status": "success", "result": str(res)}
             except Exception as ex:
                 if hasattr(task_ctx, "on_fail"):
                     task_ctx.on_fail(str(ex))
-                self.complete_task(agent.id, submitted_id)
+                self.complete_task(agent.id, submitted_id, merge_changes=False, worktree_id=wt_name)
                 self._broadcast_event("task_failed", {
                     "task_id": submitted_id,
                     "agent_id": agent.id,
@@ -810,7 +948,7 @@ class FleetManager:
                 self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
                 if worktree_path:
                     try:
-                        git_sandbox.safe_teardown(f"{agent.id.lower()}_{task_id}")
+                        git_sandbox.safe_teardown(wt_name or worktree_name)
                     except Exception:
                         pass
                 raise
@@ -829,8 +967,23 @@ class FleetManager:
             except Exception:
                 pass
 
+        from core.action_loader import discover_actions
+        reg = discover_actions(Path(__file__).parent.parent / "actions")
+        effective_tool = ""
+        if agent.engine and reg.has(f"{agent.engine}_run"):
+            effective_tool = f"{agent.engine}_run"
+        elif agent.default_tool and reg.has(agent.default_tool):
+            effective_tool = agent.default_tool
+        else:
+            if "code" in prompt.lower() or "build" in prompt.lower() or "app" in prompt.lower():
+                effective_tool = "opencode_run"
+            elif any(k in prompt.lower() for k in ("research", "transcript", "video", "youtube", "media", "search", "http")):
+                effective_tool = "agent_reach" if reg.has("agent_reach") else "web_search"
+            else:
+                effective_tool = "quick_snippet" if reg.has("quick_snippet") else "opencode_run"
+
         submitted_id = tm.submit(
-            tool_name=agent.default_tool,
+            tool_name=effective_tool,
             fn=_worker_fn,
             params={
                 "task": prompt,
@@ -840,6 +993,8 @@ class FleetManager:
                 "target_dir": target_dir,
                 "model_id": active_model,
                 "is_subtask": is_subtask,
+                "worktree_name": worktree_name if worktree_path else None,
+                "worktree_path": worktree_path,
             },
             group_id=parent_group_id or group_id if is_subtask else None,
             group_title=parent_group_title or (f"[{agent.name}] {prompt[:40]}..." if not is_subtask else None),
@@ -862,7 +1017,7 @@ class FleetManager:
             "agent": agent.name,
             "task": prompt,
             "title": prompt[:60],
-            "tool": agent.default_tool,
+            "tool": effective_tool,
             "target_dir": target_dir,
         })
         self._broadcast_event("fleet_updated", {"fleet": self.get_fleet_deck_state()})
@@ -872,25 +1027,34 @@ class FleetManager:
             "task_id": submitted_id,
             "agent_id": agent.id,
             "agent_name": agent.name,
-            "tool": agent.default_tool,
+            "tool": effective_tool,
             "model_id": active_model,
             "worktree": worktree_path,
         }
 
-    def complete_task(self, agent_id: str, task_id: str, merge_changes: bool = False) -> Dict[str, Any]:
+    def complete_task(self, agent_id: str, task_id: str, merge_changes: bool = False, worktree_id: Optional[str] = None) -> Dict[str, Any]:
         """Mark agent task complete and teardown worktree."""
         agent = self.get_agent(agent_id)
         if not agent:
             return {"success": False, "error": f"Agent '{agent_id}' not found."}
 
+        wt_id = worktree_id
+        if not wt_id and agent.active_worktree:
+            try:
+                wt_id = Path(agent.active_worktree).name
+            except Exception:
+                wt_id = task_id
+        if not wt_id:
+            wt_id = task_id
+
         merge_msg = ""
         if merge_changes and agent.active_worktree:
-            success, merge_msg = git_sandbox.merge_worktree(task_id)
+            success, merge_msg = git_sandbox.merge_worktree(wt_id)
             if not success:
                 logger.warning(f"[FleetManager] Merge failed: {merge_msg}")
 
         if agent.active_worktree:
-            teardown_msg = git_sandbox.safe_teardown(task_id)
+            teardown_msg = git_sandbox.safe_teardown(wt_id)
             logger.info(f"[FleetManager] {teardown_msg}")
 
         with self._lock:
@@ -919,6 +1083,7 @@ class FleetManager:
         tm = get_task_manager()
 
         with self._lock:
+            self.refresh_if_modified()
             state = []
             for a in self.agents.values():
                 # Sync real-time progress from task manager

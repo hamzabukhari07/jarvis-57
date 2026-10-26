@@ -59,6 +59,7 @@ class SkillRecord:
         return {
             "name": self.name,
             "description": self.description,
+            "instructions": self.instructions,
             "domain": self.domain,
             "author": self.author,
             "version": self.version,
@@ -110,6 +111,9 @@ def _parse_yaml_frontmatter(raw_yaml: str) -> dict[str, Any]:
     return meta
 
 
+EXCLUDED_SKILL_NAMES = {"antigravity_agent", "kilo_code", "opencode", "custom_skill_10", "hamza_taste"}
+
+
 def _infer_domain_from_name_and_tags(name: str, tags: list[str], folder: Path) -> str:
     combined = (name + " " + " ".join(tags) + " " + folder.name).lower()
     if any(k in combined for k in ("ui", "design", "frontend", "taste", "css", "theme", "preset", "aesthetic", "style")):
@@ -140,10 +144,12 @@ def _generate_default_triggers(name: str, domain: str, tags: list[str]) -> list[
 
 class SkillRegistry:
     def __init__(self, skills_dir: Path | None = None, logger_fn: Optional[Callable[[str], None]] = None):
-        self._dir = skills_dir or SKILLS_DIR
+        self._dir = Path(skills_dir or SKILLS_DIR).resolve()
         self._logger = logger_fn or (lambda m: print(f"[Skills] {m}"))
         self._skills: dict[str, SkillRecord] = {}
         self._state: dict[str, dict[str, Any]] = self._load_state()
+        self._last_mtime: float = 0.0
+        self._last_signature: tuple = (0.0, 0, ())
         self.reload()
 
     def _load_state(self) -> dict[str, dict[str, Any]]:
@@ -169,17 +175,67 @@ class SkillRegistry:
         except Exception as e:
             logger.debug("Failed to save skills state: %s", e)
 
+    def get_signature(self) -> tuple[float, int, tuple[str, ...]]:
+        """Return composite signature of skills directory: (max_mtime, count, sorted_entry_names)."""
+        if not self._dir.exists():
+            return (0.0, 0, ())
+        try:
+            mtime = self._dir.stat().st_mtime
+            entries = []
+            for entry in os.scandir(self._dir):
+                try:
+                    entries.append(entry.name)
+                    stat = entry.stat()
+                    if stat.st_mtime > mtime:
+                        mtime = stat.st_mtime
+                    if entry.is_dir():
+                        skill_md = Path(entry.path) / "SKILL.md"
+                        if skill_md.is_file():
+                            s_mtime = skill_md.stat().st_mtime
+                            if s_mtime > mtime:
+                                mtime = s_mtime
+                except OSError:
+                    pass
+            entries.sort()
+            return (mtime, len(entries), tuple(entries))
+        except OSError:
+            return (0.0, 0, ())
+
+    def get_mtime(self) -> float:
+        """Return latest modification timestamp for the skills root directory and discovered skills."""
+        return self.get_signature()[0]
+
+    def refresh_if_modified(self) -> bool:
+        """
+        Rescan skills directory if modified since last load.
+        Evicts deleted skills and loads new/modified skills in-place.
+        Returns True if a reload occurred, False otherwise.
+        """
+        with _lock:
+            current_sig = self.get_signature()
+            if current_sig != self._last_signature:
+                self.reload()
+                return True
+            return False
+
     def reload(self) -> None:
         """Scan skills directory recursively for all SKILL.md packages."""
         with _lock:
-            self._skills.clear()
+            self._state = self._load_state()
+            new_skills: dict[str, SkillRecord] = {}
+
             if not self._dir.exists():
                 self._dir.mkdir(parents=True, exist_ok=True)
+                self._skills.clear()
+                self._last_signature = self.get_signature()
+                self._last_mtime = self._last_signature[0]
                 return
 
             # Discover all SKILL.md files (top-level and domain categorized)
             for skill_file in self._dir.rglob("SKILL.md"):
                 item_folder = skill_file.parent
+                if item_folder.name in EXCLUDED_SKILL_NAMES:
+                    continue
                 try:
                     content = skill_file.read_text(encoding="utf-8")
                     m = _FRONTMATTER_RE.match(content)
@@ -187,6 +243,8 @@ class SkillRegistry:
                         meta_block, body = m.group(1), m.group(2).strip()
                         meta = _parse_yaml_frontmatter(meta_block)
                         name = str(meta.get("name") or item_folder.name).strip()
+                        if name in EXCLUDED_SKILL_NAMES:
+                            continue
                         desc = str(meta.get("description") or f"Skill for {name}").strip()
                         author = str(meta.get("author") or "system").strip()
                         version = str(meta.get("version") or "1.0").strip()
@@ -215,7 +273,7 @@ class SkillRegistry:
                     disabled = saved.get("disabled", False)
                     auto_activate = saved.get("auto_activate", True)
 
-                    self._skills[name] = SkillRecord(
+                    new_skills[name] = SkillRecord(
                         name=name,
                         description=desc,
                         instructions=body,
@@ -232,17 +290,24 @@ class SkillRegistry:
                 except Exception as e:
                     self._logger(f"⚠️ Failed to parse {skill_file}: {e}")
 
+            # Evict removed skills, load new/modified skills in-place
+            self._skills.clear()
+            self._skills.update(new_skills)
+            self._last_signature = self.get_signature()
+            self._last_mtime = self._last_signature[0]
             self._logger(f"Discovered {len(self._skills)} declarative skills across {len(self.list_domains())} domains.")
 
     def list_domains(self) -> list[str]:
         """Return list of all unique domains."""
         with _lock:
+            self.refresh_if_modified()
             domains = set(s.domain.upper() for s in self._skills.values())
             return sorted(domains or ["GENERAL"])
 
     def list_skills(self, domain: Optional[str] = None) -> list[dict[str, Any]]:
         """Return metadata list of all discovered skills, optionally filtered by domain."""
         with _lock:
+            self.refresh_if_modified()
             skills = list(self._skills.values())
             if domain and domain.upper() != "ALL":
                 skills = [s for s in skills if s.domain.upper() == domain.upper()]
@@ -251,11 +316,12 @@ class SkillRegistry:
     def read_skill(self, name: str) -> str:
         """Retrieve full markdown instructions for a specific skill."""
         with _lock:
+            self.refresh_if_modified()
             clean_name = (name or "").strip()
             if clean_name in self._skills:
                 s = self._skills[clean_name]
                 return f"# SKILL: {s.name} ({s.domain.upper()})\n**Description:** {s.description}\n\n{s.instructions}"
-            
+
             for k, s in self._skills.items():
                 if clean_name.lower() in k.lower() or k.lower() in clean_name.lower():
                     return f"# SKILL: {s.name} ({s.domain.upper()})\n**Description:** {s.description}\n\n{s.instructions}"
@@ -268,6 +334,7 @@ class SkillRegistry:
         Returns prioritized active skills for prompt context injection.
         """
         with _lock:
+            self.refresh_if_modified()
             q = (query or "").lower().strip()
             if not q:
                 return [s for s in self._skills.values() if s.pinned and not s.disabled]
@@ -311,6 +378,7 @@ class SkillRegistry:
         plus full instructions for any pinned skills.
         """
         with _lock:
+            self.refresh_if_modified()
             active_skills = [s for s in self._skills.values() if not s.disabled]
             if not active_skills:
                 return ""
@@ -513,6 +581,7 @@ tags:
                 if name in self._state:
                     del self._state[name]
                 self._save_state()
+                self._last_mtime = self.get_mtime()
                 return True, f"Skill '{name}' deleted successfully."
             except Exception as e:
                 return False, f"Failed to delete skill '{name}': {e}"

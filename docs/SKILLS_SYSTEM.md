@@ -42,31 +42,29 @@ Every skill in ZEZO resides in its own isolated directory under `skills/<skill_n
 
 ```markdown
 ---
-name: hamza_taste
-description: Master Studio UI Anti-Slop Directive & Reference-First Design Protocol for autonomous web generation and frontend agents.
-domain: design
+name: website_build
+description: Master studio protocol for creating websites, landing pages, and UI components adhering to Hamza Taste design references and anti-slop gates.
+domain: ui
 author: Hamza Bukhari
-version: 2.5.0
-tags:
-  - Design System
-  - Anti-Slop
-  - Tailwind
-  - ReUI
+version: 1.0.0
 triggers:
-  - "design"
-  - "ui"
-  - "frontend styling"
-  - "build a website"
+  - "build website"
+  - "create landing page"
+  - "make website"
+  - "hero section"
+  - "pricing table"
+  - "web app"
 auto_activate: true
-pinned: false
 ---
 
-# 🎨 Hamza Taste — Studio UI Anti-Slop Directive
+# 🌐 Website Build — Studio Greenfield Creation Protocol
 
-## Executive Rules
-1. Anti-Slop is a FILTER (what to reject), while Reference HTML Templates supply 100% of the DIRECTION.
-2. Never output naive generic centered cards with purple gradients.
-3. Use calibrated spacing, semantic tokens, and high-contrast typography.
+## Executive Workflow
+1. **Phase 1: Intake & Clarification Gate**: Intercepts open-ended queries, prompts for the 4 architectural pillars (`scope_type`, `tech_stack`, `color_theme`, `key_sections`), and enforces a 1-sentence Commitment Read-Back confirmation before workspace allocation.
+2. **Phase 2: Deterministic Catalog Resolution**: Queries `skills/website_build/references/catalog.json` across 5 scope folders (`1_landing_pages`, `2_business_sites`, `3_portfolios`, `4_dashboards`, `5_components`) indexing 20 authentic HTML templates. Eliminates pseudo-random modulo string hashing.
+3. **Phase 3: Anti-Slop Directive**: Enforces 3 tiers of hard design constraints (anti-slop filter, rhythm/geometry locks, micro-interactions).
+4. **Phase 4: Stack Parity**: Supports Single-File HTML and Modular React 18 + Vite architectures with clean dependency resolution.
+5. **Phase 5: Smart Live Preview**: Launches ephemeral preview servers (ports 9400-9480) for HTML or background dev servers for React, permanently suppressing blank `file://` popups.
 ```
 
 ### Frontmatter Schema

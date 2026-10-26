@@ -38,6 +38,7 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
     task = str(params.get("task") or "").strip()
     model_id = str(params.get("model_id") or params.get("model") or "").strip() or None
     target_path = str(params.get("path") or params.get("project_path") or "").strip() or None
+    entity_content = str(params.get("entity_content") or "").strip() or None
     if not agent_id:
         return "Error: agent_id is required to dispatch a task. Available agents can be queried with action='list_agents'."
     if not task:
@@ -59,6 +60,38 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
             f" (last remembered repo: {remembered})" if remembered else "",
         )
 
+    # ── Stateless Greenfield Intake & Confirmation Gate for Fleet Builds ────
+    is_web_agent = agent_id.upper() in ("VERVE", "FLUX")
+    is_web_task = any(k in task.lower() for k in ("build website", "create website", "make a website", "make website", "build landing page", "create landing page", "build portfolio", "create portfolio", "new website", "new landing page"))
+    if (is_web_agent or is_web_task) and not target_path:
+        from actions.antigravity_agent import check_greenfield_gate
+        gate_params = dict(params)
+        if entity_content:
+            gate_params["entity_content"] = entity_content
+        gate_msg = check_greenfield_gate(
+            task=task,
+            parameters=gate_params,
+            caller_tool="fleet_control",
+        )
+        if gate_msg:
+            return gate_msg
+
+    # Enrich task with resolved stack/theme parameters upon confirmed dispatch
+    stack_info = []
+    if params.get("tech_stack"):
+        stack_info.append(f"Stack: {params.get('tech_stack')}")
+    if params.get("color_theme"):
+        stack_info.append(f"Theme: {params.get('color_theme')}")
+    if params.get("scope_type"):
+        stack_info.append(f"Scope: {params.get('scope_type')}")
+    if params.get("key_sections"):
+        stack_info.append(f"Sections: {params.get('key_sections')}")
+    if entity_content:
+        stack_info.append(f"Entity/Content: {entity_content}")
+    if stack_info:
+        joined_info = ", ".join(stack_info)
+        task = f"{task}\n[{joined_info}]"
+
     # Debounce / deduplication check (12 seconds window for same agent and similar prompt)
     now = time.time()
     agent_key = agent_id.upper()
@@ -77,7 +110,18 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
                 agent_name = (fleet_manager.get_agent(agent_id) or type("Agent", (), {"name": agent_id})).name
                 return f"Task already dispatched to {agent_name} and in progress. Task ID: {existing_task_id}."
 
-    res = fleet_manager.dispatch_task(agent_id=agent_id, prompt=task, path=target_path, model_override=model_id)
+    res = fleet_manager.dispatch_task(
+        agent_id=agent_id,
+        prompt=task,
+        path=target_path,
+        model_override=model_id,
+        scope_type=params.get("scope_type"),
+        entity_content=entity_content,
+        tech_stack=params.get("tech_stack"),
+        color_theme=params.get("color_theme"),
+        key_sections=params.get("key_sections"),
+        confirmed=bool(params.get("confirmed", False)),
+    )
     if not res.get("success"):
         return f"Fleet dispatch failed: {res.get('error', 'Unknown error')}"
 
@@ -382,6 +426,48 @@ TOOL = {
             "specialty": {
                 "type": "STRING",
                 "description": "Agent technical specialty or focus area.",
+            },
+            "scope_type": {
+                "type": "STRING",
+                "enum": ["landing_page", "portfolio", "full_website", "hero_section", "component"],
+                "description": (
+                    "Scope of the web build. Set ONLY if user stated (e.g. 'landing page', 'portfolio', 'full website', 'hero section', 'pricing card'). "
+                    "Otherwise OMIT it — ZEZO will ask."
+                ),
+            },
+            "entity_content": {
+                "type": "STRING",
+                "description": (
+                    "Biographical info, name, role, projects, or reference to desktop resume for portfolio/personal sites."
+                ),
+            },
+            "tech_stack": {
+                "type": "STRING",
+                "enum": ["single_file_html", "modular_html_css_js", "react_vite", "nextjs"],
+                "description": (
+                    "Tech stack for new website creation. Set this ONLY if user explicitly stated a stack. "
+                    "Otherwise OMIT it — ZEZO will ask the user. Never invent a default yourself."
+                ),
+            },
+            "color_theme": {
+                "type": "STRING",
+                "enum": ["dark_obsidian", "clean_minimal", "luxury_gold", "cyber_matrix", "custom"],
+                "description": (
+                    "Visual design theme / aesthetic. Set this ONLY if stated. Otherwise OMIT it — ZEZO will ask."
+                ),
+            },
+            "key_sections": {
+                "type": "STRING",
+                "description": (
+                    "Comma-separated key sections (e.g. 'hero, features, pricing, contact'). Set ONLY if user stated. Otherwise OMIT it."
+                ),
+            },
+            "confirmed": {
+                "type": "BOOLEAN",
+                "description": (
+                    "Set to true ONLY after the user explicitly hears the plan and confirms ('yes', 'proceed', 'build it'). "
+                    "Omit or false on initial request."
+                ),
             },
         },
         "required": ["action"],

@@ -55,18 +55,18 @@ Each desk position reflects the agent's live operational status:
 
 ZEZO includes an out-of-the-box roster of specialized agents defined in [`config/fleet_agents.json`](file:///d:/anitgravity/zezo%20work/jarvis-57/config/fleet_agents.json):
 
-| Agent ID | Name | Role & Specialty | Default Engine / Tool | Risk Tier | Desk Coordinates |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **`MICHAEL`** | **Michael** | Lead Software Architect & Tech Lead (Structural planning, task breakdown) | `groq` (Llama 3.3 70B) | `L1_MUTATION` | (180, 160) |
-| **`VERVE`** | **Verve** | Senior Frontend & UI Specialist (Tailwind, animations, design tokens) | `antigravity_run` | `L1_MUTATION` | (320, 160) |
-| **`FLUX`** | **Flux** | Frontend Developer & Overflow Balancer (Component synthesis, UI fixes) | `antigravity_run` | `L1_MUTATION` | (320, 280) |
-| **`AHMAD`** | **Nexus (Ahmad)** | Senior Full-Stack & Python Backend Specialist (FastAPI, Postgres, schemas) | `opencode_run` | `L2_DESTRUCTIVE` | (460, 160) |
-| **`DWIGHT`** | **Dwight** | Senior Refactoring & QA Specialist (Test suites, audits, complexity reduction) | `kilo_run` | `L1_MUTATION` | (460, 280) |
-| **`PAM`** | **Pam** | Design System & Token Architect (Token extraction, palette generation) | `extract_design_system` | `L0_READ_ONLY` | (320, 280) |
-| **`DEVDYNAMO`**| **DevDynamo (Haider)** | Autonomous Full-Stack Engineer (End-to-end features, modern web apps) | `opencode_run` | `L1_MUTATION` | (180, 280) |
-| **`KELLY`** | **Kelly** | Social & Deep Web Researcher (Reddit, YouTube, content extraction) | `agent_reach` | `L0_READ_ONLY` | (600, 160) |
-| **`QUANTUM`** | **Quantum** | Deep Web Researcher & Technical Scraper (Documentation, whitepapers) | `kilo_run` | `L1_MUTATION` | (600, 280) |
-| **`RECON`** | **Recon** | Deep Intelligence & OSINT Researcher (Autonomous multi-source research) | `agent_reach` | `L0_READ_ONLY` | (600, 400) |
+| Agent ID | Name | Role & Specialty | Execution Engine | Default Action Tool | Risk Tier | Desk Coordinates |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **`MICHAEL`** | **Michael** | Lead Software Architect & Tech Lead (Structural planning, task breakdown) | `opencode` | `opencode_run` | `L1_MUTATION` | (180, 160) |
+| **`VERVE`** | **Verve** | Senior Frontend & UI Specialist (Tailwind, animations, design tokens, `website_build`) | `antigravity` | `antigravity_run` | `L1_MUTATION` | (320, 160) |
+| **`FLUX`** | **Flux** | Frontend Developer & Overflow Balancer (Component synthesis, UI fixes, `website_build`) | `antigravity` | `antigravity_run` | `L1_MUTATION` | (320, 280) |
+| **`AHMAD`** | **Nexus (Ahmad)** | Senior Full-Stack & Python Backend Specialist (FastAPI, Postgres, schemas) | `opencode` | `opencode_run` | `L2_DESTRUCTIVE` | (460, 160) |
+| **`DWIGHT`** | **Dwight** | Senior Refactoring & QA Specialist (Test suites, audits, complexity reduction) | `kilo` | `kilo_run` | `L1_MUTATION` | (460, 280) |
+| **`PAM`** | **Pam** | Design System & Token Architect (Token extraction, palette generation) | `custom` | `extract_design_system` | `L0_READ_ONLY` | (460, 280) |
+| **`DEVDYNAMO`**| **DevDynamo (Haider)** | Autonomous Full-Stack Engineer (End-to-end features, modern web apps) | `opencode` | `opencode_run` | `L1_MUTATION` | (180, 280) |
+| **`KELLY`** | **Kelly** | Social & Deep Web Researcher (Reddit, YouTube, content extraction) | `custom` | `agent_reach` | `L0_READ_ONLY` | (600, 160) |
+| **`QUANTUM`** | **Quantum** | Deep Web Researcher & Technical Scraper (Documentation, whitepapers) | `kilo` | `kilo_run` | `L1_MUTATION` | (600, 280) |
+| **`RECON`** | **Recon** | Deep Intelligence & OSINT Researcher (Autonomous multi-source research) | `custom` | `agent_reach` | `L0_READ_ONLY` | (600, 400) |
 
 ---
 
@@ -109,7 +109,10 @@ To ensure absolute codebase integrity, agents operate under strict permissions:
 When a mutation task is dispatched:
 1. ZEZO creates an isolated Git worktree under `.agent_worktrees/<task_id>/` on a dedicated branch (`agent/<clean_task_id>`).
 2. The agent executes all edits, builds, and tests inside this quarantined directory.
-3. Once the task succeeds, changes undergo a **4-gate safe teardown and merge check** guarded by `_merge_lock` before merging back into `main`.
+3. Once the task succeeds (`prog == 100`), `complete_task(agent.id, task_id, merge_changes=True, worktree_id=...)` automatically runs a **4-gate safe teardown and merges changes to the main branch** under `_merge_lock`, preventing code loss.
+
+### 3. Declarative Skill Injection
+In `core/fleet_manager.py:dispatch_task`, when an agent defines skills in `agent.allowed_skills` (such as `website_build`), ZEZO automatically queries `core.skill_loader.get_skill_registry()` and injects the full declarative instructions under an `[ACTIVE SKILL: <name>]` block directly into the enriched execution prompt.
 
 ---
 
@@ -117,6 +120,7 @@ When a mutation task is dispatched:
 
 Users can click on any agent in the Scranton Office to open a dedicated, isolated conversational channel:
 - **Independent Conversation Context:** Chats do not pollute the primary voice session memory.
-- **Assistant-UI Thread:** Full markdown rendering, code block copy buttons, and turn-by-turn reasoning pills.
+- **Actionable Task Dispatch Bridge:** Direct chat messages to agents in `/api/fleet/chat` are classified by `_is_actionable_task()`. When a user requests code creation or web building (e.g. "Build a landing page for my crypto app"), the chat engine bridges directly to `fleet_manager.dispatch_task()`, triggers real background execution, and replies with honest live Task ID telemetry, completely eliminating single-turn chat hallucinations.
+- **Assistant-UI Thread:** Full markdown rendering, code block copy buttons, and turn-by-turn reasoning pills for conceptual explanations.
 - **Dynamic Model Switching:** Allows overriding the agent's default LLM on the fly (e.g., switching between Gemini 3.7 Flash and Claude Sonnet 4.6).
 - **Live Soul Editing:** The side panel allows editing the agent's `prompt_prefix`, allowed tools, and capabilities directly from the UI.

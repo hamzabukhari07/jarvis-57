@@ -592,8 +592,6 @@ class MainWindow(QMainWindow):
             tag, msg = "SYS", text[4:].strip()
 
         self._server.broadcast("log_entry", {"tag": tag, "message": msg})
-        if tag in ("USER", "AI"):
-            self._server.broadcast("transcript_stream", {"speaker": tag.lower(), "text": msg, "done": True})
 
     def _on_stream_emitted(self, speaker: str, text: str, done: bool):
         self._server.broadcast("transcript_stream", {

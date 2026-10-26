@@ -592,14 +592,13 @@ export const ENGINE_MODELS_MAP: Record<string, { id: string; label: string }[]> 
  { id: 'kilo/stepfun/step-3.7-flash:free', label: 'StepFun Step 3.7 Flash (Free)' },
  ],
  antigravity_run: [
- { id: 'gemini-3.8-flash-high', label: 'Gemini 3.8 Flash (High)' },
- { id: 'gemini-3.8-flash-medium', label: 'Gemini 3.8 Flash (Medium)' },
- { id: 'gemini-3.8-flash-low', label: 'Gemini 3.8 Flash (Low)' },
- { id: 'gemini-3.7-flash-medium', label: 'Gemini 3.7 Flash (Medium)' },
- { id: 'gemini-3.1-pro-high', label: 'Gemini 3.1 Pro (High)' },
- { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (Thinking)' },
- { id: 'claude-opus-4-6-thinking', label: 'Claude Opus 4.6 (Thinking)' },
- ],
+	 { id: 'gemini-3.7-flash-high', label: 'Gemini 3.7 Flash (High)' },
+	 { id: 'gemini-3.7-flash-medium', label: 'Gemini 3.7 Flash (Medium)' },
+	 { id: 'gemini-3.7-flash-low', label: 'Gemini 3.7 Flash (Low)' },
+	 { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 (Thinking)' },
+	 { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (Thinking)' },
+	 { id: 'claude-fable-5-1', label: 'Claude Fable 5.1' },
+	 ],
  groq: [
  { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile' },
  { id: 'deepseek-r1-distill-llama-70b', label: 'DeepSeek R1 Distill Llama 70B' },
@@ -659,8 +658,8 @@ interface ToolDefinition {
  desc: string
 }
 
-const AVAILABLE_SKILLS: SkillDefinition[] = [
- { id: 'hamza_taste', name: 'hamza_taste', desc: 'Studio UI aesthetic, anti-slop rules & design presets' },
+const FALLBACK_SKILLS: SkillDefinition[] = [
+ { id: 'website_build', name: 'website_build', desc: 'Studio UI aesthetic, anti-slop rules & design presets' },
  { id: 'opencode', name: 'opencode', desc: 'Full autonomous multi-file coding workflow' },
  { id: 'kilo_code', name: 'kilo_code', desc: 'Free-tier fast refactoring & edits' },
  { id: 'antigravity_agent', name: 'antigravity_agent', desc: 'Agentic code synthesis & studio UI' },
@@ -673,9 +672,6 @@ const AVAILABLE_SKILLS: SkillDefinition[] = [
 ]
 
 const AVAILABLE_TOOLS: ToolDefinition[] = [
- { id: 'opencode_run', name: 'opencode_run', desc: 'Autonomous multi-file coding agent' },
- { id: 'kilo_run', name: 'kilo_run', desc: 'Free-tier fast refactoring agent' },
- { id: 'antigravity_run', name: 'antigravity_run', desc: 'Studio UI & Antigravity synthesis' },
  { id: 'groq', name: 'groq', desc: 'Ultra-fast Groq LLM inference' },
  { id: 'code_helper', name: 'code_helper', desc: 'Single function / snippet generator' },
  { id: 'file_controller', name: 'file_controller', desc: 'File/folder CRUD, search, organization' },
@@ -758,12 +754,43 @@ export function getPersonaFileContent(
 
 export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ backendLogs = [] }) => {
  const [agents, setAgents] = useState<AgentOfficeMember[]>(INITIAL_AGENTS)
+ const [availableSkills, setAvailableSkills] = useState<SkillDefinition[]>(FALLBACK_SKILLS)
  const [selectedAgentId, setSelectedAgentId] = useState<string>('MICHAEL')
  const [internalLogs, setInternalLogs] = useState<LogEntry[]>([])
  const [logFilterMode, setLogFilterMode] = useState<'agent' | 'errors'>('agent')
  const [logSearchQuery, setLogSearchQuery] = useState('')
  const [autoFollowLogs, setAutoFollowLogs] = useState(true)
  const logsEndRef = useRef<HTMLDivElement>(null)
+
+ // Query dynamic skills from backend /api/skills so office modals reflect active disk skills
+ useEffect(() => {
+ let isMounted = true
+ const loadLiveSkills = async () => {
+ try {
+ const res = await api.getSkills()
+ if (isMounted && res && Array.isArray(res.skills) && res.skills.length > 0) {
+ const liveSkills: SkillDefinition[] = res.skills
+ .filter((s: any) => s && s.name && s.name !== 'custom_skill_10' && s.name !== 'hamza_taste')
+ .map((s: any) => ({
+ id: s.name,
+ name: s.display_name || s.name,
+ desc: s.description || (s.triggers && s.triggers.length > 0 ? s.triggers.slice(0, 3).join(', ') : 'Autonomous skill module'),
+ }))
+ if (liveSkills.length > 0) {
+ setAvailableSkills(liveSkills)
+ }
+ }
+ } catch (err) {
+ console.debug('Failed to query live skills in AutonomousOfficeScreen, using fallback:', err)
+ }
+ }
+ loadLiveSkills()
+ window.addEventListener('zezo_skills_updated', loadLiveSkills)
+ return () => {
+ isMounted = false
+ window.removeEventListener('zezo_skills_updated', loadLiveSkills)
+ }
+ }, [])
 
  // Fetch initial logs snapshot from backend API
  useEffect(() => {
@@ -866,7 +893,7 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  ])
  const [newAgentSelectedSkills, setNewAgentSelectedSkills] = useState<string[]>([
  'opencode',
- 'hamza_taste',
+ 'website_build',
  ])
  const folderInputRef = useRef<HTMLInputElement>(null)
 
@@ -982,10 +1009,10 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  setEditAgentEngine(agent.engine || 'opencode_run')
  setEditAgentModel(agent.model || 'opencode/nemotron-3-ultra-free')
  setEditAgentTools([...(agent.tools || [])])
- const currentSkills = AVAILABLE_SKILLS.filter((s) =>
+ const currentSkills = availableSkills.filter((s) =>
  agent.specialty?.toLowerCase().includes(s.id.toLowerCase())
  ).map((s) => s.id)
- setEditAgentSkills(currentSkills.length > 0 ? currentSkills : ['opencode', 'hamza_taste'])
+ setEditAgentSkills(currentSkills.length > 0 ? currentSkills : ['opencode', 'website_build'])
  setIsEditAgentOpen(true)
  playOfficeFoley('click', soundEnabled)
  }
@@ -2756,15 +2783,15 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  <button
  type="button"
  onClick={() => {
- if (newAgentSelectedSkills.length === AVAILABLE_SKILLS.length) {
+ if (newAgentSelectedSkills.length === availableSkills.length) {
  setNewAgentSelectedSkills([])
  } else {
- setNewAgentSelectedSkills(AVAILABLE_SKILLS.map((s) => s.id))
+ setNewAgentSelectedSkills(availableSkills.map((s) => s.id))
  }
  }}
  className="text-[10px] font-mono text-[var(--muted-foreground)] hover:text-[var(--foreground)] px-2 py-0.5 rounded border border-[var(--border)] bg-[var(--input)]/30 hover:bg-[var(--muted)]"
  >
- {newAgentSelectedSkills.length === AVAILABLE_SKILLS.length ? 'Clear Skills' : 'All Skills'}
+ {newAgentSelectedSkills.length === availableSkills.length ? 'Clear Skills' : 'All Skills'}
  </button>
  <button
  type="button"
@@ -2785,7 +2812,7 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  {/* SKILLS TAB CONTENT */}
  <TabsContent value="skills" className="mt-1">
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-1">
- {AVAILABLE_SKILLS.map((skill) => {
+ {availableSkills.map((skill) => {
  const isSelected = newAgentSelectedSkills.includes(skill.id)
  return (
  <button
@@ -3082,12 +3109,40 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  <span>Tools ({editAgentTools.length})</span>
  </TabsTrigger>
  </TabsList>
+ <div className="flex items-center gap-1.5">
+ <button
+ type="button"
+ onClick={() => {
+ if (editAgentSkills.length === availableSkills.length) {
+ setEditAgentSkills([])
+ } else {
+ setEditAgentSkills(availableSkills.map((s) => s.id))
+ }
+ }}
+ className="text-[10px] font-mono text-[var(--muted-foreground)] hover:text-[var(--foreground)] px-2 py-0.5 rounded border border-[var(--border)] bg-[var(--input)]/30 hover:bg-[var(--muted)]"
+ >
+ {editAgentSkills.length === availableSkills.length ? 'Clear Skills' : 'All Skills'}
+ </button>
+ <button
+ type="button"
+ onClick={() => {
+ if (editAgentTools.length === AVAILABLE_TOOLS.length) {
+ setEditAgentTools([])
+ } else {
+ setEditAgentTools(AVAILABLE_TOOLS.map((t) => t.id))
+ }
+ }}
+ className="text-[10px] font-mono text-[var(--muted-foreground)] hover:text-[var(--foreground)] px-2 py-0.5 rounded border border-[var(--border)] bg-[var(--input)]/30 hover:bg-[var(--muted)]"
+ >
+ {editAgentTools.length === AVAILABLE_TOOLS.length ? 'Clear Tools' : 'All Tools'}
+ </button>
+ </div>
  </div>
 
  {/* SKILLS TAB */}
  <TabsContent value="skills" className="mt-1">
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
- {AVAILABLE_SKILLS.map((skill) => {
+ {availableSkills.map((skill) => {
  const isSelected = editAgentSkills.includes(skill.id)
  return (
  <button

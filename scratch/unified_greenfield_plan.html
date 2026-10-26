@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Unified Greenfield Website Pipeline Plan</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #09090b;
+    --fg: #fafafa;
+    --muted: #a1a1aa;
+    --border: #27272a;
+    --card-bg: #121216;
+    --accent: #6366f1;
+    --accent-hover: #4f46e5;
+    --accent-subtle: rgba(99, 102, 241, 0.15);
+    --success: #10b981;
+    --success-subtle: rgba(16, 185, 129, 0.15);
+    --warning: #f59e0b;
+    --warning-subtle: rgba(245, 158, 11, 0.15);
+    --danger: #ef4444;
+    --danger-subtle: rgba(239, 68, 68, 0.15);
+    color-scheme: dark;
+  }
+  :root:not([data-theme="dark"]) {
+    --bg: #f8fafc;
+    --fg: #0f172a;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --card-bg: #ffffff;
+    --accent: #4f46e5;
+    --accent-hover: #4338ca;
+    --accent-subtle: rgba(79, 70, 229, 0.1);
+    --success: #059669;
+    --success-subtle: rgba(5, 150, 105, 0.1);
+    --warning: #d97706;
+    --warning-subtle: rgba(217, 119, 6, 0.1);
+    --danger: #dc2626;
+    --danger-subtle: rgba(220, 38, 38, 0.1);
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --bg: #09090b;
+    --fg: #fafafa;
+    --muted: #a1a1aa;
+    --border: #27272a;
+    --card-bg: #121216;
+    --accent: #6366f1;
+    --accent-hover: #4f46e5;
+    --accent-subtle: rgba(99, 102, 241, 0.15);
+    --success: #10b981;
+    --success-subtle: rgba(16, 185, 129, 0.15);
+    --warning: #f59e0b;
+    --warning-subtle: rgba(245, 158, 11, 0.15);
+    --danger: #ef4444;
+    --danger-subtle: rgba(239, 68, 68, 0.15);
+    color-scheme: dark;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding-block: 2rem;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    line-height: 1.6;
+  }
+  code, pre {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  header {
+    margin-bottom: 2.5rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1.5rem;
+  }
+  .badge-group {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+  }
+  .badge-primary { background: var(--accent-subtle); color: var(--accent); border: 1px solid var(--accent); }
+  .badge-success { background: var(--success-subtle); color: var(--success); border: 1px solid var(--success); }
+  .badge-warning { background: var(--warning-subtle); color: var(--warning); border: 1px solid var(--warning); }
+  h1 {
+    font-size: 2.25rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin: 0 0 0.5rem 0;
+    text-wrap: balance;
+  }
+  p.lead {
+    font-size: 1.125rem;
+    color: var(--muted);
+    margin: 0;
+  }
+  section {
+    margin-bottom: 3rem;
+  }
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .card h3 {
+    margin-top: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .conflict-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    font-size: 0.875rem;
+  }
+  .conflict-table th, .conflict-table td {
+    border: 1px solid var(--border);
+    padding: 0.75rem 1rem;
+    text-align: left;
+  }
+  .conflict-table th {
+    background: var(--card-bg);
+    font-weight: 600;
+  }
+  .conflict-table tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .roadmap-step {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    position: relative;
+  }
+  .step-num {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-subtle);
+    width: 3rem;
+    height: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .step-content {
+    flex: 1;
+    min-width: 0;
+  }
+  .step-content h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    font-size: 1.25rem;
+  }
+  ul {
+    margin: 0.5rem 0;
+    padding-left: 1.25rem;
+  }
+  li {
+    margin-bottom: 0.35rem;
+  }
+  pre.code-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    font-size: 0.8125rem;
+    margin-top: 0.75rem;
+  }
+  .highlight {
+    color: var(--accent);
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="badge-group">
+      <span class="badge badge-primary">Unified Architecture</span>
+      <span class="badge badge-success">Production Ready</span>
+      <span class="badge badge-warning">Zero Conflicts</span>
+    </div>
+    <h1>Unified Greenfield Website Pipeline Plan</h1>
+    <p class="lead">Merging Greenfield Website Intake Fix Plan & Comprehensive Pipeline Audit into a single definitive execution spec with full system integration.</p>
+  </header>
+
+  <!-- Section 1: Explicit Conflict Resolutions -->
+  <section>
+    <h2>1. Explicit Conflict Resolutions</h2>
+    <p>All conflicting architectural approaches between the Fix Plan and Audit Report have been definitively resolved as follows:</p>
+
+    <div style="overflow-x: auto;">
+      <table class="conflict-table">
+        <thead>
+          <tr>
+            <th>Conflict Area</th>
+            <th>Fix Plan Approach</th>
+            <th>Audit Report Approach</th>
+            <th>Resolved Unified Strategy</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>1. Template Handover</strong></td>
+            <td>In-place copy to <code>index.html</code></td>
+            <td>Ephemeral <code>DESIGN_BLUEPRINT.html</code> with cleanup condition</td>
+            <td><span class="highlight">In-place copy to index.html</span> as primary path, augmented with guaranteed `finally:` block cleanup for any temporary artifact.</td>
+          </tr>
+          <tr>
+            <td><strong>2. Intake Gate</strong></td>
+            <td>5-Pillar Model (Scope, Entity, Stack, Theme, Sections)</td>
+            <td>2-Step Confirmation Gate (Ask & Read-back)</td>
+            <td><span class="highlight">Merged 5-Pillar & 2-Step Gate:</span> Step 1 collects missing pillars (scope, entity/content, stack, theme, sections); Step 2 reads back 1-sentence plan requiring explicit `confirmed=true`. Portfolio scope explicitly validates resume/entity content.</td>
+          </tr>
+          <tr>
+            <td><strong>3. Anti-Slop Guards</strong></td>
+            <td>Pure negative filter</td>
+            <td>Tier 2/3 hardcoded CSS overrides (glassmorphism, zinc palette, radii)</td>
+            <td><span class="highlight">Pure Negative Filter:</span> Strip prescriptive CSS overrides. Keep only Tier 1 hard gates (no purple gradients, no unstyled controls, no fake copy, no RGB primaries, no fragile layouts).</td>
+          </tr>
+          <tr>
+            <td><strong>4. Design Resolver</strong></td>
+            <td>De-poisoned prompt matching</td>
+            <td><code>catalog.json</code> deterministic matcher</td>
+            <td><span class="highlight">Catalog.json Deterministic Matcher + De-poisoned Scans:</span> Scan user query only (never injected SKILL.md), delete modulo hash.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Section 2: Comprehensive Feature Inclusion Matrix -->
+  <section>
+    <h2>2. Comprehensive Feature Inclusion Matrix</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h3>REST Fallback & Auth Parity <span class="badge badge-success">Included</span></h3>
+        <p>Ensures that if CLI authentication or execution fails, the Gemini REST fallback preserves exact stack parity (single-file HTML, multi-file HTML, or React/Vite) without defaulting to vanilla HTML.</p>
+      </div>
+      <div class="card">
+        <h3>HTTP Preview Server <span class="badge badge-success">Included</span></h3>
+        <p>Spawns ephemeral local HTTP servers (ports 9400–9480) for static HTML or runs Vite servers for React builds, completely eliminating the white screen CORS/file:// bug.</p>
+      </div>
+      <div class="card">
+        <h3>Greenfield Undo & Worktree Merge <span class="badge badge-success">Included</span></h3>
+        <p>Registers workspace directory creation in `core/undo.py` so new greenfield builds enjoy 1-click rollback, with safe git worktree branch merges.</p>
+      </div>
+      <div class="card">
+        <h3>Allowed Skills & Execution Bridge <span class="badge badge-success">Included</span></h3>
+        <p>Injects allowed skills into the task context and establishes a robust direct chat execution bridge between ZEZO Live and the background worker threads.</p>
+      </div>
+      <div class="card">
+        <h3>Frontend Skills & Backend Reload <span class="badge badge-success">Included</span></h3>
+        <p>Reconciles localStorage against API skills, purges orphaned IDs, and adds mtime check in `_skills_list_handler` for zero-restart registry reloads.</p>
+      </div>
+      <div class="card">
+        <h3>Fleet Architecture & Chat Dispatch <span class="badge badge-success">Included</span></h3>
+        <p>Corrects agent engine mappings, parameter bindings, worktree alignment, and enables direct actionable verb detection in fleet chat handler.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 3: Phased Implementation Roadmap -->
+  <section>
+    <h2>3. Phased Implementation Roadmap & File Changes</h2>
+
+    <div class="roadmap-step">
+      <div class="step-num">01</div>
+      <div class="step-content">
+        <h3>Phase 1: Intake Gate & 5-Pillar State Machine</h3>
+        <p><strong>Target Files:</strong> <code>actions/antigravity_agent.py</code>, <code>actions/fleet_control.py</code>, <code>core/prompt.txt</code></p>
+        <ul>
+          <li>Implement unified 5-pillar extraction (`scope_type`, `entity_content`, `tech_stack`, `color_theme`, `key_sections`).</li>
+          <li>Enforce 2-step confirmation gate: prompt for missing pillars in Step 1, read back plan and require `confirmed=true` in Step 2.</li>
+          <li><strong>Portfolio Scope Handling:</strong> If `scope_type == 'portfolio'` and no `entity_content`/resume present, return a prompt asking for name, role, key projects, or a desktop resume PDF.</li>
+        </ul>
+        <pre class="code-block"><code>def check_greenfield_gate(task: str, parameters: Dict[str, Any]) -> Optional[str]:
+    scope = parameters.get("scope_type", "general")
+    if scope == "portfolio" and not parameters.get("entity_content"):
+        return "Portfolio build requires candidate entity content or resume PDF. Please provide name, role, key projects, or attach resume PDF."
+    if not parameters.get("confirmed", False):
+        return "BUILD NOT STARTED. Read the 1-sentence plan back to the user and ask for confirmation."
+    return None</code></pre>
+      </div>
+    </div>
+
+    <div class="roadmap-step">
+      <div class="step-num">02</div>
+      <div class="step-content">
+        <h3>Phase 2: Catalog Matcher & De-Poisoned Design Resolver</h3>
+        <p><strong>Target Files:</strong> <code>core/design_resolver.py</code></p>
+        <ul>
+          <li>Adopt deterministic `catalog.json` lookup for template selection.</li>
+          <li>De-poison matcher: scan user query text strictly, omitting injected skill instructions.</li>
+          <li>Remove legacy modulo hash fallbacks. Prioritize raw HTML reference templates over `.md` files.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="roadmap-step">
+      <div class="step-num">03</div>
+      <div class="step-content">
+        <h3>Phase 3: In-Place Template Handover & Guaranteed Finally Cleanup</h3>
+        <p><strong>Target Files:</strong> <code>actions/antigravity_agent.py</code></p>
+        <ul>
+          <li>Copy resolved template directly to workspace `index.html` for in-place adaptation.</li>
+          <li>Wrap worker execution in a strict `try...finally` block ensuring any temporary blueprint files are unconditionally unlinked.</li>
+        </ul>
+        <pre class="code-block"><code>try:
+    _run_worker(worker_params)
+finally:
+    for bp in ("DESIGN_BLUEPRINT.html", "DESIGN_BLUEPRINT.md"):
+        if (repo / bp).exists():
+            (repo / bp).unlink(missing_ok=True)</code></pre>
+      </div>
+    </div>
+
+    <div class="roadmap-step">
+      <div class="step-num">04</div>
+      <div class="step-content">
+        <h3>Phase 4: Preview Server, REST Parity & Undo Integration</h3>
+        <p><strong>Target Files:</strong> <code>actions/antigravity_agent.py</code>, <code>core/undo.py</code>, <code>actions/website_cloner.py</code></p>
+        <ul>
+          <li>Route preview through local HTTP/Vite servers instead of raw `file://` URIs.</li>
+          <li>Ensure REST fallback respects requested tech stack (Single-File HTML vs React).</li>
+          <li>Register greenfield root directories in `core/undo.py` for robust rollback support.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="roadmap-step">
+      <div class="step-num">05</div>
+      <div class="step-content">
+        <h3>Phase 5: Frontend Skills Sync & Backend Reload</h3>
+        <p><strong>Target Files:</strong> <code>frontend/src/components/settings/SkillsSettingsTab.tsx</code>, <code>frontend/src/components/office/AutonomousOfficeScreen.tsx</code>, <code>core/ui_server.py</code></p>
+        <ul>
+          <li><strong>SkillsSettingsTab.tsx:</strong> Reconcile localStorage against `api.getSkills()`, purge orphaned IDs, clean `DEFAULT_SKILLS` markdown.</li>
+          <li><strong>AutonomousOfficeScreen.tsx:</strong> Replace static `AVAILABLE_SKILLS` with live `api.getSkills()`.</li>
+          <li><strong>ui_server.py:</strong> Add directory mtime check in `_skills_list_handler` to trigger registry reload without server restart.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="roadmap-step">
+      <div class="step-num">06</div>
+      <div class="step-content">
+        <h3>Phase 6: Fleet Architecture & Chat Dispatch Fixes</h3>
+        <p><strong>Target Files:</strong> <code>config/fleet_agents.json</code>, <code>core/fleet_manager.py</code>, <code>core/ui_server.py</code></p>
+        <ul>
+          <li><strong>config/fleet_agents.json:</strong> Replace `default_tool` with `engine` (antigravity/opencode/kilo), purge CLI runners from `allowed_tools`, replace string `"None"` with `null`, move PAM desk to `(460, 280)`, remove ghost `"groq"` from Michael.</li>
+          <li><strong>core/fleet_manager.py:</strong> Inject `allowed_skills` from `SkillRegistry` into `enriched_prompt`; align worktree `task_id` with `submitted_id`; set `merge_changes=True` on success; fix Pam's `extract_design_system` param mapping.</li>
+          <li><strong>core/ui_server.py (`_fleet_chat_handler`):</strong> Detect actionable verbs (build/create/fix/write/redesign/make) and dispatch via `fleet_manager.dispatch_task` instead of returning hallucinated text.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="roadmap-step">
+      <div class="step-num">07</div>
+      <div class="step-content">
+        <h3>Phase 7: SKILL.md & Prompt.txt Rewrite</h3>
+        <p><strong>Target Files:</strong> <code>skills/website_build/SKILL.md</code>, <code>core/prompt.txt</code></p>
+        <ul>
+          <li><strong>skills/website_build/SKILL.md:</strong> Add 5th Pillar (`entity_content`); remove hardcoded glassmorphism CSS, fixed radii, zinc palette; keep only Tier 1 anti-slop gates (no purple gradients, no unstyled controls, no fake copy, no RGB primaries, no fragile layouts); mandate reference template supplies 100% of visual direction.</li>
+          <li><strong>core/prompt.txt:</strong> Remove verbatim portfolio script at line ~252; add Portfolio & Personal Brand Discovery Directive (ask name/role/projects/resume PDF before building).</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="roadmap-step">
+      <div class="step-num">08</div>
+      <div class="step-content">
+        <h3>Phase 8: Catalog & References Reorganization</h3>
+        <p><strong>Target Directory:</strong> <code>skills/website_build/references/</code></p>
+        <ul>
+          <li>Create <code>catalog.json</code> with fields: `id`, `name`, `relative_path`, `scope`, `theme`, `tags`, `bg_mode`, `primary_color`.</li>
+          <li>Reorganize references into 5 clean folders: `1_landing_pages`, `2_business_sites`, `3_portfolios`, `4_dashboards`, `5_components`.</li>
+          <li>Delete 0-byte and duplicate files: `Opsdeck Admin Kit.html`, `Scrapbook Resume.txt`, duplicate `index-raw.html`, and `rebuilt.html`.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="roadmap-step">
+      <div class="step-num">09</div>
+      <div class="step-content">
+        <h3>Phase 9: Comprehensive 3-Layer Verification</h3>
+        <p><strong>Verification Execution Plan:</strong></p>
+        <ul>
+          <li><strong>Layer 1 (Static):</strong> Run `python -m py_compile` on all modified Python files; `npm run typecheck` on modified TSX components.</li>
+          <li><strong>Layer 2 (Runtime):</strong> Test intake gate (missing params → clarification returned), commit gate (`confirmed=false` → read-back), template handover (`index.html` copied, blueprint cleaned), preview server (HTTP not `file://`), undo registration (`register_repo_undo > 0`).</li>
+          <li><strong>Layer 3 (Regression):</strong> Run `pytest tests/test_website_cloner_suite.py tests/test_design_system_suite.py tests/test_code_engines_phase1.py`.</li>
+        </ul>
+      </div>
+    </div>
+
+  </section>
+</div>
+</body>
+</html>

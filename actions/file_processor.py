@@ -193,12 +193,12 @@ def _process_pdf(path: Path, action: str, params: dict, speak=None) -> str:
         res = read_file(path, max_chars=max_chars, instruction=params.get("instruction", ""))
         return res.text
 
-    if action in ("summarize", "extract_text", "translate_hint", "analyze", "reformat"):
+    if action in ("read", "summarize", "extract_text", "translate_hint", "analyze", "reformat"):
         text = _extract_pdf_text()
         if not text.strip():
             return "Could not extract text from PDF (may be scanned/image-based)."
 
-        if action == "extract_text":
+        if action in ("read", "extract_text"):
             out = _output_path(path, "text", ".txt")
             out.write_text(text, encoding="utf-8")
             return text
@@ -266,7 +266,7 @@ def _process_text_doc(path: Path, file_type: str, action: str,
         lines = content.count("\n")
         return f"Word count: {words} words, {chars} characters, {lines} lines."
 
-    if action == "extract_text":
+    if action in ("read", "extract_text"):
         if file_type != "txt":
             out = _output_path(path, "extracted", ".txt")
             out.write_text(content, encoding="utf-8")
@@ -413,6 +413,9 @@ def _process_json(path: Path, action: str, params: dict, speak=None) -> str:
     except Exception as e:
         return f"Invalid JSON: {e}"
 
+    if action in ("read", "extract_text"):
+        return content
+
     if action == "validate":
         return f"Valid JSON. Type: {type(data).__name__}, size: {_file_size_str(path)}"
 
@@ -467,10 +470,8 @@ def _process_code(path: Path, action: str, params: dict, speak=None) -> str:
                 return f"Run failed: {e}"
         return f"Direct execution not supported for .{ext} files."
 
-    if action == "info":
-        lines = content.count("\n")
-        words = len(content.split())
-        return f"Code file: {lines} lines, {words} words, {_file_size_str(path)}"
+    if action in ("read", "extract_text"):
+        return content
 
     prompt_map = {
         "explain":   f"Explain this {ext} code clearly:\n\n```{ext}\n{content[:30000]}\n```",
@@ -759,12 +760,12 @@ def _process_pptx(path: Path, action: str, params: dict, speak=None) -> str:
         res = read_file(path, max_chars=50000, instruction=params.get("instruction", ""))
         return res.text
 
-    if action in ("summarize", "extract_text", "analyze"):
+    if action in ("read", "summarize", "extract_text", "analyze"):
         text = _read_pptx_text()
-        if action == "extract_text":
+        if action in ("read", "extract_text"):
             out = _output_path(path, "text", ".txt")
             out.write_text(text, encoding="utf-8")
-            return f"Text extracted. Saved: {out.name}"
+            return text
         try:
             model    = _gemini_client()
             prompt   = f"{'Summarize' if action == 'summarize' else 'Analyze'} this presentation:\n{text[:30000]}"
@@ -820,7 +821,7 @@ def _execute_sync(path: Path, file_type: str, action: str, params: dict, speak=N
 
 # Actions that run locally in < 300ms — execute synchronously so user gets instant 1-turn response
 SYNC_FAST_ACTIONS = {
-    "extract_text", "info", "word_count", "validate", "list", "stats",
+    "read", "extract_text", "info", "word_count", "validate", "list", "stats",
     "to_word", "extract_pages", "to_csv", "format", "translate_hint"
 }
 

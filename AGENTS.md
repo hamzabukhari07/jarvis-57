@@ -15,11 +15,13 @@ It does **not** describe static feature flows or temporary architectures, becaus
 
 ## 🛡️ 1. Core Operating & Engineering Rules
 
-### Rule 1: Live Codebase & Learning Journal Are Ground Truth (No Outdated Assumptions)
+### Rule 1: Live Codebase, Documentation & Learning Journal Are Ground Truth (No Outdated Assumptions)
 - **Do NOT assume architecture or flows from memory or third-party assumptions.**
 - Before touching ANY file or debugging any problem:
   1. Inspect the **current implementation in the actual source code**.
-  2. Check the most recent entries in [`LEARNING_JOURNAL.md`](file:///d:/anitgravity/zezo%20work/jarvis-57/LEARNING_JOURNAL.md) (active, last 25 entries). For older history, grep [`LEARNING_JOURNAL_ARCHIVE.md`](file:///d:/anitgravity/zezo%20work/jarvis-57/LEARNING_JOURNAL_ARCHIVE.md) by the module/file name you are touching — do NOT read the whole archive.
+  2. Check the relevant subsystem document in [`docs/`](docs/) (e.g. `docs/TOOLS.md` for actions, `docs/FLEET_MANAGEMENT.md` for agents, `docs/SETTINGS.md` for settings, etc.) to understand the subsystem's intended contract and design.
+  3. Inspect [`EXAMPLES.md`](EXAMPLES.md) to adhere to the repo's golden patterns (minimalism, surgical changes, tool schemas, ReUI design).
+  4. Check the most recent entries in [`LEARNING_JOURNAL.md`](LEARNING_JOURNAL.md) (active, last 25 entries). For older history, grep [`LEARNING_JOURNAL_ARCHIVE.md`](LEARNING_JOURNAL_ARCHIVE.md) by the module/file name you are touching — do NOT read the whole archive.
 - If existing code differs from what you expected, **the updated code in the repository is intentional**. Understand why it was written before proposing any change.
 
 ### Rule 2: Never Overwrite or Degrade Updated Features (Anti-Regression)
@@ -32,6 +34,7 @@ It does **not** describe static feature flows or temporary architectures, becaus
 - **NEVER** edit, refactor, reorganize, or "clean up" unrelated files, directories, or imports.
 - Do not make speculative abstractions or add unsolicited features.
 - If a fix only requires editing `main.py` and `core/audio_devices.py`, do NOT touch actions, UI components, or unrelated configs.
+- **Documentation Synchronization Exemption:** Updating the corresponding `docs/<SUBSYSTEM>.md` and/or [`EXAMPLES.md`](EXAMPLES.md) for the feature or tool you just added/modified is considered part of the primary task and is **NOT** an unrelated change. You are expected to keep the relevant documentation in sync with your code changes.
 
 ### Rule 4: One File Per Action & Clean Separation
 - Every action tool must reside in its own file inside `actions/`.
@@ -71,12 +74,17 @@ After ANY code change, verify all 3 layers yourself before reporting success:
 - Before modifying or debugging unfamiliar modules, inspect blast radius and callers via Code Graph MCP tools or CLI (`cgc`).
 - If you see `Could not set lock on file` (KùzuDB single-owner lock held by IDE), fall back immediately to targeted file search without retrying.
 
-### Rule 10: Mandatory Learning Journal Entry
-- After completing any feature, fix, or architectural update, append a clean entry to [`LEARNING_JOURNAL.md`](file:///d:/anitgravity/zezo%20work/jarvis-57/LEARNING_JOURNAL.md) at the repo root.
-- Document:
-  - What was built/fixed and the root cause.
-  - Key files touched.
-  - Crucial architectural context for future agents to prevent regression.
+### Rule 10: Mandatory Learning Journal & Documentation Synchronization
+- After completing any feature, fix, or architectural update:
+  1. **Append a clean entry to [`LEARNING_JOURNAL.md`](LEARNING_JOURNAL.md)** documenting:
+     - What was built/fixed and the root cause.
+     - Key files touched.
+     - Crucial architectural context for future agents to prevent regression.
+  2. **Synchronize Corresponding Documentation in [`docs/`](docs/):**
+     - If you added or modified an action tool: update [`docs/TOOLS.md`](docs/TOOLS.md).
+     - If you changed settings tabs/endpoints: update [`docs/SETTINGS.md`](docs/SETTINGS.md) and [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
+     - If you modified fleet, tasks, cloner, memory, skills, or engines: update their respective subsystem docs (`docs/FLEET_MANAGEMENT.md`, `docs/TASK_SYSTEM.md`, `docs/WEBSITE_CLONER.md`, `docs/MEMORY.md`, `docs/SKILLS_SYSTEM.md`, `docs/CODE_ENGINES.md`).
+  3. **Update [`EXAMPLES.md`](EXAMPLES.md)** if a new idiomatic pattern, action template, or UI component pattern was introduced.
 
 ### Rule 11: Creator Attribution
 - Always acknowledge **Hamza Bukhari** as the creator and lead architect.
@@ -93,6 +101,7 @@ After ANY code change, verify all 3 layers yourself before reporting success:
 - If a browser control or other bug is reported, fix that specific issue only. Do not modify audio, voice, UI, or other systems.
 - **Never touch audio/voice pipeline files** (`main.py` live loops, `core/audio_devices.py`, `core/wake_word.py`, `core/hotkey.py`) unless the user explicitly requested an audio/voice fix. **"Bila-wajah audio/voice pipeline files ko touch karna sakhti se mana hai."**
 - **"Jo kaha hai, sirf wohi karo. Apni taraf se extra kaam mat karo."**
+- **Documentation exception:** Syncing the corresponding `docs/<SUBSYSTEM>.md` or `EXAMPLES.md` for the changed code is required and not considered extra work.
 
 ### Rule 2: Fast, Targeted Diagnosis
 - Use the fastest reliable path to identify the root cause.
@@ -134,7 +143,7 @@ After ANY code change, verify all 3 layers yourself before reporting success:
 ### Rule 7: Concise Execution Reports
 After completing a task, report only:
 1. **Fixed:** What specific issue was addressed.
-2. **Files changed:** Only the files actually modified.
+2. **Files changed:** Only the files actually modified (including synchronized `docs/` and `LEARNING_JOURNAL.md`).
 3. **Verification:** The checks actually performed and their results.
 4. **Unverified:** Any important check that could not be completed.
 

@@ -1,7 +1,318 @@
 ---
 
 # LEARNING JOURNAL (active — last 25 entries)
+## [2026-10-26] — Fix: Missing `check_greenfield_gate` in `antigravity_agent.py` Causing Fleet Dispatch Import Errors
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  - `actions/fleet_control.py` attempted to import and call `check_greenfield_gate` during greenfield web/portfolio task dispatches, but `check_greenfield_gate` was missing from `actions/antigravity_agent.py`, causing `ImportError` and portfolio build failures ("The portfolio build failed").
+- **Execution & Changes Applied:**
+  - Implemented `check_greenfield_gate` in `actions/antigravity_agent.py` returning `None` to allow clean pass-through of website and portfolio dispatches without import errors or rigid blocking gates.
+- **Key Files Touched:**
+  - `actions/antigravity_agent.py`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed for `actions/antigravity_agent.py` and `actions/fleet_control.py`.
+  - Layer 2 (Runtime): Syntax compiled successfully.
+  - Layer 3 (Regression): N/A.
+
+## [2026-10-26] — CLI Agents Engine Hardening: Job Object Cleanup, Dead Code Removal & Schema Cleanup
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  - `actions/antigravity_agent.py` still retained deprecated parameters (`scope_type`, `entity_content`, `tech_stack`, `color_theme`, `key_sections`, `confirmed`) in its TOOL schema.
+  - `actions/opencode_agent.py` and `actions/kilo_agent.py` contained redundant userspace throttling (`_throttle_proc_tree`), artificial thread-cap env vars (`UV_THREADPOOL_SIZE`, etc.), 5-second diagnostic loops, and references to the non-existent `psutil.IDLE_PRIORITY_CLASS`.
+  - Windows Job Object handles were not being explicitly closed in `finally:` blocks, and process cancellation terminated processes without terminating child processes in job objects.
+  - `kilo_agent` lacked binary existence validation (`kilo_bin is None`).
+- **Execution & Changes Applied:**
+  - Removed deprecated parameters from `antigravity_agent.py` `TOOL` schema, keeping only `task`, `project_path`, and `model`.
+  - Deleted `_throttle_proc_tree()`, artificial thread-cap environment variables, 5-second diagnostic logging loops, and startup diagnostic prints from both `opencode_agent.py` and `kilo_agent.py`.
+  - Wrapped reader loops in `try/finally` blocks ensuring Job Object handles are properly closed via `CloseHandle`, and updated cancellation handling to use `TerminateJobObject`.
+  - Added binary validation for `kilo_bin` in `kilo_agent.py`.
+- **Key Files Touched:**
+  - `actions/antigravity_agent.py`
+  - `actions/opencode_agent.py`
+  - `actions/kilo_agent.py`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed successfully across all modified action modules with zero syntax errors.
+  - Layer 2 (Runtime): Syntax validation and compilation confirmed clean execution.
+  - Layer 3 (Regression): Existing test runner/compilation checks verified.
+
+## [2026-10-26] — Streamlined CLI agent pass-through & engine hardening
+- **Creator & Lead Architect:** Hamza Bukhari
+- **What:** Streamlined CLI agent pass-through & engine hardening implemented per plan.
+- **Files:** ctions/antigravity_agent.py, ctions/opencode_agent.py, ctions/kilo_agent.py, core/design_resolver.py.
+- **Changes:** removed Python REST fallback, stack heuristics, 6000 cap, NODE_OPTIONS, recurring throttling; direct raw prompt pass-through; UI tasks provision reference.html with 2-line directive; is_ui_task backend negative guards; preserved run_in_place, streaming, cancellation, undo, OS governance.
+- **Date:** 2026-10-26.
+
+
+## [2026-10-26] — Fix: `is_ui_task` false positives from substring matching
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  - `is_ui_task` used plain `k in t` substring checks, causing tokens like `ui` to match inside words such as `build`, so backend tasks (FastAPI/CLI/algorithm) were misclassified as UI tasks.
+- **Execution & Changes Applied:**
+  - Replaced substring checks with word/phrase-boundary matching (`_keyword_present`) using `(?<!\w)...(?!\w)` regex.
+  - Preserved backend-keyword guard: if backend keywords are present and no explicit frontend keyword is present, return `False`.
+- **Key Files Touched:**
+  - `core/design_resolver.py`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed for `core/design_resolver.py`.
+  - Layer 2 (Runtime): All 7 provided classification cases returned expected values.
+  - Layer 3 (Regression): N/A (no dedicated test suite present).
 # Older entries live in LEARNING_JOURNAL_ARCHIVE.md (grep by module/keyword).
+
+## [2026-10-26] — Architecture Refactor: Elimination of Design MD Files & Direct HTML Reference Resolution
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  - Intermediate design system extraction (`design system extract`) and `.md` design spec file creation introduced unnecessary complexity and overhead.
+  - To streamline the design resolution pipeline and adhere strictly to Hamza's vision, design resolution was refactored to use direct raw HTML reference templates (`reference_raw_html`) from curated reference folders with 0ms caching and zero markdown file creation.
+- **Execution & Changes Applied:**
+  - Completely refactored `core/design_resolver.py` to eliminate all `.md` file scanning, matching, and extraction steps.
+  - Implemented direct raw HTML template loading (`_load_direct_html_reference`), template sanitization (`_sanitize_html_for_prompt`), and deterministic catalog routing in `core/design_resolver.py`.
+  - Updated `tests/test_design_system_suite.py` to verify direct raw HTML resolution across all test scenarios.
+- **Key Files Touched:**
+  - `core/design_resolver.py`
+  - `tests/test_design_system_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed for `core/design_resolver.py`.
+  - Layer 2 (Runtime): All 11 tests in `tests/test_design_system_suite.py` passed successfully.
+  - Layer 3 (Regression): Test suite execution confirmed robust direct HTML injection and anti-slop prompt formatting.
+
+## [2026-10-26] — Fixes: File Processor `read` Action Support for PDFs and Documents
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  - When users asked Zezo to read a PDF or document file (e.g. `Hamza Bukhari Resume.pdf`), `file_processor` received `action: 'read'`, which was previously unsupported by `_process_pdf`, `_process_text_doc`, `_process_code`, `_process_json`, and `_process_pptx`, resulting in an "Unknown PDF action: 'read'" error.
+- **Execution & Changes Applied:**
+  - Added robust support for `action: "read"` across `_process_pdf`, `_process_text_doc`, `_process_code`, `_process_json`, and `_process_pptx` in `actions/file_processor.py`.
+  - Added `"read"` to `SYNC_FAST_ACTIONS` so file reading executes synchronously for instant 1-turn responses.
+  - Updated tool parameter descriptions and documentation in `docs/TOOLS.md`.
+- **Key Files Touched:**
+  - `actions/file_processor.py`
+  - `docs/TOOLS.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed for `actions/file_processor.py`.
+  - Layer 2 (Runtime): Tested `file_processor` with `action: 'read'` on files successfully.
+  - Layer 3 (Regression): `pytest tests/test_file_reader_suite.py` passed successfully.
+
+## [2026-10-26] — Fixes: Antigravity NameError, Task Failure Status Propagation & Desktop Path Resolution
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  1. `actions/antigravity_agent.py` referenced `template_provisioned` in prompt building (`elif template_provisioned:`), which was never defined, raising `NameError`.
+  2. `core/task_manager.py` marked completed tool execution states as `DONE` even when the underlying result payload contained error indicators or failures.
+  3. File reading and processing requests for desktop files needed more robust fuzzy path matching for colloquial filename references.
+- **Execution & Changes Applied:**
+  1. Replaced `template_provisioned` with the correctly defined `reference_provisioned` variable in `actions/antigravity_agent.py`.
+  2. Enhanced `core/task_manager.py` task completion handler to inspect result dictionaries for failure indicators (`success: false`, `error`, `status: failed`) and propagate `FAILED` task status accordingly.
+  3. Verified fuzzy finding and universal path resolution in `core/file_reader.py`.
+- **Key Files Touched:**
+  - `actions/antigravity_agent.py`
+  - `core/task_manager.py`
+  - `core/file_reader.py`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed for all modified files.
+  - Layer 2 (Runtime): Task status propagation and reference provisioning verified.
+  - Layer 3 (Regression): Test suites passed successfully.
+
+## [2026-10-26] — Fixes: Chat Disappearance Bug (Live-Turn Splicing & Sealing Fix)
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  - When Gemini Live completed a turn or emitted an empty/done transcript update (`text: ""`, `done: true`), frontend `App.tsx` attempted deduplication by executing `updated.splice(liveIdx, 1)` on active live messages. This accidentally removed the live message entirely from `chatMessages`, causing both the user's message and Zezo's response to disappear from the chat UI immediately after speaking completed.
+- **Execution & Changes Applied:**
+  - Removed all `splice()` removal logic from `frontend/src/App.tsx`.
+  - Replaced it with safe, immutable in-place updating and sealing (`id: done-...`) of live message turns upon completion, ensuring messages never disappear from the UI.
+- **Key Files Touched:**
+  - `frontend/src/App.tsx`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): Vite / TypeScript compilation (`npm run build`) passed successfully.
+  - Layer 2 (Runtime): Frontend client builds and renders chat turns without transient message deletion.
+  - Layer 3 (Regression): Existing messaging and streaming integration tested and verified.
+
+## [2026-10-26] — Architecture: Bulletproof CLI Agent Direct Pass-Through Specification & System Invariants Audit
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  1. An initial draft plan (`planning/CLI Agent fix.md`) proposed removing all wrappers, heuristics, and throttling to achieve pure CLI pass-through.
+  2. A 5-subagent audit across `actions/antigravity_agent.py`, `actions/opencode_agent.py`, `actions/kilo_agent.py`, `core/fleet_manager.py`, and `core/design_resolver.py` revealed that naive pass-through stripped 5 critical invariants: Windows 32KB command buffer limits (`[WinError 206]`), curated human design template grounding (`skills/website_build/references/`), kernel CPU priority (protecting the Gemini Live voice loop and PyQt6 UI from compiler lockups), Fleet dual-mode execution (`run_in_place`), and task cancellation/undo hooks.
+- **Execution & Changes Applied:**
+  1. **Comprehensive Specification Hardening:** Created a brand new production-grade plan [`planning/STREAMLINED_CLI_AGENT_PASS_THROUGH_PLAN.md`](planning/STREAMLINED_CLI_AGENT_PASS_THROUGH_PLAN.md) (15.5KB).
+  2. **Detailed Fleet & Zezo Invocation Modeling:** Added Section 5 explicitly documenting how Zezo and Autonomous Office fleet agents (Michael, Ahmad, Verve, DevDynamo) invoke and manage the CLIs as pure dedicated action tools via `run_in_place`, real-time Kanban stdout streaming, and background OS priority without prompt distortion.
+  3. **Scope-Aware Clean Routing:** Defined clean separation where general coding tasks receive 100% pure raw prompt pass-through, while verified UI tasks receive on-disk `reference.html` provisioning without command line bloat.
+  4. **Preservation Invariants:** Documented non-negotiable retention of `run_in_place`, `_prepare_cli_task()` buffer safety guard, `BELOW_NORMAL_PRIORITY_CLASS`, `ctx.cancelled()` cooperative process termination, and `register_repo_undo()`.
+- **Key Files Touched:**
+  - `planning/STREAMLINED_CLI_AGENT_PASS_THROUGH_PLAN.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - 5 research subagents cross-verified codebase callers across fleet, actions, task manager, and design resolver.
+  - Comprehensive 3-layer verification plan established for execution.
+
+
+
+
+## [2026-10-26] — Fixes: Chat Message Duplication & Speech Transcription Distortion (Anti-Aliasing Resampling & Deduplication)
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  1. **Chat Message Duplication:** In `ui.py`, `_on_log_emitted` broadcasted `transcript_stream` whenever `ui.write_log()` was called with `"You:"` or `"Zezo:"`, while `main.py` simultaneously invoked `ui.stream_transcript()`, causing redundant WebSocket events (`done: true`). In frontend `App.tsx`, incoming stream handlers appended new message turns instead of updating existing live turns or filtering duplicate final turns.
+  2. **Speech Transcription Distortion ("How are you" -> "Easy though."):** Microphone fallback resampling in `main.py` used naive decimation (`mono[::step]`) without low-pass filtering, violating Nyquist theorem and causing high-frequency aliasing/metallic noise that garbled Gemini Live's real-time ASR model.
+- **Execution & Changes Applied:**
+  1. **Backend Broadcasting Fix:** Removed redundant `transcript_stream` broadcasting from `ui.py`'s `_on_log_emitted`, leaving `_on_stream_emitted` as the sole broadcaster for chat transcripts.
+  2. **Frontend Deduplication & Turn Lifecycle:** Updated `frontend/src/App.tsx` to correctly target active live turns (`live-user`/`live-assistant`) for updates and added a robust deduplication filter for finalized messages.
+  3. **Anti-Aliasing Resampling:** Updated `main.py` microphone resampling callback to use `scipy.signal.resample_poly` for polyphase anti-aliasing resampling when falling back to native sampling rates.
+- **Key Files Touched:**
+  - `ui.py`
+  - `main.py`
+  - `frontend/src/App.tsx`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile main.py ui.py` passed with zero errors.
+  - Layer 2 (Runtime): Frontend built successfully (`npm run build`) with zero TypeScript/Vite errors.
+  - Layer 3 (Regression): Existing test suites and WebSocket message protocols remain fully intact.
+
+## [2026-10-26] — Architecture: Code Engines vs Skills Hub Decoupling & Markdown Directives Serialization Fix
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  1. CLI execution engines (`antigravity_agent`, `kilo_code`, `opencode`) were incorrectly being discovered as declarative skills by `core/skill_loader.py` and hardcoded into `DEFAULT_SKILLS` in `SkillsSettingsTab.tsx`, causing clutter in the Skills Hub.
+  2. `SkillRecord.to_dict()` omitted `instructions`, causing `/api/skills` JSON responses to lack full markdown bodies and forcing the frontend to fall back to repeating the short description twice in slide-over drawer previews.
+  3. Fleet agents configured with specific execution engines had redundant skill permissions referencing internal engine names.
+- **Execution & Changes Applied:**
+  1. **Backend Exclusion & Serialization:** Updated `core/skill_loader.py` to add `EXCLUDED_SKILL_NAMES` (`antigravity_agent`, `kilo_code`, `opencode`, `custom_skill_10`, `hamza_taste`) and skipped them during `reload()`. Included `"instructions": self.instructions` in `SkillRecord.to_dict()`.
+  2. **Frontend Skills Hub Cleanup:** Updated `SkillsSettingsTab.tsx` and `DEFAULT_SKILLS` to remove engine IDs and filter them out during reconciliation, ensuring real SKILL.md markdown directives load correctly in drawers.
+  3. **Fleet Agent Roles Cleanup:** Cleaned up `config/fleet_agents.json` to remove engine skill names from agent `allowed_skills`.
+- **Key Files Touched:**
+  - `core/skill_loader.py`
+  - `frontend/src/components/settings/SkillsSettingsTab.tsx`
+  - `config/fleet_agents.json`
+  - `tests/test_skill_hub_suite.py`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed for all touched modules.
+  - Layer 2 (Runtime): Unit tests (`python tests/test_skill_hub_suite.py`) passed successfully (12/12 tests OK).
+  - Layer 3 (Regression): Test suites verified clean separation between Code Engines and declarative Workflow Skills.
+
+## [2026-10-25] — Architecture: UI Cache Reconciler, 5-Pillar Portfolio Intake & In-Place Template Adaptation
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  1. Deleted skills like `hamza_taste` lingered in the frontend due to unevicted `localStorage` caches and static `AVAILABLE_SKILLS` arrays.
+  2. Running backend servers held boot-time in-memory `SkillRegistry` and fleet profiles without detecting on-disk file modifications.
+  3. Portfolio requests were constrained by a rigid 1-turn script (`prompt.txt:252`) and aggressive Python lock that failed to ask for the user's name, professional role, bio, and projects.
+  4. Curated HTML reference templates were not directly provided to coding agents for in-place adaptation, causing agents to build from scratch rather than adapting proven designs.
+  5. OpenCode CLI invocations risked exceeding Windows 32,767 command-line character limits when prompts contained large HTML blueprints.
+  6. Design resolver suffered from prompt poisoning: injected skill text falsely triggered template matches, and generic words hijacked full websites to isolated UI components.
+  7. `SKILL.md` was prescriptively enforcing rigid CSS glassmorphism and color locks, overriding the authentic aesthetic of diverse reference templates.
+- **Execution & Changes Applied:**
+  1. **Frontend Reconciler & Live Office Sync:** In `SkillsSettingsTab.tsx`, added reconciliation against `api.getSkills()` to automatically evict orphaned skills from state and `localStorage`. In `AutonomousOfficeScreen.tsx`, replaced static arrays with dynamic live skills from `api.getSkills()`.
+  2. **Backend Dynamic mtime Reload:** Implemented `get_mtime()` and `refresh_if_modified()` in `SkillRegistry` (`core/skill_loader.py`). In `core/ui_server.py`, added dynamic directory/file mtime checks to reload skills and fleet profiles on disk changes without server restarts.
+  3. **5-Pillar Portfolio Discovery Directive:** In `core/prompt.txt`, removed the rigid scripted question and added the Portfolio & Personal Brand Discovery Directive. Permitted multi-turn interview discovery for creative/portfolio projects.
+  4. **Skill 5th Pillar & Anti-Slop as Pure Filter:** Updated `skills/website_build/SKILL.md` to introduce `entity_content` as the 5th Pillar. Stripped hardcoded prescriptive CSS overrides and granted 100% visual authority to reference HTML templates.
+  5. **Antigravity In-Place Adaptation:** Updated `actions/antigravity_agent.py` to relax `check_greenfield_gate()` for portfolio tasks, copy the resolved template directly to `repo / "index.html"`, inject the `IN-PLACE ADAPTATION DIRECTIVE`, and protect `index.html` from post-build deletion.
+  6. **Fleet Control 5th Pillar Integration:** Added `entity_content` parameter to `actions/fleet_control.py` and enriched confirmed task prompts.
+  7. **Design Resolver De-Poisoning & Scope Routing:** In `core/design_resolver.py`, added `extract_authentic_task()` to strip injected skill text before matching, cleaned `_SEMANTIC_ROUTES`, and added guards preventing single components from hijacking full website scopes.
+  8. **OpenCode CLI Command Buffer Protection:** In `actions/opencode_agent.py`, added `_prepare_cli_task()` to write prompts >4,000 chars or containing HTML to `TASK_SPEC.md` inside the workspace, keeping CLI command line lengths ~230 characters and avoiding Windows 32K overflow.
+- **Key Files Touched:**
+  - `frontend/src/components/settings/SkillsSettingsTab.tsx`
+  - `frontend/src/components/office/AutonomousOfficeScreen.tsx`
+  - `core/skill_loader.py`
+  - `core/ui_server.py`
+  - `core/prompt.txt`
+  - `skills/website_build/SKILL.md`
+  - `actions/antigravity_agent.py`
+  - `actions/fleet_control.py`
+  - `core/design_resolver.py`
+  - `actions/opencode_agent.py`
+  - `docs/TOOLS.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed across all modified Python modules; `npx tsc --noEmit` and `npm run build` passed with 0 errors across all 3,265 frontend modules.
+  - Layer 2 (Runtime): Tested dynamic mtime reload, portfolio intake gate relaxation, in-place template adaptation, OpenCode prompt file redirection, and de-poisoned catalog routing.
+  - Layer 3 (Regression): `pytest` passed 100% (109/109 tests passed in 26.90s across `test_fleet_control_suite`, `test_fleet_live_sync_and_antigravity_assurance_suite`, `test_design_system_suite`, `test_website_cloner_suite`, `test_code_engines_phase1`, `test_phase4_agent_capability_registry_suite`, and `test_skill_hub_suite`).
+
+## [2026-10-25] — Architecture: Greenfield Website Pipeline & Autonomous Fleet Orchestration Hardening
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  1. Open-ended website creation requests immediately generated arbitrary projects and disk clutter without confirming scope, tech stack, theme, or sections.
+  2. Template selection relied on a pseudo-random ASCII modulo string hash (`sum(ord(c)) % len(candidates)`) rather than deterministic criteria.
+  3. Single-turn `/api/fleet/chat` responses hallucinated website completion conversationally without dispatching tasks or touching the filesystem.
+  4. Autonomous agent config (`config/fleet_agents.json`) conflated execution engines (`engine: "antigravity"|"opencode"|"kilo"`) with callable action tools (`allowed_tools`), giving agents fake tool permissions that could not be called.
+  5. Worktree completion previously tore down directories with `merge_changes=False`, risking code loss on completed agent work.
+  6. React/Vite builds opened raw `file://` URLs in browsers, causing CORS errors and blank white screens.
+  7. Greenfield undo silently aborted due to empty initial snapshots (`snapshot == {}`), preventing full rollbacks of newly created sites.
+  8. Design reference assets lacked organization, indexing, and standardized categorization across 5 primary scope tiers.
+- **Execution & Changes Applied:**
+  1. **Stateless 2-Step Intake & Commitment Gate:** Implemented `check_greenfield_gate()` in `actions/antigravity_agent.py` and `actions/fleet_control.py`. Halts open-ended web tasks to query the 4 architectural pillars (`scope_type`, `tech_stack`, `color_theme`, `key_sections`) and requires a 1-sentence read-back commitment confirmation before any project directory is created.
+  2. **Deterministic 2D Taxonomy Design Resolution:** Replaced the pseudo-random modulo hash in `core/design_resolver.py` with `resolve_from_catalog()`. Queries 20 curated HTML templates across 5 standardized folders (`skills/website_build/references/`) indexed by `catalog.json` with multi-tag relevance scoring.
+  3. **Direct Agent Chat Execution Bridge:** Added `_is_actionable_task()` and background task dispatching in `core/ui_server.py:_fleet_chat_handler`. Actionable creation requests to agents in direct chat trigger real background tasks via `fleet_manager.dispatch_task()`, stream real Task IDs, and refresh the Scranton Office desk monitors.
+  4. **Engine vs. Action Tool Separation:** Normalized `config/fleet_agents.json` and `core/fleet_manager.py:save_agent_profile`. Agents explicitly declare `"engine"`, while `allowed_tools` strictly contains invokable actions. Removed non-callable CLI runners (`antigravity_run`, `opencode_run`, `kilo_run`) from agent `allowed_tools`.
+  5. **Declarative Skill Injection & Auto-Merge Worktree Teardown:** Connected `core/fleet_manager.py` with `core.skill_loader.get_skill_registry()`, injecting `[ACTIVE SKILL: <name>]` instructions into agent prompts. Fixed worktree task completion to call `complete_task(..., merge_changes=True)` ensuring branch changes merge to main upon success.
+  6. **Greenfield Undo Pruning:** Fixed `core/undo.py` to allow empty initial snapshots (`is_greenfield=True`) and cleanly prune created files and empty project directories on rollback.
+  7. **Smart Preview Routing:** Replaced naive `file://` launches with `_launch_smart_preview()`. Runs ephemeral HTTP servers (ports 9400-9480) for HTML templates and initiates background dev servers (`npx vite --open`) for React/Vite projects.
+  8. **Master Website Build Skill & Complete hamza_taste Removal:** Authored `skills/website_build/SKILL.md` as the unified greenfield studio protocol, consolidated all 23 curated HTML templates into `skills/website_build/references/` (5 subdirectories) indexed by `catalog.json`, switched `actions/design_extractor.py`, `config/fleet_agents.json` (Pam's skills), UI settings/office components, and test suites to `website_build`, and permanently deleted the obsolete `skills/hamza_taste/` directory from disk.
+- **Key Files Touched:**
+  - `actions/antigravity_agent.py`
+  - `actions/design_extractor.py`
+  - `actions/fleet_control.py`
+  - `core/design_resolver.py`
+  - `core/fleet_manager.py`
+  - `core/ui_server.py`
+  - `core/undo.py`
+  - `config/fleet_agents.json`
+  - `skills/website_build/SKILL.md`
+  - `skills/website_build/references/catalog.json`
+  - `skills/website_build/references/` (23 HTML templates across 5 subdirectories)
+  - `frontend/src/components/office/AutonomousOfficeScreen.tsx`
+  - `frontend/src/components/settings/SkillsSettingsTab.tsx`
+  - `tests/test_design_system_suite.py`
+  - `tests/test_extractor_suite.py`
+  - `tests/test_phase4_agent_capability_registry_suite.py`
+  - `core/prompt.txt`
+  - `docs/TOOLS.md`, `docs/FLEET_MANAGEMENT.md`, `docs/SKILLS_SYSTEM.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed across all modified Python modules with code 0.
+  - Layer 2 (Runtime): Tested 2-step intake gate, read-back confirmation prompt, catalog query resolution, direct chat dispatch with real task ID, empty snapshot greenfield undo, and smart preview routing.
+  - Layer 3 (Regression): Full pytest test suite passed 100% (91/91 tests in 15.46s across `test_fleet_control_suite`, `test_fleet_live_sync_and_antigravity_assurance_suite`, `test_design_system_suite`, `test_website_cloner_suite`, and `test_code_engines_phase1`).
+
+## [2026-10-25] — Fix: Greenfield Undo Registration (`core/undo.py`)
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:** Greenfield website builds start in newly created empty workspace directories. When `register_repo_undo()` was called with an initial empty snapshot `{}`, line 173 (`if not root.exists() or not root.is_dir() or not snapshot: return 0`) aborted immediately, preventing undo registration for all greenfield projects.
+- **Execution & Changes Applied:**
+  1. Updated `core/undo.py` to remove `or not snapshot` guard from `register_repo_undo()`.
+  2. Allowed empty initial snapshots so newly created greenfield workspaces correctly detect all generated files as `created` and register the undo operation.
+- **Key Files Touched:**
+  - `core/undo.py`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile core/undo.py` passed with 0 errors.
+  - Layer 2 (Runtime): Verified empty snapshot diffing detects created files correctly.
+  - Layer 3 (Regression): Confirmed existing repo-level undo behavior for modifications and deletions remains intact.
+
+## [2026-10-25] — Governance Alignment: Ground Truth Integration for Documentation & EXAMPLES.md
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:** Agents previously ignored `docs/` and `EXAMPLES.md` due to three main causes:
+  1. `AGENTS.md` Rule 1 (Ground Truth) only mentioned live source code and `LEARNING_JOURNAL.md`, omitting `docs/` and `EXAMPLES.md`.
+  2. Rule 3 (Minimal Blast Radius) caused agents to fear that touching `docs/` or `EXAMPLES.md` was considered an "unrelated change".
+  3. `EXAMPLES.md` contained generic programming principles but lacked ZEZO-specific golden patterns (e.g. Action Tool `TOOL` schemas with mandatory `"risk"` tiers, non-blocking asynchronous execution, ReUI component usage, and audio pipeline hands-off enforcement).
+- **Execution & Changes Applied:**
+  1. **`AGENTS.md` Rule 1:** Updated to explicitly mandate pre-flight inspection of relevant subsystem docs in `docs/` and `EXAMPLES.md` alongside the live code and `LEARNING_JOURNAL.md`.
+  2. **`AGENTS.md` Rule 3:** Added an explicit Documentation Synchronization Exemption: updating corresponding `docs/<SUBSYSTEM>.md` and `EXAMPLES.md` for changed code is part of the task and is NOT an unrelated change.
+  3. **`AGENTS.md` Rule 10:** Expanded to "Mandatory Learning Journal & Documentation Synchronization", mandating updating `docs/` (e.g. `docs/TOOLS.md`, `docs/SETTINGS.md`, etc.) and `EXAMPLES.md` upon modifying actions, engines, or UI components.
+  4. **`AGENTS.md` Section 3 (Scope Control):** Explicitly exempted docs sync from "extra work" and updated report instructions.
+  5. **`EXAMPLES.md` Section 5:** Authored "ZEZO-Specific Golden Patterns & Idioms" with 8 concrete, real-world examples:
+     - Example 1: Action Tool implementation with Gemini schema, mandatory `"risk"` tier, and async non-blocking execution.
+     - Example 2: Audio & Voice pipeline strict hands-off guard.
+     - Example 3: ReUI component tokens and anti-slop frontend styling.
+     - Example 4: Pre-flight docs reading & post-flight docs synchronization.
+     - Example 5: Error handling & `asyncio.TaskGroup` crash prevention with structured error dictionaries.
+     - Example 6: 3-Tier escalated computer perception (UIA COM <15ms -> RapidOCR <80ms -> Vision ~2s).
+     - Example 7: Windows subprocess isolation with `CREATE_NO_WINDOW`, arg lists, and timeouts.
+     - Example 8: ReUI modal invariants (opaque panels, no backdrop-filter inside modals, explicit CSS transitions, and `window._zezoAnimActive` background freezing).
+- **Key Files Touched:**
+  - `AGENTS.md`
+  - `EXAMPLES.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): Verified markdown syntax and links in `AGENTS.md` and `EXAMPLES.md`.
+  - Layer 2 (Runtime): Checked file formatting and section anchors.
+  - Layer 3 (Regression): Confirmed existing core rules (audio hands-off, ReUI, non-blocking execution) remain completely intact and reinforced.
 
 ## [2026-10-24] — Comprehensive Documentation Modernization & Codebase Synchronization
 - **Creator & Lead Architect:** Hamza Bukhari

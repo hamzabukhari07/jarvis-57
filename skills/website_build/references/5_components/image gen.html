@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Gen Dashboard Canvas</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                fontFamily: { sans: ['Inter', 'sans-serif'] },
+                colors: {
+                    surface: '#151515',
+                    surfaceDark: '#0e0e0e',
+                    surfaceLight: '#1f1f1f',
+                    brand: '#10b981',
+                }
+            }
+        }
+    }
+</script>
+<style>
+    body {
+        background-color: #09090b;
+        color: #ececec;
+        overflow: hidden;
+    }
+    
+    .bg-grid-pattern {
+        background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+        background-size: 24px 24px;
+    }
+
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+    .connection-line {
+        stroke-dasharray: 10;
+        animation: dashFlow 20s linear infinite;
+    }
+    @keyframes dashFlow {
+        to { stroke-dashoffset: -100; }
+    }
+
+    input:focus, textarea:focus { outline: none; }
+</style>
+</head>
+<body class="w-screen h-screen relative bg-grid-pattern flex flex-col">
+
+    <!-- Ambient Gradient Overlay -->
+    <div class="absolute inset-0 pointer-events-none z-0" style="background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.02) 0%, transparent 70%);"></div>
+
+    <!-- Top Navigation Bar -->
+    <nav class="absolute top-4 left-4 right-4 h-14 z-50 flex justify-between items-center px-4">
+        <!-- Left Side: Logo & Tools -->
+        <div class="flex items-center gap-4 bg-[#111111]/90 backdrop-blur-md rounded-2xl border border-white/5 p-1 pl-4 pr-1 shadow-[0_8px_16px_rgba(0,0,0,0.4)]">
+            <div class="flex items-center gap-2 mr-2">
+                <iconify-icon icon="solar:gallery-minimalistic-linear" class="text-xl text-white"></iconify-icon>
+                <span class="text-sm font-medium tracking-tight pr-4 border-r border-white/10">Night Forest</span>
+            </div>
+            <div class="flex items-center gap-1">
+                <button class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 text-white transition-colors">
+                    <iconify-icon icon="solar:cursor-linear" class="text-lg"></iconify-icon>
+                </button>
+                <button class="w-10 h-10 flex items-center justify-center rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                    <iconify-icon icon="solar:square-bottom-down-linear" class="text-lg"></iconify-icon>
+                </button>
+                <button class="w-10 h-10 flex items-center justify-center rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                    <iconify-icon icon="solar:pen-new-square-linear" class="text-lg"></iconify-icon>
+                </button>
+                <button class="w-10 h-10 flex items-center justify-center rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                    <iconify-icon icon="solar:magic-stick-3-linear" class="text-lg"></iconify-icon>
+                </button>
+                <button class="w-10 h-10 flex items-center justify-center rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                    <iconify-icon icon="solar:sidebar-minimalistic-linear" class="text-lg"></iconify-icon>
+                </button>
+            </div>
+        </div>
+
+        <!-- Right Side: Multiplayers & Actions -->
+        <div class="flex items-center gap-4">
+            <!-- Avatars -->
+            <div class="flex items-center -space-x-2 mr-2">
+                <img src="https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/0d868fef-f560-45ca-ab35-5dad4fc29059_800w.webp" class="w-8 h-8 rounded-full border-2 border-[#111] object-cover" alt="User">
+                <img src="https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/3186f9ea-5f5a-49f7-8fcf-568ad52f515e_800w.webp" class="w-8 h-8 rounded-full border-2 border-[#111] object-cover" alt="User">
+                <div class="w-8 h-8 rounded-full border-2 border-[#111] bg-gray-800 flex items-center justify-center relative overflow-hidden">
+                    <img src="https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/65695f80-23f9-46ee-8487-cbb6c93cc48b_800w.webp" class="w-full h-full object-cover" alt="User">
+                </div>
+                <iconify-icon icon="solar:alt-arrow-down-linear" class="text-gray-400 text-sm ml-2"></iconify-icon>
+            </div>
+            
+            <button class="flex items-center gap-2 px-4 py-2 bg-transparent hover:bg-white/5 text-white rounded-xl text-sm font-medium transition-colors">
+                <iconify-icon icon="solar:play-linear" class="text-lg"></iconify-icon>
+                Run
+            </button>
+            <button class="px-5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl text-sm font-medium transition-colors">
+                Share
+            </button>
+        </div>
+    </nav>
+
+    <!-- Canvas Area -->
+    <div class="relative w-full h-full" id="canvas-container">
+        
+        <!-- SVG Connections Layer -->
+        <svg class="absolute inset-0 w-full h-full pointer-events-none z-10" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">
+            <defs>
+                <linearGradient id="lineGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="rgba(255,255,255,0.05)"></stop>
+                    <stop offset="50%" stop-color="rgba(255,255,255,0.2)"></stop>
+                    <stop offset="100%" stop-color="rgba(255,255,255,0.05)"></stop>
+                </linearGradient>
+            </defs>
+            <!-- Vis Style to Render Engine -->
+            <path d="M 330 450 C 500 450, 600 440, 840 440" stroke="url(#lineGlow)" stroke-width="2" fill="none"></path>
+            <path d="M 330 450 C 500 450, 600 440, 840 440" stroke="rgba(255,255,255,0.15)" stroke-width="1" fill="none" class="connection-line"></path>
+            
+            <!-- Scene Idea to Render Engine -->
+            <path d="M 600 270 C 600 350, 700 410, 840 410" stroke="url(#lineGlow)" stroke-width="2" fill="none"></path>
+            <path d="M 600 270 C 600 350, 700 410, 840 410" stroke="rgba(255,255,255,0.15)" stroke-width="1" fill="none" class="connection-line"></path>
+            
+            <!-- Restrictions to Render Engine -->
+            <path d="M 660 630 C 750 630, 750 470, 840 470" stroke="url(#lineGlow)" stroke-width="2" fill="none"></path>
+            <path d="M 660 630 C 750 630, 750 470, 840 470" stroke="rgba(255,255,255,0.15)" stroke-width="1" fill="none" class="connection-line"></path>
+
+            <!-- Render Engine to Preview -->
+            <path d="M 1160 440 C 1220 440, 1220 380, 1280 380" stroke="url(#lineGlow)" stroke-width="2" fill="none"></path>
+            <path d="M 1160 440 C 1220 440, 1220 380, 1280 380" stroke="rgba(255,255,255,0.15)" stroke-width="1" fill="none" class="connection-line"></path>
+        </svg>
+
+        <!-- Node 1: Visual Style -->
+        <div class="gsap-node absolute w-[280px] z-20 left-[5%] top-[28%]">
+            <div class="rounded-3xl p-[1px] bg-gradient-to-b from-white/10 to-transparent shadow-2xl backdrop-blur-xl">
+                <div class="rounded-[calc(1.5rem-1px)] p-5 bg-[#18181b] border border-white/5 h-full flex flex-col gap-4 shadow-[inset_0_1px_2px_rgba(255,255,255,0.05)]">
+                    <div class="flex items-center gap-2 text-white">
+                        <iconify-icon icon="solar:pallete-2-linear" class="text-lg"></iconify-icon>
+                        <h3 class="text-sm font-semibold tracking-tight">Visual style</h3>
+                    </div>
+                    
+                    <div class="space-y-4 mt-2">
+                        <div>
+                            <div class="flex items-center gap-1.5 text-gray-500 mb-2">
+                                <iconify-icon icon="solar:document-text-linear" class="text-xs"></iconify-icon>
+                                <label class="text-[11px] uppercase tracking-wider">Style preset</label>
+                            </div>
+                            <div class="flex items-center justify-between text-sm text-gray-300 hover:text-white cursor-pointer group">
+                                <span>Cinematic Soft Glow</span>
+                                <iconify-icon icon="solar:alt-arrow-down-linear" class="text-gray-500 group-hover:text-white transition-colors"></iconify-icon>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex items-center gap-1.5 text-gray-500 mb-2">
+                                <iconify-icon icon="solar:palette-round-linear" class="text-xs"></iconify-icon>
+                                <label class="text-[11px] uppercase tracking-wider">Color palette</label>
+                            </div>
+                            <div class="flex items-center justify-between text-sm text-gray-300 hover:text-white cursor-pointer group">
+                                <span>Midnight Forest</span>
+                                <iconify-icon icon="solar:alt-arrow-down-linear" class="text-gray-500 group-hover:text-white transition-colors"></iconify-icon>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex items-center gap-1.5 text-gray-500 mb-2">
+                                <iconify-icon icon="solar:layers-linear" class="text-xs"></iconify-icon>
+                                <label class="text-[11px] uppercase tracking-wider">Texture tone</label>
+                            </div>
+                            <div class="flex items-center justify-between text-sm text-gray-300 hover:text-white cursor-pointer group">
+                                <span>Dreamlike</span>
+                                <iconify-icon icon="solar:alt-arrow-down-linear" class="text-gray-500 group-hover:text-white transition-colors"></iconify-icon>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-2 pt-4 border-t border-white/5 flex items-center gap-2">
+                        <div class="bg-[#27272a] text-gray-400 text-[11px] px-2.5 py-1 rounded-md flex items-center gap-2">
+                            Midjourney 4.2
+                            <button class="hover:text-white"><iconify-icon icon="solar:add-linear"></iconify-icon></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="absolute -bottom-8 right-6 z-50 flex flex-col items-center animate-bounce" style="animation-duration: 3s;">
+                <iconify-icon icon="solar:cursor-bold" class="text-2xl text-yellow-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] transform -rotate-12"></iconify-icon>
+                <div class="bg-yellow-400 text-black text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 shadow-md">Rita</div>
+            </div>
+        </div>
+
+        <!-- Node 2: Scene Idea -->
+        <div class="gsap-node absolute w-[320px] z-20 left-[26%] top-[12%]">
+            <div class="rounded-3xl p-[1px] bg-gradient-to-b from-white/10 to-transparent shadow-2xl backdrop-blur-xl">
+                <div class="rounded-[calc(1.5rem-1px)] p-5 bg-[#18181b] border border-white/5 h-full flex flex-col gap-3 shadow-[inset_0_1px_2px_rgba(255,255,255,0.05)]">
+                    <div class="flex items-center gap-2 text-white">
+                        <iconify-icon icon="solar:monitor-linear" class="text-lg"></iconify-icon>
+                        <h3 class="text-sm font-semibold tracking-tight">Scene Idea</h3>
+                    </div>
+                    
+                    <p class="text-sm text-gray-300 leading-relaxed mt-1">
+                        A quiet forest clearing illuminated by moonlight. Mist floating above the ground with a glowing creature emerging between trees.
+                    </p>
+
+                    <div class="mt-2 relative">
+                        <div class="w-full bg-[#111] border border-white/5 rounded-xl px-4 py-3 text-sm text-gray-600">Describe your idea</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Node 3: Restrictions -->
+        <div class="gsap-node absolute w-[320px] z-20 left-[26%] top-[52%]">
+            <div class="rounded-3xl p-[1px] bg-gradient-to-b from-white/10 to-transparent shadow-2xl backdrop-blur-xl">
+                <div class="rounded-[calc(1.5rem-1px)] p-5 bg-[#18181b] border border-white/5 h-full flex flex-col gap-3 shadow-[inset_0_1px_2px_rgba(255,255,255,0.05)]">
+                    <div class="flex items-center gap-2 text-white">
+                        <iconify-icon icon="solar:forbidden-circle-linear" class="text-lg"></iconify-icon>
+                        <h3 class="text-sm font-semibold tracking-tight">Restrictions</h3>
+                    </div>
+                    
+                    <div class="text-sm text-gray-300 leading-relaxed mt-1 space-y-1">
+                        <p class="text-gray-400">Avoid</p>
+                        <ul class="list-disc pl-4 space-y-0.5">
+                            <li>modern objects</li>
+                            <li>artificial lighting</li>
+                            <li>buildings</li>
+                        </ul>
+                    </div>
+
+                    <div class="mt-2 relative">
+                        <div class="w-full bg-[#111] border border-white/5 rounded-xl px-4 py-3 text-sm text-gray-600">Add restrictions</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Node 4: Render Engine -->
+        <div class="gsap-node absolute w-[320px] z-20 left-[48%] top-[29%]">
+            <div class="rounded-3xl p-[1px] bg-gradient-to-b from-white/10 to-transparent shadow-2xl backdrop-blur-xl">
+                <div class="rounded-[calc(1.5rem-1px)] p-5 bg-[#18181b] border border-white/5 h-full flex flex-col shadow-[inset_0_1px_2px_rgba(255,255,255,0.05)]">
+                    <div class="flex items-center gap-2 text-white mb-6 border-b border-white/5 pb-4">
+                        <iconify-icon icon="solar:cpu-bolt-linear" class="text-lg"></iconify-icon>
+                        <h3 class="text-sm font-semibold tracking-tight">Render Engine</h3>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-2">
+                            <iconify-icon icon="solar:settings-linear"></iconify-icon> Settings
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 text-gray-400 text-xs">
+                                <iconify-icon icon="solar:magic-stick-linear"></iconify-icon> Engine
+                            </div>
+                            <div class="bg-[#111] border border-white/5 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs text-gray-300 cursor-pointer hover:bg-white/5 w-32 justify-between">
+                                <span class="truncate">Midnight...</span>
+                                <iconify-icon icon="solar:alt-arrow-down-linear" class="text-gray-500"></iconify-icon>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 text-gray-400 text-xs">
+                                <iconify-icon icon="solar:leaf-linear"></iconify-icon> Seed
+                            </div>
+                            <div class="bg-[#111] border border-white/5 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs text-gray-300 cursor-pointer hover:bg-white/5 w-32 justify-between">
+                                <span>48291</span>
+                                <iconify-icon icon="solar:alt-arrow-down-linear" class="text-gray-500"></iconify-icon>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 text-gray-400 text-xs">
+                                <iconify-icon icon="solar:maximize-square-minimalistic-linear"></iconify-icon> Detail level
+                            </div>
+                            <div class="bg-[#111] border border-white/5 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs text-gray-300 cursor-pointer hover:bg-white/5 w-32 justify-between">
+                                <span>High</span>
+                                <iconify-icon icon="solar:alt-arrow-down-linear" class="text-gray-500"></iconify-icon>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 text-gray-400 text-xs">
+                                <iconify-icon icon="solar:lightning-linear"></iconify-icon> Lighting model
+                            </div>
+                            <div class="bg-[#111] border border-white/5 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs text-gray-300 cursor-pointer hover:bg-white/5 w-32 justify-between">
+                                <span>Dynamic</span>
+                                <iconify-icon icon="solar:alt-arrow-down-linear" class="text-gray-500"></iconify-icon>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 text-gray-400 text-xs">
+                                <iconify-icon icon="solar:pen-linear"></iconify-icon> Sampling steps
+                            </div>
+                            <div class="bg-[#111] border border-white/5 rounded-lg flex items-center text-xs text-gray-300 w-32 overflow-hidden">
+                                <button class="px-2 py-1.5 hover:bg-white/10 text-gray-500 hover:text-white transition-colors border-r border-white/5"><iconify-icon icon="solar:alt-arrow-left-linear"></iconify-icon></button>
+                                <span class="flex-1 text-center font-medium">35</span>
+                                <button class="px-2 py-1.5 hover:bg-white/10 text-gray-500 hover:text-white transition-colors border-l border-white/5"><iconify-icon icon="solar:alt-arrow-right-linear"></iconify-icon></button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 text-gray-400 text-xs">
+                                <iconify-icon icon="solar:layers-minimalistic-linear"></iconify-icon> Style intensity
+                            </div>
+                            <div class="bg-[#111] border border-white/5 rounded-lg flex items-center text-xs text-gray-300 w-32 overflow-hidden">
+                                <button class="px-2 py-1.5 hover:bg-white/10 text-gray-500 hover:text-white transition-colors border-r border-white/5"><iconify-icon icon="solar:alt-arrow-left-linear"></iconify-icon></button>
+                                <span class="flex-1 text-center font-medium">7</span>
+                                <button class="px-2 py-1.5 hover:bg-white/10 text-gray-500 hover:text-white transition-colors border-l border-white/5"><iconify-icon icon="solar:alt-arrow-right-linear"></iconify-icon></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Node 5: Preview Image -->
+        <div class="gsap-node absolute w-[380px] z-20 left-[72%] top-[18%]">
+            <div class="rounded-3xl p-[1px] bg-gradient-to-b from-white/10 to-transparent shadow-[0_32px_64px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+                <div class="rounded-[calc(1.5rem-1px)] p-4 bg-[#18181b] border border-white/5 h-full flex flex-col shadow-[inset_0_1px_2px_rgba(255,255,255,0.05)]">
+                    <div class="flex items-center gap-2 text-white mb-4 px-2">
+                        <iconify-icon icon="solar:play-circle-linear" class="text-lg"></iconify-icon>
+                        <h3 class="text-sm font-semibold tracking-tight">Preview image</h3>
+                    </div>
+                    
+                    <div class="relative w-full aspect-[4/5] rounded-2xl overflow-hidden bg-black group">
+                        <img src="https://hoirqrkdgbmvpwutwuwj.supabase.co/storage/v1/object/public/assets/assets/a4780cd9-2a3d-4bdc-9e5f-85a097b3a8bf_3840w.webp" alt="Generated Output" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    </div>
+                    
+                    <div class="flex items-center justify-end gap-3 mt-4 px-2 text-gray-500">
+                        <button class="hover:text-white transition-colors"><iconify-icon icon="solar:copy-linear" class="text-lg"></iconify-icon></button>
+                        <button class="hover:text-white transition-colors"><iconify-icon icon="solar:like-linear" class="text-lg"></iconify-icon></button>
+                        <button class="hover:text-white transition-colors"><iconify-icon icon="solar:dislike-linear" class="text-lg"></iconify-icon></button>
+                        <button class="hover:text-white transition-colors"><iconify-icon icon="solar:refresh-linear" class="text-lg"></iconify-icon></button>
+                        <button class="hover:text-white transition-colors"><iconify-icon icon="solar:export-linear" class="text-lg"></iconify-icon></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="absolute -top-6 -right-16 z-50 flex flex-col items-center animate-bounce" style="animation-duration: 4s; animation-delay: 1s;">
+                <iconify-icon icon="solar:cursor-bold" class="text-2xl text-[#00f38d] drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] transform rotate-12"></iconify-icon>
+                <div class="bg-[#00f38d] text-black text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 shadow-md">Stephen</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Bottom Action Bar (Floating Input) -->
+    <div class="fixed bottom-10 left-1/2 -translate-x-1/2 w-[640px] z-50 flex flex-col gap-4">
+        
+        <div class="relative rounded-3xl p-[1px] bg-gradient-to-r from-rose-500 via-amber-500 to-emerald-500 shadow-[0_16px_48px_rgba(0,0,0,0.5)]">
+            <div class="bg-[#111111] rounded-[calc(1.5rem-1px)] p-4 flex flex-col gap-3 relative z-10 h-full w-full shadow-[inset_0_2px_4px_rgba(255,255,255,0.05)]">
+                
+                <textarea rows="1" placeholder="Describe your idea" class="w-full bg-transparent text-sm text-white placeholder-gray-500 resize-none px-2 py-1 focus:outline-none"></textarea>
+                
+                <div class="flex items-center justify-between px-2">
+                    <div class="flex items-center gap-3 text-gray-500">
+                        <button class="hover:text-white transition-colors"><iconify-icon icon="solar:add-circle-linear" class="text-xl"></iconify-icon></button>
+                        <button class="hover:text-white transition-colors"><iconify-icon icon="solar:pen-linear" class="text-lg"></iconify-icon></button>
+                        <button class="hover:text-white transition-colors"><iconify-icon icon="solar:palette-linear" class="text-lg"></iconify-icon></button>
+                    </div>
+                    
+                    <div class="flex items-center gap-3">
+                        <button class="text-gray-500 hover:text-white transition-colors"><iconify-icon icon="solar:microphone-linear" class="text-xl"></iconify-icon></button>
+                        <button class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center hover:bg-gray-200 transition-colors shadow-lg">
+                            <iconify-icon icon="solar:arrow-up-linear" class="text-lg"></iconify-icon>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 px-2">
+            <button class="px-4 py-1.5 rounded-full bg-[#18181b] border border-white/5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors">Cover illustration</button>
+            <button class="px-4 py-1.5 rounded-full bg-[#18181b] border border-white/5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors">Cinematic shot</button>
+        </div>
+    </div>
+
+    <!-- Right Sidebar Tools -->
+    <div class="fixed right-6 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-40">
+        <button class="w-10 h-10 rounded-xl bg-[#111]/80 backdrop-blur-md border border-white/5 text-gray-500 hover:text-white flex items-center justify-center transition-colors">
+            <iconify-icon icon="solar:sun-linear" class="text-lg"></iconify-icon>
+        </button>
+        <button class="w-10 h-10 rounded-xl bg-[#111]/80 backdrop-blur-md border border-white/5 text-gray-500 hover:text-white flex items-center justify-center transition-colors">
+            <iconify-icon icon="solar:layers-minimalistic-linear" class="text-lg"></iconify-icon>
+        </button>
+        <button class="w-10 h-10 rounded-xl bg-[#111]/80 backdrop-blur-md border border-white/5 text-gray-500 hover:text-white flex items-center justify-center transition-colors">
+            <iconify-icon icon="solar:magic-stick-linear" class="text-lg"></iconify-icon>
+        </button>
+        <button class="w-10 h-10 rounded-xl bg-[#111]/80 backdrop-blur-md border border-white/5 text-gray-500 hover:text-white flex items-center justify-center transition-colors">
+            <iconify-icon icon="solar:diskette-linear" class="text-lg"></iconify-icon>
+        </button>
+    </div>
+
+    <!-- Bottom Left Zoom Controls -->
+    <div class="fixed bottom-6 left-6 flex items-center bg-[#111]/80 backdrop-blur-md border border-white/5 rounded-xl z-40 overflow-hidden">
+        <button class="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 border-r border-white/5 transition-colors">
+            <iconify-icon icon="solar:add-linear" class="text-lg"></iconify-icon>
+        </button>
+        <button class="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+            <iconify-icon icon="solar:minus-linear" class="text-lg"></iconify-icon>
+        </button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const nodes = document.querySelectorAll('.gsap-node');
+            
+            nodes.forEach((node, index) => {
+                gsap.to(node, {
+                    y: "random(-8, 8)",
+                    x: "random(-4, 4)",
+                    duration: "random(4, 8)",
+                    ease: "sine.inOut",
+                    yoyo: true,
+                    repeat: -1,
+                    delay: index * 0.5
+                });
+            });
+            
+            gsap.from('.gsap-node', {
+                y: 40,
+                opacity: 0,
+                duration: 1,
+                stagger: 0.1,
+                ease: "power3.out"
+            });
+        });
+    </script>
+
+</body>
+</html>

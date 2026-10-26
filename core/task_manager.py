@@ -390,11 +390,21 @@ class TaskManager:
                     if state.cancel_event.is_set():
                         state.status = TaskStatus.CANCELLED
                     elif state.status != TaskStatus.FAILED:
-                        state.status = TaskStatus.DONE
+                        is_error_result = isinstance(result, dict) and (
+                            result.get("success") is False
+                            or "error" in result
+                            or result.get("status") == "failed"
+                        )
+                        if is_error_result:
+                            state.status = TaskStatus.FAILED
+                            state.error = result.get("error") or str(result)
+                            state.message = f"failed: {state.error}"
+                        else:
+                            state.status = TaskStatus.DONE
+                            state.progress = 100
+                            state.message = state.message or "completed"
                         if result is not None:
                             state.result = result
-                        state.progress = 100
-                        state.message = state.message or "completed"
             except Exception as e:
                 logger.exception("task %s failed", task_id)
                 with self._lock:
