@@ -373,29 +373,66 @@ def load_catalog() -> list[dict[str, Any]]:
     return templates
 
 
-def _find_template_file(template: dict[str, Any], available_html: list[Path]) -> Optional[Path]:
-    """Resolve the real on-disk HTML path for a catalog entry."""
+def _find_template_file(
+    template: dict[str, Any] | str | Path,
+    available_html: Optional[list[Path]] = None,
+) -> Optional[Path]:
+    """Resolve the real on-disk HTML path for a catalog entry or path string."""
     ws = _get_workspace_root()
-    ref_path = template.get("relative_path", "")
+    if isinstance(template, (str, Path)):
+        ref_path = str(template).strip()
+    elif isinstance(template, dict):
+        ref_path = str(template.get("relative_path", "") or template.get("path", "") or template.get("name", "")).strip()
+    else:
+        ref_path = str(template).strip()
+
     if not ref_path:
         return None
 
-    p_wb = ws / "skills" / "website_build" / "references" / ref_path
-    if p_wb.exists() and p_wb.is_file() and p_wb.stat().st_size > 0:
-        return p_wb
+    ref_file_name = Path(ref_path).name
+    target_norm = _norm_stem(ref_file_name)
 
+    # 1. Direct path check (workspace-relative or absolute)
+    p_direct = Path(ref_path)
+    if not p_direct.is_absolute():
+        p_direct = ws / ref_path
+    if p_direct.exists() and p_direct.is_file() and p_direct.stat().st_size > 0:
+        return p_direct
+
+    # 2. Check candidate reference directories
+    ref_roots = [
+        ws / "skills" / "website_build" / "references",
+        ws / "skills" / "hamza_taste" / "references",
+        ws / "References" / "new Designs",
+        ws / "References" / "UI",
+    ]
+    for root in ref_roots:
+        if not root.exists():
+            continue
+        p = root / ref_path
+        if p.exists() and p.is_file() and p.stat().st_size > 0:
+            return p
+
+    # 3. Direct filename match under primary references
     wb_dir = ws / "skills" / "website_build" / "references"
     if wb_dir.exists():
-        for p in wb_dir.rglob(Path(ref_path).name):
+        for p in wb_dir.rglob(ref_file_name):
             if p.is_file() and p.stat().st_size > 0:
                 return p
 
-    target_norm = _norm_stem(Path(ref_path).name)
+    # 4. Search in available_html or auto-discover
+    if available_html is None:
+        try:
+            available_html, _ = _get_available_templates()
+        except Exception:
+            available_html = []
+
     for p in available_html:
         if _norm_stem(p.name) == target_norm or target_norm in _norm_stem(p.name):
             if p.is_file() and p.stat().st_size > 0:
                 return p
 
+    # 5. Fallback in References/new Designs
     for p in (ws / "References" / "new Designs").rglob("*.html"):
         if _norm_stem(p.name) == target_norm and p.is_file() and p.stat().st_size > 0:
             return p
