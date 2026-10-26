@@ -661,23 +661,39 @@ class FleetManager:
         subtasks = []
         low = prompt.lower()
         if any(w in low for w in ("research", "scrape", "youtube", "investigate", "find")):
-            subtasks.append(("KELLY", "Perform deep research and gather key technical requirements: " + prompt))
+            subtasks.append(("KELLY", "Perform deep research and gather key technical requirements: " + prompt, "research"))
         if any(w in low for w in ("ui", "frontend", "landing", "page", "css", "html", "react", "view")):
             frontend_id = "VERVE" if self.get_agent("VERVE") else ("FLUX" if self.get_agent("FLUX") else "ALI")
-            subtasks.append((frontend_id, "Design and build responsive frontend user interface and components: " + prompt))
+            subtasks.append((frontend_id, "Design and build responsive frontend user interface and components: " + prompt, "frontend"))
         if any(w in low for w in ("api", "backend", "database", "crud", "endpoint", "server", "model", "auth")):
-            subtasks.append(("AHMAD", "Implement robust backend APIs, database schemas, and service logic: " + prompt))
+            subtasks.append(("AHMAD", "Implement robust backend APIs, database schemas, and service logic: " + prompt, "backend"))
         if any(w in low for w in ("test", "qa", "verify", "audit", "security", "bug", "check")):
-            subtasks.append(("DWIGHT", "Conduct end-to-end test verification, security review, and edge case audit: " + prompt))
+            subtasks.append(("DWIGHT", "Conduct end-to-end test verification, security review, and edge case audit: " + prompt, "tests"))
 
         # Default fallback if no specific keywords matched
         if not subtasks:
-            subtasks = [("AHMAD", prompt)]
+            subtasks = [("AHMAD", prompt, "")]
+
+        if path:
+            base_dir = Path(path).resolve()
+        else:
+            from core.repo_context import get_unique_project_dir
+            base_dir = Path(get_unique_project_dir(prompt)).resolve()
 
         dispatched = []
-        for target_id, sub_prompt in subtasks:
+        for target_id, sub_prompt, sub_folder in subtasks:
             target_agent = self.get_agent(target_id) or self.resolve_agent_by_mention_or_capability(target_id) or list(self.agents.values())[0]
-            res = self.dispatch_task(target_agent.id, sub_prompt, path=path, is_subtask=True)
+            if len(subtasks) > 1 and sub_folder:
+                sub_path = str((base_dir / sub_folder).resolve())
+                try:
+                    Path(sub_path).mkdir(parents=True, exist_ok=True)
+                except Exception as e:
+                    logger.warning("[FleetManager] Could not create subtask dir %s: %s", sub_path, e)
+            else:
+                sub_path = str(base_dir)
+
+            res = self.dispatch_task(target_agent.id, sub_prompt, path=sub_path, is_subtask=True)
+            res["path"] = sub_path
             dispatched.append(res)
 
         return {
@@ -685,6 +701,7 @@ class FleetManager:
             "orchestrator": "MICHAEL",
             "decomposed_count": len(dispatched),
             "tasks": dispatched,
+            "base_path": str(base_dir),
         }
 
     def _broadcast_event(self, event_type: str, data: Dict[str, Any]) -> None:

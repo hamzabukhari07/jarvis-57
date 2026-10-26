@@ -317,7 +317,7 @@ def _handle_peer_chat(params: Dict[str, Any]) -> str:
 
 def _handle_decompose(params: Dict[str, Any]) -> str:
     prompt = str(params.get("task") or params.get("prompt") or "").strip()
-    path = params.get("path")
+    path = str(params.get("path") or params.get("project_path") or "").strip() or None
     if not prompt:
         return "Error: task prompt is required for workflow decomposition."
 
@@ -330,6 +330,7 @@ def _handle_decompose(params: Dict[str, Any]) -> str:
         "task": prompt,
         "count": count,
         "tasks": tasks,
+        "base_path": res.get("base_path"),
     })
 
     return f"Michael Scott decomposed and dispatched {count} specialist tasks:\n" + "\n".join(task_summaries)
