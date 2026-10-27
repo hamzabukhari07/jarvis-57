@@ -1,0 +1,43 @@
+[TASK DIRECTIVE]
+Adapt and synthesize the master design blueprint into the production deliverable: `{target_file}`.
+Your mission is to produce a high-fidelity, fully responsive, and complete Developer / Creative Portfolio website directly inside `{target_file}`.
+Incorporate authentic user identity, narrative biography, technical expertise, featured showcase projects, career milestones, and contact channels.
+Execute this deliverable in a single, direct, comprehensive pass.
+
+[DESIGN ASSETS AVAILABLE IN WORKSPACE]
+1. `DESIGN.md`: The single source of truth for design tokens, typography scales, component recipes, and anti-slop rules (<design-context> DSL).
+2. `master-template.html`: The canonical design blueprint containing the complete visual DNA, typography hierarchy, component classes, color variables, responsive breakpoints, and animation styles.
+You must ground your implementation in the visual aesthetics, layout rhythm, and design tokens established by `DESIGN.md` and `master-template.html`. Update and adapt the layout directly into `{target_file}`.
+
+[THEME & CUSTOMIZATION DIRECTIVE]
+Visual Theme Specification:
+{theme}
+- Adhere strictly to the color palette, typography font stack, spacing scales, and border radii defined in the theme directive and master template.
+- Maintain high contrast, polished glassmorphism/card surfaces, cohesive accent glows, and authentic micro-interactions.
+- Never regress into default browser styling or unstyled components.
+
+[CONTENT SPECIFICATION]
+User Profile & Portfolio Content:
+{content}
+- Populate every section with authentic, personalized content derived from the specification above.
+- Never use generic placeholder text (e.g., "Lorem Ipsum", "Project 1 Description", "Your Name Here").
+- Ensure all technical stack badges, project descriptions, achievements, and timeline entries reflect the provided user facts.
+
+[SLOT SPECIFICATION]
+Surgically adapt each designated layout slot:
+{slots}
+Key architectural slots to fulfill:
+- [HERO_SLOT]: Primary introduction, full-bleed or split layout, profile portrait/avatar placeholder, distinctive title/role, dynamic status badge, and immediate call-to-action triggers (e.g., "View Work", "Get in Touch").
+- [BIO_ABOUT_SLOT]: Personal narrative, engineering philosophy, core competencies, and high-level milestone metrics.
+- [EXPERIENCE_TIMELINE_SLOT]: Chronological career progression, enterprise roles, responsibilities, and quantified impact.
+- [PROJECTS_PORTFOLIO_SLOT]: Featured case studies and project cards, including technology stack badges, architecture highlights, live demo links, and repository buttons.
+- [SKILLS_CAPABILITIES_SLOT]: Categorized skills matrices (Frontend, Backend, Systems, Cloud, AI/ML, Design) rendered with interactive badges or progress indicators.
+- [CONTACT_FOOTER_SLOT]: Contact coordinates, social media links (GitHub, LinkedIn, X, email), availability status, and lead architect attribution.
+
+[CRITICAL DIRECT-EXECUTION CONSTRAINTS]
+1. DIRECT SINGLE-PASS ADAPTATION: Write the complete, production-ready code directly into `{target_file}`. Do not output conversational filler, truncated snippets, or partial implementations.
+2. NO INTERMEDIATE SCRIPTS: You are STRICTLY FORBIDDEN from generating or executing intermediate Python inspection scripts (e.g., `inspect.py`, BeautifulSoup parsers, AST crawlers, or DOM manipulation scripts). Adapt the HTML directly.
+3. PRESERVE CSS ANIMATIONS & JS NAVIGATION: Retain all keyframe animations, transition curves, theme switching logic, smooth-scrolling behaviors, mobile navigation drawers, and interactive modal handlers defined in `master-template.html`.
+4. SURGICAL SLOT TARGETING: Target and replace slot content accurately without breaking parent Flexbox/Grid wrappers, container sizing, or responsive media queries.
+5. COMPLETE DIRECTLY WITHOUT STALL: Proceed directly to file synthesis and complete the deliverable without pauses, questions, or multi-step deferrals.
+

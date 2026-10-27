@@ -27,7 +27,13 @@ ZEZO/
 │   ├── teardown_engine.py           # REA Teardown Engine via rea-agents@6.7.0 CLI
 │   ├── tunnel_manager.py            # Cloudflare Quick Tunnel daemon manager
 │   ├── action_loader.py             # Dynamic action discoverer & registry (33 actions)
-│   ├── fleet_manager.py             # Autonomous multi-agent fleet orchestrator & workspace isolation
+│   ├── fleet/                       # Modular Fleet Management subsystem
+│   │   ├── __init__.py              # Subsystem exports (FleetAgent, FleetRegistry, FleetDispatcher, FleetOrchestrator)
+│   │   ├── registry.py              # FleetRegistry: Storage, CRUD, desk coordinates, JSON persistence
+│   │   ├── dispatcher.py            # FleetDispatcher: Sandboxing, skill injection, task dispatch, telemetry
+│   │   └── orchestrator.py          # FleetOrchestrator: Multi-agent decomposition, peer delegation, Git worktrees
+│   ├── fleet_manager.py             # Backward-compatible Facade uniting registry, dispatcher & orchestrator
+│   ├── antigravity_runner.py        # Antigravity CLI worker engine, Windows Job throttling, snapshot diffs
 │   ├── plugin_loader.py             # Plugin discoverer & execution sandbox
 │   ├── skill_loader.py              # Declarative skill registry (`skills/<name>/SKILL.md`)
 │   ├── skill_scanner.py             # Multi-stage security & prompt injection scanner

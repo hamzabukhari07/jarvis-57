@@ -109,6 +109,13 @@ class TaskState:
     parent_id: Optional[str] = None
     cancel_event: threading.Event = field(default_factory=threading.Event)
     _high_cpu_sec: int = field(default=0, repr=False)
+    _last_log_time: float = field(default=0.0, repr=False)
+
+    @property
+    def elapsed_sec(self) -> float:
+        start = self.started_at or time.time()
+        end = self.finished_at or time.time()
+        return round(max(0.0, end - start), 1)
 
     def transition_to(self, new_status: TaskStatus) -> bool:
         """Safely transition to new status enforcing monotonic progression."""
@@ -146,11 +153,17 @@ class TaskState:
         started_str = time.strftime("%H:%M:%S", time.localtime(self.started_at)) if self.started_at else "--:--:--"
         model_name = self.model
         if not model_name and isinstance(self.params, dict):
-            model_name = self.params.get("model") or ""
+            model_name = self.params.get("model") or self.params.get("model_id") or ""
         if not model_name:
             t = (self.tool or "").lower()
             from core.models import DEFAULT_ANTIGRAVITY_MODEL
-            if self.tool in CODING_TOOLS or "opencode" in t or "kilo" in t or "antigravity" in t:
+            if "antigravity" in t:
+                try:
+                    from memory.config_manager import get_antigravity_model
+                    model_name = get_antigravity_model() or DEFAULT_ANTIGRAVITY_MODEL
+                except Exception:
+                    model_name = DEFAULT_ANTIGRAVITY_MODEL
+            elif self.tool in CODING_TOOLS or "opencode" in t or "kilo" in t:
                 try:
                     from memory.config_manager import get_opencode_model
                     model_name = get_opencode_model()
@@ -180,6 +193,12 @@ class TaskState:
             "error": self.error,
             "pid": self.pid,
             "params": self.params,
+            "prompt_full": (
+                (self.params.get("prompt_full") if isinstance(self.params, dict) else None)
+                or (self.params.get("enriched_prompt") if isinstance(self.params, dict) else None)
+                or (self.params.get("task") if isinstance(self.params, dict) else None)
+                or ""
+            ),
             "group_id": self.group_id or self.id,
             "group_title": self.group_title or "",
             "parent_id": self.parent_id or "",
@@ -187,9 +206,8 @@ class TaskState:
             "started_at": self.started_at,
             "started_time_str": started_str,
             "finished_at": self.finished_at,
-            "elapsed_sec": round(
-                (self.finished_at or time.time()) - self.started_at, 1
-            ),
+            "elapsed_sec": self.elapsed_sec,
+            "duration": f"{int(self.elapsed_sec)}s",
         }
 
 
@@ -599,9 +617,21 @@ class TaskManager:
                 clean_msg = strip_ansi(message).strip()
                 if clean_msg:
                     s.message = clean_msg[-280:]
-                    ts = time.strftime("%H:%M:%S")
-                    if not s.logs or s.logs[-1].get("text") != clean_msg:
+                    now = time.time()
+                    ts = time.strftime("%H:%M:%S", time.localtime(now))
+                    last_log = s.logs[-1] if s.logs else None
+                    last_text = last_log.get("text") if last_log else None
+                    last_prog = last_log.get("progress", 0) if last_log else 0
+                    time_diff = now - getattr(s, "_last_log_time", 0.0)
+
+                    if (
+                        not last_log
+                        or last_text != clean_msg
+                        or s.progress > last_prog
+                        or time_diff >= 3.0
+                    ):
                         s.logs.append({"time": ts, "text": clean_msg, "progress": s.progress})
+                        s._last_log_time = now
                         if len(s.logs) > 250:
                             s.logs = s.logs[-250:]
 

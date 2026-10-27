@@ -1,0 +1,42 @@
+[TASK DIRECTIVE]
+Adapt and synthesize the master design blueprint into the production deliverable: `{target_file}`.
+Your mission is to produce a high-density, mission-critical Telemetry & Analytics Dashboard HUD directly inside `{target_file}`.
+Incorporate real-time system metric KPI cards, dynamic data visualizations and charts, telemetry status badges, operational activity logs, filterable data tables, and intuitive subsystem navigation.
+Execute this deliverable in a single, direct, comprehensive pass.
+
+[DESIGN ASSETS AVAILABLE IN WORKSPACE]
+1. `DESIGN.md`: The single source of truth for design tokens, typography scales, component recipes, and anti-slop rules (<design-context> DSL).
+2. `master-template.html`: The canonical design blueprint containing high-density HUD UI styles, monospaced data fonts, metric badge counters, tabular layouts, chart containers, and real-time status indicator styles.
+You must ground your implementation in the visual aesthetics, layout rhythm, and design tokens established by `DESIGN.md` and `master-template.html`. Update and adapt the layout directly into `{target_file}`.
+
+[THEME & CUSTOMIZATION DIRECTIVE]
+Visual Theme Specification:
+{theme}
+- Adhere strictly to the dark HUD color palette, high-contrast monospace data typography, status glow accents (e.g., active green, warning amber, critical crimson), and compact card surfaces.
+- Maintain dense, space-efficient information architecture suitable for monitoring and telemetry cockpits.
+- Eliminate visual fluff; every pixel must serve data clarity, operational awareness, and quick readability.
+
+[CONTENT SPECIFICATION]
+Telemetry & Analytics Data Specification:
+{content}
+- Populate every panel, chart, and table with authentic operational metrics, system parameters, and telemetry streams from the specification above.
+- Never use generic placeholder text (e.g., "Metric 1", "0000", "Lorem Ipsum").
+- Ensure all metric figures, percentage deltas, timestamped logs, and table rows reflect the specified domain.
+
+[SLOT SPECIFICATION]
+Surgically adapt each designated layout slot:
+{slots}
+Key architectural slots to fulfill:
+- [TOPBAR_HUD_SLOT]: Mission control header displaying active node/fleet status, real-time clock, environment pill, alert count badge, and user session profile.
+- [SIDEBAR_NAV_SLOT]: Collapsible vertical navigation bar with subsystem routes, quick filters, view switcher, and system health status summary.
+- [METRIC_KPI_CARDS_SLOT]: High-impact KPI stat cards featuring key operational metrics, trend indicators (positive/negative percentage deltas), sparklines, and status badges.
+- [PRIMARY_VISUALIZATION_SLOT]: Main analytics chart container (time-series performance curve, resource distribution, or network traffic graph) rendered via interactive SVG/Canvas.
+- [DATA_TABLE_GRID_SLOT]: High-density operational data table with sortable column headers, status badges, timestamp formatting, search filter bar, and pagination controls.
+- [LOG_EVENT_STREAM_SLOT]: Monospaced, terminal-style live event log viewer displaying timestamped system events, log level indicators (INFO, WARN, ERROR), and auto-scroll capability.
+
+[CRITICAL DIRECT-EXECUTION CONSTRAINTS]
+1. DIRECT SINGLE-PASS ADAPTATION: Write the complete, production-ready code directly into `{target_file}`. Do not output conversational filler, truncated snippets, or partial implementations.
+2. NO INTERMEDIATE SCRIPTS: You are STRICTLY FORBIDDEN from generating or executing intermediate Python inspection scripts (e.g., `inspect.py`, BeautifulSoup parsers, AST crawlers, or DOM manipulation scripts). Adapt the HTML directly.
+3. PRESERVE CSS ANIMATIONS & JS NAVIGATION: Retain all CSS animations, chart drawing/rendering routines, real-time data timer loops, sidebar collapse toggles, and filter event handlers defined in `master-template.html`.
+4. SURGICAL SLOT TARGETING: Target and replace slot content accurately without breaking parent CSS Grid layouts, card proportions, or responsive dashboard breakpoints.
+5. COMPLETE DIRECTLY WITHOUT STALL: Proceed directly to file synthesis and complete the deliverable without pauses, questions, or multi-step deferrals.

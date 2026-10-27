@@ -1,0 +1,37 @@
+[TASK DIRECTIVE]
+Execute a surgical in-place modification of `{target_file}`.
+Your mission is to update, replace, or enhance specific designated components or sections inside `{target_file}` while preserving all unaffected DOM structures, global styling sheets, and application runtime scripts bit-for-bit.
+Execute this deliverable in a single, direct, surgical pass without collateral alterations.
+
+[DESIGN ASSETS AVAILABLE IN WORKSPACE]
+1. `DESIGN.md`: The single source of truth for design tokens, typography scales, component recipes, and anti-slop rules (<design-context> DSL).
+2. `master-template.html`: The canonical design blueprint containing the styling tokens, utility classes, component markup patterns, and behavioral scripts for the modification.
+Ground your surgical update strictly on the patterns established by `DESIGN.md` and `master-template.html` while respecting the existing conventions of `{target_file}`.
+
+[THEME & CUSTOMIZATION DIRECTIVE]
+Visual Theme Specification:
+{theme}
+- Seamlessly blend the modified section into the existing visual aesthetic of `{target_file}`.
+- Match existing color variables, typography scales, surface elevations, padding rhythms, and border radii.
+- Ensure all updated elements reflect the intended visual polish without introducing mismatched styling rules or conflicting CSS overrides.
+
+[CONTENT SPECIFICATION]
+Section Content & Modification Details:
+{content}
+- Inject the exact text, updated attributes, new sub-components, revised data points, or media references specified above.
+- Strictly adhere to real factual information; do not insert synthetic placeholder text or unverified mock data.
+- Ensure all newly introduced elements match the functional and semantic intent of the parent application.
+
+[SLOT SPECIFICATION]
+Surgically target the designated component slots:
+{slots}
+Target boundaries:
+- [TARGET_SECTION_SLOT]: The exact element ID, CSS class, or semantic HTML tag demarcating the component to update. Modify only within this boundary.
+- [INVARIANT_SURROUNDING_SLOTS]: Unaltered regions (document <head>, global styles, top navigation headers, neighboring sections, footers, and script tags) that MUST remain completely untouched.
+
+[CRITICAL DIRECT-EXECUTION CONSTRAINTS]
+1. DIRECT SINGLE-PASS ADAPTATION: Perform the update directly on `{target_file}` in a single pass. Do not emit fragmented diffs, conversational commentary, or incomplete code blocks.
+2. NO INTERMEDIATE SCRIPTS: You are STRICTLY FORBIDDEN from generating or executing intermediate Python inspection scripts (e.g., `inspect.py`, BeautifulSoup parsers, AST crawlers, or DOM manipulation scripts). Edit `{target_file}` directly.
+3. PRESERVE CSS ANIMATIONS & JS NAVIGATION: Retain all surrounding CSS stylesheets, keyframe animations, event listener bindings, and JavaScript execution hooks present in `{target_file}` and `master-template.html`.
+4. SURGICAL SLOT TARGETING: Touch ONLY the exact designated target section. Preserve all surrounding DOM trees, indentation rhythms, and layout containers.
+5. COMPLETE DIRECTLY WITHOUT STALL: Proceed directly to file modification and complete the update without pauses, clarification loops, or multi-step deferrals.

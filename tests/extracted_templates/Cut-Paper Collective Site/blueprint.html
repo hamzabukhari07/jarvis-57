@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cut-Paper Collective Site &bull; Design Blueprint</title>
+  <style>
+    :root {
+      --bp-bg: #09090b;
+      --bp-surface: #121215;
+      --bp-surface-subtle: #18181b;
+      --bp-border: #27272a;
+      --bp-border-subtle: rgba(255, 255, 255, 0.08);
+      --bp-text: #fafafa;
+      --bp-muted: #a1a1aa;
+      --bp-accent: #6366f1;
+      --bp-radius: 12px;
+      --src-bg: #dfc8ff;
+      --src-surface: #ebe0c8;
+      --src-accent: #161412;
+      --src-text: #161412;
+      --src-muted: #5a5248;
+      --src-border: #161412;
+      --src-btn-radius: 6px;
+      --src-card-radius: 16px;
+    }
+    @keyframes spin { to{transform:rotate(360deg)} }
+.anim-demo-0 { animation: spin 3s infinite ease-in-out; }
+@keyframes pageIn { from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none} }
+.anim-demo-1 { animation: pageIn 3s infinite ease-in-out; }
+@keyframes pageOut { to{opacity:0;transform:translateY(-6px)} }
+.anim-demo-2 { animation: pageOut 3s infinite ease-in-out; }
+@keyframes rise { from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none} }
+.anim-demo-3 { animation: rise 3s infinite ease-in-out; }
+@keyframes lineUp { from{transform:translateY(105%)}to{transform:none} }
+.anim-demo-4 { animation: lineUp 3s infinite ease-in-out; }
+@keyframes hills { from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none} }
+.anim-demo-5 { animation: hills 3s infinite ease-in-out; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bp-bg);
+      color: var(--bp-text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.5;
+      padding: 32px 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .bp-container { max-width: 1120px; margin: 0 auto; }
+    .bp-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--bp-border);
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .bp-title-wrap h1 {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .theme-badge {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 9px;
+      border-radius: 9999px;
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+    .bp-subtitle {
+      color: var(--bp-muted);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+    .btn-copy-css {
+      background: var(--bp-accent);
+      color: #fff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn-copy-css:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-copy-css:active { transform: translateY(0); }
+    .section-title {
+      font-size: 15px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--bp-muted);
+      margin: 32px 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--bp-border);
+    }
+    .swatches-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 14px;
+    }
+    .swatch-card {
+      background: var(--bp-surface);
+      border: 1px solid var(--bp-border);
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+    .swatch-card:hover {
+      border-color: #52525b;
+      transform: translateY(-2px);
+    }
+    .swatch-tile {
+      height: 72px;
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: 6px;
+    }
+    .swatch-tag {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.4);
+      color: #fff;
+      backdrop-filter: blur(4px);
+    }
+    .swatch-details {
+      padding: 10px 12px;
+    }
+    .swatch-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--bp-text);
+    }
+    .swatch-token {
+      font-size: 11px;
+      color: var(--bp-muted);
+      font-family: monospace;
+    }
+    .swatch-hex {
+      margin-top: 4px;
+      font-size: 11px;
+      color: #818cf8;
+    }
+    .chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .color-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: monospace;
+      color: #fff;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+      transition: transform 0.15s;
+    }
+    .color-chip:hover { transform: scale(1.05); }
+    .two-col-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 768px) {
+      .two-col-grid { grid-template-columns: 1fr; }
+    }
+    .bp-card {
+      background: var(--bp-surface);
+      border: 1px solid var(--bp-border);
+      border-radius: var(--bp-radius);
+      padding: 20px;
+    }
+    .type-specimen {
+      margin-bottom: 16px;
+    }
+    .type-label {
+      font-size: 11px;
+      color: var(--bp-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .type-display {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: var(--bp-text);
+    }
+    .type-body {
+      font-size: 14px;
+      color: var(--bp-muted);
+      line-height: 1.6;
+    }
+    .type-code {
+      font-family: monospace;
+      font-size: 12px;
+      color: #a7f3d0;
+      background: #000;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--bp-border);
+    }
+    .preview-canvas {
+      background: var(--src-bg);
+      border: 1px solid var(--src-border);
+      border-radius: var(--src-card-radius);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .src-btn-primary {
+      background: var(--src-accent);
+      color: #fff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: var(--src-btn-radius);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-block;
+      text-align: center;
+      transition: filter 0.2s;
+    }
+    .src-btn-primary:hover { filter: brightness(1.1); }
+    .src-btn-glass {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--src-border);
+      color: var(--src-text);
+      padding: 10px 18px;
+      border-radius: var(--src-btn-radius);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-block;
+      text-align: center;
+    }
+    .src-input {
+      background: var(--src-surface);
+      border: 1px solid var(--src-border);
+      color: var(--src-text);
+      padding: 9px 12px;
+      border-radius: var(--src-btn-radius);
+      font-size: 13px;
+      outline: none;
+      width: 100%;
+    }
+    .src-input:focus { border-color: var(--src-accent); }
+    .src-card-demo {
+      background: var(--src-surface);
+      border: 1px solid var(--src-border);
+      border-radius: var(--src-card-radius);
+      padding: 16px;
+    }
+    .src-card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--src-text);
+      margin-bottom: 4px;
+    }
+    .src-card-sub {
+      font-size: 12px;
+      color: var(--src-muted);
+    }
+    .kf-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 14px;
+    }
+    .kf-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 12px;
+      padding: 16px;
+    }
+    .kf-visual-box {
+      height: 60px;
+      width: 100%;
+      background: #000;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--bp-border);
+    }
+    .kf-demo-badge {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--src-accent);
+    }
+    .kf-name {
+      font-size: 12px;
+      font-weight: 600;
+      font-family: monospace;
+      color: var(--bp-text);
+      display: block;
+    }
+    .kf-meta {
+      font-size: 10px;
+      color: var(--bp-muted);
+    }
+    .code-container {
+      position: relative;
+    }
+    pre.code-block {
+      background: #050507;
+      border: 1px solid var(--bp-border);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #d4d4d8;
+      overflow-x: auto;
+      max-height: 380px;
+    }
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      color: #fafafa;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 9999;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="bp-container">
+    <header class="bp-header">
+      <div class="bp-title-wrap">
+        <h1>Cut-Paper Collective Site <span class="theme-badge">LIGHT SPEC</span></h1>
+        <p class="bp-subtitle">Extracted Design Tokens &bull; 53 Variables &bull; 26 Colors &bull; 7 Animations</p>
+      </div>
+      <button class="btn-copy-css" onclick="copyTokens()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        Copy :root CSS
+      </button>
+    </header>
+
+    <div class="section-title">Color Hierarchy & Semantic Roles</div>
+    <div class="swatches-grid">
+      
+        <div class="swatch-card" onclick="copyText('#dfc8ff', 'Copied #dfc8ff')" title="Click to copy hex">
+          <div class="swatch-tile" style="background-color: #dfc8ff; border: 1px solid transparent;">
+            <span class="swatch-tag">LIGHT</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Background</div>
+            <div class="swatch-token">--bg</div>
+            <div class="swatch-hex"><code>#dfc8ff</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#ebe0c8', 'Copied #ebe0c8')" title="Click to copy hex">
+          <div class="swatch-tile" style="background-color: #ebe0c8; border: 1px solid transparent;">
+            <span class="swatch-tag">LIGHT</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Surface</div>
+            <div class="swatch-token">--surface</div>
+            <div class="swatch-hex"><code>#ebe0c8</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#161412', 'Copied #161412')" title="Click to copy hex">
+          <div class="swatch-tile" style="background-color: #161412; border: 1px solid #3f3f46;">
+            <span class="swatch-tag">DARK</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Primary Accent</div>
+            <div class="swatch-token">--accent</div>
+            <div class="swatch-hex"><code>#161412</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#161412', 'Copied #161412')" title="Click to copy hex">
+          <div class="swatch-tile" style="background-color: #161412; border: 1px solid #3f3f46;">
+            <span class="swatch-tag">DARK</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Text Primary</div>
+            <div class="swatch-token">--text-primary</div>
+            <div class="swatch-hex"><code>#161412</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#5a5248', 'Copied #5a5248')" title="Click to copy hex">
+          <div class="swatch-tile" style="background-color: #5a5248; border: 1px solid transparent;">
+            <span class="swatch-tag">DARK</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Text Muted</div>
+            <div class="swatch-token">--text-muted</div>
+            <div class="swatch-hex"><code>#5a5248</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#161412', 'Copied #161412')" title="Click to copy hex">
+          <div class="swatch-tile" style="background-color: #161412; border: 1px solid #3f3f46;">
+            <span class="swatch-tag">DARK</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Hairline Border</div>
+            <div class="swatch-token">--border</div>
+            <div class="swatch-hex"><code>#161412</code></div>
+          </div>
+        </div>
+        
+    </div>
+    <div class="chips-row">
+      <div class="color-chip" style="background-color: #eefc54" onclick="copyText('#eefc54', 'Copied #eefc54')" title="#eefc54"><span class="chip-label">#eefc54</span></div><div class="color-chip" style="background-color: #ff9cf2" onclick="copyText('#ff9cf2', 'Copied #ff9cf2')" title="#ff9cf2"><span class="chip-label">#ff9cf2</span></div><div class="color-chip" style="background-color: #fff" onclick="copyText('#fff', 'Copied #fff')" title="#fff"><span class="chip-label">#fff</span></div><div class="color-chip" style="background-color: #28bd86" onclick="copyText('#28bd86', 'Copied #28bd86')" title="#28bd86"><span class="chip-label">#28bd86</span></div><div class="color-chip" style="background-color: #4a7fcc" onclick="copyText('#4a7fcc', 'Copied #4a7fcc')" title="#4a7fcc"><span class="chip-label">#4a7fcc</span></div><div class="color-chip" style="background-color: #b9d3f4" onclick="copyText('#b9d3f4', 'Copied #b9d3f4')" title="#b9d3f4"><span class="chip-label">#b9d3f4</span></div><div class="color-chip" style="background-color: #2a62b8" onclick="copyText('#2a62b8', 'Copied #2a62b8')" title="#2a62b8"><span class="chip-label">#2a62b8</span></div><div class="color-chip" style="background-color: #ff7b3d" onclick="copyText('#ff7b3d', 'Copied #ff7b3d')" title="#ff7b3d"><span class="chip-label">#ff7b3d</span></div>
+    </div>
+
+    <div class="section-title">Typography & Live Preview</div>
+    <div class="two-col-grid">
+      <div class="bp-card">
+        <div class="type-specimen">
+          <div class="type-label">Display & Headline (Georgia)</div>
+          <div class="type-display">Studio Precision & Elegant Hierarchy</div>
+        </div>
+        <div class="type-specimen">
+          <div class="type-label">Body Text (Palatino Linotype)</div>
+          <div class="type-body">Modular scales, calibrated contrast, and deterministic role detection keep design execution clean, coherent, and free of generic purple slop.</div>
+        </div>
+        <div class="type-specimen">
+          <div class="type-label">Telemetry & Tokens (JetBrains Mono)</div>
+          <div class="type-code">token.resolve(&#34;--accent&#34;) &rarr; #161412</div>
+        </div>
+      </div>
+
+      <div class="preview-canvas">
+        <div class="src-card-demo">
+          <div class="src-card-title">Live Extracted Component Preview</div>
+          <div class="src-card-sub">Canvas: #dfc8ff &bull; Surface: #ebe0c8 &bull; Border: #161412</div>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button class="src-btn-primary">Primary Action</button>
+          <button class="src-btn-glass">Glass Outline</button>
+        </div>
+        <input type="text" class="src-input" placeholder="Custom input field..." value="Focus ring active">
+      </div>
+    </div>
+
+    <div class="section-title">Keyframe Animations & Micro-Interactions</div>
+    <div class="kf-grid">
+      
+        <div class="bp-card kf-card">
+          <div class="kf-visual-box"><div class="kf-demo-badge anim-demo-0"></div></div>
+          <div class="kf-info">
+            <span class="kf-name">@spin</span>
+            <span class="kf-meta">3s &bull; infinite</span>
+          </div>
+        </div>
+        
+        <div class="bp-card kf-card">
+          <div class="kf-visual-box"><div class="kf-demo-badge anim-demo-1"></div></div>
+          <div class="kf-info">
+            <span class="kf-name">@pageIn</span>
+            <span class="kf-meta">3s &bull; infinite</span>
+          </div>
+        </div>
+        
+        <div class="bp-card kf-card">
+          <div class="kf-visual-box"><div class="kf-demo-badge anim-demo-2"></div></div>
+          <div class="kf-info">
+            <span class="kf-name">@pageOut</span>
+            <span class="kf-meta">3s &bull; infinite</span>
+          </div>
+        </div>
+        
+        <div class="bp-card kf-card">
+          <div class="kf-visual-box"><div class="kf-demo-badge anim-demo-3"></div></div>
+          <div class="kf-info">
+            <span class="kf-name">@rise</span>
+            <span class="kf-meta">3s &bull; infinite</span>
+          </div>
+        </div>
+        
+        <div class="bp-card kf-card">
+          <div class="kf-visual-box"><div class="kf-demo-badge anim-demo-4"></div></div>
+          <div class="kf-info">
+            <span class="kf-name">@lineUp</span>
+            <span class="kf-meta">3s &bull; infinite</span>
+          </div>
+        </div>
+        
+        <div class="bp-card kf-card">
+          <div class="kf-visual-box"><div class="kf-demo-badge anim-demo-5"></div></div>
+          <div class="kf-info">
+            <span class="kf-name">@hills</span>
+            <span class="kf-meta">3s &bull; infinite</span>
+          </div>
+        </div>
+        
+    </div>
+
+    <div class="section-title">Generated :root Tokens Block</div>
+    <div class="code-container">
+      <pre class="code-block" id="css-tokens-code"><code>/* ==========================================
+ * Design Blueprint Tokens — Cut-Paper Collective Site
+ * Theme: LIGHT | Generated by Zezo Engine
+ * ========================================== */
+:root {
+  /* --- Semantic Colors --- */
+  --bg: #dfc8ff;
+  --surface: #ebe0c8;
+  --accent: #161412;
+  --text-primary: #161412;
+  --text-muted: #5a5248;
+  --border: #161412;
+
+  /* --- Typography --- */
+  --font-display: &#x27;Georgia&#x27;, sans-serif;
+  --font-body: &#x27;Palatino Linotype&#x27;, sans-serif;
+  --font-mono: &#x27;JetBrains Mono&#x27;;
+
+  /* --- Radii &amp; Spacing --- */
+  --radius-sm: 6px;
+  --radius-md: 6px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* --- Extracted Custom Properties --- */
+  --band: #f3ead8;
+  --blue: #2a62b8;
+  --blue-2: #4a7fcc;
+  --bottom: :after;
+  --c: #ff7b3d;
+  --cream: #f3ead8;
+  --cream-2: #ebe0c8;
+  --cut: clamp(26px,6.7vw,96px);
+  --ease-io: cubic-bezier(.77,0,.175,1);
+  --ease-out: cubic-bezier(.22,1,.36,1);
+  --fg: #161412;
+  --fibre: #fffaf1;
+  --fs-body: 1.0625rem;
+  --fs-h1: clamp(2.5rem,1.6rem + 3.4vw,4.5rem);
+  --fs-h2: clamp(2rem,.5rem + 2.9vw,3rem);
+  --fs-h3: clamp(1.3rem,1.15rem + .35vw,1.5rem);
+  --fs-hero: clamp(2.875rem,.9rem + 4.6vw,4.75rem);
+  --fs-lede: clamp(1.2rem,1.05rem + .55vw,1.55rem);
+  --fs-sm: .9375rem;
+  --fs-xs: .8125rem;
+}
+
+/* --- Keyframe Animations --- */
+@keyframes spin { to{transform:rotate(360deg)} }
+@keyframes pageIn { from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none} }
+@keyframes pageOut { to{opacity:0;transform:translateY(-6px)} }
+@keyframes rise { from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none} }
+@keyframes lineUp { from{transform:translateY(105%)}to{transform:none} }
+@keyframes hills { from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none} }</code></pre>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Copied to clipboard</div>
+
+  <script>
+    function copyText(text, msg) {
+      navigator.clipboard.writeText(text).then(() => showToast(msg || 'Copied!'));
+    }
+    function copyTokens() {
+      const code = document.getElementById('css-tokens-code').innerText;
+      navigator.clipboard.writeText(code).then(() => showToast('Copied :root CSS Tokens!'));
+    }
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2000);
+    }
+  </script>
+</body>
+</html>

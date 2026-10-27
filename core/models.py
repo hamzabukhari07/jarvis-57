@@ -55,25 +55,25 @@ GEMINI_SEARCH_MODELS = (
 # These are the CLI's own model ids (with -medium/-high suffixes) — a different
 # namespace from the Gemini API names above. Do not mix the two.
 ANTIGRAVITY_CLI_MODELS = [
-    "gemini-3.7-flash-high",       # Gemini 3.7 Flash (High)
-    "gemini-3.7-flash-medium",     # Gemini 3.7 Flash (Medium)
-    "gemini-3.7-flash-low",        # Gemini 3.7 Flash (Low)
-    "claude-sonnet-5-5",           # Claude Sonnet 5.5 (Thinking)
-    "claude-opus-5-5",             # Claude Opus 5.5 (Thinking)
-    "claude-fable-5-1",            # Claude Fable 5.1
+    "gemini-3.8-flash-high",       # Gemini 3.8 Flash (High)
+    "gemini-3.8-flash-medium",     # Gemini 3.8 Flash (Medium)
+    "gemini-3.8-flash-low",        # Gemini 3.8 Flash (Low)
+    "claude-sonnet-4-6",           # Claude Sonnet 4.6 (Thinking)
+    "claude-opus-4-6-thinking",    # Claude Opus 4.6 (Thinking)
+    "gpt-oss-120b-medium",         # GPT-OSS 120B Medium
 ]
-DEFAULT_ANTIGRAVITY_MODEL = "gemini-3.7-flash-medium"
+DEFAULT_ANTIGRAVITY_MODEL = "gemini-3.8-flash-medium"
 
 # Friendly aliases → canonical Antigravity model id.
 ANTIGRAVITY_MODEL_ALIASES = {
-    "sonnet": "claude-sonnet-5-5",
-    "claude": "claude-sonnet-5-5",
-    "claude-sonnet": "claude-sonnet-5-5",
-    "opus": "claude-opus-5-5",
-    "claude-opus": "claude-opus-5-5",
-    "fable": "claude-fable-5-1",
-    "3.7": "gemini-3.7-flash-medium",
-    "3.8": "gemini-3.7-flash-medium",
+    "sonnet": "claude-sonnet-4-6",
+    "claude": "claude-sonnet-4-6",
+    "claude-sonnet": "claude-sonnet-4-6",
+    "opus": "claude-opus-4-6-thinking",
+    "claude-opus": "claude-opus-4-6-thinking",
+    "3.8": "gemini-3.8-flash-medium",
+    "flash": "gemini-3.8-flash-medium",
+    "medium": "gemini-3.8-flash-medium",
 }
 
 

@@ -204,6 +204,31 @@ graph TD
 
 ---
 
+## 🚀 Automated 2-File Architecture & Permanent Reference Cache Engine
+
+To achieve 4x–8x token efficiency and eliminate exploratory agent stalls, ZEZO provides a deterministic, zero-latency 2-file provisioning pipeline backed by a permanent reference cache (`skills/website_build/references/extracted_cache/`):
+
+### 1. DESIGN.md (<design-context> DSL)
+- **Machine-Readable YAML Frontmatter:** 35+ semantic color tokens (`primary`, `ink`, `mute`, `hairline`, `canvas`, `canvas-soft`, `link`, `success`, `error`, `violet`, `cyan`, `gradient-*`), full typography hierarchy scale (`display-xl` to `button-lg`), modular radii (`rounded.md`, `rounded.xl`), and 10 illustrative kit-mirror components (`ex-pricing-tier`, `ex-cart-drawer`, `ex-modal-card`, etc.).
+- **LLM Cognitive Guidance Markdown:** Overview & Key Characteristics, Color breakdown, Typographic principles, Spacing/Layout, Stacked Elevation ladder (Level 0 to Level 5), Component recipes, and strict Anti-Slop DOs and DON'Ts.
+- **Pure Semantics (~3–6 KB):** Replaces verbose HTML boilerplate with dense, structured Markdown rules, saving 4x–8x context tokens for the coding agent.
+
+### 2. master-template.html (< 40 KB)
+- **100% Valid DOM Structure:** Preserves full `<!DOCTYPE html>`, `<head>`, and `<body>`.
+- **Interactive JS & CSS Intact:** Preserves all CSS keyframe animations, event listeners, and interaction routines.
+- **Lightweight SVG Substitution:** Strips megabytes of base64 image bloat and replaces them with clean SVG placeholders.
+- **Semantic Slot Boundaries:** Automatically tags real DOM landmarks with standard markers:
+  - `<!-- SLOT:HERO_START -->` ... `<!-- SLOT:HERO_END -->`
+  - `<!-- SLOT:PROJECTS_START -->` ... `<!-- SLOT:PROJECTS_END -->`
+  - `<!-- SLOT:SKILLS_START -->` ... `<!-- SLOT:SKILLS_END -->`
+  - `<!-- SLOT:CONTACT_START -->` ... `<!-- SLOT:CONTACT_END -->`
+
+### 3. Permanent Reference Cache Store
+- Extracted `DESIGN.md` and `master-template.html` are permanently saved in `skills/website_build/references/extracted_cache/<template_slug>/`.
+- On subsequent runs using the same reference, ZEZO performs an instant cache hit (`< 5ms`), copying both files directly into the task workspace without re-extraction. Zero duplicate CPU work.
+
+---
+
 ## 🛑 3-Tier Anti-Slop Directive (`skills/hamza_taste/SKILL.md`)
 
 | Tier | Name | Enforced Constraints |

@@ -1,0 +1,44 @@
+[TASK DIRECTIVE]
+Adapt and synthesize the master design blueprint into the production deliverable: `{target_file}`.
+Your mission is to produce a high-converting, interactive, and fully responsive SaaS / Product Landing Page directly inside `{target_file}`.
+Incorporate clear product value propositions, an interactive product showcase/preview, detailed feature grids, customer social proof, transparent pricing tiers, an interactive FAQ accordion, and compelling conversion call-to-action sections.
+Execute this deliverable in a single, direct, comprehensive pass.
+
+[DESIGN ASSETS AVAILABLE IN WORKSPACE]
+1. `DESIGN.md`: The single source of truth for design tokens, typography scales, component recipes, and anti-slop rules (<design-context> DSL).
+2. `master-template.html`: The canonical design blueprint containing product UI styling, gradient accents, modern card elevation, typography scales, responsive layouts, and interactive component scripts.
+You must ground your implementation in the visual aesthetics, layout rhythm, and design tokens established by `DESIGN.md` and `master-template.html`. Update and adapt the layout directly into `{target_file}`.
+
+[THEME & CUSTOMIZATION DIRECTIVE]
+Visual Theme Specification:
+{theme}
+- Adhere strictly to brand identity color variables, primary action button gradients, dark/light surface tokens, and card border glows.
+- Ensure seamless visual hierarchy, crisp typography contrast, polished hover states, and smooth transitions on all interactive controls.
+- Maintain professional SaaS polish; eliminate unstyled elements and raw default browser inputs.
+
+[CONTENT SPECIFICATION]
+Product & Marketing Content:
+{content}
+- Populate every section with authentic product copy, feature descriptions, and conversion narratives from the specification above.
+- Never use generic placeholder text (e.g., "Feature 1 Description", "Acme Product", "Lorem Ipsum").
+- Ensure all metric figures, customer testimonials, pricing tier breakdowns, and FAQ answers reflect the specific product domain.
+
+[SLOT SPECIFICATION]
+Surgically adapt each designated layout slot:
+{slots}
+Key architectural slots to fulfill:
+- [NAVBAR_SLOT]: Fixed or floating navigation header featuring product brand logo, anchor links, documentation/pricing shortcuts, and primary "Get Started" / "Sign In" action buttons.
+- [HERO_CTA_SLOT]: High-conversion hero banner with primary value proposition headline, secondary supporting hook, primary CTA button, secondary demo trigger, and social proof micro-counter (e.g., "Join 10,000+ developers").
+- [SOCIAL_PROOF_SLOT]: Trusted partner/company logo marquee, press mentions, user satisfaction badges, and key validation metrics.
+- [FEATURE_GRID_SLOT]: Multi-column feature breakdown highlighting core capabilities with custom icon containers, concise headlines, and value-oriented copy.
+- [INTERACTIVE_SHOWCASE_SLOT]: Interactive product UI demo, live interactive code snippet, or interactive tabbed workflow preview.
+- [PRICING_TABLE_SLOT]: Multi-tier pricing structure (e.g., Starter, Pro, Enterprise) with billing frequency toggle (monthly/annual), feature matrix checklists, highlighted popular plan badge, and conversion buttons.
+- [FAQ_ACCORDION_SLOT]: Collapsible interactive FAQ accordion with accessible toggle behavior and clear answers to critical user questions.
+- [FINAL_CTA_FOOTER_SLOT]: High-impact closing conversion banner, product sitemap, newsletter signup, legal links, and brand copyright.
+
+[CRITICAL DIRECT-EXECUTION CONSTRAINTS]
+1. DIRECT SINGLE-PASS ADAPTATION: Write the complete, production-ready code directly into `{target_file}`. Do not output conversational filler, truncated snippets, or partial implementations.
+2. NO INTERMEDIATE SCRIPTS: You are STRICTLY FORBIDDEN from generating or executing intermediate Python inspection scripts (e.g., `inspect.py`, BeautifulSoup parsers, AST crawlers, or DOM manipulation scripts). Adapt the HTML directly.
+3. PRESERVE CSS ANIMATIONS & JS NAVIGATION: Retain all CSS animations, smooth reveal transitions, pricing billing frequency toggles, accordion event listeners, and mobile navigation scripts defined in `master-template.html`.
+4. SURGICAL SLOT TARGETING: Target and replace slot content accurately without breaking parent Flexbox/Grid wrappers, container sizing, or responsive media queries.
+5. COMPLETE DIRECTLY WITHOUT STALL: Proceed directly to file synthesis and complete the deliverable without pauses, questions, or multi-step deferrals.

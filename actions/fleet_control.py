@@ -339,6 +339,8 @@ def _handle_decompose(params: Dict[str, Any]) -> str:
 
 _ACTION_DISPATCH: Dict[str, Callable[[Dict[str, Any]], str]] = {
     "dispatch": _handle_dispatch,
+    "reassign": _handle_dispatch,
+    "switch": _handle_dispatch,
     "hire": _handle_hire,
     "fire": _handle_fire,
     "update": _handle_update,
@@ -353,6 +355,8 @@ _ACTION_DISPATCH: Dict[str, Callable[[Dict[str, Any]], str]] = {
     "decompose_workflow": _handle_decompose,
     "decompose": _handle_decompose,
 }
+
+_HANDLERS = _ACTION_DISPATCH
 
 
 def fleet_control(parameters: Dict[str, Any], **kwargs: Any) -> str:
@@ -372,7 +376,8 @@ TOOL = {
         "trigger P2P peer handoffs with upstream deliverables, decompose multi-stage workflows, hire/fire/update agents, or query agent status. "
         "Use action='update' whenever the user wants to change an agent's role, name, specialty, allowed tools, or model. "
         "Use this whenever the user addresses a specific agent ('Tell Verve to build a landing page', 'Kelly transcribe and summarize this video', "
-        "'Ahmad build the auth API', 'Michael decompose this project') or for delegating work to the autonomous specialist fleet."
+        "'Ahmad build the auth API', 'Michael decompose this project'), asks to reassign a task, or when an agent is stuck or not working "
+        "('verve is not working, kisi or ko task assign kr de', 'switch agent', 'assign to someone else', 'Flux se karwao'), or for delegating work to the autonomous specialist fleet."
     ),
     "risk": "local_mutation",
     "enabled": True,
@@ -382,7 +387,7 @@ TOOL = {
         "properties": {
             "action": {
                 "type": "STRING",
-                "enum": ["dispatch", "hire", "fire", "update", "edit", "list_agents", "get_status", "peer_chat", "decompose_workflow"],
+                "enum": ["dispatch", "reassign", "switch", "hire", "fire", "update", "edit", "list_agents", "get_status", "peer_chat", "decompose_workflow"],
                 "description": "The fleet management action to execute.",
             },
             "agent_id": {

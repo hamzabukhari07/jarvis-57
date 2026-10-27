@@ -1500,9 +1500,16 @@ class ZezoLive:
                     "[ACTIVE AUTONOMOUS FLEET ROSTER]\n"
                     "The currently registered, active specialist agents on the office deck are:\n"
                     + "\n".join(roster_lines) + "\n"
-                    "RULE: When delegating or dispatching tasks to the fleet (via fleet_control), "
-                    "ONLY assign work to agents currently listed above. "
-                    "Never guess, invent, or use decommissioned agents.\n\n"
+                    "ACTION-FIRST FLEET INVARIANTS:\n"
+                    "- When delegating or dispatching tasks to the fleet (via fleet_control), "
+                    "ONLY assign work to agents currently listed above. Never guess, invent, or use decommissioned agents.\n"
+                    "- ZERO VERBAL SIMULATION: You have NO ability to assign, dispatch, or reassign tasks by speaking alone. "
+                    "You MUST call fleet_control(action='dispatch', ...) in the exact same turn. "
+                    "NEVER say 'Assigning...', 'Flux is building...', or 'I\'ve dispatched...' unless a tool call was executed.\n"
+                    "- UNNAMED REASSIGNMENT: If the user says an agent is not working or asks to assign to 'someone else' "
+                    "('kisi or ko task assign kr de', 'switch agent'), automatically pick the matching alternative specialist "
+                    "(VERVE <-> FLUX for frontend) and immediately invoke fleet_control(action='dispatch', agent_id='FLUX', task=..., confirmed=true).\n"
+                    "- If user says task is not showing, NEVER claim 'display lag'. Immediately verify via task_status or dispatch.\n\n"
                 )
         except Exception as e:
             logger.debug("[FleetManager] Fleet context formatting skipped: %s", e)

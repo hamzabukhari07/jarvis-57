@@ -2,7 +2,7 @@
 
 > **Project:** ZEZO  
 > **Creator & Lead Architect:** Hamza Bukhari  
-> **Source Modules:** [`core/fleet_manager.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/fleet_manager.py), [`actions/fleet_control.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/actions/fleet_control.py), [`frontend/src/components/office/AutonomousOfficeScreen.tsx`](file:///d:/anitgravity/zezo%20work/jarvis-57/frontend/src/components/office/AutonomousOfficeScreen.tsx), [`frontend/src/components/office/AgentDirectChatView.tsx`](file:///d:/anitgravity/zezo%20work/jarvis-57/frontend/src/components/office/AgentDirectChatView.tsx)  
+> **Source Modules:** [`core/fleet_manager.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/fleet_manager.py) (Facade), [`core/fleet/`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/fleet/) (`registry.py`, `dispatcher.py`, `orchestrator.py`), [`actions/fleet_control.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/actions/fleet_control.py), [`frontend/src/components/office/AutonomousOfficeScreen.tsx`](file:///d:/anitgravity/zezo%20work/jarvis-57/frontend/src/components/office/AutonomousOfficeScreen.tsx), [`frontend/src/components/office/AgentDirectChatView.tsx`](file:///d:/anitgravity/zezo%20work/jarvis-57/frontend/src/components/office/AgentDirectChatView.tsx)  
 > **Configuration:** [`config/fleet_agents.json`](file:///d:/anitgravity/zezo%20work/jarvis-57/config/fleet_agents.json)  
 > **Target OS:** Windows 10/11 (Primary), macOS, Linux  
 
@@ -28,6 +28,41 @@ flowchart TD
     classDef core fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff;
     class A,B,C,D,E,F,G,H,I core;
 ```
+
+---
+
+## 🏗️ Modular Subsystem Architecture (`core/fleet/`)
+
+To eliminate God-object bloat and prevent lock contention between heavy Git sandbox operations and live agent telemetry, the fleet subsystem is partitioned into three decoupled modules unified under a backward-compatible Facade:
+
+```mermaid
+flowchart TD
+    FM["FleetManager (Facade)<br/>core/fleet_manager.py"]
+    FM --> FR["FleetRegistry<br/>core/fleet/registry.py"]
+    FM --> FD["FleetDispatcher<br/>core/fleet/dispatcher.py"]
+    FM --> FO["FleetOrchestrator<br/>core/fleet/orchestrator.py"]
+
+    FR ---|"CRUD, JSON config, Desk Coordinates, Souls"| FR_DESC["State Lock (_lock)"]
+    FD ---|"Risk gates, Skill injection, Background execution"| FD_DESC["Telemetry Streaming"]
+    FO ---|"Task decomposition, Worktrees, Auto-merge"| FO_DESC["Merge Lock"]
+
+    classDef comp fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#fff;
+    class FM,FR,FD,FO comp;
+```
+
+1. **`core/fleet/registry.py` (`FleetRegistry`):**
+   - Manages agent models (`FleetAgent`), desk allocations (`OFFICE_DESK_COORDINATES`), and configuration persistence (`config/fleet_agents.json`).
+   - Guarded by its own dedicated re-entrant lock (`_lock`) ensuring thread-safe reads and writes.
+2. **`core/fleet/dispatcher.py` (`FleetDispatcher`):**
+   - Validates risk tiers (`L0_READ_ONLY`, `L1_MUTATION`, `L2_DESTRUCTIVE`) and circuit breaker status.
+   - Dynamically injects declarative skills (`agent.allowed_skills`) and spawns background tasks via `TaskManager`.
+   - Wraps progress callbacks with rate-limited (`>= 1.0s` or completion) `fleet_updated` deck broadcasts for UI synchronization.
+3. **`core/fleet/orchestrator.py` (`FleetOrchestrator`):**
+   - Handles multi-agent workflow decomposition (`decompose_and_dispatch`) and peer-to-peer delegation (`delegate_peer_task`).
+   - Manages Git worktree quarantine lifecycle and merges results safely upon task completion.
+4. **`core/fleet_manager.py` (Facade):**
+   - Implements the Facade Pattern, composing `registry`, `dispatcher`, and `orchestrator` while exposing all historical methods, properties, and module-level helpers.
+   - Guarantees 100% backward compatibility for all existing callers (`main.py`, `fleet_control.py`, `ui_server.py`).
 
 ---
 
@@ -113,6 +148,52 @@ When a mutation task is dispatched:
 
 ### 3. Declarative Skill Injection
 In `core/fleet_manager.py:dispatch_task`, when an agent defines skills in `agent.allowed_skills` (such as `website_build`), ZEZO automatically queries `core.skill_loader.get_skill_registry()` and injects the full declarative instructions under an `[ACTIVE SKILL: <name>]` block directly into the enriched execution prompt.
+
+---
+
+## 🐝 The 4-Way Scranton Fleet Swarm Pipeline (`decompose_and_dispatch`)
+
+When a complex full-stack or multi-tiered engineering directive is received (e.g., *"Build an end-to-end AI landing page and SaaS backend with test coverage"*), ZEZO's Lead Architect **Michael** ([`core/fleet/orchestrator.py:decompose_and_dispatch`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/fleet/orchestrator.py)) orchestrates the **4-Way Scranton Fleet Swarm Pipeline**.
+
+Rather than bottlenecking execution into a single agent or writing fragile intermediate Python synthesis scripts, Michael decomposes the objective into four domain-isolated, concurrent streams:
+
+```mermaid
+flowchart TD
+    M["Michael Scott (Tech Lead)<br/>Decomposes Project Directive"]
+    M -->|"1. Frontend Layout"| V["Verve (Antigravity)<br/>Path: frontend/<br/>Layout, Tailwind, Tokens, Grid"]
+    M -->|"2. Component Synthesis"| F["Flux (Antigravity)<br/>Path: frontend/components/<br/>Interactive Widgets, Modals, Micro-UI"]
+    M -->|"3. Backend & API Services"| A["Nexus / Ahmad (OpenCode)<br/>Path: backend/<br/>FastAPI, Schemas, DB Models, Logic"]
+    M -->|"4. QA & Security Audit"| D["Dwight (Kilo Code)<br/>Path: tests/<br/>Pytest/Vitest, AST Audits, Anti-Slop"]
+
+    V -.->|"Pipes Layout Tokens"| F
+    V -.->|"API Client Contracts"| A
+    A -.->|"Endpoints & Types"| D
+    F -.->|"DOM Targets"| D
+
+    classDef lead fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff;
+    classDef worker fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#fff;
+    class M lead;
+    class V,F,A,D worker;
+```
+
+### Specialist Roles in the 4-Way Swarm:
+1. **Verve ([`actions/antigravity_agent.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/actions/antigravity_agent.py) via [`core/antigravity_runner.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/antigravity_runner.py)):**
+   - **Domain:** Frontend Layout & Visual Architecture (`frontend/`).
+   - **Deliverables:** Structural HTML5/React tree, responsive grid containers (`max-w-7xl`), CSS variables / dark obsidian design tokens, and smooth scroll animations.
+2. **Flux ([`actions/antigravity_agent.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/actions/antigravity_agent.py) via [`core/antigravity_runner.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/antigravity_runner.py)):**
+   - **Domain:** Component Synthesis & Overflow Balancing (`frontend/components/`).
+   - **Deliverables:** Interactive cards, modal drawers, dynamic filters, animated SVG icons, and stateful micro-components.
+3. **Nexus / Ahmad ([`actions/opencode_agent.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/actions/opencode_agent.py)):**
+   - **Domain:** Full-Stack & Python Backend Specialist (`backend/`).
+   - **Deliverables:** RESTful FastAPI endpoints, Pydantic V2 validation models, SQLite/PostgreSQL schemas, and service logic.
+4. **Dwight ([`actions/kilo_agent.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/actions/kilo_agent.py)):**
+   - **Domain:** Senior Refactoring, Verification & QA Specialist (`tests/`).
+   - **Deliverables:** End-to-end integration test suites (`pytest`, `vitest`), AST complexity audits, anti-slop rule enforcement, and security vulnerability scans.
+
+### Swarm Pipeline Architectural Invariants:
+- **Subdirectory Domain Isolation:** Subtasks are explicitly dispatched into dedicated subdirectories (`base_path/frontend/`, `base_path/backend/`, `base_path/tests/`) under the project root. This prevents file collision races and Git worktree merge conflicts.
+- **Direct-Execution Guarantee:** Forbids intermediate Python builder scripts (`build_index.py`, `generate.py`). Code is emitted directly to final target files, preventing multi-minute latency penalties.
+- **Upstream Deliverable Piping:** When peer delegation occurs (`delegate_peer_task`), design tokens, extracted schemas, and candidate metadata are automatically serialized and prepended to downstream agent prompts.
 
 ---
 

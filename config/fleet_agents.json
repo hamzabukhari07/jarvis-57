@@ -43,7 +43,7 @@
       "default_tool": "antigravity_run",
       "risk_tier": "L1_MUTATION",
       "prompt_prefix": "You are Verve, Frontend & UI Design Specialist.",
-      "model_id": "gemini-3.7-flash-medium",
+      "model_id": "gemini-3.8-flash-medium",
       "desk_x": 320,
       "desk_y": 160,
       "worktree": "c:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57",
@@ -90,8 +90,7 @@
       ],
       "allowed_skills": [
         "website_build",
-        "multi_agent_collaboration",
-        "make_plan"
+        "multi_agent_collaboration"
       ],
       "capabilities": [
         "web_design",

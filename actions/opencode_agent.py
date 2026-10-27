@@ -398,13 +398,15 @@ def opencode_agent(parameters: dict, player=None, speak=None) -> str:
         )
 
     model = _resolve_model(parameters.get("model") or parameters.get("model_id"))
+    scope_type = parameters.get("scope_type")
+    color_theme = parameters.get("color_theme")
 
     # Resolve design system tokens if UI/Web task
     from core.design_resolver import is_ui_task, resolve_design, format_design_prompt
     resolved_design = None
     task_with_design = task
     if is_ui_task(task):
-        resolved_design = resolve_design(task, repo_path=repo)
+        resolved_design = resolve_design(task, repo_path=repo, scope=scope_type, theme=color_theme)
         if resolved_design and resolved_design.is_active():
             reference_provisioned = False
             try:
@@ -424,9 +426,19 @@ def opencode_agent(parameters: dict, player=None, speak=None) -> str:
                 logger.warning("Failed to provision reference.html for OpenCode: %s", e)
 
             if reference_provisioned:
+                theme_val = color_theme or "dark_obsidian"
                 design_directive = (
-                    "Design Reference: A curated template has been placed at 'reference.html'. "
-                    "Inspect it as your read-only source of truth for styles, typography, and layout, and synthesize 'index.html' with authentic content."
+                    "CRITICAL THEME RE-SKINNING & STRUCTURAL FIDELITY DIRECTIVE:\n"
+                    "- A curated design reference has been placed at 'reference.html'. Inspect it as your primary structural blueprint.\n"
+                    "- DO NOT invent a new layout from scratch or output generic, unstyled boilerplate.\n"
+                    "- 1:1 STRUCTURAL SKELETON ADAPTATION: You MUST preserve the exact section flow, container grids, navigation hierarchy, card framing, and typography scale of 'reference.html'.\n"
+                    f"- THEME RE-SKINNING RULE: If 'reference.html' is in light mode or has a different palette, DO NOT discard it! Re-skin its CSS variables and styles into the requested theme ({theme_val}) without discarding the reference skeleton:\n"
+                    "  * Transform light backgrounds into deep, refined obsidian/dark void tones (#07080c).\n"
+                    "  * Invert typography to high-contrast crisp white and muted grays.\n"
+                    "  * Inject glowing accents, subtle neon box-shadows, and gradient borders directly onto the existing card wrappers.\n"
+                    "- CONTENT & BRANDING ADAPTATION: Retain the reference's exact geometry and layout, but replace all placeholder copy, titles, logos, and features with authentic content for the requested project.\n"
+                    "- DIRECT CODE DELIVERY: Write 'index.html' directly to disk in a single pass.\n"
+                    "- FORBIDDEN: Do not write intermediate Python builder scripts (e.g., 'build_*.py', 'cleanup.py') or generation helpers—deliver the complete, production-ready 'index.html' directly."
                 )
                 task_with_design = f"{task}\n\n{design_directive}"
             else:

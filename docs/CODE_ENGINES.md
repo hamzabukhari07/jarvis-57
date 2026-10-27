@@ -149,3 +149,25 @@ Defined in [`actions/code_engines_status.py`](file:///d:/anitgravity/zezo%20work
 - **Action `list`:** Inspects all engines and returns a structured summary for Gemini Live or the Assistant UI.
 - **Action `check`:** Checks a specific engine and reports readiness or installation commands.
 - **Voice Response:** Provides an executive 1-sentence spoken summary while rendering complete engine telemetry into the chat drawer.
+
+---
+
+## ⚡ Antigravity Engine Architecture & Decoupled Execution
+
+ZEZO's Antigravity integration uses a decoupled architecture separating Gemini tool registration from heavy background execution:
+
+1. **Clean Action Tool (`actions/antigravity_agent.py`):**
+   - Exports the official `TOOL` declaration and callable `handler` complying with Gemini function calling specs.
+   - Enforces greenfield project gates (`check_greenfield_gate`) to prevent unintentional overwrites.
+   - Delegates execution cleanly to `core.antigravity_runner.run_antigravity_worker`.
+
+2. **Core Background Engine (`core/antigravity_runner.py`):**
+   - **Hardware Throttling:** Creates Windows Job Objects with CPU affinity masking (`_create_throttled_job`) to prevent CLI runs from starving audio loops or GUI rendering.
+   - **Pre-Flight Asset Provisioning Engine:** Automatically provisions `< 25 KB` `blueprint.html` (design tokens, CSS variables, typography) and `< 40 KB` `master-template.html` (working clone with semantic slots `<!-- SLOT:HERO_START -->`, etc.) in the target repo before CLI invocation. This eliminates 15–20 minute stalls caused by the agent trying to digest bloated 10 MB raw reference files.
+   - **Dynamic Modular Prompt Synthesizer:** Detects the domain archetype (`portfolio`, `landing_page`, `dashboard`, `surgical_edit`) and synthesizes tailored prompts using modular exemplars in `core/prompts/exemplars/*.txt` via `core/prompts/prompt_synthesizer.py`.
+   - **Strict Anti-Stall Guardrails:** Injects non-negotiable instructions: single-pass direct adaptation to `{target_file}`, strict prohibition of intermediate Python scripts (`BeautifulSoup`, chunkers, `inspect.py`), and style/interaction preservation.
+   - **Non-Interactive Batch Directive:** Injects a critical execution directive (`CRITICAL BATCH EXECUTION DIRECTIVE: USER STATUS: CONFIRMED`) preventing CLI prompts from pausing for interactive user confirmation.
+   - **Full Dispatched Prompt Telemetry (`prompt_full`):** Stores the complete synthesized prompt into payload parameters, allowing `TaskState.to_dict()` and the frontend `TaskManagerModal` to provide one-click prompt inspection and copying.
+   - **Live Progress & Streaming:** Drains stdout lines in a daemon thread, streaming live task lines (`ctx.report(pct, line[:80])`) and advancing progress dynamically (30% → 45% → 60% → 80% → 95%) rather than freezing.
+   - **Recursive Diffing:** Employs `_tree_snapshot(repo)` to detect newly created deliverables (e.g. `index.html`) recursively across subdirectories.
+   - **Smart Preview System:** Automatically starts local HTTP servers (ports 9400-9480) or Vite dev servers upon build completion.

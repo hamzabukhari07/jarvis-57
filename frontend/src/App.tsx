@@ -103,6 +103,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isLogModalOpen, setIsLogModalOpen] = useState(false)
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [isMobileRemoteOpen, setIsMobileRemoteOpen] = useState(false)
   const [canvasContent, setCanvasContent] = useState<string>('')
   const [isMicMuted, setIsMicMuted] = useState(false)
@@ -589,7 +590,10 @@ export default function App() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setIsTaskModalOpen(true)}
+            onClick={() => {
+              setSelectedTaskId(null)
+              setIsTaskModalOpen(true)
+            }}
             title="Task Matrix & Registry"
             className="h-8 w-8 p-0 shrink-0 hidden sm:inline-flex"
           >
@@ -788,7 +792,7 @@ export default function App() {
                   </div>
                 </FrameHeader>
 
-                <ScrollArea className="flex-1">
+                <ScrollArea className="flex-1 [&>[data-radix-scroll-area-viewport]]:p-0.5">
                   {tasks.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center text-[var(--muted-foreground)] py-12">
                       <Grid className="w-8 h-8 text-[var(--muted-foreground)] opacity-30 mb-2" />
@@ -798,7 +802,7 @@ export default function App() {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-2 pr-1.5 min-w-0">
+                    <div className="space-y-2 pr-1.5 mr-0.5 min-w-0">
                       {/* Filter out child tasks (subtasks) - they appear nested in TaskManagerModal */}
                       {tasks.filter((t) => !t.parent_id).map((t, idx) => {
                         const status = (t.status || 'QUEUED').toUpperCase()
@@ -820,10 +824,14 @@ export default function App() {
                         return (
                           <div
                             key={idx}
-                            className="p-2.5 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] bg-[var(--input)]/60 border border-[var(--border)] hover:border-[var(--primary)] transition-all flex flex-col gap-1.5 shadow-2xs min-w-0 w-full overflow-hidden"
+                            onClick={() => {
+                              setSelectedTaskId(t.id)
+                              setIsTaskModalOpen(true)
+                            }}
+                            className="p-2.5 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] bg-[var(--input)]/60 border border-[var(--border)] hover:border-[var(--primary)] hover:bg-[var(--card)]/90 transition-all cursor-pointer select-none flex flex-col gap-1.5 shadow-2xs min-w-0 w-full overflow-hidden"
                           >
                             {/* Task Description */}
-                            <div className="font-medium text-[var(--foreground)] text-xs leading-snug break-all min-w-0">
+                            <div className="font-medium text-[var(--foreground)] text-xs leading-snug line-clamp-2 break-words min-w-0 select-text" title={displayTitle}>
                               {displayTitle}
                             </div>
                             {t.message && t.message !== displayTitle && (
@@ -834,7 +842,7 @@ export default function App() {
 
                             {/* Status Tag Badge + Progress Details */}
                             <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-[var(--border)]/40 min-w-0">
-                              <div className="flex items-center gap-1.5 min-w-0 shrink">
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-hidden">
                                 <Badge
                                   variant={badgeVariant}
                                   size="xs"
@@ -853,27 +861,27 @@ export default function App() {
                                   {!isRunning && !isDone && !isCancelled && !isFailed && <Clock className="w-2.5 h-2.5 text-[var(--muted-foreground)]" />}
                                   <span>{isRunning ? 'RUNNING' : status}</span>
                                 </Badge>
-                                <span className="text-[9px] font-mono text-[var(--muted-foreground)] uppercase truncate">
+                                <span className="text-[9px] font-mono text-[var(--muted-foreground)] uppercase truncate" title={t.id}>
                                   {t.id}
                                 </span>
                               </div>
 
                               <div className="flex items-center gap-1.5 shrink-0">
                                 <span className="text-[10px] font-mono font-semibold text-[var(--foreground)] tabular-nums">
-                                  {t.progress}%
+                                  {Math.round(t.progress || 0)}%
                                 </span>
                                 <div className="w-10 h-1.5 bg-[var(--card)] rounded-full overflow-hidden border border-[var(--border)]/30 shrink-0">
                                   <div
                                     className={`h-full transition-all duration-300 ${
                                       isRunning
-                                        ? 'bg-[var(--primary)]'
+                                        ? 'bg-[var(--primary)] animate-pulse'
                                         : isDone
                                           ? 'bg-emerald-500'
                                           : isCancelled || isFailed
                                             ? 'bg-red-500/60'
                                             : 'bg-[var(--muted)]'
                                     }`}
-                                    style={{ width: `${t.progress}%` }}
+                                    style={{ width: `${Math.min(100, Math.max(0, Math.round(t.progress || 0)))}%` }}
                                   />
                                 </div>
                               </div>
@@ -1291,9 +1299,13 @@ export default function App() {
       {/* 100% Official ReUI Task Matrix & Registry Modal with KPIs and Inspector */}
       <TaskManagerModal
         isOpen={isTaskModalOpen}
-        onClose={() => setIsTaskModalOpen(false)}
+        onClose={() => {
+          setIsTaskModalOpen(false)
+          setSelectedTaskId(null)
+        }}
         onCancelTask={cancelTask}
         tasks={tasks}
+        initialTaskId={selectedTaskId}
       />
 
       {/* 100% Official ReUI Mobile Remote Gateway & QR Pairing Modal */}

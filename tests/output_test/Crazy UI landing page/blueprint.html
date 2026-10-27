@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crazy UI landing page &bull; Design Blueprint</title>
+  <style>
+    :root {
+      --bp-bg: #f6f4f2;
+      --bp-surface: #ede9e4;
+      --bp-border: #e9e9e9;
+      --bp-text: #0a0a0a;
+      --bp-muted: #6c6c6c;
+      --bp-accent: #14120f;
+      --bp-accent-sec: #0e1c29;
+      --bp-radius: 14px;
+      --bp-btn-radius: 5px;
+      --bp-font-display: 'Instrument Serif', -apple-system, sans-serif;
+      --bp-font-body: 'Inter', -apple-system, sans-serif;
+      --bp-font-mono: 'JetBrains Mono', monospace;
+    }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none} }
+.anim-demo-0 { animation: fadeIn 3s infinite ease-in-out; }
+@keyframes popIn { to{transform:none} }
+.anim-demo-1 { animation: popIn 3s infinite ease-in-out; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bp-bg);
+      color: var(--bp-text);
+      font-family: var(--bp-font-body);
+      line-height: 1.5;
+      padding: 32px 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .bp-container { max-width: 1120px; margin: 0 auto; }
+    .bp-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--bp-border);
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .bp-title-wrap h1 {
+      font-family: var(--bp-font-display);
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .theme-badge {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      background: #14120f20; color: #14120f; border: 1px solid #14120f40;
+    }
+    .bp-subtitle {
+      color: var(--bp-muted);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+    .btn-copy-css {
+      background: var(--bp-accent);
+      color: #fff;
+      border: none;
+      padding: 9px 16px;
+      border-radius: var(--bp-btn-radius);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn-copy-css:hover { opacity: 0.9; transform: translateY(-1px); }
+    .section-title {
+      font-family: var(--bp-font-display);
+      font-size: 15px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 36px 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--bp-text);
+    }
+    .bp-card {
+      background: var(--bp-surface);
+      border: 1px solid var(--bp-border);
+      border-radius: var(--bp-radius);
+      padding: 20px;
+    }
+    .swatches-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 14px;
+    }
+    .swatch-card {
+      background: var(--bp-surface);
+      border: 1px solid var(--bp-border);
+      border-radius: var(--bp-radius);
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .swatch-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    }
+    .swatch-tile {
+      height: 72px;
+      width: 100%;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: 8px;
+    }
+    .swatch-tag {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .swatch-details {
+      padding: 12px;
+    }
+    .swatch-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--bp-text);
+    }
+    .swatch-token {
+      font-size: 10px;
+      font-family: monospace;
+      color: var(--bp-muted);
+      margin-top: 2px;
+    }
+    .swatch-hex {
+      font-size: 11px;
+      font-family: monospace;
+      font-weight: 600;
+      color: var(--bp-text);
+      margin-top: 4px;
+    }
+    .chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .color-chip {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      border: 1px solid rgba(0,0,0,0.1);
+      transition: transform 0.15s;
+    }
+    .color-chip:hover { transform: scale(1.1); }
+    .chip-label { display: none; }
+    .two-col-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 768px) {
+      .two-col-grid { grid-template-columns: 1fr; }
+    }
+    .type-specimen {
+      margin-bottom: 16px;
+    }
+    .type-label {
+      font-size: 11px;
+      color: var(--bp-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .type-display {
+      font-family: var(--bp-font-display);
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--bp-text);
+    }
+    .type-body {
+      font-family: var(--bp-font-body);
+      font-size: 14px;
+      color: var(--bp-muted);
+      line-height: 1.6;
+    }
+    .type-code {
+      font-family: var(--bp-font-mono);
+      font-size: 12px;
+      color: var(--bp-accent);
+      background: rgba(0,0,0,0.04);
+      padding: 6px 10px;
+      border-radius: 6px;
+      display: inline-block;
+      margin-top: 4px;
+    }
+    .preview-canvas {
+      background: var(--bp-surface);
+      border: 1px solid var(--bp-border);
+      border-radius: var(--bp-radius);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .src-btn-primary {
+      background: var(--bp-accent);
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: var(--bp-btn-radius);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .src-btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .src-btn-glass {
+      background: transparent;
+      color: var(--bp-text);
+      border: 1px solid var(--bp-border);
+      padding: 10px 20px;
+      border-radius: var(--bp-btn-radius);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .src-btn-glass:hover { background: rgba(0,0,0,0.04); }
+    .src-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      background: var(--bp-accent-sec);
+      color: #fff;
+    }
+    .src-input {
+      width: 100%;
+      padding: 10px 14px;
+      background: transparent;
+      border: 1px solid var(--bp-border);
+      border-radius: var(--bp-btn-radius);
+      color: var(--bp-text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .src-input:focus {
+      border-color: var(--bp-accent);
+      box-shadow: 0 0 0 2px var(--bp-accent)40;
+    }
+    .kf-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 14px;
+    }
+    .kf-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 12px;
+      padding: 16px;
+    }
+    .kf-visual-box {
+      height: 60px;
+      width: 100%;
+      background: rgba(0,0,0,0.04);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--bp-border);
+    }
+    .kf-demo-badge {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--bp-accent);
+    }
+    .kf-name {
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--bp-font-mono);
+      color: var(--bp-text);
+    }
+    .kf-meta {
+      font-size: 10px;
+      color: var(--bp-muted);
+    }
+    .code-container {
+      position: relative;
+    }
+    pre.code-block {
+      background: #09090b;
+      border: 1px solid var(--bp-border);
+      border-radius: var(--bp-radius);
+      padding: 16px;
+      font-family: var(--bp-font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      color: #fafafa;
+      overflow-x: auto;
+      max-height: 380px;
+    }
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      color: #fafafa;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 9999;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="bp-container">
+    <header class="bp-header">
+      <div class="bp-title-wrap">
+        <h1>Crazy UI landing page <span class="theme-badge">Refined Editorial & Classic Typography</span></h1>
+        <p class="bp-subtitle">Extracted Design System &bull; 19 Tokens &bull; 32 Colors &bull; 2 Animations &bull; Instrument Serif</p>
+      </div>
+      <button class="btn-copy-css" onclick="copyTokens()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        Copy :root CSS
+      </button>
+    </header>
+
+    <div class="section-title">Color Architecture & Semantic Hierarchy</div>
+    <div class="swatches-grid">
+      
+        <div class="swatch-card" onclick="copyText('#f6f4f2', 'Copied #f6f4f2')" title="Click to copy #f6f4f2">
+          <div class="swatch-tile" style="background-color: #f6f4f2; border: 1px solid rgba(0,0,0,0.1);">
+            <span class="swatch-tag" style="background:rgba(0,0,0,0.6);color:#fff;">LIGHT</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Background</div>
+            <div class="swatch-token">--bg</div>
+            <div class="swatch-hex"><code>#f6f4f2</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#ede9e4', 'Copied #ede9e4')" title="Click to copy #ede9e4">
+          <div class="swatch-tile" style="background-color: #ede9e4; border: 1px solid rgba(0,0,0,0.1);">
+            <span class="swatch-tag" style="background:rgba(0,0,0,0.6);color:#fff;">LIGHT</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Surface</div>
+            <div class="swatch-token">--surface</div>
+            <div class="swatch-hex"><code>#ede9e4</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#14120f', 'Copied #14120f')" title="Click to copy #14120f">
+          <div class="swatch-tile" style="background-color: #14120f; border: 1px solid rgba(255,255,255,0.15);">
+            <span class="swatch-tag" style="background:rgba(255,255,255,0.2);color:#fff;">DARK</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Primary Accent</div>
+            <div class="swatch-token">--accent</div>
+            <div class="swatch-hex"><code>#14120f</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#0e1c29', 'Copied #0e1c29')" title="Click to copy #0e1c29">
+          <div class="swatch-tile" style="background-color: #0e1c29; border: 1px solid rgba(255,255,255,0.15);">
+            <span class="swatch-tag" style="background:rgba(255,255,255,0.2);color:#fff;">DARK</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Secondary Accent</div>
+            <div class="swatch-token">--accent-secondary</div>
+            <div class="swatch-hex"><code>#0e1c29</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#0a0a0a', 'Copied #0a0a0a')" title="Click to copy #0a0a0a">
+          <div class="swatch-tile" style="background-color: #0a0a0a; border: 1px solid rgba(255,255,255,0.15);">
+            <span class="swatch-tag" style="background:rgba(255,255,255,0.2);color:#fff;">DARK</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Headline Ink</div>
+            <div class="swatch-token">--text-primary</div>
+            <div class="swatch-hex"><code>#0a0a0a</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#e9e9e9', 'Copied #e9e9e9')" title="Click to copy #e9e9e9">
+          <div class="swatch-tile" style="background-color: #e9e9e9; border: 1px solid rgba(0,0,0,0.1);">
+            <span class="swatch-tag" style="background:rgba(0,0,0,0.6);color:#fff;">LIGHT</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Hairline Border</div>
+            <div class="swatch-token">--border</div>
+            <div class="swatch-hex"><code>#e9e9e9</code></div>
+          </div>
+        </div>
+        
+    </div>
+    <div class="chips-row">
+      <div class="color-chip" style="background-color: #000" onclick="copyText('#000', 'Copied #000')" title="#000"><span class="chip-label">#000</span></div><div class="color-chip" style="background-color: #fff" onclick="copyText('#fff', 'Copied #fff')" title="#fff"><span class="chip-label">#fff</span></div><div class="color-chip" style="background-color: #a1a1a1" onclick="copyText('#a1a1a1', 'Copied #a1a1a1')" title="#a1a1a1"><span class="chip-label">#a1a1a1</span></div><div class="color-chip" style="background-color: #e5e5e5" onclick="copyText('#e5e5e5', 'Copied #e5e5e5')" title="#e5e5e5"><span class="chip-label">#e5e5e5</span></div><div class="color-chip" style="background-color: #171717" onclick="copyText('#171717', 'Copied #171717')" title="#171717"><span class="chip-label">#171717</span></div><div class="color-chip" style="background-color: #0f0f0f" onclick="copyText('#0f0f0f', 'Copied #0f0f0f')" title="#0f0f0f"><span class="chip-label">#0f0f0f</span></div><div class="color-chip" style="background-color: #5b5b5b" onclick="copyText('#5b5b5b', 'Copied #5b5b5b')" title="#5b5b5b"><span class="chip-label">#5b5b5b</span></div><div class="color-chip" style="background-color: #edebe9" onclick="copyText('#edebe9', 'Copied #edebe9')" title="#edebe9"><span class="chip-label">#edebe9</span></div>
+    </div>
+
+    <div class="section-title">Component Design System & Live Specimen</div>
+    <div class="two-col-grid">
+      <div class="bp-card">
+        <div class="type-specimen">
+          <div class="type-label">Display & Headline (Instrument Serif)</div>
+          <div class="type-display">Design Precision & Distinct Identity</div>
+        </div>
+        <div class="type-specimen">
+          <div class="type-label">Body Text (Inter)</div>
+          <div class="type-body">Modular spacing scales, calibrated contrast, and authentic semantic tokens preserve the unique character of this reference design.</div>
+        </div>
+        <div class="type-specimen">
+          <div class="type-label">Telemetry & Tokens (JetBrains Mono)</div>
+          <div class="type-code">token.resolve("--accent") &rarr; #14120f</div>
+        </div>
+      </div>
+
+      <div class="preview-canvas">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="type-label">Live Extracted Component Preview</span>
+          <span class="src-pill">LIVE PROTOTYPE</span>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button class="src-btn-primary">Primary Action</button>
+          <button class="src-btn-glass">Ghost Secondary</button>
+        </div>
+        <input type="text" class="src-input" placeholder="Search or filter records..." value="Active focus ring demonstration">
+      </div>
+    </div>
+
+    <div class="section-title">Micro-Interactions & Animation Lab</div>
+    <div class="kf-grid">
+      
+        <div class="bp-card kf-card">
+          <div class="kf-visual-box"><div class="kf-demo-badge anim-demo-0"></div></div>
+          <div class="kf-info">
+            <span class="kf-name">@fadeIn</span>
+            <span class="kf-meta">3s &bull; infinite</span>
+          </div>
+        </div>
+        
+        <div class="bp-card kf-card">
+          <div class="kf-visual-box"><div class="kf-demo-badge anim-demo-1"></div></div>
+          <div class="kf-info">
+            <span class="kf-name">@popIn</span>
+            <span class="kf-meta">3s &bull; infinite</span>
+          </div>
+        </div>
+        
+    </div>
+
+    <div class="section-title">Production-Ready :root Tokens Stylesheet</div>
+    <div class="code-container">
+      <pre class="code-block" id="css-tokens-code"><code>/* ==========================================
+ * Design Blueprint Tokens - Crazy UI landing page
+ * Style: REFINED EDITORIAL &amp; CLASSIC TYPOGRAPHY
+ * Theme: LIGHT | Generated by Zezo Studio Engine
+ * ========================================== */
+:root {
+  /* --- Semantic Palette --- */
+  --bg: #f6f4f2;
+  --surface: #ede9e4;
+  --accent: #14120f;
+  --accent-secondary: #0e1c29;
+  --text-primary: #0a0a0a;
+  --text-muted: #6c6c6c;
+  --border: #e9e9e9;
+
+  /* --- Typography --- */
+  --font-display: &#x27;Instrument Serif&#x27;, sans-serif;
+  --font-body: &#x27;Inter&#x27;, sans-serif;
+  --font-mono: &#x27;JetBrains Mono&#x27;;
+
+  /* --- Radii &amp; Spacing --- */
+  --radius-sm: 6px;
+  --radius-md: 5px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-full: 9999px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* --- Custom Design Properties --- */
+  --cream: #f6f4f2;
+  --cream-2: #ede9e4;
+  --cream-3: #edebe9;
+  --cream-4: #e8e6e1;
+  --ff: &#x27;Inter&#x27;,&#x27;Inter Tight&#x27;,-apple-system,BlinkMacSystemFont,&#x27;Segoe UI&#x27;,sans-serif;
+  --ff-serif: &#x27;Instrument Serif&#x27;,&#x27;Canela Text Trial&#x27;,&#x27;Canela Text&#x27;,Georgia,serif;
+  --ff-tight: &#x27;Inter Tight&#x27;,&#x27;Inter&#x27;,sans-serif;
+  --ink: #0a0a0a;
+  --ink-2: #141414;
+  --line: #e5e5e5;
+  --max: 1300px;
+  --muted-2: #a1a1a1;
+  --muted-3: #888;
+  --radius: 10px;
+  --radius-lg: 16px;
+}
+
+/* --- Keyframe Animations --- */
+@keyframes fadeIn { from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none} }
+@keyframes popIn { to{transform:none} }</code></pre>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Copied to clipboard</div>
+
+  <script>
+    function copyText(text, msg) {
+      navigator.clipboard.writeText(text).then(() => showToast(msg || 'Copied!'));
+    }
+    function copyTokens() {
+      const code = document.getElementById('css-tokens-code').innerText;
+      navigator.clipboard.writeText(code).then(() => showToast('Copied :root CSS Tokens!'));
+    }
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2000);
+    }
+  </script>
+</body>
+</html>

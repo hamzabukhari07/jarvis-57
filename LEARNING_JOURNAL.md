@@ -1,6 +1,382 @@
 ---
 
 # LEARNING JOURNAL (active — last 25 entries)
+## [2026-10-28] — Strict 2-File Architecture (DESIGN.md DSL + master-template.html) & Permanent Reference Cache
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  1. **Token Inefficiency of Visual HTML Blueprints:**
+     - `blueprint.html` wasted AI context tokens with unnecessary visual layout markup (`<div>`, flex wrappers, grid classes) when ingested by LLM agents.
+     - Agents need pure semantic tokens, typography scales, component recipes, and anti-slop rules, not visual HTML showcases.
+  2. **Need for a Single Source of Truth (`DESIGN.md` DSL):**
+     - Modern industry benchmark for agentic coding repositories is a structured markdown specification (`<design-context>` Architectural DSL) with machine-readable YAML frontmatter + LLM cognitive guidance narrative.
+  3. **Duplicate Extraction CPU Overhead:**
+     - Without caching, every build task for the same reference template re-extracted the design system from scratch.
+  4. **Strict 2-File Streamlined Workflow:**
+     - Completely eliminated `blueprint.html` from the pipeline. The agent workspace and task execution now strictly revolve around 2 complementary files:
+       * `DESIGN.md` (Tokens, Recipes & Anti-Slop Rules — the Brain)
+       * `master-template.html` (Interactive DOM, CSS animations, JavaScript logic & Semantic Slots — the Body)
+- **Execution & Changes Applied:**
+  - **Permanent Reference Cache Store (`core/design_resolver.py`):**
+    - Built `get_or_create_reference_design_cache()` storing extracted artifacts into `skills/website_build/references/extracted_cache/<slug>/`.
+    - First run extracts `DESIGN.md` and `master-template.html` in < 1s; subsequent runs hit the cache in < 5ms for zero redundant CPU work.
+    - Updated `generate_blueprint_and_template()` to return `(design_md_path, master_template_path)` and completely stopped creating `blueprint.html`.
+  - **Runner & Task Provisioning (`core/antigravity_runner.py`):**
+    - Updated `_provision_blueprint_and_template()` to provision strictly `DESIGN.md` and `master-template.html` into task repositories.
+    - Updated workspace slots prompts to prioritize `DESIGN.md` as the single source of truth for design tokens.
+  - **Prompt Synthesizer Exemplars (`core/prompts/exemplars/*.txt`):**
+    - Updated `landing_page_archetype.txt`, `portfolio_archetype.txt`, `dashboard_archetype.txt`, and `surgical_edit_archetype.txt` to replace `blueprint.html` with `DESIGN.md`.
+  - **Full DSL Specification Enforcement (`core/design_extractor.py`):**
+    - `generate_design_md` generates the complete `<design-context>` DSL with 35+ semantic color tokens, complete typography hierarchy, spacing scale, component recipes, 10 illustrative kit-mirror components (`ex-*`), and comprehensive Markdown narrative.
+  - **Documentation & Verification:**
+    - Updated `docs/DESIGN_SYSTEM_ARCHITECTURE.md` to document the 2-file architecture and reference caching store.
+    - Updated tests in `tests/test_design_resolver_blueprint.py` and `tests/test_e2e_blueprint_engine.py`.
+    - All 3 layers verified: Layer 1 static compile passed, Layer 2 runtime unit tests passed (8/8), Layer 3 regression passed (12/12).
+- **Key Files Touched:**
+  - `core/design_extractor.py`
+  - `core/design_resolver.py`
+  - `core/antigravity_runner.py`
+  - `core/prompts/exemplars/landing_page_archetype.txt`
+  - `core/prompts/exemplars/portfolio_archetype.txt`
+  - `core/prompts/exemplars/dashboard_archetype.txt`
+  - `core/prompts/exemplars/surgical_edit_archetype.txt`
+  - `tests/test_design_resolver_blueprint.py`
+  - `tests/test_e2e_blueprint_engine.py`
+  - `docs/DESIGN_SYSTEM_ARCHITECTURE.md`
+  - `LEARNING_JOURNAL.md`
+- **Why this was built / Root Cause & Motivation:**
+  1. **Monolithic Blueprint Theming & Static Fallbacks:**
+     - `blueprint.html` previously rendered identical-looking design systems regardless of the reference template: a hardcoded dark zinc/indigo shell (`#09090b`) was used universally, and colors defined with modern CSS formats (`oklch(...)`, `hsl(...)`) failed regex extraction and fell back to default indigo.
+     - A subtle `NameError: name 'primary_font' is not defined` in `generate_blueprint_html` triggered an exception that silently fell back to `_sanitize_html_for_prompt` (dumping an unstyled slice of the raw HTML head into `blueprint.html`).
+  2. **Truncation Risk in Master Template:**
+     - In `core/design_resolver.py`, a naive string slice `c = c[:target_len]` was cutting documents exceeding byte limits (such as Scrapbook Resume at 39,500 bytes), corrupting the DOM and truncating `<body>`.
+- **Execution & Changes Applied:**
+  - **Color Space Normalization (`core/design_extractor.py`):**
+    - Built math-based `_oklch_to_hex(l, c, h)` and `_hsl_to_hex(h, s, l)` conversion algorithms.
+    - Updated `_normalize_color_to_hex` to accurately resolve modern CSS `oklch(...)`, `hsl(...)`, `rgb(...)`, and `#hex` tokens.
+  - **Dynamic Semantic Role & Accent Resolution (`core/design_extractor.py`):**
+    - Expanded semantic variable keys to prioritize `--accent`, `--primary`, `--brand`, `--cobalt`, `--sky`, `--purple`, `--green`, `--coral`, etc.
+    - Added contrast-aware filtering ensuring `primary_accent != bg_color` and `primary_accent != text_primary`.
+    - Implemented 5 distinct aesthetic profile detectors: *Creative Scrapbook & Visual Narrative*, *Refined Editorial & Classic Typography*, *Modern SaaS & High-Precision System*, *Dark Cyberpunk & High-Contrast Neon HUD*, and *Minimalist Monochromatic & Hairline Grid*.
+  - **Dynamic Theme-Responsive Blueprint Generator (`core/design_extractor.py`):**
+    - `generate_blueprint_html` now dynamically skins its own UI using the reference template's extracted tokens (`--bp-bg`, `--bp-surface`, `--bp-border`, `--bp-text`, `--bp-accent`, `--bp-accent-sec`, and typographic display/body families).
+    - Integrated live extracted components: Themed Executive Top Bar, Live Extracted Component Preview Canvas (Primary CTA, Ghost button, Accent pill, Search input with focus glow), 6 Semantic Hierarchy Swatches, Typographic Scale Specimen, Micro-Interactions Keyframe Lab, and copyable CSS `:root` block.
+    - Output size strictly maintained `< 25 KB`.
+  - **Non-Destructive DOM Condensation (`core/design_resolver.py`):**
+    - Removed arbitrary string truncation `c[:target_len]`, guaranteeing 100% valid document structure (`<html><head><body>`) and functional scripts.
+    - Added safe DOM-level condensation of repetitive grid/flex children when templates exceed max byte targets.
+  - **Verification:**
+    - Static compile (Layer 1): `py_compile` passed on all core files.
+    - Live reference extraction (Layer 2): `run_reference_test.py` tested against `Scrapbook Resume.html` (2.58 MB -> 21.9 KB blueprint, 172.1 KB template in 0.60s), `Hairline Grid Portfolio.html` (21.7 KB blueprint, 195.0 KB template in 0.09s), and `Crazy UI landing page.html` (19.7 KB blueprint, 32.3 KB template in 0.05s). Each generated distinct, theme-faithful design systems and valid interactive templates with 4/4 semantic slots.
+    - Test suite regression (Layer 3): 27/27 pytest tests passed in 2.83s.
+- **Key Files Touched:**
+  - `core/design_extractor.py`
+  - `core/design_resolver.py`
+  - `tests/run_reference_test.py`
+
+## [2026-10-27] — Automated Blueprint & Master Template Clone Engine, Dynamic Prompt Synthesizer & Frontend Prompt Inspector
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  1. **15–20 Minute Stalls & Interactive Wait Traps:**
+     - Autonomous coding agents (like `agy`) regularly stalled for 15–20 minutes when given raw multi-megabyte reference templates. Without strict constraints, models entered exploratory paralysis: attempting to write intermediate Python helper scripts (e.g. `BeautifulSoup`, chunkers, `inspect.py`), scanning thousands of irrelevant framework nodes, or waiting indefinitely on interactive prompts ("Should I proceed?").
+  2. **Reference HTML Bloat & Parameter Bottlenecks:**
+     - Curated reference templates often contain megabytes of embedded base64 images, compiled data URIs, and hydration states (e.g. 10.5 MB in `clerk clone.html`). Passing or processing raw templates overloaded LLM context windows, blew past Windows 32K CLI limits, and caused timeout aborts.
+  3. **Lack of Standardized Semantic Slots for In-Place Adaptation:**
+     - Headless coding agents require deterministic structural slot boundaries (`HERO`, `PROJECTS`, `SKILLS`, `CONTACT`) to adapt user biographical and domain content surgically without breaking responsive grid containers, CSS animations, or JavaScript view routers.
+  4. **Monolithic Prompting vs Domain Archetypes:**
+     - Hardcoded generic prompts lacked tailored directives for specific product domains (Portfolios vs SaaS Landing Pages vs Analytics Dashboards vs Surgical Edits) and lacked explicit anti-stall guardrails.
+  5. **HUD Observability Blindspot:**
+     - Users and developers could not view the exact assembled prompt dispatched to the CLI in real-time, making prompt debugging and verification slow.
+- **Execution & Changes Applied:**
+  - **Automated Blueprint & Master Template Engine (`core/design_resolver.py`, `core/design_extractor.py`):**
+    - Implemented `generate_blueprint_and_template(reference_html_path: Path, output_dir: Path) -> Tuple[Path, Path]`:
+      * Integrates with `core/design_extractor.py` to strip base64 bloat, minifying layout styles and generating `< 25 KB` `blueprint.html`.
+      * Generates `< 40 KB` `master-template.html` featuring lightweight SVG placeholders (`DEFAULT_SVG_PLACEHOLDER`), compact CSS, and preserved interactive JS.
+      * Injects standard semantic slot boundaries into `master-template.html`:
+        `<!-- SLOT:HERO_START --> ... <!-- SLOT:HERO_END -->`
+        `<!-- SLOT:PROJECTS_START --> ... <!-- SLOT:PROJECTS_END -->`
+        `<!-- SLOT:SKILLS_START --> ... <!-- SLOT:SKILLS_END -->`
+        `<!-- SLOT:CONTACT_START --> ... <!-- SLOT:CONTACT_END -->`
+      * Implemented `inject_semantic_slots()` with 5-pass intelligent section matching and sequential fallback guaranteeing 100% boundary presence.
+      * Sub-second deterministic processing across all 23 reference templates (average ~0.15s).
+  - **Dynamic Modular Prompt Synthesizer (`core/prompts/prompt_synthesizer.py`, `core/prompts/exemplars/*.txt`):**
+    - Created modular exemplar architectures for `portfolio_archetype.txt`, `landing_page_archetype.txt`, `dashboard_archetype.txt`, and `surgical_edit_archetype.txt`.
+    - Enforced mandatory anti-stall guardrail directives across all exemplars:
+      1. Direct adaptation to target file in a single pass.
+      2. Absolute prohibition against writing intermediate Python scripts (`BeautifulSoup`, chunking, or inspection scripts).
+      3. Strict preservation of styles, animations, and interactive JS.
+      4. Targeted content injection via semantic slots.
+      5. Explicit non-interactive batch mode directive ("USER STATUS: CONFIRMED. DO NOT ask 'Should I proceed?'").
+  - **Pre-Flight Asset Provisioning & Runner Integration (`core/antigravity_runner.py`):**
+    - Implemented `_provision_blueprint_and_template` to pre-generate `blueprint.html` (< 25 KB) and `master-template.html` (< 40 KB) before invoking the CLI.
+    - Integrated `detect_archetype` and `synthesize_prompt` to generate archetype-tailored prompts.
+    - Attached `prompt_full` into execution payload and `TaskState.params` for live UI telemetry.
+  - **Task State Telemetry & Serialization (`core/task_manager.py`):**
+    - Extended `TaskState.to_dict()` to serialize `prompt_full` from params or enriched prompts.
+  - **Frontend HUD Inspector & Click-to-Inspect (`frontend/src/components/tasks/TaskManagerModal.tsx`, `frontend/src/App.tsx`):**
+    - Added collapsible "Dispatched Prompt to CLI" accordion in `TaskManagerModal` with one-click clipboard copy (`COPY PROMPT` / `COPIED`).
+    - Enhanced task cards in `App.tsx` with pointer cursor, hover states, and click handlers passing `initialTaskId` to open and auto-select the task in the detail drawer.
+- **Key Files Touched:**
+  - `core/design_resolver.py`
+  - `core/design_extractor.py`
+  - `core/prompts/exemplars/*.txt` (`portfolio_archetype.txt`, `landing_page_archetype.txt`, `dashboard_archetype.txt`, `surgical_edit_archetype.txt`)
+  - `core/prompts/prompt_synthesizer.py`
+  - `core/antigravity_runner.py`
+  - `core/task_manager.py`
+  - `frontend/src/App.tsx`
+  - `frontend/src/components/tasks/TaskManagerModal.tsx`
+- **Crucial Architectural Context to Prevent Regression:**
+  1. **Pre-flight on Disk Over In-Memory Prompts:** Never pass large raw HTML into CLI flags or prompt strings. Always pre-generate `< 25 KB` `blueprint.html` and `< 40 KB` `master-template.html` on disk before invoking the CLI.
+  2. **Anti-Stall Guardrails:** Keep the prohibition on intermediate Python scripts and the batch execution directive in all prompt synthesis templates; omitting them causes headless agents to stall waiting for confirmation or get stuck writing scrapers.
+  3. **Telemetry Invariant:** Always preserve `prompt_full` in `TaskState.params` and `TaskState.to_dict()` so the frontend inspector can display the exact CLI instruction.
+  4. **ReUI Component Standards:** The task inspector drawer and HUD cards follow ReUI design standards with semantic CSS variables and no `transition: all`.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile core/design_resolver.py core/design_extractor.py core/prompts/prompt_synthesizer.py core/antigravity_runner.py core/task_manager.py` passed with 0 errors.
+  - Layer 2 (Runtime): Tested prompt synthesis across all 4 archetypes; verified `generate_blueprint_and_template` produced size-constrained files (< 25 KB blueprint, < 40 KB template) with all 4 slots across all 23 reference templates.
+  - Layer 3 (Regression): `pytest tests` passed all 21/21 tests. No audio/voice files touched.
+
+
+## [2026-10-27] — Model Badge Resolution, 65% Progress Math Unfreeze & Rich CLI Heartbeat Logs
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  1. **Wrong Model Badge in Task Manager (`opencode/glm-5.3-flash-free` on Antigravity tasks):**
+     - In `core/fleet/dispatcher.py`, `submit_params` only passed `"model_id": active_model`.
+     - In `core/task_manager.py:to_dict()`, `model_name = self.params.get("model")` was checked without inspecting `"model_id"`. When blank, it fell back to `get_opencode_model()` for all coding tools, mistakenly rendering `opencode/glm-5.3-flash-free` on Antigravity tasks.
+  2. **Progress Stuck at 65% During LLM Synthesis Turns:**
+     - In `core/antigravity_runner.py`, dynamic progress used `30 + min(35, elapsed * 1.5) + activity_factor`. When CLI stdout was buffering during long synthesis turns before files were flushed to disk, `activity_factor` remained 0, causing `30 + 35 = 65%` to become a rigid mathematical ceiling.
+  3. **Repetitive 2-Line Heartbeat Logs ("Synthesizing components..."):**
+     - Heartbeat stages were limited to alternating between two static strings every 2.5s without phase timestamps or file synthesis context.
+- **Execution & Changes Applied:**
+  - **Model Resolution (`core/task_manager.py` & `core/fleet/dispatcher.py`):**
+    - Updated `TaskState.to_dict()` to inspect both `params.get("model")` and `params.get("model_id")`.
+    - Separated `"antigravity"` from general coding tools in `to_dict()` fallback logic, falling back to `get_antigravity_model() or DEFAULT_ANTIGRAVITY_MODEL` rather than `get_opencode_model()`.
+    - Added `"model": active_model` alongside `"model_id"` in `FleetDispatcher.dispatch_task()`.
+  - **Dynamic Progress Unfreeze & Smooth Asymptotic Curve (`core/antigravity_runner.py`):**
+    - Replaced the 65% cap with an asymptotic progression curve: 0-30s advances up to +30%, 30-90s up to +51%, 90s+ up to +58%, allowing smooth progress up to 88% while CLI is generating before deliverable files are written.
+  - **Context-Rich Heartbeat Cycles (`core/antigravity_runner.py`):**
+    - Enriched heartbeat stages with elapsed time (`[1m 45s]`), model display, and multi-phase stage descriptors so the log stream provides clear, real-time feedback without looking stuck.
+- **Key Files Touched:**
+  - `core/task_manager.py`
+  - `core/fleet/dispatcher.py`
+  - `core/antigravity_runner.py`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile core/task_manager.py core/fleet/dispatcher.py core/antigravity_runner.py` passed with 0 errors.
+  - Layer 2 (Runtime): Tested `TaskState.to_dict()` with `model_id` and empty fallback; verified model accurately reflects `gemini-3.8-flash-low` and `gemini-3.8-flash-medium` instead of opencode.
+  - Layer 3 (Regression): `pytest tests/test_fleet_dispatcher.py` passed 5/5. Zero audio/voice pipeline files touched.
+
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  1. **Frontend Duration Blank/Missing:**
+     - In `TaskState.to_dict()`, `TaskState` previously only emitted `"elapsed_sec": round(...)`. The frontend HUD (`TaskManagerModal.tsx`) checks `t.duration` to render the elapsed time string (e.g. `Duration: 14s`). Without a `"duration"` key in `to_dict()`, the duration element remained blank.
+  2. **Log Starvation During Long-Running Subagent Executions:**
+     - In `TaskManager._report()`, a strict deduplication check (`if not s.logs or s.logs[-1].get("text") != clean_msg:`) dropped all updates with matching status text. When autonomous coding agents or cloner tasks ran for several minutes (up to 7+ minutes) while sending periodic progress heartbeats or incremental progress percentages with the same descriptive phase message, all telemetry was dropped, causing apparent log freezing in the frontend.
+- **Execution & Changes Applied:**
+  - **Duration Mapping (`core/task_manager.py`):**
+    - Added `@property def elapsed_sec(self) -> float` to `TaskState` computing `round(max(0.0, end - start), 1)`.
+    - In `TaskState.to_dict()`, mapped `"elapsed_sec": self.elapsed_sec` and `"duration": f"{int(self.elapsed_sec)}s"`.
+  - **Heartbeat Progress & Log Streaming (`core/task_manager.py`):**
+    - Added `_last_log_time: float` to `TaskState`.
+    - Updated `TaskManager._report()` to append log entries if message changed (`last_text != clean_msg`), or if progress increased (`s.progress > last_prog`), or if more than 3.0 seconds elapsed (`now - s._last_log_time >= 3.0`).
+    - Maintained the log cap (`len(s.logs) > 250`) and ANSI stripping.
+  - **Documentation Synchronization (`docs/TASK_SYSTEM.md`):**
+    - Documented duration mapping and heartbeat streaming in Section 6 (Frontend Synchronization).
+- **Key Files Touched:**
+  - `core/task_manager.py`
+  - `docs/TASK_SYSTEM.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile core/task_manager.py` passed with 0 errors.
+  - Layer 2 (Runtime): Verified with standalone execution script covering `to_dict()` duration formatting (`"0s"`, `"14s"`), progress increase appends, heartbeat interval appends (> 3.0s), and deduplication suppression (< 3s).
+  - Layer 3 (Regression): `pytest tests/test_fleet_dispatcher.py` passed 5/5. Zero audio/voice pipeline files touched.
+
+## [2026-10-27] — Scranton Fleet Swarm, Direct-Execution Pipeline & UI Telemetry Responsiveness
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  1. **13-Minute Latency via 1.4 MB Base64 Bloat & Python Builder Scripts:**
+     - In `core/design_resolver.py` and `core/antigravity_runner.py`, resolved reference templates contained massive base64-encoded images (up to 1.4 MB). When provided in the prompt context, the LLM attempted to write intermediate Python builder scripts (`build_index.py`, `build_full_portfolio.py`, `generate.py`) that assembled base64 chunks before writing to disk, leading to 13-minute turnaround times and CLI script execution timeouts.
+  2. **7-Minute Log Silence via Deduplication & Unstreamed Subprocess Buffering:**
+     - CLI stdout (`agy`, `opencode`, `kilo`) was previously buffered by OS pipes or suppressed by rigid status deduplication filters (`t1 == t2`), causing over 7 minutes of visual silence in the HUD and Task Manager where the progress indicator appeared frozen (e.g., at 30% or 65%) with zero log telemetry.
+  3. **Single-Task Fleet Bottleneck & Verbal Reassignment Hallucination:**
+     - Michael's decomposition previously routed requests sequentially or collapsed frontend tasks into a single agent, creating a single-worker bottleneck. When reassigning unnamed tasks or reporting dispatch status, Gemini Live voice prompts would verbally hallucinate completion or status due to ambiguous task titles and lack of structured decomposition payload feedback.
+  4. **App.tsx Sidebar Card Height Explosion:**
+     - In `frontend/src/App.tsx`, task cards used unconstrained `break-all` on verbose task prompt strings without line clamping, causing sidebar task cards to balloon hundreds of pixels vertically on long prompts, pushing other system controls off-screen.
+  5. **TaskManagerModal Raw Epoch Timestamps:**
+     - In `frontend/src/components/tasks/TaskManagerModal.tsx`, task start times and duration rendered raw float epoch values (e.g., `1730024823.412`), degrading readability and causing UI clutter.
+- **Execution & Changes Applied:**
+  - **Direct-Execution & Prompt Sanitization (`core/design_resolver.py`, `core/antigravity_runner.py`):**
+    - Implemented `_sanitize_html_for_prompt` in `core/design_resolver.py` to strip out heavy base64 data URIs (`data:image/[^;]+;base64,...`) and truncate oversized SVG paths (`d="..."`), replacing them with lightweight SVG placeholders and budgeting context to 50k chars.
+    - Added the strict directive to `core/antigravity_runner.py`: `- ABSOLUTELY FORBIDDEN: DO NOT write intermediate Python builder scripts (e.g. build_index.py, build_full_portfolio.py, generate.py, cleanup.py). Write the HTML/CSS directly.`
+    - Direct write reduced synthesis time from ~13 minutes to under 60-90 seconds.
+  - **Continuous Telemetry Line Draining & Heartbeat Engine (`core/antigravity_runner.py`, `core/fleet/dispatcher.py`):**
+    - Dedicated daemon reader thread (`bufsize=1`) drains CLI stdout line-by-line in real time, avoiding OS pipe buffer deadlocks.
+    - Dynamic progress curve: smoothly advances across distinct milestones (30% -> 45% -> 60% -> 80% -> 95%) coupled with a 2.5-second fallback heartbeat cycle (`Synthesizing components...`, `Writing deliverable files...`) so the UI never stays silent for more than 2.5 seconds.
+  - **The 4-Way Scranton Fleet Swarm Pipeline (`core/fleet/orchestrator.py`, `docs/FLEET_MANAGEMENT.md`):**
+    - Upgraded multi-agent workflow decomposition in `FleetOrchestrator.decompose_and_dispatch`:
+      * **Verve (Antigravity):** Core layout, responsive grids, hero framing, Tailwind styling, design token fidelity.
+      * **Flux (Antigravity):** Dynamic interactive components, modals, filters, overflow balance.
+      * **Nexus / Ahmad (OpenCode):** REST API routers, Pydantic schemas, database models, backend logic.
+      * **Dwight (Kilo):** Automated test suites (pytest/vitest), security audit, edge case verification, anti-slop enforcement.
+    - Enforced directory isolation: each subtask targets isolated subdirectories (`frontend/`, `backend/`, `tests/`, `research/`) under a single project root, with upstream deliverables piped across handoffs.
+  - **Frontend UI Polish & Responsiveness (`frontend/src/App.tsx`, `frontend/src/components/tasks/TaskManagerModal.tsx`):**
+    - `App.tsx`: Applied `line-clamp-2 break-words select-text` with tooltip `title={displayTitle}` to sidebar task cards, along with animated pulse indicators on active progress bars and strict integer rounding (`Math.round(progress || 0)%`).
+    - `TaskManagerModal.tsx`: Implemented `formatRelativeTime(epochSec)` converting raw epochs to clean relative timestamps (`12s ago`, `4m ago`, or HH:MM) and added the prominent Failure Callout Banner for instant error diagnostics.
+- **Key Files Touched:**
+  - `core/design_resolver.py`
+  - `core/antigravity_runner.py`
+  - `actions/antigravity_agent.py`
+  - `core/fleet/orchestrator.py`
+  - `core/fleet/dispatcher.py`
+  - `frontend/src/App.tsx`
+  - `frontend/src/components/tasks/TaskManagerModal.tsx`
+  - `docs/FLEET_MANAGEMENT.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` validated all modified Python modules (`core/fleet/orchestrator.py`, `core/antigravity_runner.py`, `core/design_resolver.py`, `actions/antigravity_agent.py`, `core/fleet/dispatcher.py`).
+  - Layer 2 (Runtime): Verified frontend rendering, relative time conversions, line-clamp constraints, and progress pulse animations.
+  - Layer 3 (Regression): `pytest tests/test_fleet_dispatcher.py` passes cleanly. Zero audio/voice pipeline files touched.
+## [2026-10-27] — Voice Anti-Hallucination, Unnamed Fleet Reassignment & Anti-Gaslighting Prompt Invariants
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  - Live conversational voice interactions could occasionally hallucinate task assignment or reassignment through vocal claims alone without dispatching `fleet_control`.
+  - When users requested unnamed reassignments (e.g. "kisi or ko task assign kr de", "someone else", "switch agent", "Verve is not working"), the model previously lacked explicit auto-routing instructions to alternative specialists (e.g. FLUX for frontend) with remembered prompts.
+  - Urgent nudges ("kr naa", "do it", "jaldi karo") risked conversational filler instead of immediate tool dispatch.
+  - When users stated a task was not showing or not assigned, the model risked gaslighting with excuses like "display lag" or "network delay" instead of checking actual state.
+- **Execution & Changes Applied:**
+  - **`core/prompt.txt`:**
+    - Expanded task reassignment & correction rule to handle both named and unnamed reassignments (routing unnamed frontend tasks to FLUX with remembered task prompt and `confirmed=true`).
+    - Added **Imperative Urgency Guard**: on nudges like "kr naa", "do it", "jaldi karo", forbids conversational filler and mandates immediate tool execution.
+    - Added **Anti-Gaslighting Guard**: on user reports that a task isn't showing ("task show nahi ho raha"), strictly forbids blaming display lag or network delay and mandates immediate invocation of `task_status` or `fleet_control`.
+    - Strengthened general tool acknowledgment rule: assistant has NO ability to assign or reassign tasks by speaking alone; it MUST invoke `fleet_control`.
+  - **`docs/PROMPT_SYSTEM.md`:**
+    - Synchronized Fleet Delegation Invariants with the new prompt invariants.
+- **Key Files Touched:**
+  - `core/prompt.txt`
+  - `docs/PROMPT_SYSTEM.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): Validated dynamic template token substitution and syntax across `core/prompt.txt` and `docs/PROMPT_SYSTEM.md`.
+  - Layer 2 (Runtime): Verified template rendering with `_render_prompt` in Python (54,216 chars, 0 unexpanded tokens).
+  - Layer 3 (Regression): `pytest tests/test_fleet_dispatcher.py` passed 5/5. Zero audio/voice pipeline files touched.
+
+## [2026-10-27] — Design Resolver Semantic Isolation, Word Boundary Protection & Theme Re-Skinning Engine
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  - **Issue 1 (Landing Page Disconnect):** In `core/design_resolver.py`, stopword stripping in `_is_explicit_match` reduced `ai landing page.html` to a single token `['ai']`, causing any prompt mentioning "AI" (e.g. "Vortex AI") to trigger a 100% explicit match for `Taskmuse` (a light-sand colored calendar planner app). Because the user asked for `dark_obsidian` with glowing animations, the CLI agent ignored the mismatched reference and synthesized from scratch due to weak 2-line "inspiration" prompts lacking theme re-skinning rules.
+  - **Issue 2 (Portfolio / Dashboard Hijack):** In `_SEMANTIC_ROUTES`, naive substring check `kw in task_clean` caused the 2-letter keyword `"os"` to match inside the word **"decomp`os`e"** in user prompts (e.g. "Decompose and assign to frontend team"), immediately routing to `froma os ` (stem `Froma-Os-`). Concurrently, Michael Scott's workflow decomposition injected a synthetic prefix `"and components:"` which bypassed component guards, and callers failed to pass `scope_type="portfolio"`.
+- **Execution & Changes Applied:**
+  - **`core/design_resolver.py`:**
+    - Fixed `_is_explicit_match` with `generic_tokens = {"ai", "app", "ui", "web", "site", ...}` guard: single generic tokens no longer trigger 100% explicit match.
+    - Upgraded `_SEMANTIC_ROUTES` matching to use regex whole-word boundary matching `_keyword_present(task_clean, kw)` (`r"(?<!\w)" + re.escape(kw) + r"(?!\w)"`), eliminating substring false positives like `"os"` in `"decompose"` or `"repos"`.
+    - Implemented strict Category & Scope Isolation: when `inferred_scope in ("portfolio", "landing_page", "business_site")`, isolated component templates (`5_components/`) and OS dashboards (`4_dashboards/`) are disqualified unless explicitly requested.
+  - **`core/fleet/orchestrator.py` & `actions/fleet_control.py`:**
+    - Cleaned up frontend decomposition subtask prefix: removed polluting `"and components:"` string.
+    - Added automatic scope inference in `decompose_and_dispatch` (`scope_type='portfolio'` for portfolio/resume requests) and forwarded `scope_type` to `dispatcher.dispatch_task()`.
+  - **`core/antigravity_runner.py`, `actions/antigravity_agent.py`, `actions/kilo_agent.py`, `actions/opencode_agent.py`:**
+    - Forwarded `scope=scope_type, theme=color_theme` into `resolve_design()`.
+    - Injected the Product Design **Theme Re-Skinning & Structural Fidelity Directive**:
+      1. Preserves 100% of `reference.html`'s section flow, grid containers, card framing, and typography hierarchy.
+      2. Strictly commands theme re-skinning: if reference is light, do not discard; re-skin CSS variables into dark obsidian (`#07080c`), invert typography, and inject gradient borders & glowing neon accents onto existing card wrappers.
+      3. Adapts placeholder copy and branding to the authentic user project.
+- **Key Files Touched:**
+  - `core/design_resolver.py`
+  - `core/antigravity_runner.py`
+  - `core/fleet/orchestrator.py`
+  - `actions/fleet_control.py`
+  - `actions/antigravity_agent.py`
+  - `actions/kilo_agent.py`
+  - `actions/opencode_agent.py`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` compiled all 8 modified modules cleanly.
+  - Layer 2 (Runtime): Verified with end-to-end trace:
+    * Portfolio with "decompose": Resolves `Hairline Grid Portfolio.html` (`3_portfolios/`), never `Froma-Os-`.
+    * Landing page with "AI" and dark obsidian: Resolves `saas.html` (`1_landing_pages/`), never `ai landing page.html` Taskmuse.
+    * "Decompose" substring test: Resolves `Saas (Autonomous Choice)`, 0 substring collision.
+    * Fleet Orchestrator: Dispatches `scope_type="portfolio"` without `"and components:"`.
+  - Layer 3 (Regression): `pytest tests/test_fleet_dispatcher.py` passed 5/5. Zero audio/voice pipeline files touched.
+## [2026-10-27] — Modular Fleet Manager Decomposition (Registry, Dispatcher, Orchestrator & Facade)
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  - `core/fleet_manager.py` had expanded to 1,310+ lines into a monolithic God-Object coupling agent CRUD/persistence, execution dispatching, worker threading, telemetry broadcasting, task decomposition, and Git worktree isolation under a single global lock.
+  - Decomposing the system eliminates lock contention between agent telemetry and heavy Git teardown/merge operations, increases testability, and adheres to clean architecture principles.
+- **Execution & Changes Applied:**
+  - **`core/fleet/registry.py` (`FleetRegistry`):**
+    - Isolated agent data models (`FleetAgent`), desk grid coordinates (`OFFICE_DESK_COORDINATES`), permissions, risk tiers, and JSON configuration persistence (`fleet_agents.json`).
+    - Dedicated state lock (`_lock = threading.RLock()`) guarding agent profiles, soul markdown, and fleet deck states.
+  - **`core/fleet/dispatcher.py` (`FleetDispatcher`):**
+    - Handles risk-tier validation (`L0_READ_ONLY`, `L1_MUTATION`, `L2_DESTRUCTIVE`), circuit breaker integration, declarative skill injection, and execution dispatching.
+    - Manages background thread workers, reporting wrappers with rate-limited (>= 1.0s or completion) `fleet_updated` deck broadcasts, and failure/cancellation lifecycle hooks.
+  - **`core/fleet/orchestrator.py` (`FleetOrchestrator`):**
+    - High-level multi-agent task decomposition (`decompose_and_dispatch`), peer-to-peer delegation (`delegate_peer_task`), and composite session ID generation.
+    - Quarantined Git worktree lifecycle management (`complete_task` with 4-gate safe teardown and merge lock).
+  - **`core/fleet/__init__.py`:**
+    - Package exports for `FleetAgent`, `FleetRegistry`, `FleetDispatcher`, `FleetOrchestrator`, and constants.
+  - **`core/fleet_manager.py` (Backward-Compatible Facade):**
+    - Composes `FleetRegistry`, `FleetDispatcher`, and `FleetOrchestrator`.
+    - Transparent properties for `agents`, `_lock`, `config_path` and forwarders for all legacy methods and module-level helpers (`get_fleet_manager`, `resolve_agent_by_mention_or_capability`, `get_agent`, `list_agents`, `generate_peer_session_id`, `delegate_peer_task`), guaranteeing 100% backward compatibility for all dependent callers.
+- **Key Files Touched:**
+  - `core/fleet/registry.py` (Created)
+  - `core/fleet/dispatcher.py` (Created)
+  - `core/fleet/orchestrator.py` (Created)
+  - `core/fleet/__init__.py` (Created)
+  - `core/fleet_manager.py` (Refactored to Facade)
+  - `tests/test_fleet_dispatcher.py` (Created)
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` compiled all modules cleanly.
+  - Layer 2 (Runtime): Instantiated `FleetManager`, validated agent retrieval, deck state, profile updates, and backward-compatible properties.
+  - Layer 3 (Regression): `pytest tests/test_fleet_dispatcher.py -v` passed 5/5 tests in 7.51s; external modules (`teardown_engine`, `fleet_control`, `ui_server`) import and run without modification.
+
+## [2026-10-27] — Clean Decoupling of Antigravity Agent & Background Runner Engine
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  - `actions/antigravity_agent.py` historically contained both the action tool declaration and the entire heavy CLI execution engine (Windows job objects, core affinity masking, stdout line-draining threads, smart preview launchers, snapshot diffing, and prompt synthesis).
+  - Decoupling execution logic from the tool entry point isolates system-level process management into a dedicated core engine module, maintaining Rule 4 adherence and cleaner testability.
+- **Execution & Changes Applied:**
+  - **`core/antigravity_runner.py` (New Execution Engine Worker):**
+    - Extracted `_find_antigravity_bin`, `_resolve_model`, `_is_root_dir`, `_ensure_gitignore`, `_tree_snapshot`.
+    - Extracted Windows job object throttling (`_create_throttled_job`, `_assign_pid_to_job`, `_WIN_HIDE`).
+    - Extracted smart preview system (`_launch_static_preview`, `_try_launch_react_preview`, `_launch_smart_preview`).
+    - Implemented `run_antigravity_worker(payload: dict, ctx: Optional[TaskContext] = None) -> dict` including design resolution, pillar instructions, batch directive, live line draining, dynamic progress advancement (30% -> 95%), undo snapshot registration, and preview launch.
+  - **`actions/antigravity_agent.py` (Clean Action Tool Entry Point):**
+    - Streamlined to handle greenfield gate verification, target path resolution, parameter mapping, and delegating execution to `core.antigravity_runner.run_antigravity_worker`.
+    - Maintained full backwards compatibility by re-exporting `_run_worker` and core helpers.
+    - Preserved `TOOL` schema and standard `handler` export.
+- **Key Files Touched:**
+  - `core/antigravity_runner.py` (Created)
+  - `actions/antigravity_agent.py` (Refactored)
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile core/antigravity_runner.py actions/antigravity_agent.py` passed with zero errors.
+  - Layer 2 (Runtime): Verified binary discovery, model alias resolution, root directory check, empty parameter gate validation, and dynamic action discovery via `discover_actions(Path('actions'))`.
+  - Layer 3 (Regression): Confirmed schema exports, `handler` callable signature, and backwards-compatible re-exports.
+
+## [2026-10-27] — Antigravity Agent Batch Directive, Dynamic Progress & Live Fleet Broadcast
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause:**
+  - Tasks dispatched to Antigravity CLI (agy) sometimes paused asking for user plan approval or stayed frozen at a static 30% progress until files materialized on disk.
+  - Shallow `repo.glob("*")` missed nested files during build generation.
+  - FLUX had `make_plan` in its `allowed_skills` causing it to output plan steps rather than code deliverables.
+  - AutonomousOfficeScreen.tsx and Agent Cards only received progress events without updated fleet deck state synchronization.
+- **Execution & Changes Applied:**
+  - **`actions/antigravity_agent.py`:**
+    - Injected explicit `CRITICAL BATCH EXECUTION DIRECTIVE` to enforce non-interactive batch mode and immediate disk saving of `index.html`.
+    - Implemented dynamic progress advancement across 30% -> 45% -> 60% -> 80% -> 94% using elapsed time and output line activity.
+    - Added live stdout line streaming to report UI status (`latest_line[:80]`).
+    - Swapped shallow `glob("*")` with recursive `_tree_snapshot(repo)` diff against `before_tree` to detect file creations and boost progress to 94% with `Building files: ...` status.
+  - **`config/fleet_agents.json`:**
+    - Removed `"make_plan"` from `FLUX`'s `allowed_skills` so it generates code deliverables directly.
+  - **`core/fleet_manager.py`:**
+    - Enhanced `_reporting_wrapper` with rate-limited (>= 1.0s or prog == 100) broadcast of `fleet_updated` with `get_fleet_deck_state()` alongside `task_progress` events.
+- **Key Files Touched:**
+  - `actions/antigravity_agent.py`
+  - `config/fleet_agents.json`
+  - `core/fleet_manager.py`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile actions/antigravity_agent.py core/fleet_manager.py` succeeded with zero errors.
+  - Layer 2 (Runtime): Tested FLUX config schema, rate-limited broadcast wrapper mechanics, and module symbol imports via automated verification script.
+
 ## [2026-10-27] — Multi-Agent Portfolio & Greenfield Pipeline Hardening (Batch 1 Complete Execution)
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Why this was built / Root Cause:**

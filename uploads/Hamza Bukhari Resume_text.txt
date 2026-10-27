@@ -1,0 +1,64 @@
+HAMZA BUKHARI
+hamzabukhari.build@gmail.com | +92 328 1622225 | Lahore, Pakistan
+GitHub: github.com/fakexezo-lgtm
+Objective
+Data Science undergraduate and aspiring full-stack developer looking for a software engineering /
+web development / AI internship where I can contribute to real projects, learn from experienced
+engineers, and strengthen my fundamentals. I enjoy building end-to-end products and am
+comfortable picking up new tools quickly.
+Education
+BS Data Science University of Central Punjab (UCP), Lahore
+Expected Graduation: 2026
+Technical Skills
+Skill Area Technologies
+Frontend React, Next.js, TypeScript, JavaScript (ES6+), HTML5, CSS3,
+Tailwind CSS, shadcn/ui
+Backend & Database Node.js, Express, Python (FastAPI basics), Electron, REST APIs,
+PostgreSQL, Supabase, JWT Authentication
+AI / LLM Tools LLM API Integration (Groq, Gemini, Ollama), Prompt
+Engineering, Vector Search (FAISS, LanceDB), LangChain (basics)
+Tools & Workflow Git & GitHub, Vercel, Postman, VS Code, AI-assisted
+development (Cursor, Claude)
+Currently Learning Data Structures & Algorithms, deeper JavaScript/Python
+fundamentals, system design basics
+Projects
+ZEZO ( Neural OS Foundation )
+Electron, React, Node.js, Google Gemini, LanceDB |https://github.com/fakexezo-lgtm/zezo
+● Developed a local-first "Neural OS" that lets me control my computer and files using natural
+language commands.
+
+● Used Electron to bridge the AI with my OS, enabling tasks like opening apps, managing files,
+and automating browser workflows.
+● Implemented long-term memory using vector search (LanceDB), allowing the AI to recall past
+tasks and project context.
+● Built a mobile integration layer to interact with Android devices directly from my desktop
+interface.
+Penvox AI Engine (Content Generation Platform)
+Next.js, Supabase, Serverless Functions, LLM APIs | https://github.com/fakexezo-lgtm/penvox
+● Built a tool that takes a YouTube video and generates ready-to-post content for multiple
+social media platforms.
+● Created a pipeline using serverless functions to fetch video data and process it through an
+LLM.
+● Set up user authentication and Supabase Row Level Security so each user can only access
+their own data.
+● Integrated a subscription flow with a payment gateway to make it a working paid product.
+Refract CRM (Customer Relationship Management App)
+Next.js, PostgreSQL, Prisma, Tailwind CSS | https://github.com/fakexezo-lgtm/Refract
+● Designed and deployed a CRM from scratch database schema, backend APIs, frontend
+dashboard, and hosting.
+● Modeled customer, team, and organization relationships in PostgreSQL.
+● Built role-based access so team members and admins see different permissions.
+● Improved dashboard responsiveness by optimizing API routes and database queries.
+What I Bring as an Intern
+Shipping mindset: Three deployed, working projects built end-to-end comfortable going from idea
+to a live URL.
+Fast learner: I use modern AI tools (Cursor, Claude) to move quickly, and I actively read docs and
+code to understand what I'm building.
+Honest about my level: I'm still building depth in core CS fundamentals and am eager to be
+mentored, review code, and improve as an engineer.
+Team-ready: Comfortable with Git workflows, code reviews, and picking up an existing codebase.
+
+## 🔗 Extracted Links, Profiles & Contact Info:
+- **GitHub:** github.com/fakexezo-lgtm, http://github.com/fakexezo-lgtm, http://github.com/fakexezo-lgtm/penvox-ai, http://github.com/fakexezo-lgtm/refract-crm, https://github.com/fakexezo-lgtm/Refract, https://github.com/fakexezo-lgtm/penvox, https://github.com/fakexezo-lgtm/zezo
+- **Email:** hamzabukhari.build@gmail.com
+- **Phone:** +92 328 1622225

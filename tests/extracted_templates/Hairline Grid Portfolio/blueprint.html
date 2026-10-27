@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hairline Grid Portfolio &bull; Design Blueprint</title>
+  <style>
+    :root {
+      --bp-bg: #0e0e10;
+      --bp-surface: #151518;
+      --bp-border: #303034;
+      --bp-text: #f5f5f7;
+      --bp-muted: #a0a1a9;
+      --bp-accent: #67a6fb;
+      --bp-accent-sec: #a78bfa;
+      --bp-radius: 16px;
+      --bp-btn-radius: 10px;
+      --bp-font-display: 'ui-sans-serif', -apple-system, sans-serif;
+      --bp-font-body: 'Geist', -apple-system, sans-serif;
+      --bp-font-mono: 'Geist Mono', monospace;
+    }
+    @keyframes ring { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 45%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+.anim-demo-0 { animation: ring 3s infinite ease-in-out; }
+@keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+.anim-demo-1 { animation: blink 3s infinite ease-in-out; }
+@keyframes pulse { 0% { transform: scale(1); opacity: .55; } 70%, 100% { transform: scale(2.6); opacity: 0; } }
+.anim-demo-2 { animation: pulse 3s infinite ease-in-out; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.anim-demo-3 { animation: rise 3s infinite ease-in-out; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.anim-demo-4 { animation: draw 3s infinite ease-in-out; }
+@keyframes fade { to { opacity: 1; } }
+.anim-demo-5 { animation: fade 3s infinite ease-in-out; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bp-bg);
+      color: var(--bp-text);
+      font-family: var(--bp-font-body);
+      line-height: 1.5;
+      padding: 32px 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .bp-container { max-width: 1120px; margin: 0 auto; }
+    .bp-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--bp-border);
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .bp-title-wrap h1 {
+      font-family: var(--bp-font-display);
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .theme-badge {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      background: #67a6fb20; color: #67a6fb; border: 1px solid #67a6fb40;
+    }
+    .bp-subtitle {
+      color: var(--bp-muted);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+    .btn-copy-css {
+      background: var(--bp-accent);
+      color: #fff;
+      border: none;
+      padding: 9px 16px;
+      border-radius: var(--bp-btn-radius);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn-copy-css:hover { opacity: 0.9; transform: translateY(-1px); }
+    .section-title {
+      font-family: var(--bp-font-display);
+      font-size: 15px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 36px 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--bp-text);
+    }
+    .bp-card {
+      background: var(--bp-surface);
+      border: 1px solid var(--bp-border);
+      border-radius: var(--bp-radius);
+      padding: 20px;
+    }
+    .swatches-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 14px;
+    }
+    .swatch-card {
+      background: var(--bp-surface);
+      border: 1px solid var(--bp-border);
+      border-radius: var(--bp-radius);
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .swatch-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    }
+    .swatch-tile {
+      height: 72px;
+      width: 100%;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: 8px;
+    }
+    .swatch-tag {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .swatch-details {
+      padding: 12px;
+    }
+    .swatch-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--bp-text);
+    }
+    .swatch-token {
+      font-size: 10px;
+      font-family: monospace;
+      color: var(--bp-muted);
+      margin-top: 2px;
+    }
+    .swatch-hex {
+      font-size: 11px;
+      font-family: monospace;
+      font-weight: 600;
+      color: var(--bp-text);
+      margin-top: 4px;
+    }
+    .chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .color-chip {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      border: 1px solid rgba(0,0,0,0.1);
+      transition: transform 0.15s;
+    }
+    .color-chip:hover { transform: scale(1.1); }
+    .chip-label { display: none; }
+    .two-col-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 768px) {
+      .two-col-grid { grid-template-columns: 1fr; }
+    }
+    .type-specimen {
+      margin-bottom: 16px;
+    }
+    .type-label {
+      font-size: 11px;
+      color: var(--bp-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .type-display {
+      font-family: var(--bp-font-display);
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--bp-text);
+    }
+    .type-body {
+      font-family: var(--bp-font-body);
+      font-size: 14px;
+      color: var(--bp-muted);
+      line-height: 1.6;
+    }
+    .type-code {
+      font-family: var(--bp-font-mono);
+      font-size: 12px;
+      color: var(--bp-accent);
+      background: rgba(0,0,0,0.04);
+      padding: 6px 10px;
+      border-radius: 6px;
+      display: inline-block;
+      margin-top: 4px;
+    }
+    .preview-canvas {
+      background: var(--bp-surface);
+      border: 1px solid var(--bp-border);
+      border-radius: var(--bp-radius);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .src-btn-primary {
+      background: var(--bp-accent);
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: var(--bp-btn-radius);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .src-btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .src-btn-glass {
+      background: transparent;
+      color: var(--bp-text);
+      border: 1px solid var(--bp-border);
+      padding: 10px 20px;
+      border-radius: var(--bp-btn-radius);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .src-btn-glass:hover { background: rgba(0,0,0,0.04); }
+    .src-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      background: var(--bp-accent-sec);
+      color: #fff;
+    }
+    .src-input {
+      width: 100%;
+      padding: 10px 14px;
+      background: transparent;
+      border: 1px solid var(--bp-border);
+      border-radius: var(--bp-btn-radius);
+      color: var(--bp-text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .src-input:focus {
+      border-color: var(--bp-accent);
+      box-shadow: 0 0 0 2px var(--bp-accent)40;
+    }
+    .kf-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 14px;
+    }
+    .kf-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 12px;
+      padding: 16px;
+    }
+    .kf-visual-box {
+      height: 60px;
+      width: 100%;
+      background: rgba(0,0,0,0.04);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--bp-border);
+    }
+    .kf-demo-badge {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--bp-accent);
+    }
+    .kf-name {
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--bp-font-mono);
+      color: var(--bp-text);
+    }
+    .kf-meta {
+      font-size: 10px;
+      color: var(--bp-muted);
+    }
+    .code-container {
+      position: relative;
+    }
+    pre.code-block {
+      background: #09090b;
+      border: 1px solid var(--bp-border);
+      border-radius: var(--bp-radius);
+      padding: 16px;
+      font-family: var(--bp-font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      color: #fafafa;
+      overflow-x: auto;
+      max-height: 380px;
+    }
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      color: #fafafa;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 9999;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="bp-container">
+    <header class="bp-header">
+      <div class="bp-title-wrap">
+        <h1>Hairline Grid Portfolio <span class="theme-badge">Creative Scrapbook & Visual Narrative</span></h1>
+        <p class="bp-subtitle">Extracted Design System &bull; 43 Tokens &bull; 6 Colors &bull; 8 Animations &bull; ui-sans-serif</p>
+      </div>
+      <button class="btn-copy-css" onclick="copyTokens()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        Copy :root CSS
+      </button>
+    </header>
+
+    <div class="section-title">Color Architecture & Semantic Hierarchy</div>
+    <div class="swatches-grid">
+      
+        <div class="swatch-card" onclick="copyText('#0e0e10', 'Copied #0e0e10')" title="Click to copy #0e0e10">
+          <div class="swatch-tile" style="background-color: #0e0e10; border: 1px solid rgba(255,255,255,0.15);">
+            <span class="swatch-tag" style="background:rgba(255,255,255,0.2);color:#fff;">DARK</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Background</div>
+            <div class="swatch-token">--bg</div>
+            <div class="swatch-hex"><code>#0e0e10</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#151518', 'Copied #151518')" title="Click to copy #151518">
+          <div class="swatch-tile" style="background-color: #151518; border: 1px solid rgba(255,255,255,0.15);">
+            <span class="swatch-tag" style="background:rgba(255,255,255,0.2);color:#fff;">DARK</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Surface</div>
+            <div class="swatch-token">--surface</div>
+            <div class="swatch-hex"><code>#151518</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#67a6fb', 'Copied #67a6fb')" title="Click to copy #67a6fb">
+          <div class="swatch-tile" style="background-color: #67a6fb; border: 1px solid rgba(255,255,255,0.15);">
+            <span class="swatch-tag" style="background:rgba(0,0,0,0.6);color:#fff;">LIGHT</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Primary Accent</div>
+            <div class="swatch-token">--accent</div>
+            <div class="swatch-hex"><code>#67a6fb</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#a78bfa', 'Copied #a78bfa')" title="Click to copy #a78bfa">
+          <div class="swatch-tile" style="background-color: #a78bfa; border: 1px solid rgba(255,255,255,0.15);">
+            <span class="swatch-tag" style="background:rgba(0,0,0,0.6);color:#fff;">LIGHT</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Secondary Accent</div>
+            <div class="swatch-token">--accent-secondary</div>
+            <div class="swatch-hex"><code>#a78bfa</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#f5f5f7', 'Copied #f5f5f7')" title="Click to copy #f5f5f7">
+          <div class="swatch-tile" style="background-color: #f5f5f7; border: 1px solid rgba(0,0,0,0.1);">
+            <span class="swatch-tag" style="background:rgba(0,0,0,0.6);color:#fff;">LIGHT</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Headline Ink</div>
+            <div class="swatch-token">--text-primary</div>
+            <div class="swatch-hex"><code>#f5f5f7</code></div>
+          </div>
+        </div>
+        
+        <div class="swatch-card" onclick="copyText('#303034', 'Copied #303034')" title="Click to copy #303034">
+          <div class="swatch-tile" style="background-color: #303034; border: 1px solid rgba(255,255,255,0.15);">
+            <span class="swatch-tag" style="background:rgba(255,255,255,0.2);color:#fff;">DARK</span>
+          </div>
+          <div class="swatch-details">
+            <div class="swatch-name">Hairline Border</div>
+            <div class="swatch-token">--border</div>
+            <div class="swatch-hex"><code>#303034</code></div>
+          </div>
+        </div>
+        
+    </div>
+    <div class="chips-row">
+      <div class="color-chip" style="background-color: #18181b" onclick="copyText('#18181b', 'Copied #18181b')" title="#18181b"><span class="chip-label">#18181b</span></div><div class="color-chip" style="background-color: #fcfcfd" onclick="copyText('#fcfcfd', 'Copied #fcfcfd')" title="#fcfcfd"><span class="chip-label">#fcfcfd</span></div><div class="color-chip" style="background-color: #e4e4e7" onclick="copyText('#e4e4e7', 'Copied #e4e4e7')" title="#e4e4e7"><span class="chip-label">#e4e4e7</span></div><div class="color-chip" style="background-color: #3f3f46" onclick="copyText('#3f3f46', 'Copied #3f3f46')" title="#3f3f46"><span class="chip-label">#3f3f46</span></div><div class="color-chip" style="background-color: #000" onclick="copyText('#000', 'Copied #000')" title="#000"><span class="chip-label">#000</span></div><div class="color-chip" style="background-color: #fafafa" onclick="copyText('#fafafa', 'Copied #fafafa')" title="#fafafa"><span class="chip-label">#fafafa</span></div>
+    </div>
+
+    <div class="section-title">Component Design System & Live Specimen</div>
+    <div class="two-col-grid">
+      <div class="bp-card">
+        <div class="type-specimen">
+          <div class="type-label">Display & Headline (ui-sans-serif)</div>
+          <div class="type-display">Design Precision & Distinct Identity</div>
+        </div>
+        <div class="type-specimen">
+          <div class="type-label">Body Text (Geist)</div>
+          <div class="type-body">Modular spacing scales, calibrated contrast, and authentic semantic tokens preserve the unique character of this reference design.</div>
+        </div>
+        <div class="type-specimen">
+          <div class="type-label">Telemetry & Tokens (Geist Mono)</div>
+          <div class="type-code">token.resolve("--accent") &rarr; #67a6fb</div>
+        </div>
+      </div>
+
+      <div class="preview-canvas">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="type-label">Live Extracted Component Preview</span>
+          <span class="src-pill">LIVE PROTOTYPE</span>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button class="src-btn-primary">Primary Action</button>
+          <button class="src-btn-glass">Ghost Secondary</button>
+        </div>
+        <input type="text" class="src-input" placeholder="Search or filter records..." value="Active focus ring demonstration">
+      </div>
+    </div>
+
+    <div class="section-title">Micro-Interactions & Animation Lab</div>
+    <div class="kf-grid">
+      
+        <div class="bp-card kf-card">
+          <div class="kf-visual-box"><div class="kf-demo-badge anim-demo-0"></div></div>
+          <div class="kf-info">
+            <span class="kf-name">@ring</span>
+            <span class="kf-meta">3s &bull; infinite</span>
+          </div>
+        </div>
+        
+        <div class="bp-card kf-card">
+          <div class="kf-visual-box"><div class="kf-demo-badge anim-demo-1"></div></div>
+          <div class="kf-info">
+            <span class="kf-name">@blink</span>
+            <span class="kf-meta">3s &bull; infinite</span>
+          </div>
+        </div>
+        
+        <div class="bp-card kf-card">
+          <div class="kf-visual-box"><div class="kf-demo-badge anim-demo-2"></div></div>
+          <div class="kf-info">
+            <span class="kf-name">@pulse</span>
+            <span class="kf-meta">3s &bull; infinite</span>
+          </div>
+        </div>
+        
+        <div class="bp-card kf-card">
+          <div class="kf-visual-box"><div class="kf-demo-badge anim-demo-3"></div></div>
+          <div class="kf-info">
+            <span class="kf-name">@rise</span>
+            <span class="kf-meta">3s &bull; infinite</span>
+          </div>
+        </div>
+        
+        <div class="bp-card kf-card">
+          <div class="kf-visual-box"><div class="kf-demo-badge anim-demo-4"></div></div>
+          <div class="kf-info">
+            <span class="kf-name">@draw</span>
+            <span class="kf-meta">3s &bull; infinite</span>
+          </div>
+        </div>
+        
+        <div class="bp-card kf-card">
+          <div class="kf-visual-box"><div class="kf-demo-badge anim-demo-5"></div></div>
+          <div class="kf-info">
+            <span class="kf-name">@fade</span>
+            <span class="kf-meta">3s &bull; infinite</span>
+          </div>
+        </div>
+        
+    </div>
+
+    <div class="section-title">Production-Ready :root Tokens Stylesheet</div>
+    <div class="code-container">
+      <pre class="code-block" id="css-tokens-code"><code>/* ==========================================
+ * Design Blueprint Tokens - Hairline Grid Portfolio
+ * Style: CREATIVE SCRAPBOOK &amp; VISUAL NARRATIVE
+ * Theme: DARK | Generated by Zezo Studio Engine
+ * ========================================== */
+:root {
+  /* --- Semantic Palette --- */
+  --bg: #0e0e10;
+  --surface: #151518;
+  --accent: #67a6fb;
+  --accent-secondary: #a78bfa;
+  --text-primary: #f5f5f7;
+  --text-muted: #a0a1a9;
+  --border: #303034;
+
+  /* --- Typography --- */
+  --font-display: &#x27;ui-sans-serif&#x27;, sans-serif;
+  --font-body: &#x27;Geist&#x27;, sans-serif;
+  --font-mono: &#x27;Geist Mono&#x27;;
+
+  /* --- Radii &amp; Spacing --- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* --- Custom Design Properties --- */
+  --accent-soft: color-mix(in oklab, oklch(0.72 0.14 256) 14%, oklch(0.165 0.005 286));
+  --c: 12px;
+  --code-bg: oklch(0.135 0.005 286);
+  --code-fg: oklch(0.93 0.003 286);
+  --danger: oklch(0.7 0.17 25);
+  --dur: 240ms;
+  --dur-fast: 160ms;
+  --dur-slow: 620ms;
+  --ease-in-out: cubic-bezier(.77, 0, .175, 1);
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --faint: oklch(0.55 0.012 286);
+  --fg: oklch(0.972 0.002 286);
+  --fg-2: oklch(0.84 0.007 286);
+  --font-hand: &quot;Caveat&quot;, &quot;Bradley Hand&quot;, cursive;
+  --font-mono: &quot;Geist Mono&quot;, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* --- Keyframe Animations --- */
+@keyframes ring { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 45%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+@keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+@keyframes pulse { 0% { transform: scale(1); opacity: .55; } 70%, 100% { transform: scale(2.6); opacity: 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes fade { to { opacity: 1; } }</code></pre>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Copied to clipboard</div>
+
+  <script>
+    function copyText(text, msg) {
+      navigator.clipboard.writeText(text).then(() => showToast(msg || 'Copied!'));
+    }
+    function copyTokens() {
+      const code = document.getElementById('css-tokens-code').innerText;
+      navigator.clipboard.writeText(code).then(() => showToast('Copied :root CSS Tokens!'));
+    }
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2000);
+    }
+  </script>
+</body>
+</html>

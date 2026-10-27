@@ -36,6 +36,7 @@ import {
   ChevronRight,
   BrainCircuit,
   CheckCircle2,
+  XCircle,
   Code2,
   Eye,
 } from "lucide-react";
@@ -105,10 +106,18 @@ export const FleetTaskToolUI = makeAssistantToolUI({
   toolName: "fleet_task",
   render: ({ args, result, status }) => {
     const isRunning = status.type === "running";
+    const isFailed =
+      (result as any)?.status === "failed" ||
+      (result as any)?.success === false ||
+      Boolean((result as any)?.error);
     const agent = (args as any)?.agent || "Agent";
     const target = (args as any)?.target || (args as any)?.task || "Task";
     const prompt = (args as any)?.prompt || "";
     const output = (result as any)?.output || (result as any)?.result || "";
+    const errorMsg =
+      typeof (result as any)?.error === "object"
+        ? JSON.stringify((result as any)?.error, null, 2)
+        : (result as any)?.error || output || "Task execution failed.";
 
     return (
       <div className="my-2 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 text-xs text-[var(--foreground)] shadow-xs">
@@ -125,6 +134,11 @@ export const FleetTaskToolUI = makeAssistantToolUI({
                   <span className="flex items-center gap-1 text-[var(--accent)]">
                     <Loader2 className="size-2.5 animate-spin" />
                     Executing...
+                  </span>
+                ) : isFailed ? (
+                  <span className="flex items-center gap-1 text-red-400 font-semibold">
+                    <XCircle className="size-2.5" />
+                    Failed
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-emerald-400">
@@ -145,15 +159,29 @@ export const FleetTaskToolUI = makeAssistantToolUI({
           {/* Phase 2: Execution Result & Code Trace */}
           <ChainOfThoughtStep defaultOpen={true}>
             <ChainOfThoughtTrigger
-              leftIcon={<Code2 className="size-4 text-emerald-400" />}
+              leftIcon={
+                isFailed ? (
+                  <XCircle className="size-4 text-red-400" />
+                ) : (
+                  <Code2 className="size-4 text-emerald-400" />
+                )
+              }
             >
-              <span>Command & AST Synthesis Output</span>
+              <span className={isFailed ? "text-red-400 font-medium" : ""}>
+                {isFailed ? "Execution Failure Trace" : "Command & AST Synthesis Output"}
+              </span>
             </ChainOfThoughtTrigger>
             <ChainOfThoughtContent>
               {isRunning ? (
                 <ChainOfThoughtItem className="flex items-center gap-2">
                   <Loader2 className="size-3 animate-spin text-[var(--accent)]" />
                   <span>Synthesizing code refactoring, AST invariants & safety matrices...</span>
+                </ChainOfThoughtItem>
+              ) : isFailed ? (
+                <ChainOfThoughtItem>
+                  <div className="rounded-md border border-red-500/30 bg-red-950/20 p-2 text-red-300 font-mono text-[11px] whitespace-pre-wrap">
+                    {errorMsg}
+                  </div>
                 </ChainOfThoughtItem>
               ) : (
                 <ChainOfThoughtItem>

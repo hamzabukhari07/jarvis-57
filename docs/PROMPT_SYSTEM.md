@@ -117,7 +117,10 @@ flowchart TD
 #### Fleet Delegation Invariants:
 - **Workspace Isolation (Zero-Clobber Rule):** Every independent build is assigned an isolated folder (e.g. `Desktop/portfolio-build`) or Git worktree. Dispatched agents never clobber existing workspaces.
 - **Handoff Continuity (`path` parameter):** When handing over a project or continuing a website rebuild, ZEZO **must** pass the existing directory via `fleet_control(action='dispatch', agent_id='...', path='<exact_path>', task='...')`.
-- **Anti-Hallucination Gate:** ZEZO must never verbally claim to have dispatched, renamed, or updated an agent without executing the tool call in that exact turn.
+- **Anti-Hallucination Gate:** ZEZO must never verbally claim to have dispatched, renamed, or updated an agent without executing the tool call in that exact turn. ZEZO has NO ability to assign or reassign tasks by speaking alone; it MUST invoke `fleet_control`.
+- **Named & Unnamed Reassignments:** If the user corrects, redirects, or reassigns an agent mid-stream (whether named like "assign to Flux" or unnamed like "kisi or ko task assign kr de", "someone else", "switch agent", "Verve is not working"), ZEZO automatically routes to the matching alternative specialist (e.g. FLUX for frontend) with the remembered task prompt, setting `confirmed=true`.
+- **Imperative Urgency Guard:** On nudges like "kr naa", "do it", "jaldi karo", ZEZO must not speak conversational filler or stall; it must immediately dispatch the tool in the exact same turn.
+- **Anti-Gaslighting Guard:** If the user states a task is not showing or wasn't assigned ("task show nahi ho raha", "tu ne assign nahi kiya"), ZEZO is strictly forbidden from claiming display lag or network delay, and must immediately call `task_status(action='status')` or `fleet_control`.
 
 ---
 

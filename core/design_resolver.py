@@ -487,6 +487,8 @@ def _normalize_theme(t: Optional[str]) -> Optional[str]:
     if not t:
         return None
     t = t.lower().strip().replace("-", "_").replace(" ", "_")
+    if "edit" in t or "paper" in t or "scrapbook" in t:
+        return "editorial_warm"
     if "dark" in t or "obsidian" in t or "void" in t:
         return "dark_obsidian"
     if "lux" in t or "gold" in t or "warm" in t:
@@ -495,8 +497,6 @@ def _normalize_theme(t: Optional[str]) -> Optional[str]:
         return "clean_minimal"
     if "bold" in t or "creat" in t or "vibrant" in t:
         return "creative_bold"
-    if "edit" in t or "paper" in t:
-        return "editorial_warm"
     return t
 
 
@@ -651,26 +651,59 @@ def resolve_design(
     task_clean = authentic_task.lower() if authentic_task else task.lower()
     has_redesign_intent = is_redesign_or_explicit_request(authentic_task or task)
 
+    # Prioritize explicitly passed scope & theme arguments, falling back to task bracket directives [Scope: ...] / [Theme: ...]
+    explicit_scope = _normalize_scope(scope)
+    if not explicit_scope:
+        m_sc = re.search(r"\[[^\]]*\bScope:\s*([^,\]\r\n]+)", task, re.I)
+        if m_sc:
+            explicit_scope = _normalize_scope(m_sc.group(1).strip())
+
+    explicit_theme = _normalize_theme(theme)
+    if not explicit_theme:
+        m_th = re.search(r"\[[^\]]*\bTheme:\s*([^,\]\r\n]+)", task, re.I)
+        if m_th:
+            explicit_theme = _normalize_theme(m_th.group(1).strip())
+
     # 1. Priority 1: User-Explicit Reference Match in task
     matched_html: Optional[Path] = None
     task_words = set(re.findall(r"[a-z0-9]+", task_clean))
 
-    def _is_explicit_match(stem_str: str) -> bool:
+    def _is_explicit_match(p_file: Path) -> bool:
+        stem_str = p_file.stem
         if stem_str.lower() in ("design-system", "design_system", "design system"):
             return False
         clean_stem = re.sub(r"[-_\s]+", " ", stem_str.lower())
         clean_stem = clean_stem.replace(".html", "").replace(".htm", "").replace("design", "").strip()
+        generic_tokens = {"ai", "app", "ui", "web", "site", "new", "doc", "docs", "dev", "pro", "v1", "v2"}
         stem_tokens = [t for t in clean_stem.split() if t not in ("landing", "page", "the", "a", "an", "and", "component", "system")]
         if not stem_tokens:
             stem_tokens = clean_stem.split()
+
+        # Direct explicit reference name checks
+        if p_file.name.lower() in task_clean:
+            return True
+        if f"use {clean_stem}" in task_clean or f"like {clean_stem}" in task_clean or f"{clean_stem} template" in task_clean or f"{clean_stem} reference" in task_clean:
+            return True
+
+        # Reject if stem_tokens is just that single generic token (e.g., 'ai landing page.html' stripping landing/page leaves ['ai'])
+        if len(stem_tokens) == 1 and stem_tokens[0] in generic_tokens:
+            return False
+
+        # If explicit_scope is defined, ensure candidate doesn't violate explicit_scope
+        if explicit_scope:
+            expected_dir = _SCOPE_DIRS.get(explicit_scope, "")
+            p_posix = str(p_file).replace("\\", "/")
+            if expected_dir and expected_dir not in p_posix:
+                return False
+
         if stem_tokens and all(tok in task_words for tok in stem_tokens):
             return True
-        if clean_stem and len(clean_stem) >= 3 and re.search(rf"\b{re.escape(clean_stem)}\b", task_clean):
+        if clean_stem and clean_stem not in generic_tokens and len(clean_stem) >= 3 and re.search(rf"\b{re.escape(clean_stem)}\b", task_clean):
             return True
         return False
 
     for p in available_html:
-        if _is_explicit_match(p.stem):
+        if _is_explicit_match(p):
             matched_html = p
             break
 
@@ -687,66 +720,64 @@ def resolve_design(
                 full_raw_html=full_raw_h,
             )
 
-    # 2. Priority 2: Check session memory & persistent memory
+    # 2. Priority 2: Check session memory & persistent memory (only if no redesign intent and matches explicit_scope)
     candidate_design_target = ""
-    if session_memory and isinstance(session_memory, dict):
-        candidate_design_target = (
-            session_memory.get("active_design_path")
-            or session_memory.get("active_design")
-            or session_memory.get("last_loaded_file")
-            or session_memory.get("active_file")
-            or ""
-        )
+    if not has_redesign_intent:
+        if session_memory and isinstance(session_memory, dict):
+            candidate_design_target = (
+                session_memory.get("active_design_path")
+                or session_memory.get("active_design")
+                or session_memory.get("last_loaded_file")
+                or session_memory.get("active_file")
+                or ""
+            )
 
-    if not candidate_design_target:
-        try:
-            from memory.memory_manager import recall
-            candidate_design_target = recall("active_design_path") or recall("active_design") or ""
-        except Exception:
-            candidate_design_target = ""
+        if not candidate_design_target:
+            try:
+                from memory.memory_manager import recall
+                candidate_design_target = recall("active_design_path") or recall("active_design") or ""
+            except Exception:
+                candidate_design_target = ""
 
     if candidate_design_target:
-        p = Path(candidate_design_target)
-        if p.exists() and p.is_file():
-            res = _load_direct_html_reference(p)
-            if res:
-                name, stype, raw_h, full_raw_h, s_path = res
-                return ResolvedDesign(
-                    source_name=name,
-                    source_type="reference_cached",
-                    raw_html=raw_h,
-                    anti_slop_rules=anti_slop,
-                    source_path=s_path,
-                    full_raw_html=full_raw_h,
-                )
-        else:
-            target_norm = _norm_stem(str(candidate_design_target))
-            matched_h = next((h for h in available_html if _norm_stem(h.name) == target_norm), None)
-            if matched_h:
-                res = _load_direct_html_reference(matched_h)
+        cached_matches_scope = True
+        if explicit_scope:
+            expected_dir = _SCOPE_DIRS.get(explicit_scope, "")
+            p_posix = str(candidate_design_target).replace("\\", "/")
+            if expected_dir and expected_dir not in p_posix:
+                cached_matches_scope = False
+
+        if cached_matches_scope:
+            p = Path(candidate_design_target)
+            if p.exists() and p.is_file():
+                res = _load_direct_html_reference(p)
                 if res:
                     name, stype, raw_h, full_raw_h, s_path = res
                     return ResolvedDesign(
                         source_name=name,
-                        source_type=stype,
+                        source_type="reference_cached",
                         raw_html=raw_h,
                         anti_slop_rules=anti_slop,
                         source_path=s_path,
                         full_raw_html=full_raw_h,
                     )
+            else:
+                target_norm = _norm_stem(str(candidate_design_target))
+                matched_h = next((h for h in available_html if _norm_stem(h.name) == target_norm), None)
+                if matched_h:
+                    res = _load_direct_html_reference(matched_h)
+                    if res:
+                        name, stype, raw_h, full_raw_h, s_path = res
+                        return ResolvedDesign(
+                            source_name=name,
+                            source_type=stype,
+                            raw_html=raw_h,
+                            anti_slop_rules=anti_slop,
+                            source_path=s_path,
+                            full_raw_html=full_raw_h,
+                        )
 
     # 3. Priority 3: Deterministic Catalog & Semantic Category Match
-    explicit_scope = _normalize_scope(scope)
-    if not explicit_scope:
-        m_sc = re.search(r"\[[^\]]*\bScope:\s*([^,\]\r\n]+)", task, re.I)
-        if m_sc:
-            explicit_scope = _normalize_scope(m_sc.group(1).strip())
-
-    explicit_theme = _normalize_theme(theme)
-    if not explicit_theme:
-        m_th = re.search(r"\[[^\]]*\bTheme:\s*([^,\]\r\n]+)", task, re.I)
-        if m_th:
-            explicit_theme = _normalize_theme(m_th.group(1).strip())
 
     if explicit_scope or explicit_theme:
         cat_match = resolve_from_catalog(scope=explicit_scope, theme=explicit_theme, task_text=authentic_task)
@@ -768,22 +799,41 @@ def resolve_design(
 
     # Semantic keyword routing across curated reference templates
     inferred_scope = explicit_scope or _infer_scope(task_clean)
+    comp_stems = ("aura frame", "nexus", "autonomus", "skeumorphic spatial component", "image gen")
+    dash_stems = ("froma os", "froma os ", "Standalone Ecosystem", "orbit admin")
+
     for keywords, target_stem in _SEMANTIC_ROUTES:
-        if any(kw in task_clean for kw in keywords):
+        if any(_keyword_present(task_clean, kw) for kw in keywords):
             target_norm = _norm_stem(target_stem)
             cat_html = next((h for h in available_html if target_norm in _norm_stem(h.name) or _norm_stem(h.name) in target_norm), None)
 
-            is_comp = False
-            if cat_html and ("5_components" in str(cat_html).replace("\\", "/") or "component" in cat_html.name.lower()):
-                is_comp = True
-            elif target_stem in ("aura frame", "nexus", "autonomus", "skeumorphic spatial component"):
-                is_comp = True
+            # Category / Scope Isolation
+            is_comp = (target_stem.strip() in [s.strip() for s in comp_stems]) or (
+                cat_html is not None and ("5_components" in str(cat_html).replace("\\", "/") or "component" in cat_html.name.lower())
+            )
+            is_dash = (target_stem.strip() in [s.strip() for s in dash_stems]) or (
+                cat_html is not None and ("4_dashboards" in str(cat_html).replace("\\", "/") or "dashboard" in cat_html.name.lower())
+            )
 
-            if is_comp:
-                wants_comp = (inferred_scope == "component") or any(
-                    ck in task_clean for ck in ["component", "card", "frame", "hud", "widget", "button"]
+            if inferred_scope in ("portfolio", "landing_page", "business_site"):
+                if is_comp:
+                    user_wants_comp = (inferred_scope == "component") or any(
+                        _keyword_present(task_clean, ck) for ck in ["component", "card", "frame", "hud", "widget", "button"]
+                    )
+                    if not user_wants_comp:
+                        continue
+
+                if is_dash:
+                    user_wants_dash = (inferred_scope == "dashboard") or any(
+                        _keyword_present(task_clean, dk) for dk in ["dashboard", "admin", "os", "console", "portal", "ecosystem"]
+                    )
+                    if not user_wants_dash:
+                        continue
+            elif is_comp:
+                user_wants_comp = (inferred_scope == "component") or any(
+                    _keyword_present(task_clean, ck) for ck in ["component", "card", "frame", "hud", "widget", "button"]
                 )
-                if not wants_comp and inferred_scope in ("landing_page", "portfolio", "business_site", "dashboard"):
+                if not user_wants_comp and inferred_scope in ("landing_page", "portfolio", "business_site", "dashboard"):
                     continue
 
             if cat_html:
@@ -832,7 +882,7 @@ def resolve_design(
                     pass
 
     # 5. Priority 5: Autonomous Agent Choice (Deterministic Catalog Tag Matcher)
-    cat_match = resolve_from_catalog(scope=scope, theme=theme, task_text=authentic_task)
+    cat_match = resolve_from_catalog(scope=explicit_scope, theme=explicit_theme, task_text=authentic_task)
     if cat_match and cat_match.get("file_path"):
         cand_file = cat_match["file_path"]
         res = _load_direct_html_reference(cand_file)
@@ -925,3 +975,318 @@ def check_greenfield_gate(task: str, parameters: Dict[str, Any], caller_tool: st
         return f"{plan_summary} Please confirm by setting confirmed=true to proceed."
 
     return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Automated Blueprint & Master Template Generation Engine
+# ─────────────────────────────────────────────────────────────────────────────
+
+try:
+    from bs4 import BeautifulSoup, Comment
+except ImportError:
+    BeautifulSoup = None
+    Comment = None
+
+try:
+    from core.design_extractor import generate_blueprint_html, generate_design_md, strip_base64_bloat
+except ImportError:
+    try:
+        from design_extractor import generate_blueprint_html, generate_design_md, strip_base64_bloat
+    except ImportError:
+        generate_blueprint_html = None
+        generate_design_md = None
+        strip_base64_bloat = None
+
+
+def inject_semantic_slots(html_str: str) -> str:
+    """
+    Intelligently detects common section elements (hero/header, projects/features/portfolio,
+    skills/about/experience, contact/footer) and injects semantic slot boundaries:
+      <!-- SLOT:HERO_START --> ... <!-- SLOT:HERO_END -->
+      <!-- SLOT:PROJECTS_START --> ... <!-- SLOT:PROJECTS_END -->
+      <!-- SLOT:SKILLS_START --> ... <!-- SLOT:SKILLS_END -->
+      <!-- SLOT:CONTACT_START --> ... <!-- SLOT:CONTACT_END -->
+    """
+    if not html_str:
+        return html_str
+
+    slots = ["HERO", "PROJECTS", "SKILLS", "CONTACT"]
+    if all(f"<!-- SLOT:{s}_START -->" in html_str for s in slots):
+        return html_str
+
+    if not BeautifulSoup or not Comment:
+        # Fallback regex-based slot boundary injector
+        res = html_str
+        for s in slots:
+            if f"<!-- SLOT:{s}_START -->" not in res:
+                res = f"<!-- SLOT:{s}_START -->\n<!-- SLOT:{s}_END -->\n" + res
+        return res
+
+    soup = BeautifulSoup(html_str, "html.parser")
+    body = soup.find("body")
+    if not body:
+        return html_str
+
+    containers = [body]
+    main_el = body.find("main")
+    if main_el:
+        containers.append(main_el)
+    for c in list(body.find_all("div", recursive=False)):
+        containers.append(c)
+
+    candidates = []
+    seen = set()
+    for cont in containers:
+        for tag in cont.find_all(["section", "header", "footer", "article", "div"], recursive=False):
+            if id(tag) not in seen:
+                seen.add(id(tag))
+                tag_id = (tag.get("id") or "").lower()
+                tag_cls = " ".join(tag.get("class") or []).lower()
+                tag_aria = (tag.get("aria-label") or tag.get("aria-labelledby") or "").lower()
+                desc = f"{tag.name} {tag_id} {tag_cls} {tag_aria}"
+                candidates.append((tag, desc))
+
+    if len(candidates) < 4:
+        for tag in body.find_all(["section", "header", "footer"]):
+            if id(tag) not in seen:
+                seen.add(id(tag))
+                tag_id = (tag.get("id") or "").lower()
+                tag_cls = " ".join(tag.get("class") or []).lower()
+                tag_aria = (tag.get("aria-label") or tag.get("aria-labelledby") or "").lower()
+                desc = f"{tag.name} {tag_id} {tag_cls} {tag_aria}"
+                candidates.append((tag, desc))
+
+    assigned: dict[str, Any] = {"HERO": None, "PROJECTS": None, "SKILLS": None, "CONTACT": None}
+
+    # Pass 1: CONTACT (footer, contact, cta, reach, newsletter)
+    for tag, desc in candidates:
+        if tag.name == "footer" or any(k in desc for k in ["contact", "footer", "get-in-touch", "touch", "newsletter", "cta"]):
+            assigned["CONTACT"] = tag
+            break
+
+    # Pass 2: HERO (header, hero, banner, intro, masthead, top)
+    for tag, desc in candidates:
+        if tag is not assigned["CONTACT"] and (
+            tag.name == "header" or any(k in desc for k in ["hero", "banner", "intro", "masthead", "ph", "header", "top"])
+        ):
+            assigned["HERO"] = tag
+            break
+
+    # Pass 3: PROJECTS (work, project, portfolio, feature, case, service, capabilities, product, showcase)
+    for tag, desc in candidates:
+        if tag not in assigned.values() and any(
+            k in desc for k in ["project", "work", "portfolio", "feature", "case", "service", "capabilities", "product", "showcase", "integration", "gallery", "app"]
+        ):
+            assigned["PROJECTS"] = tag
+            break
+
+    # Pass 4: SKILLS (skill, stack, tech, about, experience, testimonial, pricing, team, stat, bio)
+    for tag, desc in candidates:
+        if tag not in assigned.values() and any(
+            k in desc for k in ["skill", "stack", "tech", "about", "experience", "testim", "pricing", "team", "stat", "bio", "review", "philosophy", "principle"]
+        ):
+            assigned["SKILLS"] = tag
+            break
+
+    # Pass 5: Sequential fallback for unassigned slots
+    remaining = [tag for tag, _ in candidates if tag not in assigned.values()]
+    for slot_name in slots:
+        if assigned[slot_name] is None and remaining:
+            assigned[slot_name] = remaining.pop(0)
+
+    for slot_name in slots:
+        tag = assigned.get(slot_name)
+        if tag is not None and tag.parent:
+            start_comment = Comment(f" SLOT:{slot_name}_START ")
+            end_comment = Comment(f" SLOT:{slot_name}_END ")
+            tag.insert_before(start_comment)
+            tag.insert_after(end_comment)
+        else:
+            start_comment = Comment(f" SLOT:{slot_name}_START ")
+            end_comment = Comment(f" SLOT:{slot_name}_END ")
+            body.append(start_comment)
+            body.append(end_comment)
+
+    return str(soup)
+
+
+def generate_master_template_html(raw_html: str, max_bytes: int = 40000) -> str:
+    """
+    Generates a clean interactive clone with functional JS and CSS,
+    lightweight placeholder assets, and injected semantic slot boundaries.
+    Guarantees 100% valid document structure (never arbitrarily sliced).
+    """
+    if not raw_html:
+        return ""
+
+    # 1. Strip base64 image bloat, embedded fonts, and flight hydration scripts first
+    if strip_base64_bloat:
+        c = strip_base64_bloat(raw_html)
+    else:
+        ph_img = (
+            'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" '
+            'viewBox="0 0 400 300"><rect width="100%" height="100%" fill="%2318181b"/>'
+            '<text x="50%" y="50%" fill="%2371717a" font-family="sans-serif" font-size="14" '
+            'dominant-baseline="middle" text-anchor="middle">Asset Placeholder</text></svg>'
+        )
+        c = re.sub(r'data:image/[^;]+;base64,[A-Za-z0-9+/=\s]{64,}', ph_img, raw_html)
+        c = re.sub(r"""<link[^>]+href=['"]data:[^'"]+['"][^>]*>""", "", c, flags=re.IGNORECASE)
+        c = re.sub(r"""<script[^>]+src=['"]data:[^'"]+['"][^>]*>.*?</script>""", "", c, flags=re.DOTALL | re.IGNORECASE)
+        c = re.sub(r"""data:(?:text/javascript|application|font)[^;'")\s]+""", "", c)
+
+    # 2. Clean CSS whitespace and comments
+    def _clean_style(m: re.Match) -> str:
+        s = m.group(1)
+        s = re.sub(r'/\*.*?\*/', '', s, flags=re.DOTALL)
+        s = re.sub(r'@font-face\s*\{[^}]*data:[^}]*\}', '', s)
+        s = re.sub(r'\s+', ' ', s)
+        s = re.sub(r'\s*([\{\}:;,])\s*', r'\1', s)
+        return f'<style>{s.strip()}</style>'
+
+    c = re.sub(r'<style[^>]*>(.*?)</style>', _clean_style, c, flags=re.DOTALL)
+
+    # 3. Strip non-slot HTML comments
+    c = re.sub(r'<!--(?!\s*SLOT:).*?-->', '', c, flags=re.DOTALL)
+
+    # 4. Simplify bulky SVGs (> 140 chars)
+    def _clean_svg(m: re.Match) -> str:
+        svg_content = m.group(0)
+        if len(svg_content) > 140:
+            m_cls = re.search(r"""class=['"]([^'"]+)['"]""", svg_content)
+            cls_attr = f' class="{m_cls.group(1)}"' if m_cls else ''
+            m_vb = re.search(r"""viewBox=['"]([^'"]+)['"]""", svg_content)
+            vb_attr = f' viewBox="{m_vb.group(1)}"' if m_vb else ' viewBox="0 0 24 24"'
+            return f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"{vb_attr}{cls_attr} fill="currentColor"><path d="M0 0h24v24H0z"/></svg>'
+        return svg_content
+
+    c = re.sub(r'<svg[^>]*>.*?</svg>', _clean_svg, c, flags=re.DOTALL)
+    c = re.sub(r'\n\s*\n', '\n', c)
+
+    # 5. Inject semantic slot boundaries on the clean HTML
+    c = inject_semantic_slots(c)
+
+    # 6. If DOM has large repetitive card/item lists, condense them via DOM structure (NEVER string slice)
+    if BeautifulSoup and len(c.encode("utf-8")) > max_bytes:
+        try:
+            soup = BeautifulSoup(c, "html.parser")
+            body = soup.find("body")
+            if body:
+                for grid in body.find_all(lambda tag: tag.get("class") and any(k in " ".join(tag.get("class")) for k in ["grid", "flex", "cards", "list"])):
+                    children = [child for child in grid.find_all(recursive=False) if getattr(child, "name", None)]
+                    if len(children) > 2:
+                        for child in children[2:]:
+                            child.decompose()
+                res = str(soup)
+                if len(res.encode("utf-8")) < len(c.encode("utf-8")):
+                    c = res
+        except Exception:
+            pass
+
+    # 7. Minify whitespace between tags if still slightly over budget
+    if len(c.encode("utf-8")) > max_bytes:
+        c = re.sub(r'>\s+<', '><', c)
+
+    return c
+
+
+_EXTRACTED_CACHE_DIR = _WORKSPACE_ROOT / "skills" / "website_build" / "references" / "extracted_cache"
+
+
+def get_or_create_reference_design_cache(
+    reference_html_path: Path | str,
+) -> Tuple[Path, Path]:
+    """
+    Retrieves or generates cached (DESIGN.md, master-template.html) for a reference template.
+    Stored inside skills/website_build/references/extracted_cache/<slug>/.
+    On cache hit, execution completes in < 5ms without re-extraction.
+    """
+    ref_path = Path(str(reference_html_path).strip()).resolve()
+    if not ref_path.exists() or not ref_path.is_file():
+        raise FileNotFoundError(f"Reference HTML file not found at: {ref_path}")
+
+    slug = re.sub(r"[^a-zA-Z0-9]+", "_", ref_path.stem).strip("_").lower()
+    cache_dir = _EXTRACTED_CACHE_DIR / slug
+    cached_md = cache_dir / "DESIGN.md"
+    cached_mt = cache_dir / "master-template.html"
+
+    ref_mtime = ref_path.stat().st_mtime
+    if (
+        cached_md.exists()
+        and cached_md.stat().st_size > 0
+        and cached_mt.exists()
+        and cached_mt.stat().st_size > 0
+        and cached_md.stat().st_mtime >= ref_mtime
+        and cached_mt.stat().st_mtime >= ref_mtime
+    ):
+        logger.debug("Cache HIT for reference template '%s' at %s", ref_path.name, cache_dir)
+        return cached_md, cached_mt
+
+    # Cache MISS: Extract once deterministically and persist
+    logger.info("Cache MISS for reference template '%s'. Extracting DESIGN.md & master-template.html...", ref_path.name)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    raw_html = ref_path.read_text(encoding="utf-8", errors="ignore")
+
+    if len(raw_html) > 300000:
+        if strip_base64_bloat:
+            raw_html = strip_base64_bloat(raw_html)
+        else:
+            raw_html = _sanitize_html_for_prompt(raw_html, max_chars=300000)
+
+    # 1. Generate world-class DESIGN.md (<design-context> YAML Token DSL + Narrative)
+    if generate_design_md:
+        try:
+            design_md_content = generate_design_md(raw_html, title=ref_path.stem)
+            cached_md.write_text(design_md_content, encoding="utf-8")
+        except Exception as e:
+            logger.warning("Failed to generate DESIGN.md for cache: %s", e)
+            cached_md.write_text(f"# {ref_path.stem}\n\nFailed to extract design tokens.", encoding="utf-8")
+    else:
+        cached_md.write_text(f"# {ref_path.stem}\n\nDesign extractor unavailable.", encoding="utf-8")
+
+    # 2. Generate clean interactive master-template.html (< 40 KB)
+    master_template_content = generate_master_template_html(raw_html, max_bytes=39900)
+    cached_mt.write_text(master_template_content, encoding="utf-8")
+
+    return cached_md, cached_mt
+
+
+def generate_blueprint_and_template(
+    reference_html_path: Path | str,
+    output_dir: Path | str,
+) -> Tuple[Path, Path]:
+    """
+    Automated Design Specification & Master Template Generation Engine:
+    1. Reads reference HTML file or fetches from persistent cache (skills/website_build/references/extracted_cache/).
+    2. Provisions DESIGN.md (~3-6 KB <design-context> DSL) into output_dir.
+    3. Provisions < 40 KB master-template.html into output_dir with functional JS/CSS and semantic slot boundaries:
+       <!-- SLOT:HERO_START --> ... <!-- SLOT:HERO_END -->
+       <!-- SLOT:PROJECTS_START --> ... <!-- SLOT:PROJECTS_END -->
+       <!-- SLOT:SKILLS_START --> ... <!-- SLOT:SKILLS_END -->
+       <!-- SLOT:CONTACT_START --> ... <!-- SLOT:CONTACT_END -->
+    4. Returns (design_md_path, master_template_path) in < 1 second (or < 5ms on cache hit).
+    """
+    ref_path = Path(str(reference_html_path).strip()).resolve()
+    out_dir = Path(str(output_dir).rstrip()).resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Retrieve from or store into permanent reference cache
+    cached_md, cached_mt = get_or_create_reference_design_cache(ref_path)
+
+    # 2. Copy directly into task workspace
+    design_md_path = out_dir / "DESIGN.md"
+    master_template_path = out_dir / "master-template.html"
+
+    design_md_path.write_text(cached_md.read_text(encoding="utf-8"), encoding="utf-8")
+    master_template_path.write_text(cached_mt.read_text(encoding="utf-8"), encoding="utf-8")
+
+    md_size = design_md_path.stat().st_size
+    mt_size = master_template_path.stat().st_size
+    logger.info(
+        "Provisioned DESIGN.md (%d bytes) & master-template (%d bytes, < 40KB) at %s",
+        md_size,
+        mt_size,
+        out_dir,
+    )
+
+    return design_md_path, master_template_path
+

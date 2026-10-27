@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import {
  Dialog,
  DialogContent,
@@ -24,14 +24,27 @@ import {
  RefreshCw,
  ExternalLink,
  X,
+ ChevronRight,
 } from 'lucide-react'
 import { api } from '../../lib/api'
+
+export function formatRelativeTime(epochSec?: number | string): string {
+ if (!epochSec) return "—";
+ const num = Number(epochSec);
+ if (isNaN(num) || num <= 0) return "—";
+ const elapsed = Math.max(0, Math.floor(Date.now() / 1000 - num));
+ if (elapsed < 60) return `${elapsed}s ago`;
+ const mins = Math.floor(elapsed / 60);
+ if (mins < 60) return `${mins}m ago`;
+ return new Date(num * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
 interface TaskManagerModalProps {
  isOpen: boolean
  onClose: () => void
  onCancelTask?: (taskId: string) => void
  tasks?: any[]
+ initialTaskId?: string | null
 }
 
 export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
@@ -39,6 +52,7 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
  onClose,
  onCancelTask,
  tasks: initialTasks,
+ initialTaskId,
 }) => {
  const [tasks, setTasks] = useState<any[]>(initialTasks || [])
  const [isLoading, setIsLoading] = useState(false)
@@ -46,15 +60,40 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
  const [statusFilter, setStatusFilter] = useState<'ALL' | 'RUNNING' | 'QUEUED' | 'DONE' | 'FAILED'>('ALL')
  const [selectedTask, setSelectedTask] = useState<any | null>(null)
  const [isDetailOpen, setIsDetailOpen] = useState(false)
+ const [isPromptExpanded, setIsPromptExpanded] = useState(false)
  const [copiedId, setCopiedId] = useState<string | null>(null)
  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
+ const handledTaskIdRef = useRef<string | null>(null)
+
+ // Auto-select and inspect task when modal opens or initialTaskId changes
+ useEffect(() => {
+  if (!isOpen) {
+   handledTaskIdRef.current = null
+   return
+  }
+  if (isOpen && initialTaskId && handledTaskIdRef.current !== initialTaskId) {
+   const target = tasks.find((t) => t.id === initialTaskId)
+   if (target) {
+    setSelectedTask(target)
+    setIsDetailOpen(true)
+    handledTaskIdRef.current = initialTaskId
+   }
+  }
+ }, [isOpen, initialTaskId, tasks])
 
  // Keep tasks synced with live tasks passed from parent socket
  useEffect(() => {
- if (initialTasks && Array.isArray(initialTasks) && initialTasks.length > 0) {
+ if (initialTasks && Array.isArray(initialTasks)) {
  setTasks(initialTasks)
  }
  }, [initialTasks])
+
+ useEffect(() => {
+ if (selectedTask) {
+ const updated = tasks.find((t) => t.id === selectedTask.id);
+ if (updated) setSelectedTask(updated);
+ }
+ }, [tasks]);
 
  const fetchTasks = async () => {
  setIsLoading(true)
@@ -201,7 +240,7 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
  try {
  await navigator.clipboard.writeText(text)
  setCopiedId(id)
- setTimeout(() => setCopiedId(null), 1500)
+ setTimeout(() => setCopiedId(null), 2000)
  } catch (e) {
  console.warn('Copy failed:', e)
  }
@@ -400,6 +439,12 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
  {t.prompt || t.group_title || t.params?.taskTitle || t.params?.task || t.params?.target || t.description || t.message || 'Executing agentic synthesis'}
  </div>
 
+ {t.message && (
+ <div className="text-[11px] font-mono text-[var(--muted-foreground)] line-clamp-1">
+ {t.message}
+ </div>
+ )}
+
  {/* Progress Bar */}
  <div className="space-y-1">
  <div className="flex items-center justify-between text-[10px] font-mono text-[var(--muted-foreground)]">
@@ -454,8 +499,8 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
  <div className="pt-1 flex items-center justify-between text-[10px] font-mono text-[var(--muted-foreground)] border-t border-[var(--border)]/30">
  <div className="flex items-center gap-3">
  {t.model && <span>Model: {t.model}</span>}
- {t.started_at && <span>Started: {t.started_at}</span>}
- {t.duration && <span>Duration: {t.duration}</span>}
+ {t.started_at && <span>Started: {formatRelativeTime(t.started_at)}</span>}
+ { (t.elapsed_sec != null || t.duration != null) && <span>Duration: {t.elapsed_sec ? `${Math.round(t.elapsed_sec)}s` : t.duration}</span> }
  </div>
 
  <div className="flex items-center gap-2">
@@ -548,16 +593,55 @@ export const TaskManagerModal: React.FC<TaskManagerModalProps> = ({
  {selectedTask.started_at && (
  <div className="flex justify-between">
  <span className="text-[var(--muted-foreground)]">Started:</span>
- <span className="text-[var(--foreground)]">{selectedTask.started_at}</span>
+ <span className="text-[var(--foreground)]">{formatRelativeTime(selectedTask.started_at)}</span>
  </div>
  )}
- {selectedTask.duration && (
+ {(selectedTask.elapsed_sec != null || selectedTask.duration != null) && (
  <div className="flex justify-between">
  <span className="text-[var(--muted-foreground)]">Duration:</span>
- <span className="text-[var(--foreground)]">{selectedTask.duration}</span>
+ <span className="text-[var(--foreground)]">{selectedTask.elapsed_sec ? `${Math.round(selectedTask.elapsed_sec)}s` : selectedTask.duration}</span>
  </div>
  )}
  </div>
+
+ {/* Dispatched Prompt Accordion */}
+ {selectedTask.prompt_full && (
+  <div className="space-y-1.5">
+   <div className="flex items-center justify-between">
+    <button 
+     type="button"
+     onClick={() => setIsPromptExpanded(!isPromptExpanded)}
+     className="flex items-center gap-1.5 text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider hover:text-[var(--foreground)]"
+    >
+     <ChevronRight className={`w-3 h-3 transition-transform ${isPromptExpanded ? 'rotate-90' : ''}`} />
+     <span>Dispatched Prompt to CLI</span>
+    </button>
+    <Button
+     size="sm"
+     variant="ghost"
+     onClick={() => handleCopy(selectedTask.prompt_full, 'prompt_copy')}
+     className="h-5 px-1.5 text-[10px] font-mono gap-1 text-[var(--primary)] hover:bg-[var(--primary)]/10"
+    >
+     {copiedId === 'prompt_copy' ? (
+      <>
+       <Check className="w-2.5 h-2.5 text-emerald-400" />
+       <span className="text-emerald-400">COPIED</span>
+      </>
+     ) : (
+      <>
+       <Copy className="w-2.5 h-2.5" />
+       <span>COPY PROMPT</span>
+      </>
+     )}
+    </Button>
+   </div>
+   {isPromptExpanded && (
+    <div className="bg-[var(--background)] p-3 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] border border-[var(--border)] text-[10px] text-[var(--foreground)] max-h-52 overflow-y-auto whitespace-pre-wrap font-mono select-text">
+     {selectedTask.prompt_full}
+    </div>
+   )}
+  </div>
+ )}
 
  {/* Logs */}
  {selectedTask.logs && (

@@ -124,11 +124,20 @@ To prevent system exhaustion during multi-agent bursts, `TaskManager` enforces h
    - Identical URL research or website extraction requests are deduplicated if an identical target is already `RUNNING` or `QUEUED`.
    - Rapid double-invocations (< 8.0s) from live voice streaming are automatically debounced.
 
+6. **Anti-Stall Execution Safeguards & Pre-Flight Provisioning:**
+   - Tasks operating on large UI templates avoid 15–20 minute stalls by running pre-flight provisioning before invoking autonomous coding CLIs. The runner generates `< 25 KB` `blueprint.html` and `< 40 KB` `master-template.html` on disk and injects strict non-interactive batch directives, preventing agents from stalling in interactive wait loops or writing intermediate scraping scripts.
+
 ---
 
 ## 🖥️ Frontend Synchronization (`TaskManagerModal.tsx`)
 
 The frontend Task Manager modal provides continuous visibility into the background execution pool:
 - **WebSocket Synchronization:** Subscribes to `task_update` and `task_status` events broadcast by `core/ui_server.py`.
+- **Duration & Elapsed Time:** `TaskState.to_dict()` outputs both numeric `elapsed_sec` and formatted `duration` (e.g. `"14s"`), ensuring duration timers render immediately in the task detail drawer.
+- **Full Prompt Inspection (`prompt_full`):** `TaskState.to_dict()` serializes the exact prompt string dispatched to the CLI (`prompt_full`, falling back to `enriched_prompt` or `task`).
+- **Dispatched Prompt Accordion & Copy:** In the task detail drawer, users can expand the "Dispatched Prompt to CLI" accordion to view the full synthesized instruction and copy it with a single click (`COPY PROMPT`).
+- **HUD Card-to-Modal Direct Inspection:** Clicking any task card in the App HUD immediately opens the `TaskManagerModal` and auto-selects the task drawer via `initialTaskId`.
+- **Heartbeat Log Streaming:** `TaskManager._report()` streams progress heartbeats even with identical status text when progress advances or when > 3 seconds have elapsed, preventing apparent log starvation during long-running subagent executions.
 - **Filtering & Search:** Real-time search across task ID, target repo, and parameters, with status tabs (`ALL`, `RUNNING`, `QUEUED`, `DONE`, `FAILED`).
-- **Telemetry Drawer:** Detailed log viewer with auto-scroll, ANSI escape stripping, CPU/time metrics, and direct copy buttons.
+- **Telemetry Drawer & Failure Callout:** Detailed log viewer with auto-scroll, ANSI escape stripping, CPU/time metrics, and direct copy buttons. In failure states, displays a prominent red Failure Callout Banner highlighting `selectedTask.error` so errors are immediately clear without manual log tracing.
+- **Progress Sanitization & Liveness Animation:** Task progress values are strictly rounded/clamped (`Math.round(progress || 0)%`) and animated with active shimmer/pulse effects during running states.
