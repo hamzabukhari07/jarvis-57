@@ -1,6 +1,75 @@
 ---
 
 # LEARNING JOURNAL (active — last 25 entries)
+## [2026-10-28] — Reference Normalization, Settings-Driven Engine Pipeline & Master Template Calibration
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  1. **Folder Sequence Gap & Stale Catalog Mappings:**
+     - Curated reference directories had a sequence gap (1_, 3_, 4_, 5_) and catalog.json contained stale references pointing to non-existent 2_business_sites/ and deleted templates (saas.html, clerk clone.html, 
+ami landing page.html).
+  2. **Frontend Engine Toggle Filtering & Fallback:**
+     - When an engine was toggled OFF in 'Use for coding tasks', it remained visible in the Default Engine dropdown and Agent selector without auto-switching away from disabled defaults.
+  3. **Master Template Budget Overflow & ValueError Crashes:**
+     - Multi-page reference pages with heavy CSS (e.g. Cut-Paper at 73 KB CSS, frewall at 119 KB CSS) exceeded the hardcoded budget, causing ValueError aborts.
+  4. **Settings-Driven AI Generation Architecture:**
+     - Replaced mechanical regex guessing with dynamic engine binding to the user's active Default Engine CLI (gy, opencode, kilo) configured in Frontend Settings, backed by graceful deterministic fallback.
+- **Execution & Changes Applied:**
+  - Renamed directories sequentially: 1_landing_pages, 2_portfolios, 3_dashboards, 4_components.
+  - Re-mapped catalog.json and core/design_resolver.py canonical fallbacks across all 20 active reference designs.
+  - Updated rontend/src/components/settings/CodeEnginesSettingsTab.tsx and rontend/src/components/fleet/AgentInspector.tsx to filter disabled engines and auto-switch defaults.
+  - Enhanced core/master_template_builder.py with multi-page section condensation (sections[3:]), unused CSS selector pruning (_prune_unused_css), and @keyframes optimization.
+  - Built core/ai_design_generator.py and pre-warmed all 20 reference templates via scripts/generate_ai_design_specs.py.
+  - All 3 layers verified: Layer 1 static compile passed, Layer 2 runtime 20/20 templates generated without ValueError (< 65 KB) and frontend built in 11.78s, Layer 3 regression passed (37/37 pytest).
+- **Key Files Touched:**
+  - skills/website_build/references/2_portfolios/ (renamed)
+  - skills/website_build/references/3_dashboards/ (renamed)
+  - skills/website_build/references/4_components/ (renamed)
+  - skills/website_build/references/catalog.json
+  - core/design_resolver.py
+  - core/master_template_builder.py
+  - core/ai_design_generator.py (new)
+  - scripts/generate_ai_design_specs.py (new)
+  - rontend/src/components/settings/CodeEnginesSettingsTab.tsx
+  - rontend/src/components/fleet/AgentInspector.tsx
+  - 	ests/test_design_resolver_blueprint.py
+  - 	ests/test_e2e_blueprint_engine.py
+  - docs/DESIGN_SYSTEM_ARCHITECTURE.md
+  - docs/SETTINGS.md
+  - docs/CODE_ENGINES.md
+  - LEARNING_JOURNAL.md
+
+## [2026-10-28] — Modular Design Extraction Pipeline Refactor & Multi-Agent Hardening
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  1. **Monolithic Responsibility Overload:**
+     - core/design_extractor.py and core/design_resolver.py previously mixed multiple distinct concerns in monolithic files.
+  2. **Vercel Artifact Leakage & Fabrication:**
+     - Markdown generation was leaking hardcoded Vercel tokens into non-SaaS references (e.g. Scrapbook) and fabricating semantic color tokens.
+  3. **Master Template Budget Overflow:**
+     - Master templates could exceed 40 KB budgets due to single-pass reductions rather than iterative cumulative reductions.
+  4. **Strict Modular Architecture:**
+     - Split into focused single-responsibility modules: core/design_tokens.py, core/design_extractor.py, core/design_md_generator.py, core/master_template_builder.py, core/design_cache.py, core/design_resolver.py, core/_self_test.py.
+- **Execution & Changes Applied:**
+  - Deployed 8 specialized subagents to refactor, implement, audit, and clean the pipeline.
+  - Eliminated legacy blueprint.html and generate_blueprint_html references repo-wide.
+  - Layer 1 (Static): py_compile passed across all touched modules.
+  - Layer 2 (Runtime): All 9 self-tests passed (python -m core._self_test).
+  - Layer 3 (Regression): 37/37 pytest test suite passed in 2.47s.
+- **Key Files Touched:**
+  - core/design_tokens.py (new)
+  - core/design_extractor.py (rewritten)
+  - core/design_md_generator.py (new)
+  - core/master_template_builder.py (new)
+  - core/design_cache.py (new)
+  - core/design_resolver.py (refactored)
+  - core/_self_test.py (new)
+  - tests/test_design_extractor.py
+  - tests/test_design_resolver_blueprint.py
+  - tests/test_e2e_blueprint_engine.py
+  - tests/run_reference_test.py
+  - core/antigravity_runner.py
+  - LEARNING_JOURNAL.md
+
 ## [2026-10-28] — Strict 2-File Architecture (DESIGN.md DSL + master-template.html) & Permanent Reference Cache
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Why this was built / Root Cause & Motivation:**
@@ -1972,3 +2041,32 @@
   - Layer 3 (Regression): Full suite regression passed.
 
 
+
+
+---
+
+## [2026-10-28] — Design Extraction Architecture Refactor & Grep Cleanup Audit (Phase 6)
+- **What was built & fixed:**
+  - **Complete Blueprint Grep & Cleanup Audit:**
+    - Audited `core/`, `tests/`, and `actions/` for all occurrences of `generate_blueprint_html`, `blueprint_html`, and `blueprint.html`.
+    - Removed `generate_blueprint_html` across all modules (`core/design_extractor.py`, `core/design_resolver.py`, `tests/test_design_extractor.py`).
+    - Verified that no production module emits `blueprint.html`. Any remaining mentions of `blueprint.html` in `tests/` are negative assertions verifying that `blueprint.html` is strictly absent.
+    - Updated `core/antigravity_runner.py` file tracking filters: replaced deprecated `blueprint.html` with `DESIGN.md`.
+    - Updated test suites (`tests/test_design_extractor.py`, `tests/run_reference_test.py`, `tests/test_design_resolver_blueprint.py`, `tests/test_e2e_blueprint_engine.py`) to validate `DESIGN.md` and `master-template.html` instead of legacy blueprints.
+    - Cleaned unused imports (`generate_master_template_html`, `inject_semantic_slots`) from test files and ensured proper routing to `core.master_template_builder` and `core.design_cache`.
+    - Aligned `core/master_template_builder.py` semantic slot injection to support all DOM structural anchors (`HERO_START/END`, `PROJECTS_START/END`, `SKILLS_START/END`, `CONTACT_START/END`, and `HEADER`, `MAIN`, `FOOTER`, `MODAL`) with strict idempotency and size budgeting.
+- **Key files touched:**
+  - `core/antigravity_runner.py`
+  - `core/master_template_builder.py`
+  - `core/design_md_generator.py`
+  - `core/_self_test.py`
+  - `tests/test_design_extractor.py`
+  - `tests/run_reference_test.py`
+  - `tests/test_design_resolver_blueprint.py`
+  - `tests/test_e2e_blueprint_engine.py`
+  - `tests/test_master_template_builder.py`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` on all touched core and test files passed with 0 errors. `compileall` on `core/`, `actions/`, and `tests/` confirmed no broken imports.
+  - Layer 2 (Runtime): `python -m core._self_test` (9/9 passed).
+  - Layer 3 (Regression): `pytest tests/ -k "design or exemplar"` (10/10 passed), `pytest tests/test_master_template_builder.py` (7/7 passed), and `python tests/run_reference_test.py` passed live verification against real reference templates.

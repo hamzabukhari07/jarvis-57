@@ -9,11 +9,7 @@ import time
 from pathlib import Path
 import pytest
 
-from core.design_resolver import (
-    generate_blueprint_and_template,
-    generate_master_template_html,
-    inject_semantic_slots,
-)
+from core.design_resolver import generate_blueprint_and_template
 from core.prompts import (
     DASHBOARD,
     LANDING_PAGE,
@@ -32,10 +28,10 @@ from core.task_manager import TaskState, TaskStatus
 
 def _find_sample_reference() -> Path:
     candidates = [
-        Path("skills/website_build/references/1_landing_pages/saas.html"),
-        Path("skills/website_build/references/1_landing_pages/ai landing page.html"),
+        Path("skills/website_build/references/1_landing_pages/Crazy UI landing page.html"),
         Path("skills/website_build/references/1_landing_pages/blinq.html"),
-        Path("skills/website_build/references/1_landing_pages/clerk clone.html"),
+        Path("skills/website_build/references/1_landing_pages/solvine.html"),
+        Path("skills/website_build/references/1_landing_pages/dub.html"),
     ]
     for c in candidates:
         if c.exists() and c.is_file():

@@ -4,7 +4,7 @@
     {
       "id": "ai_landing_page",
       "name": "Taskmuse AI Autopilot Landing",
-      "relative_path": "1_landing_pages/ai landing page.html",
+      "relative_path": "1_landing_pages/taskmuse.html",
       "scope": "landing_page",
       "theme": "clean_minimal",
       "tags": [
@@ -80,25 +80,6 @@
       "primary_color": "#0a0a0a"
     },
     {
-      "id": "clerk_auth",
-      "name": "Clerk Authentication & Identity",
-      "relative_path": "1_landing_pages/clerk clone.html",
-      "scope": "landing_page",
-      "theme": "dark_obsidian",
-      "tags": [
-        "auth",
-        "authentication",
-        "security",
-        "developer",
-        "api",
-        "infrastructure",
-        "identity",
-        "cloud"
-      ],
-      "bg_mode": "dark_obsidian",
-      "primary_color": "#6c47ff"
-    },
-    {
       "id": "cut_paper_collective",
       "name": "Commonfold Cut-Paper Collective",
       "relative_path": "1_landing_pages/Cut-Paper Collective Site.html",
@@ -141,7 +122,7 @@
     {
       "id": "frewall",
       "name": "Fernwell Health & Pharmacy",
-      "relative_path": "2_business_sites/frewall.html",
+      "relative_path": "1_landing_pages/frewall.html",
       "scope": "business_site",
       "theme": "clean_minimal",
       "tags": [
@@ -161,7 +142,7 @@
     {
       "id": "racquet_club",
       "name": "Cirrus Racquet Club Luxury",
-      "relative_path": "2_business_sites/racquet club.html",
+      "relative_path": "1_landing_pages/racquet club.html",
       "scope": "business_site",
       "theme": "luxury_light",
       "tags": [
@@ -182,7 +163,7 @@
     {
       "id": "arclune",
       "name": "Arclune Engineering & Design Studio",
-      "relative_path": "2_business_sites/arclune.html",
+      "relative_path": "1_landing_pages/arclune.html",
       "scope": "business_site",
       "theme": "clean_minimal",
       "tags": [
@@ -201,7 +182,7 @@
     {
       "id": "hairline_grid",
       "name": "Hairline Grid Engineer Portfolio",
-      "relative_path": "3_portfolios/Hairline Grid Portfolio.html",
+      "relative_path": "2_portfolios/Hairline Grid Portfolio.html",
       "scope": "portfolio",
       "theme": "clean_minimal",
       "tags": [
@@ -220,7 +201,7 @@
     {
       "id": "scrapbook_resume",
       "name": "Tessa Marlowe Scrapbook Resume",
-      "relative_path": "3_portfolios/Scrapbook Resume.html",
+      "relative_path": "2_portfolios/Scrapbook Resume.html",
       "scope": "portfolio",
       "theme": "editorial_warm",
       "tags": [
@@ -239,7 +220,7 @@
     {
       "id": "orbit_admin",
       "name": "Orbit Ops Modern Analytics Admin",
-      "relative_path": "4_dashboards/orbit admin.html",
+      "relative_path": "3_dashboards/orbit admin.html",
       "scope": "dashboard",
       "theme": "clean_minimal",
       "tags": [
@@ -259,8 +240,8 @@
     {
       "id": "standalone_ecosystem",
       "name": "Dense Infrastructure Ecosystem Console",
-      "relative_path": "4_dashboards/Standalone Ecosystem.html",
-      "scope": "dashboard",
+      "relative_path": "4_components/Standalone Ecosystem.html",
+      "scope": "component",
       "theme": "dark_obsidian",
       "tags": [
         "infrastructure",
@@ -278,8 +259,8 @@
     {
       "id": "froma_os",
       "name": "Forma OS Window Desktop Environment",
-      "relative_path": "4_dashboards/froma os .html",
-      "scope": "dashboard",
+      "relative_path": "4_components/froma os .html",
+      "scope": "component",
       "theme": "editorial_warm",
       "tags": [
         "os",
@@ -297,7 +278,7 @@
     {
       "id": "aura_frame",
       "name": "Aura Spatial Glowing Luxury Frame",
-      "relative_path": "5_components/aura frame.html",
+      "relative_path": "4_components/aura frame.html",
       "scope": "component",
       "theme": "dark_obsidian",
       "tags": [
@@ -317,7 +298,7 @@
     {
       "id": "autonomus",
       "name": "Autonomus AI Agent Terminal Card",
-      "relative_path": "5_components/autonomus.html",
+      "relative_path": "4_components/autonomus.html",
       "scope": "component",
       "theme": "dark_obsidian",
       "tags": [
@@ -337,7 +318,7 @@
     {
       "id": "nexus",
       "name": "Nexus Cyber HUD Inspiration Card",
-      "relative_path": "5_components/nexus.html",
+      "relative_path": "4_components/nexus.html",
       "scope": "component",
       "theme": "creative_bold",
       "tags": [
@@ -356,7 +337,7 @@
     {
       "id": "skeumorphic_spatial",
       "name": "Skeuomorphic Spatial Glass Card",
-      "relative_path": "5_components/skeumorphic spatial component.html",
+      "relative_path": "4_components/skeumorphic spatial component.html",
       "scope": "component",
       "theme": "dark_obsidian",
       "tags": [
@@ -375,7 +356,7 @@
     {
       "id": "image_gen",
       "name": "Image Gen Media Canvas & Prompt Bar",
-      "relative_path": "5_components/image gen.html",
+      "relative_path": "4_components/image gen.html",
       "scope": "component",
       "theme": "dark_obsidian",
       "tags": [
@@ -390,25 +371,6 @@
       ],
       "bg_mode": "dark_void",
       "primary_color": "#10b981"
-    },
-    {
-      "id": "saas_platform",
-      "name": "Hamza Taste SaaS B2B Platform",
-      "relative_path": "1_landing_pages/saas.html",
-      "scope": "landing_page",
-      "theme": "dark_obsidian",
-      "tags": [
-        "saas",
-        "b2b",
-        "enterprise",
-        "platform",
-        "software",
-        "features",
-        "dashboard",
-        "pricing"
-      ],
-      "bg_mode": "dark_obsidian",
-      "primary_color": "#6366f1"
     },
     {
       "id": "blinq_landing",
@@ -427,24 +389,6 @@
       ],
       "bg_mode": "light_warm",
       "primary_color": "#2563eb"
-    },
-    {
-      "id": "nami_landing",
-      "name": "Nami Editorial Wave Landing",
-      "relative_path": "1_landing_pages/nami landing page.html",
-      "scope": "landing_page",
-      "theme": "editorial_warm",
-      "tags": [
-        "editorial",
-        "warm",
-        "landing",
-        "brand",
-        "typography",
-        "minimal",
-        "culture"
-      ],
-      "bg_mode": "warm_sand",
-      "primary_color": "#d97706"
     }
   ]
 }

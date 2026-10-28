@@ -7,11 +7,8 @@ from pathlib import Path
 import pytest
 import time
 
-from core.design_resolver import (
-    generate_blueprint_and_template,
-    generate_master_template_html,
-    inject_semantic_slots,
-)
+from core.design_resolver import generate_blueprint_and_template
+from core.master_template_builder import inject_semantic_slots
 
 
 def test_inject_semantic_slots_presence():
@@ -33,9 +30,11 @@ def test_inject_semantic_slots_presence():
 
 
 def test_generate_blueprint_and_template_execution(tmp_path):
-    sample_ref = Path("skills/website_build/references/1_landing_pages/saas.html")
+    sample_ref = Path("skills/website_build/references/1_landing_pages/Crazy UI landing page.html")
     if not sample_ref.exists():
-        pytest.skip("saas.html reference template not found")
+        sample_ref = Path("skills/website_build/references/1_landing_pages/blinq.html")
+    if not sample_ref.exists():
+        pytest.skip("Reference template not found")
 
     out_dir = tmp_path / "saas_build"
     t0 = time.perf_counter()

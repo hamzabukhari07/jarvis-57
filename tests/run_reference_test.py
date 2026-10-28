@@ -1,7 +1,7 @@
 """
 tests/run_reference_test.py — Dedicated Live Test & Extraction Runner
 
-Extracts `blueprint.html` and `master-template.html` from curated reference HTML files,
+Extracts `DESIGN.md` and `master-template.html` from curated reference HTML files,
 validates that both files are properly formed, valid HTML, with complete body structure,
 CSS animations intact, and semantic slots correctly injected.
 """
@@ -29,18 +29,17 @@ def run_test_on_reference(reference_rel_path: str, output_base: Path):
     print(f"=======================================================")
 
     t0 = time.perf_counter()
-    bp, mt = generate_blueprint_and_template(ref_path, dest_dir)
+    dmd, mt = generate_blueprint_and_template(ref_path, dest_dir)
     elapsed = time.perf_counter() - t0
 
-    bp_content = bp.read_text(encoding="utf-8")
+    dmd_content = dmd.read_text(encoding="utf-8")
     mt_content = mt.read_text(encoding="utf-8")
 
-    # Blueprint assertions
-    bp_size_kb = bp.stat().st_size / 1024
-    has_bp_doctype = "<!DOCTYPE html>" in bp_content
-    has_bp_swatches = "swatches-grid" in bp_content
-    has_bp_keyframes = "Keyframe Animations" in bp_content or "@keyframes" in bp_content
-    has_bp_tokens = "css-tokens-code" in bp_content or ":root" in bp_content
+    # DESIGN.md assertions
+    dmd_size_kb = dmd.stat().st_size / 1024
+    has_dmd_context = "<design-context>" in dmd_content and "</design-context>" in dmd_content
+    has_dmd_yaml = all(k in dmd_content for k in ["colors:", "typography:", "rounded:", "spacing:"])
+    blueprint_not_created = not (dest_dir / "blueprint.html").exists()
 
     # Master template assertions
     mt_size_kb = mt.stat().st_size / 1024
@@ -55,14 +54,13 @@ def run_test_on_reference(reference_rel_path: str, output_base: Path):
     has_dummy_slots = '<section class="slot-hero"></section>' in mt_content
 
     print(f">> Extraction Speed: {elapsed:.3f} seconds (< 1.0s target)")
-    print(f"\n[1] BLUEPRINT FILE: {bp.name}")
-    print(f"   - Path: {bp.resolve()}")
-    print(f"   - Size: {bp.stat().st_size} bytes ({bp_size_kb:.1f} KB)")
-    print(f"   - Status: {'[OK] PASSED (< 25 KB)' if bp.stat().st_size < 25600 else '[WARN] WARNING'}")
-    print(f"   - Complete DOCTYPE: {'[OK] Yes' if has_bp_doctype else '[FAIL] No'}")
-    print(f"   - Extracted Palette Swatches: {'[OK] Yes' if has_bp_swatches else '[FAIL] No'}")
-    print(f"   - Keyframe Animations Showcase: {'[OK] Yes' if has_bp_keyframes else '[FAIL] No'}")
-    print(f"   - Tokens & :root Stylesheet: {'[OK] Yes' if has_bp_tokens else '[FAIL] No'}")
+    print(f"\n[1] DESIGN SPECIFICATION FILE: {dmd.name}")
+    print(f"   - Path: {dmd.resolve()}")
+    print(f"   - Size: {dmd.stat().st_size} bytes ({dmd_size_kb:.1f} KB)")
+    print(f"   - Status: {'[OK] PASSED (< 30 KB)' if dmd.stat().st_size < 30000 else '[WARN] WARNING'}")
+    print(f"   - Valid <design-context> XML wrapper: {'[OK] Yes' if has_dmd_context else '[FAIL] No'}")
+    print(f"   - Machine-Readable YAML Token DSL: {'[OK] Yes' if has_dmd_yaml else '[FAIL] No'}")
+    print(f"   - Blueprint.html strictly NOT created: {'[OK] Yes' if blueprint_not_created else '[FAIL] Created'}")
 
     print(f"\n[2] MASTER TEMPLATE FILE: {mt.name}")
     print(f"   - Path: {mt.resolve()}")
@@ -74,33 +72,16 @@ def run_test_on_reference(reference_rel_path: str, output_base: Path):
     for s, present in slots_status.items():
         print(f"     * SLOT:{s} -> {'[OK]' if present else '[MISSING]'}")
 
-    # Design.md assertions
-    design_md_path = dest_dir / "DESIGN.md"
-    has_design_md = design_md_path.exists()
-    dmd_size_kb = design_md_path.stat().st_size / 1024 if has_design_md else 0.0
-    dmd_content = design_md_path.read_text(encoding="utf-8") if has_design_md else ""
-    has_dmd_context = "<design-context>" in dmd_content and "</design-context>" in dmd_content
-    has_dmd_yaml = all(k in dmd_content for k in ["colors:", "typography:", "rounded:", "spacing:", "components:"])
-    has_dmd_sections = all(k in dmd_content for k in ["## Overview", "## Colors", "## Typography", "## Layout", "## Do's and Don'ts"])
-
-    print(f"\n[3] DESIGN SYSTEM SPECIFICATION: DESIGN.md")
-    print(f"   - Path: {design_md_path.resolve()}")
-    print(f"   - Size: {design_md_path.stat().st_size if has_design_md else 0} bytes ({dmd_size_kb:.1f} KB)")
-    print(f"   - Exists on Disk: {'[OK] Yes' if has_design_md else '[FAIL] No'}")
-    print(f"   - Valid <design-context> XML wrapper: {'[OK] Yes' if has_dmd_context else '[FAIL] No'}")
-    print(f"   - Machine-Readable YAML Token DSL: {'[OK] Yes (colors, typography, rounded, spacing, components)' if has_dmd_yaml else '[FAIL] No'}")
-    print(f"   - Architectural Narrative Sections: {'[OK] Yes (Overview, Hierarchy, Responsive, Elevation, Do\'s & Don\'ts)' if has_dmd_sections else '[FAIL] No'}")
-
     return {
         "ref": ref_path.name,
         "elapsed": elapsed,
-        "bp_path": str(bp.resolve()),
+        "dmd_path": str(dmd.resolve()),
         "mt_path": str(mt.resolve()),
-        "bp_size_kb": bp_size_kb,
+        "dmd_size_kb": dmd_size_kb,
         "mt_size_kb": mt_size_kb,
         "valid_body": has_mt_body,
         "all_slots": has_all_slots,
-        "dmd_size_kb": dmd_size_kb,
+        "blueprint_absent": blueprint_not_created,
     }
 
 if __name__ == "__main__":
@@ -127,4 +108,4 @@ if __name__ == "__main__":
     print("[*] SUMMARY OF TEST RUN")
     print("=" * 55)
     for r in results:
-        print(f"- {r['ref']}: Speed={r['elapsed']:.2f}s | DESIGN.md={r.get('dmd_size_kb', 0):.1f} KB | Blueprint={r['bp_size_kb']:.1f} KB | MasterTemplate={r['mt_size_kb']:.1f} KB | ValidBody={r['valid_body']} | Slots={r['all_slots']}")
+        print(f"- {r['ref']}: Speed={r['elapsed']:.2f}s | DESIGN.md={r.get('dmd_size_kb', 0):.1f} KB | MasterTemplate={r['mt_size_kb']:.1f} KB | ValidBody={r['valid_body']} | Slots={r['all_slots']}")

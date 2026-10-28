@@ -37,6 +37,14 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
  const [riskTier, setRiskTier] = useState(agent.risk_tier || 'autonomous')
  const [isSaving, setIsSaving] = useState(false)
  const [modelsList, setModelsList] = useState<string[]>([])
+ const [enabledEngines] = useState<Record<string, boolean>>(() => {
+ try {
+ const stored = localStorage.getItem('zezo_enabled_code_engines')
+ return stored ? JSON.parse(stored) : { antigravity: true, opencode: true, kilo: true }
+ } catch {
+ return { antigravity: true, opencode: true, kilo: true }
+ }
+ })
 
  useEffect(() => {
  setDisplayName(agent.displayName || agent.name)
@@ -211,9 +219,15 @@ export const AgentInspector: React.FC<AgentInspectorProps> = ({
  onChange={(e) => setDefaultTool(e.target.value)}
  className="w-full bg-[#121110] border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-[#e4e0d8] focus:outline-hidden focus:border-[#e4e0d8]"
  >
- <option value="antigravity_run">Antigravity Synthesis (antigravity_run)</option>
- <option value="opencode_run">Opencode Autonomous (opencode_run)</option>
- <option value="kilo_run">Kilo Code Refactoring (kilo_run)</option>
+ <option value="antigravity_run" disabled={enabledEngines.antigravity === false}>
+ Antigravity Synthesis (antigravity_run){enabledEngines.antigravity === false ? ' (Disabled)' : ''}
+ </option>
+ <option value="opencode_run" disabled={enabledEngines.opencode === false}>
+ Opencode Autonomous (opencode_run){enabledEngines.opencode === false ? ' (Disabled)' : ''}
+ </option>
+ <option value="kilo_run" disabled={enabledEngines.kilo === false}>
+ Kilo Code Refactoring (kilo_run){enabledEngines.kilo === false ? ' (Disabled)' : ''}
+ </option>
  <option value="code_helper">Inline Code Helper (code_helper)</option>
  <option value="dev_agent">Dev Read-Only Agent (dev_agent)</option>
  </select>

@@ -605,7 +605,7 @@ def run_antigravity_worker(payload: dict, ctx: Optional[TaskContext] = None) -> 
             current_tree = _tree_snapshot(repo)
             created_files = [
                 rel for rel, mt in current_tree.items()
-                if before_tree.get(rel) != mt and not rel.endswith((".gitignore", "reference.html", "blueprint.html", "master-template.html", "TASK_SPEC.md"))
+                if before_tree.get(rel) != mt and not rel.endswith((".gitignore", "reference.html", "DESIGN.md", "master-template.html", "TASK_SPEC.md"))
             ]
 
             # Dynamic progress based on elapsed time and output line count/activity
@@ -690,7 +690,7 @@ def run_antigravity_worker(payload: dict, ctx: Optional[TaskContext] = None) -> 
     created_list = [rel for rel, mt in after_tree.items() if before_tree.get(rel) != mt]
     entry_point = "index.html" if (repo / "index.html").exists() else "main.py"
 
-    real_files = [p for p in created_list if p not in (".gitignore", "reference.html", "blueprint.html", "master-template.html")]
+    real_files = [p for p in created_list if p not in (".gitignore", "reference.html", "DESIGN.md", "master-template.html")]
     has_entry = (repo / "index.html").exists() or (repo / "main.py").exists() or (repo / "src").exists()
 
     if not real_files or not has_entry:

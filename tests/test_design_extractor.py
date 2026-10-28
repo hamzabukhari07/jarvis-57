@@ -9,9 +9,11 @@ from core.design_extractor import (
     DEFAULT_SVG_PLACEHOLDER,
     strip_base64_images,
     extract_keyframes,
-    generate_blueprint_html,
+    extract_design_tokens,
     extract_design_system_from_html,
 )
+from core.design_md_generator import generate_design_md
+from core.master_template_builder import build_master_template
 
 
 def test_strip_base64_images():
@@ -40,7 +42,7 @@ def test_extract_keyframes():
     assert "translateY(-10px)" in kf["floatEffect"]
 
 
-def test_generate_blueprint_html_size_and_tokens(tmp_path):
+def test_generate_design_md_and_master_template(tmp_path):
     sample_html = """<!DOCTYPE html>
     <html>
       <head>
@@ -65,19 +67,26 @@ def test_generate_blueprint_html_size_and_tokens(tmp_path):
       </body>
     </html>
     """
-    bp = generate_blueprint_html(sample_html, title="Enterprise Cloud")
-    assert "<!DOCTYPE html>" in bp
-    assert "Enterprise Cloud" in bp
-    assert ":root {" in bp
-    assert "--bg: #0b0f19;" in bp
-    assert "--accent: #3b82f6;" in bp
-    assert "@keyframes glowPulse" in bp
-    assert len(bp.encode("utf-8")) < 25000
+    tokens = extract_design_tokens(sample_html, name="Enterprise Cloud")
+    md = generate_design_md(tokens, name="Enterprise Cloud")
+    mt = build_master_template(sample_html, tokens)
 
-    out_file = tmp_path / "blueprint.html"
-    bp2 = generate_blueprint_html(sample_html, title="Saved Blueprint", output_path=out_file)
-    assert out_file.exists()
-    assert out_file.read_text(encoding="utf-8") == bp2
+    assert "<design-context>" in md
+    assert "Enterprise Cloud" in md
+    assert "colors:" in md
+    assert len(md.encode("utf-8")) < 30000
+
+    assert "<!DOCTYPE html>" in mt
+    assert "Enterprise Cloud Platform" in mt
+    assert len(mt.encode("utf-8")) < 40000
+
+    md_file = tmp_path / "DESIGN.md"
+    mt_file = tmp_path / "master-template.html"
+    md_file.write_text(md, encoding="utf-8")
+    mt_file.write_text(mt, encoding="utf-8")
+    assert md_file.exists()
+    assert mt_file.exists()
+    assert not (tmp_path / "blueprint.html").exists()
 
 
 def test_extract_design_system_backward_compatibility():

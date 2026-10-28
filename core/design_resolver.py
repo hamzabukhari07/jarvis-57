@@ -22,6 +22,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from core.design_cache import (
+    _load_direct_html_reference,
+    generate_blueprint_and_template,
+    get_or_create_reference_design_cache,
+)
+
 logger = logging.getLogger("zezo.design_resolver")
 
 _WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
@@ -140,21 +146,6 @@ def _norm_stem(name: str) -> str:
     return clean
 
 
-def _sanitize_html_for_prompt(raw_html: str, max_chars: int = 50000) -> str:
-    """Strip bulky base64 data URIs while preserving all CSS styles, animations, and layouts."""
-    if not raw_html:
-        return ""
-    cleaned = re.sub(
-        r'data:image/[^;]+;base64,[A-Za-z0-9+/=]{100,}',
-        'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100%" height="100%" fill="%23222"/></svg>',
-        raw_html,
-    )
-    cleaned = re.sub(r'd="[A-Za-z0-9\s,\.\-]{1000,}"', 'd="M0 0h24v24H0z"', cleaned)
-    if len(cleaned) > max_chars:
-        cleaned = cleaned[:max_chars] + "\n<!-- [Template content truncated for context budget] -->\n</body>\n</html>"
-    return cleaned
-
-
 def _get_anti_slop_rules() -> str:
     """Load canonical anti-slop rules from skills/website_build/SKILL.md."""
     ws = _get_workspace_root()
@@ -230,22 +221,6 @@ def is_redesign_or_explicit_request(task: str) -> bool:
     return any(k in t for k in redesign_keywords)
 
 
-def _load_direct_html_reference(html_file: Optional[Path]) -> Optional[tuple[str, str, str, str, Optional[Path]]]:
-    """
-    Returns (source_name, source_type, raw_html, full_raw_html, source_path)
-    Loads raw HTML directly with zero intermediate markdown extraction or MD files.
-    """
-    if html_file and html_file.exists():
-        try:
-            full_raw_html = html_file.read_text(encoding="utf-8", errors="ignore")
-            raw_html = _sanitize_html_for_prompt(full_raw_html)
-            clean_stem = re.sub(r"[-_\s]+", "-", html_file.stem).title()
-            return clean_stem, "reference_raw_html", raw_html, full_raw_html, html_file
-        except Exception as e:
-            logger.warning("Failed reading raw html %s: %s", html_file, e)
-    return None
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Deterministic Catalog Matching System (Zero MD dependency)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -283,8 +258,8 @@ def load_catalog() -> list[dict[str, Any]]:
     canonical_fallbacks = [
         {
             "id": "saas",
-            "name": "Saas Modern SaaS Platform",
-            "relative_path": "1_landing_pages/saas.html",
+            "name": "Solvine Modern SaaS Platform",
+            "relative_path": "1_landing_pages/solvine.html",
             "scope": "landing_page",
             "theme": "dark_obsidian",
             "tags": ["saas", "software", "cloud", "api", "b2b", "subscription", "platform", "developer platform"],
@@ -317,7 +292,7 @@ def load_catalog() -> list[dict[str, Any]]:
         {
             "id": "racquet_club",
             "name": "Cirrus Racquet Club Luxury",
-            "relative_path": "2_business_sites/racquet club.html",
+            "relative_path": "1_landing_pages/racquet club.html",
             "scope": "business_site",
             "theme": "luxury_light",
             "tags": ["club", "sports", "tennis", "padel", "luxury", "hospitality", "hotel", "fitness", "lifestyle", "resort", "warm"],
@@ -328,7 +303,7 @@ def load_catalog() -> list[dict[str, Any]]:
         {
             "id": "hairline_grid",
             "name": "Hairline Grid Engineer Portfolio",
-            "relative_path": "3_portfolios/Hairline Grid Portfolio.html",
+            "relative_path": "2_portfolios/Hairline Grid Portfolio.html",
             "scope": "portfolio",
             "theme": "clean_minimal",
             "tags": ["portfolio", "developer", "engineer", "designer", "resume", "minimal", "grid", "personal", "cv"],
@@ -339,7 +314,7 @@ def load_catalog() -> list[dict[str, Any]]:
         {
             "id": "orbit_admin",
             "name": "Orbit Ops Modern Analytics Admin",
-            "relative_path": "4_dashboards/orbit admin.html",
+            "relative_path": "3_dashboards/orbit admin.html",
             "scope": "dashboard",
             "theme": "clean_minimal",
             "tags": ["admin", "dashboard", "analytics", "metrics", "ops", "monitoring", "saas", "table", "portal"],
@@ -350,7 +325,7 @@ def load_catalog() -> list[dict[str, Any]]:
         {
             "id": "standalone_ecosystem",
             "name": "Dense Infrastructure Ecosystem Console",
-            "relative_path": "4_dashboards/Standalone Ecosystem.html",
+            "relative_path": "4_components/Standalone Ecosystem.html",
             "scope": "dashboard",
             "theme": "dark_obsidian",
             "tags": ["infrastructure", "ecosystem", "network", "cloud", "backend", "console", "visualization", "cluster", "dashboard", "analytics", "admin"],
@@ -361,7 +336,7 @@ def load_catalog() -> list[dict[str, Any]]:
         {
             "id": "autonomus",
             "name": "Autonomus AI Agent Terminal Card",
-            "relative_path": "5_components/autonomus.html",
+            "relative_path": "4_components/autonomus.html",
             "scope": "component",
             "theme": "dark_obsidian",
             "tags": ["ai", "robotics", "bot", "assistant", "agent", "terminal", "dark", "vectors", "node", "autonomous"],
@@ -447,10 +422,10 @@ def _find_template_file(
 
 _SCOPE_DIRS: dict[str, str] = {
     "landing_page": "1_landing_pages",
-    "business_site": "2_business_sites",
-    "portfolio": "3_portfolios",
-    "dashboard": "4_dashboards",
-    "component": "5_components",
+    "business_site": "1_landing_pages",
+    "portfolio": "2_portfolios",
+    "dashboard": "3_dashboards",
+    "component": "4_components",
 }
 
 
@@ -870,11 +845,10 @@ def resolve_design(
             elif repo_css.exists() and repo_css.stat().st_size > 50:
                 try:
                     fake_html = f"<html><head><style>{repo_css.read_text(encoding='utf-8', errors='ignore')}</style></head><body></body></html>"
-                    raw_h = _sanitize_html_for_prompt(fake_html)
                     return ResolvedDesign(
                         source_name=f"Project CSS ({r_path.name})",
                         source_type="project_existing",
-                        raw_html=raw_h,
+                        raw_html=fake_html,
                         anti_slop_rules=anti_slop,
                         full_raw_html=fake_html,
                     )
@@ -977,316 +951,16 @@ def check_greenfield_gate(task: str, parameters: Dict[str, Any], caller_tool: st
     return None
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Automated Blueprint & Master Template Generation Engine
-# ─────────────────────────────────────────────────────────────────────────────
-
-try:
-    from bs4 import BeautifulSoup, Comment
-except ImportError:
-    BeautifulSoup = None
-    Comment = None
-
-try:
-    from core.design_extractor import generate_blueprint_html, generate_design_md, strip_base64_bloat
-except ImportError:
-    try:
-        from design_extractor import generate_blueprint_html, generate_design_md, strip_base64_bloat
-    except ImportError:
-        generate_blueprint_html = None
-        generate_design_md = None
-        strip_base64_bloat = None
-
-
-def inject_semantic_slots(html_str: str) -> str:
-    """
-    Intelligently detects common section elements (hero/header, projects/features/portfolio,
-    skills/about/experience, contact/footer) and injects semantic slot boundaries:
-      <!-- SLOT:HERO_START --> ... <!-- SLOT:HERO_END -->
-      <!-- SLOT:PROJECTS_START --> ... <!-- SLOT:PROJECTS_END -->
-      <!-- SLOT:SKILLS_START --> ... <!-- SLOT:SKILLS_END -->
-      <!-- SLOT:CONTACT_START --> ... <!-- SLOT:CONTACT_END -->
-    """
-    if not html_str:
-        return html_str
-
-    slots = ["HERO", "PROJECTS", "SKILLS", "CONTACT"]
-    if all(f"<!-- SLOT:{s}_START -->" in html_str for s in slots):
-        return html_str
-
-    if not BeautifulSoup or not Comment:
-        # Fallback regex-based slot boundary injector
-        res = html_str
-        for s in slots:
-            if f"<!-- SLOT:{s}_START -->" not in res:
-                res = f"<!-- SLOT:{s}_START -->\n<!-- SLOT:{s}_END -->\n" + res
-        return res
-
-    soup = BeautifulSoup(html_str, "html.parser")
-    body = soup.find("body")
-    if not body:
-        return html_str
-
-    containers = [body]
-    main_el = body.find("main")
-    if main_el:
-        containers.append(main_el)
-    for c in list(body.find_all("div", recursive=False)):
-        containers.append(c)
-
-    candidates = []
-    seen = set()
-    for cont in containers:
-        for tag in cont.find_all(["section", "header", "footer", "article", "div"], recursive=False):
-            if id(tag) not in seen:
-                seen.add(id(tag))
-                tag_id = (tag.get("id") or "").lower()
-                tag_cls = " ".join(tag.get("class") or []).lower()
-                tag_aria = (tag.get("aria-label") or tag.get("aria-labelledby") or "").lower()
-                desc = f"{tag.name} {tag_id} {tag_cls} {tag_aria}"
-                candidates.append((tag, desc))
-
-    if len(candidates) < 4:
-        for tag in body.find_all(["section", "header", "footer"]):
-            if id(tag) not in seen:
-                seen.add(id(tag))
-                tag_id = (tag.get("id") or "").lower()
-                tag_cls = " ".join(tag.get("class") or []).lower()
-                tag_aria = (tag.get("aria-label") or tag.get("aria-labelledby") or "").lower()
-                desc = f"{tag.name} {tag_id} {tag_cls} {tag_aria}"
-                candidates.append((tag, desc))
-
-    assigned: dict[str, Any] = {"HERO": None, "PROJECTS": None, "SKILLS": None, "CONTACT": None}
-
-    # Pass 1: CONTACT (footer, contact, cta, reach, newsletter)
-    for tag, desc in candidates:
-        if tag.name == "footer" or any(k in desc for k in ["contact", "footer", "get-in-touch", "touch", "newsletter", "cta"]):
-            assigned["CONTACT"] = tag
-            break
-
-    # Pass 2: HERO (header, hero, banner, intro, masthead, top)
-    for tag, desc in candidates:
-        if tag is not assigned["CONTACT"] and (
-            tag.name == "header" or any(k in desc for k in ["hero", "banner", "intro", "masthead", "ph", "header", "top"])
-        ):
-            assigned["HERO"] = tag
-            break
-
-    # Pass 3: PROJECTS (work, project, portfolio, feature, case, service, capabilities, product, showcase)
-    for tag, desc in candidates:
-        if tag not in assigned.values() and any(
-            k in desc for k in ["project", "work", "portfolio", "feature", "case", "service", "capabilities", "product", "showcase", "integration", "gallery", "app"]
-        ):
-            assigned["PROJECTS"] = tag
-            break
-
-    # Pass 4: SKILLS (skill, stack, tech, about, experience, testimonial, pricing, team, stat, bio)
-    for tag, desc in candidates:
-        if tag not in assigned.values() and any(
-            k in desc for k in ["skill", "stack", "tech", "about", "experience", "testim", "pricing", "team", "stat", "bio", "review", "philosophy", "principle"]
-        ):
-            assigned["SKILLS"] = tag
-            break
-
-    # Pass 5: Sequential fallback for unassigned slots
-    remaining = [tag for tag, _ in candidates if tag not in assigned.values()]
-    for slot_name in slots:
-        if assigned[slot_name] is None and remaining:
-            assigned[slot_name] = remaining.pop(0)
-
-    for slot_name in slots:
-        tag = assigned.get(slot_name)
-        if tag is not None and tag.parent:
-            start_comment = Comment(f" SLOT:{slot_name}_START ")
-            end_comment = Comment(f" SLOT:{slot_name}_END ")
-            tag.insert_before(start_comment)
-            tag.insert_after(end_comment)
-        else:
-            start_comment = Comment(f" SLOT:{slot_name}_START ")
-            end_comment = Comment(f" SLOT:{slot_name}_END ")
-            body.append(start_comment)
-            body.append(end_comment)
-
-    return str(soup)
-
-
-def generate_master_template_html(raw_html: str, max_bytes: int = 40000) -> str:
-    """
-    Generates a clean interactive clone with functional JS and CSS,
-    lightweight placeholder assets, and injected semantic slot boundaries.
-    Guarantees 100% valid document structure (never arbitrarily sliced).
-    """
-    if not raw_html:
-        return ""
-
-    # 1. Strip base64 image bloat, embedded fonts, and flight hydration scripts first
-    if strip_base64_bloat:
-        c = strip_base64_bloat(raw_html)
-    else:
-        ph_img = (
-            'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" '
-            'viewBox="0 0 400 300"><rect width="100%" height="100%" fill="%2318181b"/>'
-            '<text x="50%" y="50%" fill="%2371717a" font-family="sans-serif" font-size="14" '
-            'dominant-baseline="middle" text-anchor="middle">Asset Placeholder</text></svg>'
-        )
-        c = re.sub(r'data:image/[^;]+;base64,[A-Za-z0-9+/=\s]{64,}', ph_img, raw_html)
-        c = re.sub(r"""<link[^>]+href=['"]data:[^'"]+['"][^>]*>""", "", c, flags=re.IGNORECASE)
-        c = re.sub(r"""<script[^>]+src=['"]data:[^'"]+['"][^>]*>.*?</script>""", "", c, flags=re.DOTALL | re.IGNORECASE)
-        c = re.sub(r"""data:(?:text/javascript|application|font)[^;'")\s]+""", "", c)
-
-    # 2. Clean CSS whitespace and comments
-    def _clean_style(m: re.Match) -> str:
-        s = m.group(1)
-        s = re.sub(r'/\*.*?\*/', '', s, flags=re.DOTALL)
-        s = re.sub(r'@font-face\s*\{[^}]*data:[^}]*\}', '', s)
-        s = re.sub(r'\s+', ' ', s)
-        s = re.sub(r'\s*([\{\}:;,])\s*', r'\1', s)
-        return f'<style>{s.strip()}</style>'
-
-    c = re.sub(r'<style[^>]*>(.*?)</style>', _clean_style, c, flags=re.DOTALL)
-
-    # 3. Strip non-slot HTML comments
-    c = re.sub(r'<!--(?!\s*SLOT:).*?-->', '', c, flags=re.DOTALL)
-
-    # 4. Simplify bulky SVGs (> 140 chars)
-    def _clean_svg(m: re.Match) -> str:
-        svg_content = m.group(0)
-        if len(svg_content) > 140:
-            m_cls = re.search(r"""class=['"]([^'"]+)['"]""", svg_content)
-            cls_attr = f' class="{m_cls.group(1)}"' if m_cls else ''
-            m_vb = re.search(r"""viewBox=['"]([^'"]+)['"]""", svg_content)
-            vb_attr = f' viewBox="{m_vb.group(1)}"' if m_vb else ' viewBox="0 0 24 24"'
-            return f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"{vb_attr}{cls_attr} fill="currentColor"><path d="M0 0h24v24H0z"/></svg>'
-        return svg_content
-
-    c = re.sub(r'<svg[^>]*>.*?</svg>', _clean_svg, c, flags=re.DOTALL)
-    c = re.sub(r'\n\s*\n', '\n', c)
-
-    # 5. Inject semantic slot boundaries on the clean HTML
-    c = inject_semantic_slots(c)
-
-    # 6. If DOM has large repetitive card/item lists, condense them via DOM structure (NEVER string slice)
-    if BeautifulSoup and len(c.encode("utf-8")) > max_bytes:
-        try:
-            soup = BeautifulSoup(c, "html.parser")
-            body = soup.find("body")
-            if body:
-                for grid in body.find_all(lambda tag: tag.get("class") and any(k in " ".join(tag.get("class")) for k in ["grid", "flex", "cards", "list"])):
-                    children = [child for child in grid.find_all(recursive=False) if getattr(child, "name", None)]
-                    if len(children) > 2:
-                        for child in children[2:]:
-                            child.decompose()
-                res = str(soup)
-                if len(res.encode("utf-8")) < len(c.encode("utf-8")):
-                    c = res
-        except Exception:
-            pass
-
-    # 7. Minify whitespace between tags if still slightly over budget
-    if len(c.encode("utf-8")) > max_bytes:
-        c = re.sub(r'>\s+<', '><', c)
-
-    return c
-
-
-_EXTRACTED_CACHE_DIR = _WORKSPACE_ROOT / "skills" / "website_build" / "references" / "extracted_cache"
-
-
-def get_or_create_reference_design_cache(
-    reference_html_path: Path | str,
-) -> Tuple[Path, Path]:
-    """
-    Retrieves or generates cached (DESIGN.md, master-template.html) for a reference template.
-    Stored inside skills/website_build/references/extracted_cache/<slug>/.
-    On cache hit, execution completes in < 5ms without re-extraction.
-    """
-    ref_path = Path(str(reference_html_path).strip()).resolve()
-    if not ref_path.exists() or not ref_path.is_file():
-        raise FileNotFoundError(f"Reference HTML file not found at: {ref_path}")
-
-    slug = re.sub(r"[^a-zA-Z0-9]+", "_", ref_path.stem).strip("_").lower()
-    cache_dir = _EXTRACTED_CACHE_DIR / slug
-    cached_md = cache_dir / "DESIGN.md"
-    cached_mt = cache_dir / "master-template.html"
-
-    ref_mtime = ref_path.stat().st_mtime
-    if (
-        cached_md.exists()
-        and cached_md.stat().st_size > 0
-        and cached_mt.exists()
-        and cached_mt.stat().st_size > 0
-        and cached_md.stat().st_mtime >= ref_mtime
-        and cached_mt.stat().st_mtime >= ref_mtime
-    ):
-        logger.debug("Cache HIT for reference template '%s' at %s", ref_path.name, cache_dir)
-        return cached_md, cached_mt
-
-    # Cache MISS: Extract once deterministically and persist
-    logger.info("Cache MISS for reference template '%s'. Extracting DESIGN.md & master-template.html...", ref_path.name)
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    raw_html = ref_path.read_text(encoding="utf-8", errors="ignore")
-
-    if len(raw_html) > 300000:
-        if strip_base64_bloat:
-            raw_html = strip_base64_bloat(raw_html)
-        else:
-            raw_html = _sanitize_html_for_prompt(raw_html, max_chars=300000)
-
-    # 1. Generate world-class DESIGN.md (<design-context> YAML Token DSL + Narrative)
-    if generate_design_md:
-        try:
-            design_md_content = generate_design_md(raw_html, title=ref_path.stem)
-            cached_md.write_text(design_md_content, encoding="utf-8")
-        except Exception as e:
-            logger.warning("Failed to generate DESIGN.md for cache: %s", e)
-            cached_md.write_text(f"# {ref_path.stem}\n\nFailed to extract design tokens.", encoding="utf-8")
-    else:
-        cached_md.write_text(f"# {ref_path.stem}\n\nDesign extractor unavailable.", encoding="utf-8")
-
-    # 2. Generate clean interactive master-template.html (< 40 KB)
-    master_template_content = generate_master_template_html(raw_html, max_bytes=39900)
-    cached_mt.write_text(master_template_content, encoding="utf-8")
-
-    return cached_md, cached_mt
-
-
-def generate_blueprint_and_template(
-    reference_html_path: Path | str,
-    output_dir: Path | str,
-) -> Tuple[Path, Path]:
-    """
-    Automated Design Specification & Master Template Generation Engine:
-    1. Reads reference HTML file or fetches from persistent cache (skills/website_build/references/extracted_cache/).
-    2. Provisions DESIGN.md (~3-6 KB <design-context> DSL) into output_dir.
-    3. Provisions < 40 KB master-template.html into output_dir with functional JS/CSS and semantic slot boundaries:
-       <!-- SLOT:HERO_START --> ... <!-- SLOT:HERO_END -->
-       <!-- SLOT:PROJECTS_START --> ... <!-- SLOT:PROJECTS_END -->
-       <!-- SLOT:SKILLS_START --> ... <!-- SLOT:SKILLS_END -->
-       <!-- SLOT:CONTACT_START --> ... <!-- SLOT:CONTACT_END -->
-    4. Returns (design_md_path, master_template_path) in < 1 second (or < 5ms on cache hit).
-    """
-    ref_path = Path(str(reference_html_path).strip()).resolve()
-    out_dir = Path(str(output_dir).rstrip()).resolve()
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    # 1. Retrieve from or store into permanent reference cache
-    cached_md, cached_mt = get_or_create_reference_design_cache(ref_path)
-
-    # 2. Copy directly into task workspace
-    design_md_path = out_dir / "DESIGN.md"
-    master_template_path = out_dir / "master-template.html"
-
-    design_md_path.write_text(cached_md.read_text(encoding="utf-8"), encoding="utf-8")
-    master_template_path.write_text(cached_mt.read_text(encoding="utf-8"), encoding="utf-8")
-
-    md_size = design_md_path.stat().st_size
-    mt_size = master_template_path.stat().st_size
-    logger.info(
-        "Provisioned DESIGN.md (%d bytes) & master-template (%d bytes, < 40KB) at %s",
-        md_size,
-        mt_size,
-        out_dir,
-    )
-
-    return design_md_path, master_template_path
-
+__all__ = [
+    "ResolvedDesign",
+    "resolve_design",
+    "resolve_from_catalog",
+    "load_catalog",
+    "is_ui_task",
+    "is_redesign_or_explicit_request",
+    "extract_authentic_task",
+    "format_design_prompt",
+    "check_greenfield_gate",
+    "generate_blueprint_and_template",
+    "get_or_create_reference_design_cache",
+]

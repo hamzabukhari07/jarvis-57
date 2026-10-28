@@ -162,6 +162,18 @@ export function CodeEnginesSettingsTab() {
       } catch {}
       return next
     })
+
+    if (!checked && engineId === defaultEngine) {
+      const fallback = engines.find(
+        (e) => e.id !== engineId && enabledEngines[e.id] !== false
+      )
+      if (fallback) {
+        setDefaultEngine(fallback.id)
+        api.setDefaultCodeEngine(fallback.id).catch((err) => {
+          console.error(`Failed to set default code engine to ${fallback.id}:`, err)
+        })
+      }
+    }
   }
 
   const handleOpenFolder = async (path: string) => {
@@ -528,11 +540,13 @@ export function CodeEnginesSettingsTab() {
             <SelectValue placeholder="Select default" />
           </SelectTrigger>
           <SelectContent>
-            {engines.map((e) => (
-              <SelectItem key={e.id} value={e.id} className="text-xs">
-                {e.label} {e.state !== 'ready' ? `(${e.state.replace('_', ' ')})` : ''}
-              </SelectItem>
-            ))}
+            {engines
+              .filter((e) => enabledEngines[e.id] !== false)
+              .map((e) => (
+                <SelectItem key={e.id} value={e.id} className="text-xs">
+                  {e.label} {e.state !== 'ready' ? `(${e.state.replace('_', ' ')})` : ''}
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
       </div>
