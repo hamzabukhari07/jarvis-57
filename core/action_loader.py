@@ -62,13 +62,11 @@ _TOOL_CATEGORIES: dict[str, str] = {
     "quick_snippet": "coding",
     "code_engines_status": "coding",
     "ast_tool": "coding",
-    "extract_design_system": "coding",
     "fleet_control": "coding",
     "task_status": "coding",
 
     # Web Intelligence & Automation
     "browser_control": "web",
-    "reverse_engineer": "web",
     "clone_website": "web",
     "web_read_page": "web",
     "web_search": "web",

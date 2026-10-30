@@ -134,9 +134,10 @@ ZEZO implements dynamic fallback ladders to guarantee resilience against provide
   - **Dwight:** QA, Security Auditor, and Compliance Guard.
   - **Kelly:** Social Intelligence & Deep Web Research Lead (`agent_reach`).
   - **Jim:** Clean Architecture & Refactoring Lead.
-  - **Pam:** Design Tokens & Brand Architect (`extract_design_system`).
+  - **Pam:** Design Tokens & Brand Architect (`antigravity_run` (generate_design_md)).
 - **Isolation & Concurrency:** Each dispatched project is allocated an isolated workspace (e.g. `Desktop/<project_name>`) or Git worktree, preventing cross-project workspace clobbering.
 - **Task Watchdog (`core/task_manager.py`):** Thread-safe background execution manager with concurrency limits (`MAX_CONCURRENT=2`), CPU throttling, ANSI log sanitization, and graceful process-tree termination.
+- **Universal AI Skill Prompt Engineer (`core/skill_prompt_engineer.py`):** Synthesizes bespoke 5-block execution directives (Task Directive, Design References, Authentic Requirements, 5-7 Subagents Decomposition, Anti-Slop Constraints) via Groq LPU (`llama-3.3-70b-versatile` ~150-200ms) with Gemini Flash failover before dispatching coding tasks to `antigravity_run`, `opencode_run`, or `kilo_run`. Strictly live AI generated (zero dummy prompts).
 
 ### 5. Multi-Tier Perception & OS Control
 ZEZO perceives and acts on the Windows desktop through a 3-tier escalated perception model:

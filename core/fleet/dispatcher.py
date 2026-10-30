@@ -449,6 +449,58 @@ class FleetDispatcher:
                     call_params["task"] = w_enriched_prompt + spec_block
                     call_params["prompt"] = call_params["task"]
 
+                # Synthesize tailored skill prompt for autonomous coding engines
+                if w_tool in ("antigravity_run", "opencode_run", "kilo_run"):
+                    try:
+                        agent_skills = getattr(w_agent, "allowed_skills", []) or []
+                        primary_skill = None
+                        if agent_skills:
+                            p_lower = (w_prompt or "").lower()
+                            matched = next((s for s in agent_skills if s in p_lower or s.replace("_", " ") in p_lower), None)
+                            primary_skill = matched or agent_skills[0]
+                        else:
+                            p_lower = (w_prompt or "").lower()
+                            if "clone" in p_lower:
+                                primary_skill = "website_clone"
+                            elif "design" in p_lower:
+                                primary_skill = "generate_design_md"
+                            elif "website" in p_lower:
+                                primary_skill = "website_build"
+
+                        if primary_skill:
+                            from core.skill_loader import get_skill_registry
+                            from core.skill_prompt_engineer import craft_skill_engine_prompt
+
+                            skill_reg = get_skill_registry()
+                            skill_sop = skill_reg.read_skill(primary_skill) if skill_reg else ""
+
+                            context_dict = {
+                                "scope_type": w_scope_type,
+                                "tech_stack": w_tech_stack,
+                                "color_theme": w_color_theme,
+                                "entity_content": w_entity_content,
+                                "key_sections": w_key_sections,
+                            }
+                            engine_name = getattr(w_agent, "engine", "antigravity") or "antigravity"
+                            crafted = craft_skill_engine_prompt(
+                                skill_name=primary_skill,
+                                skill_sop=skill_sop,
+                                user_task=w_prompt,
+                                target_dir=w_target_dir or ".",
+                                context=context_dict,
+                                engine=engine_name,
+                            )
+                            if crafted:
+                                w_enriched_prompt = crafted
+                                call_params["task"] = crafted
+                                call_params["prompt"] = crafted
+                    except Exception as pe_err:
+                        logger.warning(
+                            "[FleetDispatcher] craft_skill_engine_prompt failed for %s, falling back: %s",
+                            getattr(w_agent, "name", w_agent_id),
+                            pe_err,
+                        )
+
                 if w_tool == "antigravity_run":
                     call_params["scope_type"] = w_scope_type
                     call_params["entity_content"] = w_entity_content
@@ -456,12 +508,6 @@ class FleetDispatcher:
                     call_params["color_theme"] = w_color_theme
                     call_params["key_sections"] = w_key_sections
                     call_params["confirmed"] = w_confirmed
-
-                if w_tool == "extract_design_system":
-                    call_params["target_file"] = extracted_target
-                    call_params["file_path"] = extracted_target
-                    call_params["path"] = extracted_target
-                    call_params["output_path"] = w_target_dir
 
                 if w_model:
                     call_params["model"] = w_model

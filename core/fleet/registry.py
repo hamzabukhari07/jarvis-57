@@ -23,10 +23,9 @@ VALID_RISK_TIERS: set[str] = {"L0_READ_ONLY", "L1_MUTATION", "L2_DESTRUCTIVE"}
 CORE_AGENT_IDS: set[str] = {"MICHAEL"}
 VALID_TOOLS: set[str] = {
     "opencode_run", "kilo_run", "quick_snippet", "code_helper",
-    "antigravity_run", "groq", "extract_design_system", "agent_reach",
+    "antigravity_run", "groq", "agent_reach",
     "web_read_page", "web_reader", "web_search", "browser_control",
     "file_processor", "file_controller", "fleet_control", "task_status",
-    "reverse_engineer",
 }
 
 
@@ -46,7 +45,7 @@ def _infer_agent_defaults(role: str, specialty: str) -> Dict[str, Any]:
         return {
             "engine": "antigravity",
             "default_tool": "antigravity_run",
-            "allowed_tools": ["antigravity_run", "extract_design_system", "browser_control", "file_processor", "file_controller"],
+            "allowed_tools": ["antigravity_run", "browser_control", "file_processor", "file_controller"],
             "allowed_skills": ["website_build", "multi_agent_collaboration", "make_plan"],
             "capabilities": ["web_design", "frontend_coding", "ui_refactor", "animations"],
         }
@@ -303,7 +302,7 @@ class FleetRegistry:
 
             # Design tokens & palettes
             if has_kw("token", "tokens", "palette", "design system", "extract design"):
-                token_agent = match_candidates(lambda a: "extract_design_system" in (a.allowed_tools or []) or "design_token_extraction" in (a.capabilities or []))
+                token_agent = match_candidates(lambda a: "generate_design_md" in (a.allowed_skills or []) or "design_token_extraction" in (a.capabilities or []))
                 if token_agent:
                     return token_agent
 

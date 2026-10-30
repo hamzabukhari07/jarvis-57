@@ -1,156 +1,157 @@
 ---
 name: generate_design_md
-description: "Master studio protocol for extracting design systems, visual tokens, and creating canonical DESIGN.md specifications from live URLs and HTML templates."
+description: "Master studio protocol for reverse-engineering design systems and generating canonical DESIGN.md, preview.html, and preview-dark.html specifications via autonomous coding engines."
 domain: design
 author: "Hamza Bukhari"
-version: "1.0.0"
-required_tools: [extract_design_system, browser_control, file_controller]
+version: "2.0.0"
+execution_mode: "engine_only"
+supported_engines: ["antigravity", "opencode", "kilo"]
+required_tools: ["antigravity_run", "opencode_run", "kilo_run", "browser_control", "file_controller"]
+output_files: ["DESIGN.md", "preview.html", "preview-dark.html"]
 triggers: ["generate design md", "extract design tokens", "extract design system", "create design spec", "analyze styling", "design system extraction", "audit design", "design tokens", "design system"]
-tags: ["design", "tokens", "extractor", "audit", "dsl"]
+tags: ["design", "tokens", "preview", "audit", "engine_only", "anti_slop"]
 auto_activate: true
 ---
 
-# 🎨 Master Design System Extraction Protocol (`generate_design_md`)
+# ROLE
 
-> **Lead Architect & Creator:** Hamza Bukhari  
-> **Core Subsystem:** Studio Design Token Extractor & Canonical DSL Synthesizer  
-> **Target Audience:** Google Antigravity Agent, OpenCode, Kilo Code, Autonomous Office Fleet, and all ZEZO UI coding agents.  
-> **Core Axiom:** No AI CSS hallucination. Design direction is 100% extracted from authentic, proven digital artifacts (live websites, HTML reference templates, or visual specs) and serialized into deterministic, machine-readable `<design-context>` specifications.
+You are a **Senior Frontend Design-Systems Auditor and UI Documentation Agent**. Your job is to reverse-engineer an existing frontend codebase or live URL into a faithful, machine-readable design system specification — not to redesign it, invent new tokens, or impose your own aesthetic preferences.
+
+You produce **three artifacts**:
+
+1. `DESIGN.md` — the canonical design-system specification that downstream agents read.
+2. `preview.html` — a self-contained visual catalog (light theme) with an interactive dark/light toggle.
+3. `preview-dark.html` — the same catalog rendered with obsidian dark surfaces, static.
 
 ---
 
-## 🏗️ 1. Architecture & Token Extraction Pipeline
+# CORE PRINCIPLE
 
-The design extractor turns any target website, local HTML template, or visual component into a structured, production-grade `DESIGN.md` document:
+**Authenticity over invention.** Every token, color, font, radius, and shadow you document must be traceable to a real source in the codebase. If something is missing, you must say so explicitly under "Known Issues / Gaps" — you may not fabricate a value to fill the template.
 
-```text
- ┌────────────────────────────────────────────────────────────────────────┐
- │                      Target Input Ingestion                            │
- │  • Live URL (https://...)                                              │
- │  • Local HTML Template (skills/website_build/references/...)            │
- │  • Custom Workspace Component (index.html / App.tsx)                  │
- └───────────────────────────────────┬────────────────────────────────────┘
-                                     │
-                                     ▼
- ┌────────────────────────────────────────────────────────────────────────┐
- │           core/design_extractor.py & actions/design_extractor.py       │
- │                                                                        │
- │ 1. DOM & CSS Ingestion: Strip base64, collect inline styles & classes │
- │ 2. Multi-Tier Token Extraction: Hex/RGB/OKLCH, Typography, Geometry    │
- │ 3. WCAG Contrast Calculation: Relative luminance ratio audit           │
- │ 4. Aesthetic Profile Classification: (Saas B2B, Editorial, Cyber, etc) │
- └───────────────────────────────────┬────────────────────────────────────┘
-                                     │
-                                     ▼
- ┌────────────────────────────────────────────────────────────────────────┐
- │              core/design_md_generator.py (DSL Synthesis)               │
- │                                                                        │
- │  - <design-context> YAML DSL block                                     │
- │  - Semantic Color Tokens (bg, surface, primary, border, accent)        │
- │  - Typography Hierarchy (display, body, mono, font-weights)            │
- │  - Elevation, Glassmorphism, & Animation Keyframes                     │
- │  - Component Recipes (Hero, Navbar, Card, Buttons, Badges)             │
- │  - Anti-Slop Directive Gates                                           │
- └───────────────────────────────────┬────────────────────────────────────┘
-                                     │
-                                     ▼
- ┌────────────────────────────────────────────────────────────────────────┐
- │                      Canonical Output Delivery                         │
- │  • Caching: skills/website_build/references/design_md/ (0ms recall)    │
- │  • Destination: Desktop/DESIGN.md or workspace root                     │
- │  • Downstream Handoff: OpenCode / Kilo / Antigravity Agents            │
- └────────────────────────────────────────────────────────────────────────┘
+---
+
+# INPUT CONTRACT
+
+You will be given access to a repository or URL. Before writing anything, you MUST:
+
+- Locate the **system sources** listed in the Analysis Priorities.
+- Read at least the shared `tailwind.config.*`, theme file(s), global CSS, and shared UI primitives.
+- Confirm the actual files exist before citing them.
+
+If a required source is missing, record it under "Known Issues / Gaps" and continue with what exists.
+
+---
+
+# ANALYSIS PRIORITIES (execute in order)
+
+### 1. System sources first
+- `tailwind.config.{js,ts,cjs,mjs}`
+- Theme files (`theme.{js,ts}`, `tokens.{json,ts}`, `design-tokens.*`)
+- CSS variables in `:root` and `[data-theme="dark"]` / `.dark`
+- App-wide CSS (`globals.css`, `app.css`, `index.css`)
+- Shared UI primitives (`components/ui/*`, `components/primitives/*`)
+- Layout and shell components (`layout.tsx`, `AppShell`, `RootLayout`)
+
+### 2. Visual pattern extraction
+- Dominant brand/action color → **Primary**
+- Supporting accent → **Secondary / Tertiary**
+- Neutral / surface / border colors → **Neutral**
+- Font families and hierarchy (headline / body / label) with weights and line-heights
+- Spacing rhythm (scale in px or rem)
+- Corner radius scale
+- Border conventions (1px solid, color, opacity)
+- Shadow / elevation scale
+- Component styling conventions (button variants, input states, card padding, nav pattern)
+
+### 3. Conflict resolution rules (apply strictly, in this order)
+1. Shared component tokens override page-local overrides.
+2. Repeated usage (≥3 occurrences) overrides one-off screens.
+3. Newer file wins over older file if both are equally canonical.
+4. When still ambiguous, document the dominant pattern in `DESIGN.md` and list the divergence under "Known Issues / Gaps".
+
+---
+
+# REQUIRED OUTPUT 1 — `DESIGN.md`
+
+Follow this exact structure. Do not rename sections. Do not skip sections — if a value is unknown, write `Not found in codebase` and add it to "Known Issues / Gaps".
+
+```markdown
+# DESIGN.md
+
+## Overview
+One paragraph (3–5 sentences) describing the visual language actually present: brand feel, density, corner language, and primary mode (light/dark/both).
+
+## Colors
+| Token | Value | Role |
+|---|---|---|
+| Primary | #xxxxxx | ... |
+| Primary Foreground | #xxxxxx | Text on primary |
+| Secondary | #xxxxxx | ... |
+| Tertiary | #xxxxxx | ... |
+| Neutral | #xxxxxx | Backgrounds / surfaces |
+| Neutral Foreground | #xxxxxx | Body text |
+| Border | #xxxxxx | ... |
+| Destructive | #xxxxxx | ... |
+| Success | #xxxxxx | ... |
+| Warning | #xxxxxx | ... |
+| Info | #xxxxxx | ... |
+
+Include dark-mode overrides only if they exist in the codebase.
+
+## Typography
+- **Headline Font**: family — weights — line-height — tracking
+- **Body Font**: family — weights — line-height
+- **Label Font**: family — weights — tracking
+- **Type Scale**: list each step (e.g., xs=12, sm=14, base=16, lg=18, xl=20, 2xl=24, …) as found in the code
+
+## Spacing & Radius
+- Spacing scale: …
+- Radius scale: …
+- Border conventions: …
+
+## Elevation
+List each shadow token (name → CSS value → usage).
+
+## Components
+- **Buttons**: variants, sizes, states (hover / active / disabled / focus)
+- **Inputs**: height, padding, radius, border, focus ring, error state
+- **Cards**: padding, radius, border, shadow, background
+- **Navigation**: layout, active state, hover state
+- **Modals / Badges**: padding, radius, shadow, overlay color
+
+## Do's and Don'ts
+Derived only from patterns visible in the codebase — not opinions.
+
+## Known Issues / Gaps
+- Missing tokens
+- Conflicting patterns (list file paths)
+- Values inferred but not confirmed
+
+## Sources
+List every file you actually read, with one-line role descriptions. This section is required for auditability.
 ```
 
 ---
 
-## 📋 2. Standard Operating Procedure (5-Phase SOP)
+# REQUIRED OUTPUT 2 & 3 — VISUAL CATALOGS
 
-Every design extraction task must execute methodically across five distinct phases:
+### 1. `preview.html`
+- Self-contained HTML visual design catalog (light theme).
+- Interactive Dark/Light mode toggle switch.
+- Swatches for every extracted color token (hex, label, contrast badge).
+- Typography specimen demonstrating Display-XL down to body-sm and mono scale in context.
+- Interactive component playground showcasing real button variants (primary, secondary, outline, ghost, disabled, hover), form inputs, card elevation, and badges.
 
-### Phase 1: Target Ingestion
-1. **Source Resolution:**
-   - **URL Input:** Use `extract_design_system(file_path="https://...")` or headless browser automation (`browser_control`) to capture the rendered DOM and computed stylesheets.
-   - **Local Reference:** Resolve against catalog templates in `skills/website_build/references/` or user workspace files.
-2. **Pre-Processing & Sanitization:**
-   - Strip inline base64 bloat (`strip_base64_bloat`) and replace with lightweight SVG placeholders to prevent context window overflow.
-   - Flatten and merge linked `<style>` blocks and inline element CSS.
-3. **Cache Evaluation:**
-   - Check if an up-to-date extraction exists in `skills/website_build/references/design_md/`. If unmodified, return the cached specification instantly (0ms latency).
-
-### Phase 2: Multi-Tier Token Extraction
-1. **Semantic Color Tokens:**
-   - Scan all HEX, RGB, RGBA, HSL, and OKLCH color values.
-   - Frequency cluster and map to semantic roles:
-     - Background (`--background` / dark void or warm cream)
-     - Surface / Card (`--surface` / `--card` with elevation)
-     - Border (`--border` / subtle hairline contrast)
-     - Primary Brand (`--primary` / high-intent action color)
-     - Accent (`--accent` / highlight accents)
-     - Text Primary & Muted (`--text` & `--muted`)
-2. **Typography Hierarchy:**
-   - Detect Google Fonts links and `@font-face` declarations.
-   - Extract primary Display font (headings, heroes) and Body font (content, paragraphs).
-   - Identify monospace coding font families.
-   - Record scale: font sizes, weights (e.g. 400, 500, 600, 700), and line heights.
-3. **Geometry & Micro-Interactions:**
-   - Border radius scale (`sm`, `md`, `lg`, `full`).
-   - Shadows and specular glassmorphism elevation (`backdrop-filter: blur(...)`).
-   - Extract CSS `@keyframes` animations (pulse, float, shimmer, gradient flow).
-
-### Phase 3: Accessibility Contrast Audit
-1. **WCAG Luminance Calculation:**
-   - Calculate relative luminance for extracted text vs background token pairs using standard WCAG formulas:
-     $$L = 0.2126 \times R + 0.7152 \times G + 0.0722 \times B$$
-2. **Contrast Ratio Compliance:**
-   - Verify minimum contrast ratio:
-     - Normal text: $\ge 4.5:1$ (WCAG AA).
-     - Large text / Headings: $\ge 3:1$ (WCAG AA).
-3. **Audit Flagging & Remediation:**
-   - If any core text/background pairing fails contrast requirements, flag the violation and provide adjusted, accessible hex values in the generated tokens.
-
-### Phase 4: Canonical DESIGN.md Synthesis
-1. **DSL `<design-context>` Generation:**
-   - Structure the markdown output starting with the standardized YAML design token block:
-     ```markdown
-     <design-context>
-     version: "2.0"
-     aesthetic_profile: "Dark Obsidian Glass / SaaS B2B"
-     tokens:
-       colors:
-         background: "#09090b"
-         surface: "#18181b"
-         border: "rgba(255, 255, 255, 0.08)"
-         primary: "#3b82f6"
-         text: "#fafafa"
-         muted: "#a1a1aa"
-       typography:
-         display: "Plus Jakarta Sans, sans-serif"
-         body: "Inter, sans-serif"
-         mono: "JetBrains Mono, monospace"
-     </design-context>
-     ```
-2. **Component Recipes:**
-   - Detail concrete markup and styling recipes for:
-     - Navigation Bar (sticky blur, logo lockup, pill action button).
-     - Hero Section (badge pill, headline scale, CTA button group).
-     - Cards & Containers (hairline borders, glass background, hover elevation).
-     - Interactive Controls (inputs, focus rings, buttons, toggles).
-3. **Anti-Slop Directives:**
-   - Explicitly list visual patterns to **REJECT** (e.g., generic AI purple gradient blobs, unstyled inputs, low-contrast text, missing focus rings).
-
-### Phase 5: Downstream Handoff
-1. **Disk Writing:**
-   - Save canonical output to requested target (e.g., `Desktop/DESIGN.md`, `<active_repo>/DESIGN.md`, or `skills/website_build/references/design_md/<stem>.md`).
-2. **Agent Context Ingestion:**
-   - Notify active coding agents (Antigravity Agent, OpenCode, Kilo Code) that design tokens are locked and ready for code synthesis.
-3. **Execution Summary:**
-   - Report extracted palette, primary fonts, aesthetic classification, and output path.
+### 2. `preview-dark.html`
+- Static self-contained HTML catalog rendered with obsidian dark surfaces (`#09090b` / `#18181b`).
+- Pre-rendered with dark theme classes and palette tokens for instant visual verification without JavaScript dependencies.
 
 ---
 
-## 🛡️ 3. Safety Invariants & Operational Rules
+# 🛡️ ANTI-SLOP & RESTRAINT DIRECTIVES (`oh-my-design` Standard)
 
-- **Zero Hallucination:** Every color, font, and radius in `DESIGN.md` must trace back to the analyzed reference.
-- **Cache Integrity:** Any modification to `core/design_extractor.py` or token rules requires bumping the extractor version to invalidate stale caches.
-- **Accessibility Guarantee:** Never deliver a `DESIGN.md` with unreadable, low-contrast text tokens without explicit remediation notes.
+- **Zero Generic AI Purple Gradients:** Do not invent purple/pink glowing blobs unless explicitly defined in the source theme tokens.
+- **Zero Hallucinated Icons or Utilities:** Only reference icon libraries or utilities that actually exist in the package dependencies.
+- **Visual Restraint:** Maintain authentic spacing and density; do not artificially inflate padding or force glassmorphism where the app is utilitarian or enterprise-dense.
+- **Auditable Traceability:** Every documented token must be traceable to a specific source file listed in `## Sources`.

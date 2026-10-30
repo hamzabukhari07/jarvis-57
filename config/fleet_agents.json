@@ -18,7 +18,6 @@
         "opencode_run",
         "web_search",
         "file_processor",
-        "extract_design_system",
         "file_controller"
       ],
       "allowed_skills": [
@@ -50,7 +49,6 @@
       "active_worktree": null,
       "allowed_tools": [
         "antigravity_run",
-        "extract_design_system",
         "browser_control",
         "fleet_control",
         "task_status"
@@ -84,7 +82,6 @@
       "active_worktree": null,
       "allowed_tools": [
         "antigravity_run",
-        "extract_design_system",
         "file_processor",
         "file_controller",
         "browser_control",
@@ -187,7 +184,7 @@
       "specialty": "Design token extraction, visual branding, and HUD metrics rendering",
       "color": "#a855f7",
       "avatar_pixel": "pam_pixel.png",
-      "default_tool": "extract_design_system",
+      "default_tool": "antigravity_run",
       "risk_tier": "L0_READ_ONLY",
       "prompt_prefix": "You are Pam Beesly, Design System Architect. Ensure UI components are pixel-perfect, modern, accessible, and aesthetically premium.",
       "model_id": "",
@@ -196,15 +193,15 @@
       "worktree": null,
       "active_worktree": null,
       "allowed_tools": [
-        "extract_design_system",
+        "antigravity_run",
         "file_processor",
         "file_controller",
         "fleet_control",
         "task_status"
       ],
       "allowed_skills": [
-        "website_build",
-        "multi_agent_collaboration"
+        "generate_design_md",
+        "website_build"
       ],
       "capabilities": [
         "design_token_extraction",
@@ -212,7 +209,7 @@
         "brand_identity"
       ],
       "is_core": false,
-      "engine": "",
+      "engine": "antigravity",
       "soul_markdown": "You are Pam Beesly, Design System Architect. Ensure UI components are pixel-perfect, modern, accessible, and aesthetically premium."
     },
     "KELLY": {

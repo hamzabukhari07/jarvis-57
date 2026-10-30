@@ -67,22 +67,6 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
             f" (last remembered repo: {remembered})" if remembered else "",
         )
 
-    confirmed = bool(params.get("confirmed", False))
-    if (is_web_agent or is_web_task) and not confirmed:
-        from core.design_resolver import check_greenfield_gate
-        gate_params = dict(params)
-        gate_params.pop("path", None)
-        gate_params.pop("project_path", None)
-        if entity_content:
-            gate_params["entity_content"] = entity_content
-        gate_msg = check_greenfield_gate(
-            task=task,
-            parameters=gate_params,
-            caller_tool="fleet_control",
-        )
-        if gate_msg:
-            return gate_msg
-
     # Enrich task with resolved stack/theme parameters upon confirmed dispatch
     stack_info = []
     if params.get("tech_stack"):

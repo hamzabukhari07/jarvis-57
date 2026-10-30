@@ -109,7 +109,46 @@ def handler(parameters: dict, **kwargs: Any) -> str:
     if params.get("task"):
         raw_user_params["task"] = params.get("task")
 
-    # ── 2. Check for Fleet Delegation ────────────────────────────────────────
+    # ── 2. Check for Engine-Only or Fleet Delegation ─────────────────────────
+    # Engine skills (generate_design_md, website_build, website_clone) use the Universal Skill Prompt Engineer
+    if resolved_name in ("generate_design_md", "website_build", "website_clone"):
+        try:
+            from core.fleet_manager import get_fleet_manager
+            from core.skill_prompt_engineer import craft_skill_engine_prompt
+
+            fm = get_fleet_manager()
+            target_agent = fm.resolve_agent_for_skill(resolved_name)
+            fallback_agent = "VERVE" if resolved_name == "website_build" else "PAM"
+            agent_id = target_agent.id if target_agent else fallback_agent
+            engine_name = getattr(target_agent, "engine", "antigravity") if target_agent else "antigravity"
+
+            sop_content = skill_reg.read_skill(resolved_name)
+            target_dir = params.get("path") or params.get("project_path") or "."
+            user_task = params.get("task") or f"Execute skill {resolved_name}"
+
+            full_prompt = craft_skill_engine_prompt(
+                skill_name=resolved_name,
+                skill_sop=sop_content,
+                user_task=user_task,
+                target_dir=target_dir,
+                context=raw_user_params,
+                engine=engine_name,
+            )
+
+            dispatch_res = fm.dispatcher.dispatch_task(
+                agent_id=agent_id,
+                prompt=full_prompt,
+                path=target_dir,
+                session_memory=kwargs.get("session_memory"),
+            )
+            task_id = dispatch_res.get("task_id") or "active"
+            return (
+                f"Dispatched engine skill '{resolved_name}' to agent '{agent_id}' via coding engine "
+                f"(task: {task_id})."
+            )
+        except Exception as e:
+            logger.warning("[run_skill] Engine delegation for %s failed: %s", resolved_name, e)
+
     fleet_target: Optional[str] = (params.get("fleet_agent") or params.get("agent_id") or "").strip()
 
     if not fleet_target:

@@ -384,11 +384,7 @@ CRITICAL SOCIAL MEDIA RULE:
   YouTube data (transcript/info/trending/channel) → agent_reach
   - Playing a pasted YouTube URL: call `youtube_video(action="play", query="<the URL>")` (the URL opens directly in the browser). If playback does not start after ONE attempt, immediately open it yourself with `browser_control(action="go_to", url="<the URL>")` — do NOT call youtube_video again.
 
-[WEBSITE CLONING VS REVERSE ENGINEERING & REBUILDING (CRITICAL DISAMBIGUATION)]
-- REBUILD / REVERSE ENGINEER / SCAFFOLD / ARCHITECTURE / TEARDOWN:
-  * Triggers: "rebuild", "rebuild frontend", "can you rebuild this just only frontend", "scaffold", "teardown", "reverse engineer", "inspect stack", "x-ray", "architecture".
-  * Action: MUST dispatch `reverse_engineer(url='<url>')` (handled by SPECTER).
-  * Never dispatch `clone_website` for these intents!
+[WEBSITE CLONING & OFFLINE COPIES]
 - WEBSITE CLONING & OFFLINE COPIES:
   * Triggers: ONLY for explicit requests like "clone this website", "clone this", "save offline copy", "download HTML/CSS copy of this site", "download site", "mirror this site".
   * Action: Dispatch `clone_website(url='<url>')`.

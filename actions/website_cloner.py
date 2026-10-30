@@ -3202,7 +3202,6 @@ TOOL = {
         "Clone, mirror, or save an offline copy of a website's static HTML/CSS/JS frontend to a local Desktop folder. "
         "Downloads rendered DOM, media assets, stylesheets, and fonts, serving an offline preview. "
         "ONLY use this tool when the user explicitly asks to 'clone this website', 'save an offline copy', 'download HTML/CSS copy of this site', or 'mirror this site'. "
-        "DO NOT use for 'rebuild', 'rebuild frontend', 'scaffold', 'teardown', 'reverse engineer', 'inspect stack', 'x-ray', or 'architecture' requests — those MUST dispatch reverse_engineer instead. "
         "Use mode='full_site' only if user explicitly asks for full mirror."
     ),
     "risk": "code_execution",

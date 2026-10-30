@@ -56,6 +56,7 @@ flowchart TD
 2. **`core/fleet/dispatcher.py` (`FleetDispatcher`):**
    - Validates risk tiers (`L0_READ_ONLY`, `L1_MUTATION`, `L2_DESTRUCTIVE`) and circuit breaker status.
    - Dynamically injects declarative skills (`agent.allowed_skills`) and spawns background tasks via `TaskManager`.
+   - **Universal Skill Prompt Engineer Integration:** Automatically intercepts coding engine dispatches (ntigravity_run, opencode_run, kilo_run) and synthesizes bespoke 5-block execution directives via Groq LPU / Gemini Flash (core/skill_prompt_engineer.py) with zero dummy fallback prompts.
    - Wraps progress callbacks with rate-limited (`>= 1.0s` or completion) `fleet_updated` deck broadcasts for UI synchronization.
 3. **`core/fleet/orchestrator.py` (`FleetOrchestrator`):**
    - Handles multi-agent workflow decomposition (`decompose_and_dispatch`) and peer-to-peer delegation (`delegate_peer_task`).
@@ -97,7 +98,7 @@ ZEZO includes an out-of-the-box roster of specialized agents defined in [`config
 | **`FLUX`** | **Flux** | Frontend Developer & Overflow Balancer (Component synthesis, UI fixes, `website_build`) | `antigravity` | `antigravity_run` | `L1_MUTATION` | (320, 280) |
 | **`AHMAD`** | **Nexus (Ahmad)** | Senior Full-Stack & Python Backend Specialist (FastAPI, Postgres, schemas) | `opencode` | `opencode_run` | `L2_DESTRUCTIVE` | (460, 160) |
 | **`DWIGHT`** | **Dwight** | Senior Refactoring & QA Specialist (Test suites, audits, complexity reduction) | `kilo` | `kilo_run` | `L1_MUTATION` | (460, 280) |
-| **`PAM`** | **Pam** | Design System & Token Architect (Token extraction, palette generation) | `custom` | `extract_design_system` | `L0_READ_ONLY` | (460, 280) |
+| **`PAM`** | **Pam** | Design System & Token Architect (Token extraction, palette generation) | `antigravity` | `antigravity_run` | `L0_READ_ONLY` | (460, 280) |
 | **`DEVDYNAMO`**| **DevDynamo (Haider)** | Autonomous Full-Stack Engineer (End-to-end features, modern web apps) | `opencode` | `opencode_run` | `L1_MUTATION` | (180, 280) |
 | **`KELLY`** | **Kelly** | Social & Deep Web Researcher (Reddit, YouTube, content extraction) | `custom` | `agent_reach` | `L0_READ_ONLY` | (600, 160) |
 | **`QUANTUM`** | **Quantum** | Deep Web Researcher & Technical Scraper (Documentation, whitepapers) | `kilo` | `kilo_run` | `L1_MUTATION` | (600, 280) |

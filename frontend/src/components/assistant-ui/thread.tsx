@@ -38,7 +38,6 @@ import {
   CheckCircle2,
   XCircle,
   Code2,
-  Eye,
 } from "lucide-react";
 import { Blobatar } from "blobatar/react";
 import { Button } from "../ui/button";
@@ -198,55 +197,6 @@ export const FleetTaskToolUI = makeAssistantToolUI({
   },
 });
 
-export const ReverseEngineerToolUI = makeAssistantToolUI({
-  toolName: "reverse_engineer",
-  render: ({ args, result: _result, status }) => {
-    const isRunning = status.type === "running";
-    const url = (args as any)?.url || "";
-    const domain = url.replace(/^https?:\/\//, "").replace(/\/.*$/, "") || "Target";
-
-    return (
-      <div className="my-2 rounded-xl border border-purple-500/30 bg-purple-950/20 p-3 text-xs text-[var(--foreground)] shadow-xs">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Eye className="size-4 text-purple-400" />
-            <span className="font-semibold text-xs text-purple-200">
-              SPECTER Architectural Teardown: <strong>{domain}</strong>
-            </span>
-          </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-900/50 border border-purple-500/30 text-purple-300">
-            {isRunning ? (
-              <span className="flex items-center gap-1">
-                <Loader2 className="size-2.5 animate-spin" />
-                Fanning Out Dual-Engine...
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-emerald-400">
-                <CheckCircle2 className="size-2.5" />
-                X-Ray Complete
-              </span>
-            )}
-          </span>
-        </div>
-        <div className="text-[11px] text-zinc-400 font-mono mb-2">
-          {isRunning
-            ? "Groq synthesizing blueprint • agy-cli scaffolding project in workspace/teardowns/"
-            : `Torn down ${domain}. Architectural blueprint & live scaffold ready.`}
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            window.dispatchEvent(new CustomEvent("zezo_teardown_progress", { detail: { domain, url } }));
-          }}
-          className="h-7 px-3 text-[11px] font-mono bg-purple-950/40 border-purple-500/30 text-purple-200 hover:bg-purple-900/60"
-        >
-          <Eye className="w-3.5 h-3.5 mr-1 text-purple-400" /> Open Dual-Pane Teardown HUD
-        </Button>
-      </div>
-    );
-  },
-});
 
 /* ── 2. User Message Component ── */
 export const UserMessage: FC = () => {

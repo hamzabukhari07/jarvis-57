@@ -81,8 +81,8 @@ auto_activate: true
 ## 🏛️ The 3 Core Skills Standard
 
 ZEZO standardizes on 3 production core skills:
-1. **`website_build` (`skills/website_build/`)**: Greenfield UI creation protocol with catalog-driven references, anti-slop quality gates, and live preview servers.
-2. **`website_clone` (`skills/website_clone/`)**: High-fidelity offline website capture, asset localization, and reverse-engineering rebuilds via the Uncage Hybrid Engine (Path A: Python tool `clone_website`; Path B: direct CLI `node tools/uncage/bin/uncage.js`).
+1. **`website_build` (`skills/website_build/`)**: Greenfield UI creation protocol with catalog-driven references, anti-slop quality gates, live preview servers, and authoritative taste prompts in Section 2.5 (Scenario 1: Portfolio, Scenario 2: SaaS Landing Page, Scenario 3: CloudFleet Analytics Dashboard, embedding 6 negative rejection gates and 4 visual authority guards).
+2. **`website_clone` (`skills/website_clone/`)**: High-fidelity offline website capture, asset localization, and reverse-engineering rebuilds via the Uncage Hybrid Engine (Path A: Python tool `clone_website`; Path B: direct CLI `node tools/uncage/bin/uncage.js`), featuring Section 4 Master System Directives (Scenario A: Single-File Raw HTML, Scenario B: Clean Modular React/Next.js Framework).
 3. **`generate_design_md` (`skills/generate_design_md/`)**: Studio design token extraction and DSL `<design-context>` generator from URLs or HTML templates with WCAG accessibility contrast audits.
 
 ---
@@ -192,3 +192,19 @@ Procedural declarative skills (`SKILL.md`) are executed by the **Dual-AI Skill R
 - **Output Truncation & Memory Guard**: Large tool returns are truncated and summarized to a maximum of 1500 characters to safeguard the context window.
 - **Task Telemetry**: Reports step-by-step progress to `TaskManager` (`task_manager.report(progress=..., message=...)`).
 - **Fleet Delegation Routing**: If a skill specifies or requires autonomous fleet execution, `actions/run_skill.py` dispatches to `FleetDispatcher.dispatch_task()` while local execution runs in a non-blocking background thread.
+
+---
+
+## 🛠️ Universal AI Skill Prompt Engineer (core/skill_prompt_engineer.py)
+
+For downstream autonomous coding engines (Google Antigravity CLI \gy\, OpenCode, Kilo Code, Claude Code, Cursor, Windsurf), the **Universal AI Skill Prompt Engineer** synthesizes bespoke, executable master directives on the fly:
+- **Dual-AI Live Engine Orchestration**:
+  1. **Primary Engine**: Groq LPU (\llama-3.3-70b-versatile\) with ultra-fast latency (~150–200ms, \	imeout=12s\, \max_tokens=2048\, \	emperature=0.2\).
+  2. **Secondary Fallback**: Google Gemini 3.8 Flash (\gemini-3.8-flash\ via \core.gemini.client\) for instant failover if Groq experiences rate limits or network issues.
+  3. **Strict Live AI Mandate**: Zero dummy or hardcoded prompts are permitted. Every prompt is synthesized live from scratch. If both Groq and Gemini fail, a clean \RuntimeError\ is raised rather than falling back to fake templates.
+- **Enforced 5-Block Standard Schema**:
+  1. \[TASK DIRECTIVE]\: Mission statement, target directory, deliverable files, and execution engine.
+  2. \[DESIGN REFERENCES]\: Design DNA, token scales, typography, and reference catalog standards.
+  3. \[USER REQUIREMENTS & AUTHENTIC CONTENT]\: User directives and mandatory authentic domain copy (strictly no Lorem Ipsum).
+  4. \[SUBAGENTS WORKSPACE DECOMPOSITION]\: 5 to 7 parallel subagents with clear non-overlapping ownership for maximum velocity.
+  5. \[CRITICAL DIRECT-EXECUTION CONSTRAINTS & ANTI-SLOP GATES]\: Direct single-pass writing, no intermediate helper scripts, anti-slop visual gates, and atomic delivery.

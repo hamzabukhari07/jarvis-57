@@ -130,7 +130,7 @@ Wake phrase:  "Hey <assistant name>"      (default "Hey Zezo")
 Engine:       openwakeword (local, offline, ONNX)
 Selection:    Assistant Persona dropdown  → auto-sets the wake word
 Threshold:    0.6   (1.5 s debounce + 1.5 s cooldown)
-Auto-sleep:   15 s listen window of silence, reset after each reply
+Auto-sleep:   8 s listen window of silence, reset after each reply
 Opt-in:       Requires explicit enable in ⚙ → General & Controls
 Cost when off: Zero.  Cost when on: a queue push per frame; inference in its own thread.
 ```

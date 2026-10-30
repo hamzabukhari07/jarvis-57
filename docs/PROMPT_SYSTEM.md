@@ -83,7 +83,6 @@ ZEZO enforces strict disambiguation between inspecting/rebuilding web architectu
 
 | Intent & User Verbs | Required Tool | Execution Pipeline |
 |---------------------|---------------|-------------------|
-| **Rebuild / Scaffold / Teardown / Architecture / Stack Inspection / X-Ray**<br>*(e.g., "rebuild frontend", "scaffold this UI in React", "inspect the stack of this app", "reverse engineer Linear")* | `reverse_engineer(url=...)` | Handled by **SPECTER** via the REA CLI (`rea capture-browser-scenario`). Performs zero-LLM CDP extraction of runtime DOM, network traffic, storage, accessibility trees, and shaders. |
 | **Clone / Offline Copy / Mirror / Download Site**<br>*(e.g., "clone this website", "save offline copy", "download HTML/CSS copy")* | `clone_website(url=...)` | Handled by Uncage crawler with asset integrity verification. **Strict 2-Step Confirmation Flow:**<br>1. Ask clarifying questions regarding scope/format.<br>2. Read back plan and execute only after explicit user confirmation (`confirmed=true`). |
 
 ### 5. Browser Automation & Perception Guard (`[BROWSER CONTROL]`)

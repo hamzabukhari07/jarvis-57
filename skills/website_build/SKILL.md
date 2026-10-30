@@ -44,6 +44,7 @@ Before writing any code or initializing build scaffolds, every coding agent and 
 4. **Tech Stack (`tech_stack`):**
    - `single_file_html`: Standalone, self-contained single-file HTML5 deliverable. Zero npm dependencies, inline styles/scripts, instant double-click preview.
    - `react_tailwind`: Modular React 18 + TypeScript + Tailwind CSS (Vite architecture, production-grade clean code).
+   - `custom_stack` (Universal Framework Support): Any stack requested by the user, including **Next.js (App Router / Pages Router)**, **Astro**, **Vue / Nuxt**, **Svelte / SvelteKit**, **Remix**, **SolidJS**, or **Vanilla HTML/CSS/JS**. Whichever stack is chosen, the agent translates the reference design DNA (tokens, typography, card geometry, micro-interactions) 100% faithfully into the idiomatic conventions of that framework.
 
 5. **Visual Direction:**
    - **100% Inherited from the Matched Reference Template:** The visual direction (colors, typography, geometry, and feel) is governed directly by the authentic reference template. Inquire only about broad aesthetic preference (e.g. Clean Minimalist, Dark Tech, Tactile Editorial Warm, Creative Bold) if not obvious from the user's prompt.
@@ -123,63 +124,167 @@ When the user requests additional sections, components, or pages not present in 
 ---
 
 ### 2.5 Master System Directive (Agent Prompt Template)
-When delegating a build task to Google Antigravity Agent, OpenCode, or Kilo Code, use this standard directive:
+When delegating a build task to Google Antigravity Agent, OpenCode, Kilo Code, or Autonomous Fleet Agents, format the task directive using the standardized direct-execution structure below.
 
-```markdown
-# 🏛️ SYSTEM DIRECTIVE: DESIGN-SYSTEM CLONING & CONTENT ADAPTATION
+#### Anti-Slop Core Axiom & Quality Directives
+> **Core Axiom:** Anti-Slop is strictly a **NEGATIVE QUALITY FILTER (what to reject)**, while the Reference HTML Template is an **IMMUTABLE READ-ONLY SOURCE OF TRUTH** supplying 100% of the **DESIGN DIRECTION** (typography, colors, tokens, card geometry, micro-interactions, responsive grid, visual rhythm). Anti-slop ensures engineering craft, responsiveness, and authentic content without imposing artificial design uniformity.
 
-You are an Elite Frontend Systems Architect & UI Designer.
-Your mandate is to craft a production-grade web experience by strictly adopting the visual design system of an existing, human-crafted reference HTML template, without altering or degrading the original reference.
-
----
-
-### 📂 INPUT CONTEXT PROVIDED:
-1. **REFERENCE TEMPLATE (READ-ONLY):** `{reference_file_path}`
-   - DO NOT EDIT, DELETE, OR MUTATE THIS FILE. This is your immutable source of design truth.
-2. **CLIENT IDENTITY & AUTHENTIC CONTENT:**
-   - Name / Entity: `{client_name}`
-   - Role / Specialization: `{client_role}`
-   - Bio / Value Proposition: `{client_bio}`
-   - Key Projects / Services / Milestones: `{client_projects}`
-   - Contact & Socials: `{client_socials}`
-3. **USER CUSTOM REQUIREMENTS / NEW SECTIONS:**
-   - `{custom_requirements_or_new_sections}`
+Every task directive must incorporate and enforce the **6 Mandatory Rejection Gates** and **4 Visual Authority Guards**:
+- **Gate 1: Broken Responsive Layouts** — No absolute positioning hacks; require CSS Grid / Flexbox with standard breakpoints (375px, 768px, 1024px, 1280px+); zero horizontal scrollbar band-aids (`overflow-x: hidden`).
+- **Gate 2: Default Unstyled HTML Controls** — No raw browser buttons, inputs, textareas, checkboxes, or select dropdowns; custom hover, active, and accessible focus states styled to match the reference template; no default Chrome blue focus rings.
+- **Gate 3: Fake Placeholder Metrics, Cringe AI Buzzword Copy, or Lorem Ipsum** — No "0.00001ms Latency", "Next-Gen AI 2.0 Synergy Engine", "Loved by 10M Fortune 500 CEOs", or generic lorem ipsum; require authentic discovered user content or domain-accurate, contextual copy.
+- **Gate 4: Non-Functioning Buttons or Dead Anchors** — No empty `href="#"` links jumping to top; smooth anchor scrolling to actual sections; working mobile menu toggles, working tabs, and working filter handlers.
+- **Gate 5: Muddy Heavy Drop-Shadows (Shadow Restraint)** — Banned harsh, opaque black drop-shadows (e.g. `rgba(0,0,0,0.5)`, heavy `shadow-2xl` black smudges); required subtle diffuse ambient elevation, optical specular edge highlights, or fine 1px hairline border elevation (`border-white/[0.08]` or `border-black/[0.06]`).
+- **Gate 6: Cheap Jump Hover Animations & Clunky Micro-Interactions (Hover Restraint)** — Banned `hover:scale-105`/`scale-110` jumps and abrupt zero-easing state changes; required restrained 1px border luminance highlights (`border-white/10` ➔ `border-white/25`), subtle background brightness lift, smooth 150–200ms ease-out transitions, and tactile active click compression (`active:scale-[0.98]`).
+- **Guard 1: NO Prescriptive Style Overrides** — 100% visual authority belongs to the reference template; do not force dark glassmorphism on cream/editorial templates; preserve 0px hairline borders or organic textures when specified.
+- **Guard 2: NO Cliché AI Purple/Indigo Gradients** — Strictly forbid `bg-gradient-to-r from-purple-600 to-indigo-600`, neon purple hero text, and floating purple ambient blobs.
+- **Guard 3: NO Plain 90s RGB Primaries** — Pure `#ff0000`, `#00ff00`, `#0000ff` are banned; use calibrated palette tokens from the reference template.
+- **Guard 4: NO Dead / Sluggish Interactions** — Buttons and cards must provide tactile feedback (active compression, smooth transitions) and clear visual state changes.
 
 ---
 
-### 📐 EXECUTION PROTOCOL (4-PHASE SYNTHESIS):
+#### Scenario 1: Personal & Engineer Portfolio (Single-File HTML)
 
-#### PHASE 1: REVERSE-ENGINEER THE DESIGN SYSTEM DNA
-Before writing a single line of target code, thoroughly inspect `{reference_file_path}` and extract:
-1. **Typography Discipline:** Exact font family imports (Google Fonts, custom serif/sans, system stacks), line-heights, letter-spacing (`tracking-tight`), and font-weight scales.
-2. **Color Palette Tokens:** Primary backgrounds (e.g., exact HEX/HSL, grain, paper texture, or matte void), text contrast hierarchy, border colors (e.g., 1px subtle hairline `border-white/10` or organic cream borders), and brand accents.
-3. **Card & Container Geometry:** Exact border-radii (`rounded-none`, `rounded-xl`, `rounded-3xl`), padding rhythms, inner shadows, and glassmorphic elevations.
-4. **Interactive Micro-Interactions:** Exact CSS transitions, hover transforms, button styles (pill, bordered, magnetic, glow), and script interactions.
+````markdown
+[TASK DIRECTIVE]
+Build a clean, high-performance, responsive single-file engineer portfolio for Hamza Bukhari (Staff AI Systems & Autonomous Agents Architect) in standalone HTML5 with embedded CSS and vanilla JavaScript.
+Work within the existing target directory and output the deliverable directly as index.html with zero build or npm dependencies.
 
-#### PHASE 2: INTACT ARCHITECTURAL SYNTHESIS (NEW DELIVERABLE)
-- Generate the final deliverable as `{target_file_path}` (e.g., `index.html`).
-- **NEVER generate generic AI boilerplate or change the aesthetic direction.**
-- If the reference is a Warm Cut-Paper Editorial, your output MUST be 100% Warm Cut-Paper Editorial.
-- If the reference is a Monospace Hairline Tech Grid, your output MUST be 100% Monospace Hairline Tech Grid.
+[DESIGN REFERENCES]
+Use skills/website_build/references/3_portfolios/Hairline Grid Portfolio.html as the primary visual reference.
+Study its hairline grid layout, typography, monospace metadata hierarchy, spacing rhythm, card geometry, and clean technical aesthetic.
+Preserve the reference's visual identity (monochromatic palette, 1px hairline borders, subtle border hover glows) while adapting it to the engineer portfolio requirements.
+Use its existing design patterns instead of introducing an unrelated design theme.
+Do not copy unrelated personal data or project links from the reference.
 
-#### PHASE 3: AUTHENTIC CONTENT INJECTION (ZERO AI SLOP)
-- Replace all placeholder names, dummy titles, and generic links in the template with the provided Client Identity & Content.
-- **Strictly Banned:**
-  ❌ "Lorem ipsum" or dummy filler text.
-  ❌ Cringe AI buzzwords ("Next-Gen AI 2.0", "Synergy", "0.00001ms latency").
-  ❌ Broken anchors (`href="#"` that jump to top). Use real section IDs (`#projects`, `#contact`) or functional actions.
+[USER REQUIREMENTS & AUTHENTIC CONTENT]
+Entity / Persona: Hamza Bukhari
+Role: Creator & Lead Architect of ZEZO | Staff AI Systems & Autonomous Agents Engineer
+Required Portfolio Sections:
+Hero & Status Beacon: Full name, title, live availability status pill, concise technical bio, and quick-action links (Resume, GitHub, Email, Contact).
+Architecture & Systems Grid: Showcase flagship platforms (e.g. ZEZO Autonomous Voice & Agentic OS, Uncage Reverse-Engineering Cloner, Neural Memory Subsystem, Distributed Task Engine).
+Technical Skills & Stack: Grouped monospace skill tags (Python, TypeScript, React, Next.js, Rust, Distributed Systems, WebSockets, LLM Orchestration).
+Experience & Milestones Timeline: Chronological roles, achievements, high-throughput systems scaling, and lead architect milestones.
+Publications / Architecture Notes: Technical writing entries or deep dives with reading times and tags.
+Contact & Footer: Verified mailto link, GitHub profile link, LinkedIn, and clean 1px hairline terminal footer.
+Content Authenticity:
+Use authentic project titles, real tech stacks, and realistic metrics.
+Never inject placeholder buzzwords, fake corporate logos, or lorem ipsum filler.
 
-#### PHASE 4: EXTENSIBILITY PROTOCOL (CREATING NEW SECTIONS)
-If the user requested new sections, pages, or components that did NOT exist in the reference template:
-- **DO NOT invent a new style.**
-- Clone the existing structural patterns: borrow the card wrappers, badge styles, header hierarchies, and button markup already present in the reference template.
-- The new sections must look as if they were designed and crafted by the original human designer in the exact same sitting.
+[EXECUTION & SUBAGENT STRATEGY]
+Inspect the reference template structure, embedded styles, font imports, and scripts before writing code.
+Recreate the website as a single, self-contained standalone HTML file containing all HTML, CSS, and vanilla JS.
+Use semantic HTML5 elements, CSS Grid, and Flexbox for responsive desktop, tablet, and mobile viewing.
+Preserve the reference's authentic fonts, SVG icons, and clean micro-interactions.
+Do not introduce external npm dependencies, build tools, or complex multi-file abstractions.
+
+[VALIDATION & QUALITY REQUIREMENTS]
+Verify that index.html opens and renders flawlessly in standard browsers with zero external script or font errors.
+Verify responsive behavior across 375px, 768px, 1024px, and 1440px viewports without horizontal scrollbars.
+Test smooth anchor scrolling for all navigation links and verify no dead href="#" links exist.
+Verify subtle hover transitions on cards and project rows without jarring scale jumps.
+Ensure all copy is authentic, coherent, and reflects the engineer's domain.
+Deliverable: A complete, responsive, self-contained single-file HTML portfolio ready for instant browser preview.
+````
 
 ---
 
-### 🎯 FINAL DELIVERABLE:
-Deliver a complete, fully functioning, self-contained, responsive `{target_file_path}` that faithfully mirrors the craftsmanship of the reference template while presenting the client's authentic content.
-```
+#### Scenario 2: High-Converting SaaS Marketing Landing Page (React 18 + TypeScript + Tailwind CSS)
+
+````markdown
+[TASK DIRECTIVE]
+Build a high-converting, production-ready SaaS marketing landing page for CloudMetrics (Autonomous Cloud Observability Platform) using React 18, TypeScript, Tailwind CSS, and Lucide React icons.
+Work within the Vite + React architecture under src/ and preserve modular component organization.
+
+[DESIGN REFERENCES]
+Use skills/website_build/references/1_landing_pages/saas.html as the primary visual reference.
+Study its high-converting structure, Plus Jakarta Sans typography, dark obsidian glassmorphism, pill badges, feature grids, and button micro-interactions.
+Preserve the reference's visual identity, color tokens, borders, and ambient specular highlights while adapting it to the CloudMetrics platform.
+Use its existing design patterns instead of introducing an unrelated theme or generic templates.
+Do not copy unrelated marketing copy or brand assets from the reference.
+
+[USER REQUIREMENTS & AUTHENTIC CONTENT]
+Application / Product: CloudMetrics (Autonomous Cloud Observability & Telemetry Engine)
+Required Landing Page Sections:
+Announcement Bar & Header: Sticky blur navbar with brand logo, product navigation dropdowns, docs link, and high-contrast pill CTA ("Start Free Trial").
+Hero Section: High-converting headline, crisp value proposition subhead, primary CTA, secondary "Watch Interactive Demo" button, and an interactive telemetry frame mockup.
+Social Proof / Logo Ticker: Trusted enterprise badges with clean grayscale SVG logos.
+Bento Feature Grid: 4-card interactive bento layout showcasing real-time traces, AI anomaly detection, zero-overhead eBPF agents, and automated root-cause analysis.
+Metrics & Telemetry Counter: Verified operational metrics with animated counter cards.
+Interactive Pricing Matrix: Monthly / Annual toggle (with "Save 20%" discount badge), 3 tier cards (Starter, Pro, Enterprise) with feature checkmarks and distinct primary tier highlight.
+Testimonials Carousel: Authentic customer testimonials with avatars, names, titles, and verified company tags.
+FAQ Accordion: Interactive expand/collapse FAQ questions addressing security, data residency, integration, and pricing.
+Final Conversion CTA & Footer: High-impact dark obsidian CTA banner and comprehensive 5-column footer with legal and status links.
+Content Authenticity:
+Use domain-accurate cloud observability terminology (eBPF, OpenTelemetry, p99 latency, anomaly isolation).
+Never use fake cringe claims like "1000000x faster than reality" or generic lorem ipsum text.
+
+[EXECUTION & SUBAGENT STRATEGY]
+Inspect the existing project setup, Tailwind configuration, and component directory structure before implementation.
+Modularize into clean, reusable components under src/components/ (e.g., Navbar, Hero, FeatureGrid, BentoCard, PricingTable, FAQAccordion, Footer).
+Use TypeScript interfaces for all component props and state models; ensure zero type errors.
+Use Lucide React icons for crisp, unified iconography.
+Implement interactive states (pricing annual/monthly switch, FAQ accordion toggles, mobile hamburger navigation) with clean React hooks (useState).
+
+[VALIDATION & QUALITY REQUIREMENTS]
+Verify that the development server starts cleanly and renders without runtime or React hydration warnings.
+Confirm zero TypeScript compilation errors (tsc --noEmit passes).
+Test mobile responsive layout down to 375px; verify mobile navigation drawer opens, closes, and navigates cleanly.
+Confirm interactive states: annual/monthly toggle accurately updates pricing numbers, FAQ items expand and collapse smoothly.
+Verify that all buttons and links have active tactile compression and valid destinations.
+Ensure visual hierarchy matches the reference: subtle 1px hairline borders, optical specular glows, and no muddy heavy drop-shadows.
+Deliverable: A complete, responsive, modular React 18 + TypeScript + Tailwind CSS landing page ready for production deployment.
+````
+
+---
+
+#### Scenario 3: CloudFleet Command Console Operational Analytics Dashboard (Next.js App Router, TypeScript, Tailwind, Lucide)
+
+````markdown
+[TASK DIRECTIVE]
+Build a responsive operational analytics dashboard for CloudFleet Command Console using Next.js App Router, TypeScript, Tailwind CSS, and Lucide icons.
+Work within the existing project directory and preserve its current architecture where practical.
+
+[DESIGN REFERENCES]
+Use skills/website_build/references/4_dashboards/orbit admin.html as the primary visual reference.
+Study its dashboard layout, navigation, typography, data density, spacing, panels, and visual hierarchy.
+Preserve the reference's visual identity while adapting it to the dashboard requirements.
+Use its existing design patterns instead of introducing an unrelated dashboard theme.
+Do not copy unrelated branding or data from the reference.
+
+[USER REQUIREMENTS & AUTHENTIC CONTENT]
+Application: CloudFleet Command Console
+Required Dashboard Areas:
+Cluster Health: Display the health status of infrastructure clusters.
+Worker Nodes: Show worker-node status and relevant operational details.
+Queue Latency: Present latency data in clear, readable charts.
+Audit Logs: Provide a readable log panel with timestamps, severity, and event details.
+Task Management: Display a task table with useful columns, status indicators, and working filters.
+Data Behavior:
+Use available real data if the project provides it.
+Otherwise, use clearly identified sample data for the dashboard preview.
+Do not present simulated values as live production telemetry.
+Ensure charts, tables, and status indicators accurately reflect the data being displayed.
+
+[EXECUTION & SUBAGENT STRATEGY]
+Inspect the existing project, routes, components, and dependencies before implementation.
+Use subagents only when useful for independent work, such as dashboard layout, charts, tables, and validation.
+Use reusable components where appropriate without overengineering the application.
+Use client components only where interactive behavior requires them.
+Preserve existing functionality and avoid unrelated refactoring.
+Do not create unnecessary helper scripts, duplicate components, or dependencies.
+
+[VALIDATION & QUALITY REQUIREMENTS]
+Verify that the dashboard starts and renders correctly.
+Test task filters, navigation, and other implemented interactions.
+Confirm charts render correctly and display the intended data.
+Check responsive behavior and prevent accidental horizontal overflow.
+Ensure readable tables, clear status indicators, and consistent visual hierarchy.
+Resolve relevant TypeScript errors, runtime errors, and broken interactions.
+Clearly distinguish sample data from live data.
+Inspect the finished dashboard before reporting completion.
+Deliverable: A working, responsive Next.js dashboard with functional interactions and clearly presented operational data.
+````
 
 ---
 
@@ -187,7 +292,7 @@ Deliver a complete, fully functioning, self-contained, responsive `{target_file_
 
 > **Core Axiom:** Anti-Slop is strictly a **NEGATIVE FILTER (what to reject)**, NOT a prescriptive style enforcer. The chosen reference HTML template has **100% visual authority** over colors, typography, border geometry, shadows, and layout structure. Anti-slop rules ensure engineering craft, responsiveness, and authentic content without imposing artificial design uniformity.
 
-### 🔴 Mandatory Rejection Gates (The 4 Core Negative Filters)
+### 🔴 Mandatory Rejection Gates (The 6 Core Negative Filters)
 
 1. ❌ **Broken Responsive Layouts:**
    - Absolute positioning hacks for structural layout are strictly banned.
@@ -211,6 +316,18 @@ Deliver a complete, fully functioning, self-contained, responsive `{target_file_
    - All navigation links must smoothly anchor to actual page sections (e.g., `href="#projects"`, `href="#experience"`) or trigger real functional behaviors.
    - Interactive components (mobile menu toggles, modal dialogs, tab switching, copy-to-clipboard, filter pills) must execute working JavaScript handlers.
    - External links (GitHub, LinkedIn, Email) must use valid targets or realistic mailto/URL schemes.
+
+5. ❌ **Muddy, Heavy Drop-Shadows (Anti-Slop Shadow Restraint):**
+   - **Banned:** Harsh, muddy, opaque black drop-shadows (e.g., `box-shadow: 0 20px 25px rgba(0,0,0,0.5)`, heavy `shadow-2xl` black smudges, or deep multi-layered ink-like blurs).
+   - **Required:** Subtle, diffuse ambient elevation, optical specular edge highlights, or fine 1px hairline border elevation (`border-white/[0.08]` or `border-black/[0.06]`). Shadows must feel photographic and physically grounded, never like dirty ink spills.
+
+6. ❌ **Cheap Jump Hover Animations & Clunky Micro-Interactions (Anti-Slop Hover Restraint):**
+   - **Banned:** Jarring, aggressive jump transforms (e.g., `hover:scale-105`, `hover:scale-110`, cheap 90s bouncy zoom jumps) and abrupt zero-easing state changes.
+   - **Required:** Restrained, tactile micro-interactions:
+     - 1px hairline border luminance highlights on hover (`border-white/10` ➔ `border-white/25` or `border-neutral-200` ➔ `border-neutral-400`).
+     - Subtle background brightness lift (e.g., `hover:bg-white/[0.04]` or `hover:bg-black/[0.02]`).
+     - Smooth 150ms–200ms ease-out transitions (`transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1)` or explicit property transitions).
+     - Tactile active click compression (`active:scale-[0.98]`) for interactive buttons and cards to give physical substance.
 
 ### 🟡 Visual Authority & Anti-Override Guards
 
@@ -243,18 +360,48 @@ Deliver a complete, fully functioning, self-contained, responsive `{target_file_
    - All attributes must be valid React JSX (`class` ➔ `className`, `for` ➔ `htmlFor`, inline styles as objects).
    - Zero missing imports or unresolved TS interfaces.
 
+### Branch C: Universal Custom Stacks (`tech_stack: custom_stack / nextjs / astro / vue / svelte / etc.`)
+1. **Framework-Idiomatic Scaffolding:**
+   - **Next.js (App Router):** `app/layout.tsx`, `app/page.tsx`, `components/`, Tailwind config, clean server/client component boundaries (`use client` only where interactive state is required).
+   - **Astro:** `src/pages/index.astro`, `src/components/`, content collections or static markdown when appropriate.
+   - **Vue / Nuxt:** `src/App.vue` or `app.vue`, modular single-file components (`.vue`), script setup syntax.
+   - **Svelte / SvelteKit:** `src/routes/+page.svelte`, modular Svelte components.
+2. **Design DNA Translation:**
+   - Faithfully translate the reference template's CSS variables, font imports, color tokens, and spacing rhythm into the target framework's styling system (Tailwind config, CSS Modules, or scoped styles).
+   - Never downgrade styling or replace bespoke craftsmanship with generic framework starter defaults.
+3. **Clean Dependency Hygiene:**
+   - Only install packages strictly needed for the implementation.
+   - Generate production-ready, error-free TypeScript/JavaScript with full type safety.
+
 ---
 
 ## 🚀 5. PHASE 5: VERIFICATION & SMART LIVE PREVIEW
 
-Never declare a web build task complete without verifying rendering and preview accessibility:
+Never declare a web build task complete without verifying rendering, server health, and obtaining user confirmation before preview launch:
 
-1. **Protocol Integrity:**
-   - **Never launch React / Vite projects via `file://` protocol.** Browsers block ES module imports on `file://`.
-2. **Vite / React Verification:**
-   - Ensure dependencies are installed (`npm install`).
-   - Launch background development server (e.g. `npm run dev` or `npx vite --port 3000`).
-   - Confirm server responds with HTTP 200 before presenting preview URL to the user.
-3. **Single-File HTML Preview:**
-   - Serve static HTML projects via ZEZO's ephemeral preview server on ports `9400–9480` or direct local browser launch.
-   - Verify that all SVG icons, font imports, and interactive scripts execute without uncaught JavaScript console errors.
+### 5.1 Protocol & Build Integrity
+1. **Never launch modern framework projects via `file://` protocol:** Browsers block ES module imports and routing on `file://`.
+2. **Compile / Build Verification:** Run a quick static verification (e.g. `npm run build` or `npm run typecheck` if available, or syntax lint) to ensure zero syntax or module resolution errors.
+
+### 5.2 Smart Universal Stack Detection & Runner
+Detect the project type from `package.json` / workspace layout and run the appropriate dev server:
+- **Next.js:** Launch `npm run dev` (default port `3000`).
+- **Vite (React, Vue, Svelte, Vanilla):** Launch `npx vite --port 5173` or `npm run dev`.
+- **Astro:** Launch `npx astro dev --port 4321`.
+- **Static Single-File HTML:** Serve via ZEZO Ephemeral Preview Server on ports `9400–9480` or direct local browser.
+- **Process Spawning Rule:** Always run background development servers asynchronously with `creationflags=subprocess.CREATE_NO_WINDOW` on Windows so no orphaned CLI windows pop up.
+
+### 5.3 Background HTTP 200 Healthcheck
+Before notifying the user that the site is ready:
+1. Poll the target local server port (e.g., `http://localhost:3000`, `http://localhost:5173`, `http://localhost:9400`) in the background.
+2. Verify that the server returns an **HTTP 200** status code.
+3. If an error occurs or port conflicts arise, resolve the port or fix the build error before presenting the preview.
+
+### 5.4 Mandatory User Confirmation Gate (NEVER Auto-Open Browser)
+> ⚠️ **CRITICAL INVARIANT:** Never automatically open or pop up a browser window, webview, or system default application without explicit user permission. Auto-launching preview windows interrupts the user's workflow.
+
+1. **Step 1 — Announce Readiness:** Once the server is running and verified healthy (HTTP 200), present a clear, polite confirmation prompt:
+   > *"Website build ho chuki hai aur `http://localhost:[port]` par successfully active hai. Kya main preview window open karun?"*  
+   > *(Or in English: "Website build is complete and running at `http://localhost:[port]`. Would you like me to open the live preview window?")*
+2. **Step 2 — Wait for User Confirmation:** Do NOT call any browser launch command, shell `start`, or preview action until the user responds with affirmative intent (*"yes"*, *"open"*, *"preview dikhao"*, *"haan"*, *"proceed"*).
+3. **Step 3 — Launch Preview on Confirmation:** Only upon explicit confirmation, invoke the preview opener or HUD preview.

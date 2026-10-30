@@ -2,6 +2,119 @@
 
 # LEARNING JOURNAL (active — last 25 entries)
 
+## [2026-10-30] — Skill Prompt Engineer: Complete Purge of Hardcoded/Dummy Fallback Prompts
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Hamza Bukhari strictly mandated zero dummy or hardcoded prompts in the system: 'backup parachut add ni krna mujy kisi kisam ka dummy version prompt ni chyie real ai sy generated wala chyie'.
+  - Completely deleted '_build_deterministic_fallback' and all static/dummy prompt templates from 'core/skill_prompt_engineer.py'.
+  - The pipeline is now 100% pure live AI generation: Primary Groq LPU ('llama-3.3-70b-versatile') with Gemini Flash failover. If both AI providers fail, it raises a clean RuntimeError rather than returning fake templates.
+- **Key Files Touched:**
+  - core/skill_prompt_engineer.py
+  - docs/SKILLS_SYSTEM.md
+  - LEARNING_JOURNAL.md
+- **Verification:**
+  - Layer 1 (Static): python -m py_compile core/skill_prompt_engineer.py passed.
+  - Layer 2 (Runtime): Real execution confirmed Groq LPU generated 4,080 chars (test 1) and 4,890 chars (test 2) directly via llama-3.3-70b-versatile. Zero dummy prompts exist in the file.
+  - Layer 3 (Regression): pytest tests/test_skill_runner.py passed 7/7.
+
+## [2026-10-30] — Full Integration of AI Skill Prompt Engineer & Complete Elimination of Reverse Engineer / Design Resolver
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Resolved actions/fleet_control.py crash bug caused by dead import 'from core.design_resolver import check_greenfield_gate'. Completely removed dead gates and dead imports so fleet delegation executes directly without unhandled exceptions.
+  - Permanently deleted reverse_engineer action and core/teardown_engine.py from disk, pruned references across core/prompt.txt (disambiguation block lines 387-391), skills/generate_design_md/SKILL.md triggers, core/action_loader.py, core/fleet/registry.py, actions/website_cloner.py, and frontend UI (frontend/src/components/assistant-ui/thread.tsx).
+  - Integrated craft_skill_engine_prompt into actions/run_skill.py and core/fleet/dispatcher.py to intercept autonomous coding engines (antigravity_run, opencode_run, kilo_run) and synthesize tailored master execution directives on the fly using Groq LPU with Gemini 3.8 Flash fallback.
+- **Key Files Touched:**
+  - core/skill_prompt_engineer.py
+  - actions/run_skill.py
+  - core/fleet/dispatcher.py
+  - actions/fleet_control.py
+  - actions/website_cloner.py
+  - core/action_loader.py
+  - core/fleet/registry.py
+  - core/prompt.txt
+  - frontend/src/components/assistant-ui/thread.tsx
+  - skills/website_build/SKILL.md
+  - skills/website_clone/SKILL.md
+  - docs/SKILLS_SYSTEM.md
+  - docs/TOOLS.md
+  - tests/test_skill_runner.py
+- **Verification:**
+  - Layer 1 (Static): python -m py_compile passed on all touched files with exit code 0; npm --prefix frontend run build passed with 0 errors.
+  - Layer 2 (Runtime): Real execution of craft_skill_engine_prompt with Groq LPU for website_build, website_clone, and generate_design_md succeeded in generating standard 5-block directives with 5-7 parallel subagent decomposition; actions.fleet_control delegation verified with 0 crashes.
+  - Layer 3 (Regression): pytest tests/test_skill_runner.py passed 7 of 7 in 3.33s.
+
+## [2026-10-30] — Universal AI Skill Prompt Engineer Subsystem (`core/skill_prompt_engineer.py`)
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Downstream autonomous coding engines (Google Antigravity CLI `agy`, OpenCode, Claude Code, Cursor, Windsurf) require comprehensive, highly-structured master execution directives synthesized from procedural skill SOPs (`skills/<skill_name>/SKILL.md`), design references, and real user requirements.
+  - Built `core/skill_prompt_engineer.py` with ultra-low latency Dual-AI orchestration:
+    1. **Primary Engine:** Groq LPU (`llama-3.3-70b-versatile`) with tight latency budget (`timeout=12s`, `max_tokens=2048`, `temperature=0.2`).
+    2. **Secondary Fallback:** Gemini 3.8 Flash (`gemini-3.8-flash` via `core.gemini.client`) for resilient failover if Groq experiences rate limits or network issues.
+    3. **Offline / Deterministic Fallback:** `_build_deterministic_fallback(...)` delivering zero-network structured contract prompts with flexible argument resolution (supporting both 6-arg standard and 4-arg legacy/positional callers).
+  - Enforced mandatory 5-block schema in `PROMPT_ENGINEER_SYSTEM` and fallback generator:
+    - `[TASK DIRECTIVE]`
+    - `[DESIGN REFERENCES]`
+    - `[USER REQUIREMENTS & AUTHENTIC CONTENT]`
+    - `[SUBAGENTS WORKSPACE DECOMPOSITION]` (5-7 parallel autonomous subagents)
+    - `[CRITICAL DIRECT-EXECUTION CONSTRAINTS & ANTI-SLOP GATES]`
+- **Key Files Touched:**
+  - `core/skill_prompt_engineer.py`
+  - `docs/SKILLS_SYSTEM.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): Passed `python -m py_compile core/skill_prompt_engineer.py` (exit code 0).
+  - Layer 2 (Runtime): Verified live Groq LPU synthesis generating full 3,417-char directive with standard blocks; verified Gemini fallback under Groq error; verified deterministic offline fallback under complete network isolation.
+  - Layer 3 (Regression): Tested signature flexibility and block validation assertions.
+
+## [2026-10-30] — Skills Taste Prompts Standards: Multi-Scenario Directives & Master Rebuild Prompts
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  1. **Authoritative Master System Directives in `website_build` (Section 2.5):**
+     - Upgraded Section 2.5 of `skills/website_build/SKILL.md` from abstract templates to 3 concrete production scenario prompt specifications:
+       - **Scenario 1:** Personal & Engineer Portfolio (Single-File Standalone HTML5, referencing `3_portfolios/Hairline Grid Portfolio.html` with full responsive hairline layout, monospace metadata, authentic persona data, and zero npm dependencies).
+       - **Scenario 2:** High-Converting SaaS Marketing Landing Page (React 18 + TypeScript + Tailwind CSS, referencing `1_landing_pages/saas.html` with bento feature grid, interactive pricing toggle, testimonials, FAQ accordion, and Lucide icons).
+       - **Scenario 3:** CloudFleet Command Console Operational Analytics Dashboard (Next.js App Router, TypeScript, Tailwind CSS, Lucide icons, referencing `4_dashboards/orbit admin.html` with cluster health, worker nodes, queue latency charts, audit logs, and task management table).
+     - Directly embedded the Anti-Slop Core Axiom, the 6 Mandatory Rejection Gates (Broken Responsive Layouts, Default Unstyled HTML Controls, Fake Placeholder Metrics/Buzzword Copy/Lorem Ipsum, Non-Functioning Buttons or Dead Anchors, Muddy Heavy Drop-Shadows, Cheap Jump Hover Animations & Clunky Micro-Interactions), and 4 Visual Authority Guards into the prompt standard.
+  2. **Authoritative Reverse-Engineering System Directives in `website_clone` (Section 4):**
+     - Added Section 4 "Master System Directive (Agent Prompt Template)" to `skills/website_clone/SKILL.md` with two standardized operational rebuild directives:
+       - **Scenario A:** Rebuild Raw Clone to Single-File Standalone HTML (`index.html`/standalone HTML, vanilla JS interactions, fully localized assets, zero framework bloat).
+       - **Scenario B:** Rebuild Raw Clone to Clean Modular Framework (`rebuilt_app/` directory, React 18 + TypeScript + Tailwind CSS / Next.js, modular component breakdown under `src/components/`, full type safety, and zero in-place mutation of raw capture).
+- **Key Files Touched:**
+  - `skills/website_build/SKILL.md`
+  - `skills/website_clone/SKILL.md`
+  - `docs/SKILLS_SYSTEM.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): Verified YAML frontmatter and Markdown syntax via `core.skill_loader.get_skill_registry()`.
+  - Layer 2 (Runtime): Ran security and threat scan via `core.skill_scanner.scan_skill_text` on both skills (both passed safe with 0 violations).
+  - Layer 3 (Regression): Ran test suite `pytest tests/test_skill_runner.py` (7/7 passed).
+
+
+## [2026-10-30] — Website Build Skill: Universal Custom Stacks, Anti-Slop Restraint & Preview Confirmation Gate
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  1. **Universal Custom Stack Support:**
+     - Expanded `skills/website_build/SKILL.md` from rigid Single-File HTML / React+Tailwind branches to support any user-requested framework (Next.js App/Pages Router, Astro, Vue/Nuxt, Svelte/SvelteKit, Remix, SolidJS, Vanilla HTML/CSS/JS).
+     - Mandated framework-idiomatic scaffolding while 100% faithfully preserving the reference template's design DNA (tokens, typography, card geometry, micro-interactions).
+  2. **Anti-Slop Shadow & Hover Restraint:**
+     - Banned muddy, heavy black drop-shadows (e.g. `box-shadow: 0 20px 25px rgba(0,0,0,0.5)` or opaque `shadow-2xl` ink spills). Mandated subtle diffuse ambient elevation, optical specular edge highlights, or 1px hairline border elevation.
+     - Banned aggressive, jarring jump transforms (e.g. `hover:scale-105`, `hover:scale-110`, cheap 90s bouncy jumps) and abrupt zero-easing state changes.
+     - Enforced restrained micro-interactions: 1px hairline border luminance highlights on hover, subtle background brightness lift, smooth 150-200ms ease-out transitions, and tactile active click compression (`active:scale-[0.98]`).
+  3. **Smart Universal Stack Runner & Mandatory Preview Confirmation Gate:**
+     - Added smart project detection (`package.json`, `astro.config`, `next.config`, `vite.config`, or static `.html`) to execute the proper dev server (Next.js -> 3000, Vite/Vue/Svelte -> 5173, Astro -> 4321, HTML -> Ephemeral 9400-9480) with background `CREATE_NO_WINDOW` execution.
+     - Mandated background HTTP 200 healthcheck before declaring readiness.
+     - Instituted **Mandatory User Confirmation Gate**: strictly forbidden to auto-open or pop up the browser window. The agent must first confirm with the user (*"Website build ho chuki hai aur localhost:[port] par ready hai. Kya main preview window open karun?"*) and open only upon explicit confirmation.
+  4. **Direct-Execution Coding Agent Directive Template (Section 2.5):**
+     - Replaced verbose narrative with structured, high-velocity blocks: `[TASK DIRECTIVE]`, `[DESIGN REFERENCES]`, `[USER REQUIREMENTS & AUTHENTIC CONTENT]`, `[SUBAGENTS WORKSPACE DECOMPOSITION]` (5–7 subagents in parallel), and `[CRITICAL DIRECT-EXECUTION CONSTRAINTS]` (no intermediate scripts, ensure responsive & interactive elements work, complete directly without waiting for confirmation).
+- **Key Files Touched:**
+  - `skills/website_build/SKILL.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): Verified skill syntax, structure, and YAML frontmatter.
+  - Layer 2 (Runtime): Verified discovery and reading via `get_skill_registry().read_skill('website_build')` confirming all new gates and sections are present.
+  - Layer 3 (Regression): `pytest tests/test_skill_runner.py` passed (7/7).
+
+
 ## [2026-10-29] — Dynamic Autonomous Fleet Management & Ghost Agent Elimination
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Why this was built / Root Cause & Motivation:**
@@ -2239,3 +2352,31 @@ ec.enabled execution gate in core/action_loader.py:ActionRegistry.run() returnin
 pm --prefix frontend run build passed with 0 errors (Vite production bundle generated in 2.38s).
   - Layer 2 (Runtime): Verified ActionRegistry disabled gate blocks execution, GET /api/tools returns 15 tools across 5 categories, SkillRegistry discovers exactly 3 core skills, deleted agents stay permanently dead and cannot resurrect, engine test pings pass.
   - Layer 3 (Regression): pytest tests/test_skill_runner.py passed (7/7 passed in 2.78s).
+
+## [2026-10-30] Direct Engine DESIGN.md Synthesis & Legacy Dummy Heuristics Purge
+- **Built/Fixed**:
+  - **Permanently Deleted Legacy Dummy Parsers**: Completely removed `core/design_extractor.py` (1,454 lines of crude regex heuristics), `core/design_tokens.py` (dataclasses), `actions/design_extractor.py` (wrapper), `scripts/generate_ai_design_specs.py` (dead batch pre-warmer), and `core/_self_test.py` (deterministic pipeline test suite).
+  - **100% Autonomous Code Engine Execution (`generate_design_md`)**: Re-architected `skills/generate_design_md/SKILL.md` to mandate execution strictly via autonomous Coding Engines (`agy`, `opencode`, `kilo`) and NEVER via Gemini or Groq direct API calls.
+  - **Three Canonical Deliverables Protocol**: Standardized deliverables into:
+    1. `DESIGN.md`: The canonical design-system specification for downstream coding agents.
+    2. `preview.html`: Self-contained visual design catalog with interactive Dark/Light mode toggle.
+    3. `preview-dark.html`: Static visual catalog on obsidian dark surfaces.
+  - **Embedded Master Prompt**: Embedded the comprehensive **Senior Frontend Design-Systems Auditor and UI Documentation Agent** master prompt enforcing "authenticity over invention", system source inspection priorities (`tailwind.config.*`, CSS variables in `:root`, shared UI primitives), strict conflict resolution rules, and an auditable `## Sources` section.
+  - **Engine Skill Routing in `actions/run_skill.py`**: Added dedicated delegation logic for `generate_design_md` to immediately dispatch to the active coding engine bridge or specialized fleet agent (Pam Beesly) with the complete master prompt.
+  - **Subsystem & Fleet Alignment**: Updated `config/fleet_agents.json`, `AutonomousOfficeScreen.tsx`, `core/fleet/registry.py`, `core/fleet/dispatcher.py`, and `core/action_loader.py` to cleanly remove `extract_design_system` and map Pam Beesly directly to `antigravity_run` and `generate_design_md`.
+  - **Documentation Sync**: Synchronized `docs/TOOLS.md`, `docs/DESIGN_SYSTEM_ARCHITECTURE.md`, `docs/FLEET_MANAGEMENT.md`, and `docs/ARCHITECTURE.md`.
+- **Key Files**:
+  - `skills/generate_design_md/SKILL.md`
+  - `actions/run_skill.py`
+  - `core/fleet/registry.py`
+  - `core/fleet/dispatcher.py`
+  - `core/action_loader.py`
+  - `config/fleet_agents.json`
+  - `frontend/src/components/office/AutonomousOfficeScreen.tsx`
+  - `docs/TOOLS.md`
+  - `docs/DESIGN_SYSTEM_ARCHITECTURE.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification**:
+  - Layer 1 (Static): `python -m py_compile` on touched files passed with 0 errors. `npm --prefix frontend run build` passed with 0 errors (Vite production bundle generated in 2.37s).
+  - Layer 2 (Runtime): Verified action discovery loads 31 tools with no trace of `extract_design_system`; verified `SkillRegistry` loads the new `generate_design_md` direct engine SOP; verified fleet manager resolves design token queries to Pam Beesly.
+  - Layer 3 (Regression): `pytest tests/test_skill_runner.py` passed (7/7 passed).
