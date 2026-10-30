@@ -1,24 +1,30 @@
-"""
-actions/kilo_agent.py — Kilo Code integration (async).
+"""actions/kilo_agent.py — Transparent Kilo Code Engine Bridge (async).
 
-Delegates multi-file edits and refactors to Kilo Code CLI using free models.
+Standardized pure human-like CLI bridge for Kilo Code.
+Delegates coding tasks directly to Kilo Code CLI without synthetic prompt wrappers.
 Returns immediately with a task_id; runs the CLI in a background thread.
 Query progress with the task_status tool.
 """
 
 from __future__ import annotations
 
+import ctypes
+import json
+import logging
 import os
 import platform
 import shutil
 import subprocess
+from ctypes import wintypes
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from core.repo_context import resolve
 from core.task_manager import get_task_manager, TaskContext
 from core.undo import capture_repo_snapshot, register_repo_undo
 from memory.config_manager import get_kilo_model
+
+logger = logging.getLogger("zezo.kilo")
 
 if platform.system() == "Windows":
     _WIN_HIDE = {
@@ -31,14 +37,36 @@ else:
 
 
 def _find_kilo_bin() -> Optional[str]:
+    """Finds the native Kilo Code CLI binary."""
+    # 1. Project-local tools directory
+    local_candidates = [
+        Path("tools") / "kilo" / ("kilo.exe" if platform.system() == "Windows" else "kilo"),
+        Path.cwd() / "tools" / "kilo" / ("kilo.exe" if platform.system() == "Windows" else "kilo"),
+    ]
+    for lc in local_candidates:
+        if lc.exists() and lc.is_file():
+            return str(lc.resolve())
+
+    # 2. System PATH
     for name in ("kilo", "kilo.exe", "kilocode", "kilocode.exe"):
         b = shutil.which(name)
         if b:
             return b
+
+    # 3. Known install directories
     home_bin = Path.home() / ".kilo" / "bin" / (
         "kilo.exe" if platform.system() == "Windows" else "kilo"
     )
-    return str(home_bin) if home_bin.exists() else None
+    if home_bin.exists():
+        return str(home_bin)
+
+    app_data_bin = Path.home() / "AppData" / "Local" / "kilo" / "bin" / (
+        "kilo.exe" if platform.system() == "Windows" else "kilo"
+    )
+    if app_data_bin.exists():
+        return str(app_data_bin)
+
+    return None
 
 
 def _resolve_model(model: Optional[str]) -> str:
@@ -89,12 +117,6 @@ def _ensure_gitignore(repo_path: Path) -> None:
         pass
 
 
-import ctypes
-import logging
-from ctypes import wintypes
-
-logger = logging.getLogger("zezo.kilo")
-
 # ── Windows Job Object Throttling (Hardware-Enforced) ─────────────────────────
 
 def _create_throttled_job(mask: int, priority: int = 0x00000040):
@@ -140,7 +162,7 @@ def _create_throttled_job(mask: int, priority: int = 0x00000040):
             ]
 
         info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION()
-        info.BasicLimitInformation.LimitFlags = 0x00000010 | 0x00000020  # JOB_OBJECT_LIMIT_AFFINITY | JOB_OBJECT_LIMIT_PRIORITY_CLASS
+        info.BasicLimitInformation.LimitFlags = 0x00000010 | 0x00000020
         info.BasicLimitInformation.Affinity = mask
         info.BasicLimitInformation.PriorityClass = priority
 
@@ -171,50 +193,26 @@ def _assign_pid_to_job(hJob, pid: int) -> bool:
         return False
 
 
-MAX_CLI_PROMPT_LEN = 4000
-
-
-def _prepare_cli_task(task: str, repo_path: Path) -> str:
-    """
-    Ensure the CLI prompt does not exceed safe command-line buffer limits on Windows.
-    If the prompt exceeds MAX_CLI_PROMPT_LEN or contains raw HTML blueprints,
-    write the full task specification to TASK_SPEC.md in the repo workspace.
-    """
-    if not task:
-        return ""
-
-    task_lower = task.lower()
-    is_large = len(task) > MAX_CLI_PROMPT_LEN
-    has_raw_html = "```html" in task_lower or "<html" in task_lower or "<!doctype" in task_lower
-
-    if not (is_large or has_raw_html):
-        return task
-
-    try:
-        repo_path.mkdir(parents=True, exist_ok=True)
-        spec_file = repo_path / "TASK_SPEC.md"
-        spec_file.write_text(task, encoding="utf-8")
-        return (
-            "Execute the coding task defined in TASK_SPEC.md. "
-            "Read TASK_SPEC.md in the workspace first, then implement all specifications, "
-            "requirements, and guidelines exactly as described."
-        )
-    except Exception as e:
-        logger.warning("Failed writing TASK_SPEC.md for Kilo (%s); truncating prompt", e)
-        return task[:MAX_CLI_PROMPT_LEN]
-
-
-def _run_worker(params: dict, ctx: TaskContext) -> dict:
-    repo_val = params.get("repo") or params.get("project_path") or params.get("repo_path")
+def _run_worker(params: dict, ctx: Optional[TaskContext] = None) -> dict:
+    """Runs in the background thread. Streams telemetry, respects cancellation."""
+    repo_val = params.get("project_path") or params.get("repo") or params.get("repo_path")
     if not repo_val:
         resolved_p, _ = resolve()
         repo = str(resolved_p or (Path.home() / "Desktop" / "website").resolve())
     else:
         repo = str(Path(repo_val).resolve())
 
-    task = params.get("task", "")
+    prompt = (params.get("prompt") or params.get("task") or "").strip()
     model = params.get("model") or get_kilo_model()
     kilo_bin = params.get("bin") or _find_kilo_bin()
+
+    repo_path = Path(repo)
+    repo_path.mkdir(parents=True, exist_ok=True)
+    _ensure_gitignore(repo_path)
+    snapshot = capture_repo_snapshot(repo)
+
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
 
     if not kilo_bin:
         err_msg = "Kilo Code CLI binary not found"
@@ -222,16 +220,10 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
             ctx.on_fail(err_msg)
         return {"status": "failed", "error": err_msg, "repo": repo, "model": model}
 
-    _ensure_gitignore(Path(repo))
-    snapshot = capture_repo_snapshot(repo)
+    cmd = [kilo_bin, "run", prompt, "--model", model, "--auto"]
 
-    env = os.environ.copy()
-    env["PYTHONIOENCODING"] = "utf-8"
-
-    cli_task = _prepare_cli_task(task, Path(repo))
-    cmd = [kilo_bin, "run", cli_task, "--model", model, "--auto"]
     if ctx and hasattr(ctx, "report"):
-        ctx.report(2, f"launching Kilo in {Path(repo).name}")
+        ctx.report(2, f"Launching Kilo in {repo_path.name}")
 
     proc = subprocess.Popen(
         cmd,
@@ -250,21 +242,17 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
     if ctx and hasattr(ctx, "set_pid"):
         ctx.set_pid(proc.pid)
 
-    import psutil
-    total = psutil.cpu_count(logical=True) or 4
-    if total <= 4:
-        cap = 2
-    elif total <= 8:
-        cap = total - 2
-    else:
-        cap = max(4, total // 2)
-    cores = list(range(cap))
-    mask = (1 << cap) - 1
-
     hJob = None
-    hJob = _create_throttled_job(mask, 0x00000040)
-    if hJob:
-        _assign_pid_to_job(hJob, proc.pid)
+    try:
+        import psutil
+        total = psutil.cpu_count(logical=True) or 4
+        cap = max(2, total // 2) if total > 4 else total
+        mask = (1 << cap) - 1
+        hJob = _create_throttled_job(mask, 0x00000040)
+        if hJob:
+            _assign_pid_to_job(hJob, proc.pid)
+    except Exception as e:
+        logger.debug("Could not assign Job Object throttling: %s", e)
 
     tail: list[str] = []
     line_count = 0
@@ -280,7 +268,8 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
                         pass
                 else:
                     proc.terminate()
-                return {"status": "cancelled", "lines": line_count}
+                return {"status": "cancelled", "lines": line_count, "repo": repo}
+
             text = line.rstrip()
             if not text:
                 continue
@@ -289,8 +278,9 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
             if len(tail) > 30:
                 tail.pop(0)
 
+            pct = min(90, 5 + line_count)
             if ctx and hasattr(ctx, "report"):
-                ctx.report(min(90, 5 + line_count), text)
+                ctx.report(pct, text[:80])
     finally:
         try:
             proc.wait(timeout=10)
@@ -342,8 +332,8 @@ def _run_worker(params: dict, ctx: TaskContext) -> dict:
 
 
 def kilo_agent(parameters: dict, player=None, speak=None) -> str:
-    task = (parameters.get("task") or parameters.get("prompt") or "").strip()
-    if not task:
+    prompt = (parameters.get("prompt") or parameters.get("task") or "").strip()
+    if not prompt:
         return "Please tell me the coding task you want Kilo Code to run."
 
     explicit_path = (
@@ -373,87 +363,36 @@ def kilo_agent(parameters: dict, player=None, speak=None) -> str:
         )
 
     model = _resolve_model(parameters.get("model") or parameters.get("model_id"))
-    scope_type = parameters.get("scope_type")
-    color_theme = parameters.get("color_theme")
-
-    # Resolve design system tokens if UI/Web task
-    from core.design_resolver import is_ui_task, resolve_design, format_design_prompt
-    task_with_design = task
-    if is_ui_task(task):
-        resolved_design = resolve_design(task, repo_path=repo, scope=scope_type, theme=color_theme)
-        if resolved_design and resolved_design.is_active():
-            reference_provisioned = False
-            try:
-                repo.mkdir(parents=True, exist_ok=True)
-                ref_dst = repo / "reference.html"
-                if getattr(resolved_design, "source_path", None) and resolved_design.source_path.exists():
-                    import shutil
-                    shutil.copy2(resolved_design.source_path, ref_dst)
-                    reference_provisioned = True
-                elif getattr(resolved_design, "full_raw_html", None) and resolved_design.full_raw_html.strip():
-                    ref_dst.write_text(resolved_design.full_raw_html, encoding="utf-8")
-                    reference_provisioned = True
-                elif resolved_design.raw_html and resolved_design.raw_html.strip():
-                    ref_dst.write_text(resolved_design.raw_html, encoding="utf-8")
-                    reference_provisioned = True
-            except Exception as e:
-                logger.warning("Failed to provision reference.html for Kilo Code: %s", e)
-
-            if reference_provisioned:
-                theme_val = color_theme or "dark_obsidian"
-                design_directive = (
-                    "CRITICAL THEME RE-SKINNING & STRUCTURAL FIDELITY DIRECTIVE:\n"
-                    "- A curated design reference has been placed at 'reference.html'. Inspect it as your primary structural blueprint.\n"
-                    "- DO NOT invent a new layout from scratch or output generic, unstyled boilerplate.\n"
-                    "- 1:1 STRUCTURAL SKELETON ADAPTATION: You MUST preserve the exact section flow, container grids, navigation hierarchy, card framing, and typography scale of 'reference.html'.\n"
-                    f"- THEME RE-SKINNING RULE: If 'reference.html' is in light mode or has a different palette, DO NOT discard it! Re-skin its CSS variables and styles into the requested theme ({theme_val}) without discarding the reference skeleton:\n"
-                    "  * Transform light backgrounds into deep, refined obsidian/dark void tones (#07080c).\n"
-                    "  * Invert typography to high-contrast crisp white and muted grays.\n"
-                    "  * Inject glowing accents, subtle neon box-shadows, and gradient borders directly onto the existing card wrappers.\n"
-                    "- CONTENT & BRANDING ADAPTATION: Retain the reference's exact geometry and layout, but replace all placeholder copy, titles, logos, and features with authentic content for the requested project.\n"
-                    "- DIRECT CODE DELIVERY: Write 'index.html' directly to disk in a single pass.\n"
-                    "- FORBIDDEN: Do not write intermediate Python builder scripts (e.g., 'build_*.py', 'cleanup.py') or generation helpers—deliver the complete, production-ready 'index.html' directly."
-                )
-                task_with_design = f"{task}\n\n{design_directive}"
-            else:
-                design_prompt = format_design_prompt(resolved_design)
-                task_with_design = f"{task}\n\n{design_prompt}"
-
-    # In-place execution for fleet tasks (eliminates phantom ZEZO CODER cards)
     run_in_place = bool(parameters.get("run_in_place", False))
     task_ctx = parameters.get("task_ctx")
 
+    worker_params = {
+        "repo": str(repo),
+        "prompt": prompt,
+        "task": prompt,
+        "model": model,
+        "bin": kilo_bin,
+    }
+
     if run_in_place:
-        worker_params = {
-            "repo": str(repo),
-            "task": task_with_design,
-            "model": model,
-            "bin": kilo_bin,
-        }
         res = _run_worker(worker_params, ctx=task_ctx)
-        import json
         return json.dumps(res) if isinstance(res, dict) else str(res)
 
     tm = get_task_manager()
     task_id = tm.submit(
         "kilo_agent",
         _run_worker,
-        {
-            "repo": str(repo),
-            "task": task_with_design,
-            "model": model,
-            "bin": kilo_bin,
-        },
+        worker_params,
     )
 
     try:
         from memory.memory_manager import remember
         remember("active_project", str(repo), category="projects")
         import re
-        file_matches = re.findall(r"[\w\-]+\.[a-zA-Z0-9]+", task)
+        file_matches = re.findall(r"[\w\-]+\.[a-zA-Z0-9]+", prompt)
         if file_matches:
             remember("active_file", file_matches[0], category="projects")
-        remember("recent_task", task[:120], category="projects")
+        remember("recent_task", prompt[:120], category="projects")
     except Exception:
         pass
 
@@ -464,7 +403,7 @@ def kilo_agent(parameters: dict, player=None, speak=None) -> str:
         badge = "ZEZO CODER (QUEUED)" if is_queued else "ZEZO CODER"
         player.show_content(
             badge,
-            f"Task: {task}\nRepo: {repo}\nID: {task_id}\nSource: {source}\nStatus: {task_info.get('status', 'running')}",
+            f"Prompt: {prompt[:160]}\nRepo: {repo}\nID: {task_id}\nSource: {source}\nStatus: {task_info.get('status', 'running')}",
         )
 
     if is_queued:
@@ -482,12 +421,9 @@ def kilo_agent(parameters: dict, player=None, speak=None) -> str:
 TOOL = {
     "name": "kilo_run",
     "description": (
-        "Run Kilo Code CLI for multi-file edits WITHIN one project: "
-        "refactors, targeted changes across 2-3 files. "
-        "DO NOT use for a single function (use code_helper). "
-        "DO NOT use for a full autonomous feature (use opencode_run). "
-        "Returns a task_id immediately. Ask the user for the project "
-        "path if you do not have one."
+        "Run Kilo Code CLI for multi-file edits, refactors, and feature updates "
+        "inside a specific project directory via the native 'kilo' binary. "
+        "Returns a task_id immediately."
     ),
     "risk": "code_execution",
     "enabled": True,
@@ -496,14 +432,27 @@ TOOL = {
     "parameters": {
         "type": "OBJECT",
         "properties": {
-            "task": {"type": "STRING", "description": "Clear coding task."},
-            "model": {"type": "STRING", "description": "Optional Kilo model override."},
+            "prompt": {
+                "type": "STRING",
+                "description": "Clear coding prompt explaining what code to edit or build.",
+            },
+            "task": {
+                "type": "STRING",
+                "description": "Optional alias for prompt.",
+            },
             "project_path": {
                 "type": "STRING",
-                "description": "Project folder path.",
+                "description": "Project folder path. If omitted, resolves active workspace repo.",
+            },
+            "model": {
+                "type": "STRING",
+                "description": "Optional Kilo model override.",
             },
         },
-        "required": ["task"],
+        "required": ["prompt"],
     },
     "handler": kilo_agent,
 }
+
+handler = kilo_agent
+kilo_run = kilo_agent

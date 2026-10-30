@@ -6,25 +6,24 @@
       "specialty": "High-level architecture design, code review, and structural planning",
       "color": "#a855f7",
       "avatar_pixel": "michael_pixel.png",
-      "default_tool": "opencode_run",
+      "default_tool": "antigravity_run",
       "risk_tier": "L1_MUTATION",
       "prompt_prefix": "You are MICHAEL, Lead Software Architect & Tech Lead.",
-      "model_id": "llama-3.3-70b-versatile",
+      "model_id": "gemini-3.7-flash-high",
       "desk_x": 180,
       "desk_y": 160,
-      "worktree": null,
-      "active_worktree": null,
+      "worktree": "repo_active",
+      "active_worktree": "repo_active",
       "allowed_tools": [
+        "opencode_run",
         "web_search",
         "file_processor",
         "extract_design_system",
         "file_controller"
       ],
       "allowed_skills": [
-        "web_search",
-        "file_processor",
-        "extract_design_system",
-        "file_controller"
+        "multi_agent_collaboration",
+        "make_plan"
       ],
       "capabilities": [
         "task_decomposition",
@@ -32,7 +31,8 @@
         "multi_agent_delegation"
       ],
       "is_core": true,
-      "engine": "opencode"
+      "engine": "opencode",
+      "soul_markdown": "You are MICHAEL, Lead Software Architect & Tech Lead."
     },
     "VERVE": {
       "name": "Verve",
@@ -46,9 +46,10 @@
       "model_id": "gemini-3.8-flash-medium",
       "desk_x": 320,
       "desk_y": 160,
-      "worktree": "c:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57",
-      "active_worktree": "c:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57",
+      "worktree": null,
+      "active_worktree": null,
       "allowed_tools": [
+        "antigravity_run",
         "extract_design_system",
         "browser_control",
         "fleet_control",
@@ -64,7 +65,8 @@
         "animations"
       ],
       "is_core": false,
-      "engine": "antigravity"
+      "engine": "antigravity",
+      "soul_markdown": "You are Verve, Frontend & UI Design Specialist."
     },
     "FLUX": {
       "name": "Flux",
@@ -81,6 +83,7 @@
       "worktree": null,
       "active_worktree": null,
       "allowed_tools": [
+        "antigravity_run",
         "extract_design_system",
         "file_processor",
         "file_controller",
@@ -100,7 +103,8 @@
         "overflow_balancer"
       ],
       "is_core": false,
-      "engine": "antigravity"
+      "engine": "antigravity",
+      "soul_markdown": "You are Flux, Frontend Specialist and UI Developer. You work closely with Verve and the frontend team to build clean, responsive, aesthetic user interfaces and handle frontend workloads with Antigravity."
     },
     "AHMAD": {
       "name": "Nexus",
@@ -117,6 +121,7 @@
       "worktree": null,
       "active_worktree": null,
       "allowed_tools": [
+        "opencode_run",
         "quick_snippet",
         "file_processor",
         "file_controller",
@@ -136,7 +141,8 @@
         "auth_systems"
       ],
       "is_core": false,
-      "engine": "opencode"
+      "engine": "opencode",
+      "soul_markdown": "You are Ahmad, Senior Python Backend Specialist. Build scalable backend architectures, clean REST/GraphQL APIs, and bulletproof database models with OpenCode."
     },
     "DWIGHT": {
       "name": "Dwight",
@@ -153,6 +159,7 @@
       "worktree": null,
       "active_worktree": null,
       "allowed_tools": [
+        "kilo_run",
         "quick_snippet",
         "file_processor",
         "file_controller",
@@ -171,7 +178,8 @@
         "complexity_reduction"
       ],
       "is_core": false,
-      "engine": "kilo"
+      "engine": "kilo",
+      "soul_markdown": "You are Dwight Schrute, Senior Refactoring & QA Specialist. Ensure codebases are robust, thoroughly tested, and adhere to strict cyclomatic complexity limits."
     },
     "PAM": {
       "name": "Pam Beesly",
@@ -204,7 +212,8 @@
         "brand_identity"
       ],
       "is_core": false,
-      "engine": ""
+      "engine": "",
+      "soul_markdown": "You are Pam Beesly, Design System Architect. Ensure UI components are pixel-perfect, modern, accessible, and aesthetically premium."
     },
     "KELLY": {
       "name": "Kelly Kapoor",
@@ -223,7 +232,7 @@
       "allowed_tools": [
         "agent_reach",
         "web_search",
-        "web_reader",
+        "web_read_page",
         "youtube_video",
         "fleet_control",
         "task_status"
@@ -240,7 +249,8 @@
         "trend_analysis"
       ],
       "is_core": false,
-      "engine": ""
+      "engine": "",
+      "soul_markdown": "You are Kelly Kapoor, Research & Social Intelligence Specialist. Find trends, transcribe content, and conduct deep research across the web."
     },
     "QUANTUM": {
       "name": "Quantum",
@@ -257,14 +267,15 @@
       "worktree": null,
       "active_worktree": null,
       "allowed_tools": [
+        "kilo_run",
         "web_search",
         "agent_reach",
-        "web_reader"
+        "web_read_page"
       ],
       "allowed_skills": [
-        "web_search",
-        "agent_reach",
-        "web_reader"
+        "web_scraper",
+        "social_research",
+        "web_research_pipeline"
       ],
       "capabilities": [
         "web_research",
@@ -272,7 +283,8 @@
         "content_analysis"
       ],
       "is_core": false,
-      "engine": ""
+      "engine": "",
+      "soul_markdown": "You are Quantum, an autonomous fleet specialist focusing on deep web research and analysis."
     },
     "DEVDYNAMO": {
       "name": "DevDynamo",
@@ -289,10 +301,10 @@
       "worktree": null,
       "active_worktree": null,
       "allowed_tools": [
+        "opencode_run",
         "agent_reach",
         "web_search",
         "web_read_page",
-        "web_reader",
         "file_processor"
       ],
       "allowed_skills": [
@@ -306,7 +318,8 @@
         "content_analysis"
       ],
       "is_core": false,
-      "engine": "opencode"
+      "engine": "opencode",
+      "soul_markdown": "You are DevDynamo, an autonomous fleet specialist focusing on Full-stack development, modern web engineering, and autonomous task execution."
     },
     "DATAEINSTEIN": {
       "name": "InsightAI",
@@ -323,13 +336,13 @@
       "worktree": null,
       "active_worktree": null,
       "allowed_tools": [
+        "antigravity_run",
         "opencode_run",
         "quick_snippet",
         "file_processor",
         "file_controller"
       ],
       "allowed_skills": [
-        "opencode",
         "multi_agent_collaboration",
         "make_plan",
         "git_workflow"
@@ -340,7 +353,8 @@
         "database_design"
       ],
       "is_core": false,
-      "engine": ""
+      "engine": "",
+      "soul_markdown": "You are Dataeinstein, an autonomous fleet specialist focusing on Machine Learning, Data Analysis, Predictive Modeling."
     },
     "RECON": {
       "name": "Recon",
@@ -360,7 +374,6 @@
         "agent_reach",
         "web_search",
         "web_read_page",
-        "web_reader",
         "fleet_control",
         "task_status"
       ],
@@ -374,7 +387,8 @@
         "executive_reporting"
       ],
       "is_core": false,
-      "engine": ""
+      "engine": "",
+      "soul_markdown": "You are Recon, Autonomous Deep Researcher & Intelligence Agent."
     }
   }
 }

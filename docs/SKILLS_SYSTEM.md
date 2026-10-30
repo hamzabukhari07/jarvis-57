@@ -71,9 +71,19 @@ auto_activate: true
 
 - **`name`**: Short, snake_case identifier matching directory name.
 - **`description`**: High-level summary describing when and why the model should activate this skill.
-- **`domain`**: Functional namespace (`coding`, `design`, `research`, `system`, `media`, `orchestration`).
+- **`domain`**: Functional namespace (`ui`, `web_dev`, `design`, `coding`, `system`, `general`).
+- **`required_tools`**: List of atomic actions required by the skill (e.g. `[clone_website, browser_control, web_read_page, file_controller]`).
 - **`triggers`**: List of intent-matching keywords used by `core/skill_loader.py` to index when the skill should be surfaced.
 - **`auto_activate`**: Whether the skill is dynamically eligible for automatic prompt injection upon trigger match.
+
+---
+
+## 🏛️ The 3 Core Skills Standard
+
+ZEZO standardizes on 3 production core skills:
+1. **`website_build` (`skills/website_build/`)**: Greenfield UI creation protocol with catalog-driven references, anti-slop quality gates, and live preview servers.
+2. **`website_clone` (`skills/website_clone/`)**: High-fidelity offline website capture, asset localization, and reverse-engineering rebuilds via the Uncage Hybrid Engine (Path A: Python tool `clone_website`; Path B: direct CLI `node tools/uncage/bin/uncage.js`).
+3. **`generate_design_md` (`skills/generate_design_md/`)**: Studio design token extraction and DSL `<design-context>` generator from URLs or HTML templates with WCAG accessibility contrast audits.
 
 ---
 
@@ -168,3 +178,17 @@ Inside the Settings modal (`SkillsSettingsTab.tsx`):
 - **Live Search & Tags:** Real-time search across titles, descriptions, and tag pills.
 - **In-App Markdown Editor:** Users can view, edit, or create new declarative skills with live syntax highlighting and direct disk persistence.
 - **Activation Toggles:** Individual skills can be enabled or disabled instantly without restarting the server.
+
+
+---
+
+## ⚡ Dual-AI Skill Runner Subsystem (`core/skill_runner.py`)
+
+Procedural declarative skills (`SKILL.md`) are executed by the **Dual-AI Skill Runner**:
+- **Smart Tool Scoping**: Ingests `SKILL.md` via `SkillRegistry` and inspects `required_tools` and body tokens, scoping down from 30+ tools to only the 3-5 atomic tools needed for the workflow.
+- **Dual-AI Execution Engine**:
+  - **Primary**: High-throughput Groq LPU (`llama-3.3-70b-versatile`) performing sequential atomic tool-calling.
+  - **Stateful Fallback**: Maintains a live ledger of `completed_steps = []`. If Groq encounters HTTP 429 rate limits or network drops, it immediately hands over to Gemini (`gemini-3.8-flash`) with full execution history so the remaining steps resume without repeating step 1.
+- **Output Truncation & Memory Guard**: Large tool returns are truncated and summarized to a maximum of 1500 characters to safeguard the context window.
+- **Task Telemetry**: Reports step-by-step progress to `TaskManager` (`task_manager.report(progress=..., message=...)`).
+- **Fleet Delegation Routing**: If a skill specifies or requires autonomous fleet execution, `actions/run_skill.py` dispatches to `FleetDispatcher.dispatch_task()` while local execution runs in a non-blocking background thread.

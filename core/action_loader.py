@@ -54,6 +54,54 @@ _CTX_KEYS = ("player", "speak", "response", "session_memory", "context")
 _BEHAVIORS = ("BLOCKING", "NON_BLOCKING")
 _SCHEDULING = ("WHEN_IDLE", "SILENT", "INTERRUPT")
 
+_TOOL_CATEGORIES: dict[str, str] = {
+    # Coding & Autonomous Engines
+    "antigravity_run": "coding",
+    "opencode_run": "coding",
+    "kilo_run": "coding",
+    "quick_snippet": "coding",
+    "code_engines_status": "coding",
+    "ast_tool": "coding",
+    "extract_design_system": "coding",
+    "fleet_control": "coding",
+    "task_status": "coding",
+
+    # Web Intelligence & Automation
+    "browser_control": "web",
+    "reverse_engineer": "web",
+    "clone_website": "web",
+    "web_read_page": "web",
+    "web_search": "web",
+    "agent_reach": "web",
+    "youtube_video": "web",
+    "flight_finder": "web",
+
+    # OS, System & Desktop Control
+    "computer_control": "system",
+    "computer_settings": "system",
+    "open_app": "system",
+    "desktop_control": "system",
+    "file_controller": "system",
+    "file_processor": "system",
+    "manage_monitor": "system",
+    "system_status": "system",
+    "reminder": "system",
+    "weather_report": "system",
+    "game_updater": "system",
+    "send_message": "system",
+}
+
+
+def _infer_category(name: str, risk: str) -> str:
+    if name.startswith("mcp_"):
+        return "mcp"
+    if name in _TOOL_CATEGORIES:
+        return _TOOL_CATEGORIES[name]
+    if risk == "code_execution":
+        return "coding"
+    return "general"
+
+
 
 def _opt_upper(value, allowed: tuple[str, ...]) -> Optional[str]:
     v = str(value or "").strip().upper()
@@ -73,14 +121,103 @@ class ActionRecord:
     scheduling: Optional[str] = None   # None = the API's default (WHEN_IDLE)
     risk: str = "local_mutation"       # Default fallback risk tier
     enabled: bool = True
+    category: str = "general"
 
 
 class ActionRegistry:
-    def __init__(self, actions: dict[str, ActionRecord], logger: Callable[[str], None]):
+    def __init__(self, actions: dict[str, ActionRecord], logger: Callable[[str], None], state_path: Optional[Path] = None):
         self._actions = actions          # name -> ActionRecord, VALID entries only
         self._all_records: list[ActionRecord] = []
         self._logger = logger
         self._key_history: deque = deque(maxlen=20)
+        self._state_path: Path = Path(state_path) if state_path else (Path(__file__).resolve().parent.parent / "config" / "tools_state.json")
+        self._disabled_tools: set[str] = set()
+        self.load_tool_state()
+
+    def load_tool_state(self) -> dict[str, Any]:
+        """Loads disabled tool names from config/tools_state.json and sets rec.enabled accordingly."""
+        data = {"disabled": []}
+        try:
+            if self._state_path.exists():
+                with open(self._state_path, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                    if content:
+                        data = json.loads(content)
+            else:
+                self.save_tool_state(data)
+
+            disabled = set(data.get("disabled", []))
+            self._disabled_tools = disabled
+            for name, rec in self._actions.items():
+                rec.enabled = (name not in disabled)
+            for rec in self._all_records:
+                rec.enabled = (rec.name not in disabled)
+        except Exception as e:
+            self._logger(f"[ActionRegistry] Failed loading tool state from {self._state_path}: {e}")
+        return data
+
+    def save_tool_state(self, state: Optional[dict[str, Any]] = None) -> None:
+        """Persists disabled tool state to config/tools_state.json."""
+        try:
+            self._state_path.parent.mkdir(parents=True, exist_ok=True)
+            if state is None:
+                disabled_set = set(self._disabled_tools)
+                for name, rec in self._actions.items():
+                    if not rec.enabled:
+                        disabled_set.add(name)
+                    else:
+                        disabled_set.discard(name)
+                self._disabled_tools = disabled_set
+                state = {"disabled": sorted(list(disabled_set))}
+
+            with open(self._state_path, "w", encoding="utf-8") as f:
+                json.dump(state, f, indent=2)
+                f.write("\n")
+        except Exception as e:
+            self._logger(f"[ActionRegistry] Failed saving tool state to {self._state_path}: {e}")
+
+    def toggle_tool(self, name: str, enabled: bool) -> bool:
+        """Toggles a tool's enabled state and persists to config/tools_state.json."""
+        found = False
+        rec = self._actions.get(name)
+        if rec:
+            rec.enabled = enabled
+            found = True
+        for r in self._all_records:
+            if r.name == name:
+                r.enabled = enabled
+                found = True
+
+        if enabled:
+            self._disabled_tools.discard(name)
+        else:
+            self._disabled_tools.add(name)
+
+        self.save_tool_state()
+        return found
+
+    def get_tools_status(self, as_dict: bool = False) -> list[dict[str, Any]] | dict[str, dict[str, Any]]:
+        """Returns all registered tools, their categories, risks, descriptions, and enabled states."""
+        if as_dict:
+            return {
+                rec.name: {
+                    "category": getattr(rec, "category", "general"),
+                    "risk": rec.risk,
+                    "description": rec.description,
+                    "enabled": rec.enabled,
+                }
+                for rec in sorted(self._actions.values(), key=lambda r: r.name)
+            }
+        results = []
+        for rec in sorted(self._actions.values(), key=lambda r: r.name):
+            results.append({
+                "name": rec.name,
+                "category": getattr(rec, "category", "general"),
+                "risk": rec.risk,
+                "description": rec.description,
+                "enabled": rec.enabled,
+            })
+        return results
 
     # -- called by main.py at LiveConnectConfig build time & agent scoping --
     def get_tool_declarations(self, agent_id: Optional[str] = None, mode: Optional[str] = None) -> list[dict]:
@@ -189,7 +326,11 @@ class ActionRegistry:
     # -- called by main.py from _execute_tool --
     def run(self, name: str, parameters: dict, ctx: dict | None = None) -> str:
         rec = self._actions.get(name)
-        if rec is None or not rec.valid:
+        if not rec:
+            return f"Error: Tool '{name}' not found."
+        if not rec.enabled:
+            return f"Execution Blocked: Tool '{name}' is currently disabled in Settings. Enable it in Settings > Tools to use this capability."
+        if not rec.valid:
             return f"Action '{name}' is not available."
 
         # Hotkey Anti-Loop Circuit Breaker (stops repetitive keystroke spam)
@@ -321,12 +462,15 @@ def _validate(module, filename: str) -> ActionRecord:
 
     norm_risk = valid_risks[raw_risk]
     enabled = bool(tool.get("enabled", True))
+    category = str(tool.get("category") or "").strip()
+    if not category:
+        category = _infer_category(name, norm_risk)
 
     return ActionRecord(name=name, description=description.strip(), parameters=parameters,
                         handler=handler, file=filename, valid=True, error="",
                         behavior=_opt_upper(tool.get("behavior"), _BEHAVIORS),
                         scheduling=_opt_upper(tool.get("scheduling"), _SCHEDULING),
-                        risk=norm_risk, enabled=enabled)
+                        risk=norm_risk, enabled=enabled, category=category)
 
 
 def discover_actions(actions_dir: Path, reserved_names: set[str] | None = None,
@@ -413,6 +557,7 @@ def discover_actions(actions_dir: Path, reserved_names: set[str] | None = None,
                 valid=True,
                 risk="local_mutation",
                 enabled=True,
+                category="mcp",
             )
             valid[tool_name] = mcp_rec
             all_records.append(mcp_rec)
@@ -423,6 +568,7 @@ def discover_actions(actions_dir: Path, reserved_names: set[str] | None = None,
     global _GLOBAL_REGISTRY
     registry = ActionRegistry(valid, logger)
     registry._all_records = all_records
+    registry.load_tool_state()
     _GLOBAL_REGISTRY = registry
     logger(f"Action discovery complete: {len(valid)} active.")
     return registry

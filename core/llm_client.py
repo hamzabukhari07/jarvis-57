@@ -23,7 +23,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Callable, Generator, Optional
+from typing import Any, Callable, Generator, Optional
 
 import requests
 
@@ -467,6 +467,114 @@ def call_groq_json(
             return json.loads(raw)
         except Exception:
             return None
+
+
+def _clean_schema_types(schema: Any) -> Any:
+    """Normalize Gemini uppercase schema types (OBJECT, STRING, etc.) to lowercase for OpenAI/Groq."""
+    if isinstance(schema, dict):
+        res = {}
+        for k, v in schema.items():
+            if k == "type" and isinstance(v, str):
+                res[k] = v.lower()
+            else:
+                res[k] = _clean_schema_types(v)
+        return res
+    elif isinstance(schema, list):
+        return [_clean_schema_types(item) for item in schema]
+    return schema
+
+
+def call_groq_tools(
+    messages: list,
+    tools: list,
+    model: str = "llama-3.3-70b-versatile",
+    timeout: float = 25.0,
+) -> dict:
+    """Native OpenAI-compatible tool-calling over Groq LPU API.
+
+    Parses message.tool_calls into standardized list of dicts with {"name", "arguments"}.
+    Raises standard exception on 429 (rate limit) or timeout so the caller's
+    fallback engine (e.g. Gemini) can trigger seamlessly.
+    """
+    from memory.config_manager import get_groq_api_key
+
+    api_key = get_groq_api_key()
+    if not api_key:
+        raise ValueError("Groq API key not configured in config/api_keys.json")
+
+    endpoint = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    # Format tools into OpenAI standard schema
+    formatted_tools = []
+    for t in (tools or []):
+        if not isinstance(t, dict):
+            continue
+        if "type" in t and "function" in t:
+            formatted_tools.append(t)
+        elif "name" in t:
+            raw_params = t.get("parameters") or {"type": "object", "properties": {}}
+            cleaned_params = _clean_schema_types(raw_params)
+            formatted_tools.append({
+                "type": "function",
+                "function": {
+                    "name": t.get("name"),
+                    "description": t.get("description", ""),
+                    "parameters": cleaned_params,
+                },
+            })
+
+    payload: dict = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.1,
+    }
+    if formatted_tools:
+        payload["tools"] = formatted_tools
+        payload["tool_choice"] = "auto"
+
+    resp = requests.post(endpoint, json=payload, headers=headers, timeout=timeout)
+    if resp.status_code == 429:
+        raise requests.exceptions.HTTPError(
+            f"Groq 429 Rate Limit Exceeded: {resp.text[:200]}", response=resp
+        )
+    resp.raise_for_status()
+
+    data = resp.json()
+    choice = data.get("choices", [{}])[0]
+    msg = choice.get("message", {})
+    content = (msg.get("content") or "").strip()
+    raw_tool_calls = msg.get("tool_calls") or []
+
+    parsed_tool_calls = []
+    for tc in raw_tool_calls:
+        fn = tc.get("function", {})
+        fn_name = fn.get("name") or tc.get("name", "")
+        raw_args = fn.get("arguments") or tc.get("arguments", {})
+        if isinstance(raw_args, str):
+            try:
+                fn_args = json.loads(raw_args)
+            except Exception:
+                fn_args = {"raw": raw_args}
+        elif isinstance(raw_args, dict):
+            fn_args = raw_args
+        else:
+            fn_args = {}
+
+        parsed_tool_calls.append({
+            "id": tc.get("id", ""),
+            "name": fn_name,
+            "arguments": fn_args,
+        })
+
+    return {
+        "content": content,
+        "tool_calls": parsed_tool_calls,
+        "role": msg.get("role", "assistant"),
+    }
 
 
 

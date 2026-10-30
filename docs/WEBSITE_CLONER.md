@@ -160,3 +160,7 @@ TOOL = {
     "handler": clone_website_action,
 }
 ```
+
+
+> [!NOTE]
+> Dead code in ctions/website_cloner.py:2314-2358 referencing legacy design_cache.py and i_design_generator.py was permanently purged. All website cloning workflows are codified under declarative skill skills/website_clone/SKILL.md.

@@ -60,6 +60,7 @@ import {
 import { Blobatar } from 'blobatar/react'
 import 'blobatar/motion.css'
 import { AgentDirectChatView } from './AgentDirectChatView'
+import { AgentConfigModal } from './AgentConfigModal'
 import { cn } from '@/lib/utils'
 import { api } from '../../lib/api'
 import type { LogEntry } from '../../hooks/useZezoSocket'
@@ -93,6 +94,7 @@ export interface AgentOfficeMember {
  workspace: string
  safetyTier: string
  specialty: string
+ allowed_skills?: string[]
 }
 
 export const WORKSTATION_SLOTS = [
@@ -899,17 +901,6 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
 
  // Edit Agent Modal State
  const [isEditAgentOpen, setIsEditAgentOpen] = useState(false)
- const [editAgentName, setEditAgentName] = useState('')
- const [editAgentRole, setEditAgentRole] = useState('')
- const [editAgentPersonality, setEditAgentPersonality] = useState('')
- const [editAgentWorkspace, setEditAgentWorkspace] = useState('c:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57')
- const [editAgentEngine, setEditAgentEngine] = useState('opencode_run')
- const [editAgentModel, setEditAgentModel] = useState('gemini-2.5-flash')
- const [editAgentTools, setEditAgentTools] = useState<string[]>([])
- const [editAgentSkills, setEditAgentSkills] = useState<string[]>([])
- const editFolderInputRef = useRef<HTMLInputElement>(null)
-
- // Files Modal State (Matching office.html lines 2984-3069 & 3687-3716)
  const [isFilesModalOpen, setIsFilesModalOpen] = useState(false)
  const [selectedPersonaFile, setSelectedPersonaFile] = useState<CorePersonaFileKey>('SOUL.md')
  const [personaEditorContent, setPersonaEditorContent] = useState<string>('')
@@ -997,87 +988,11 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  playOfficeFoley('click', soundEnabled)
  }
 
- const handleOpenEditModal = (agent: AgentOfficeMember) => {
- setEditAgentName(agent.name)
- setEditAgentRole(agent.role)
- setEditAgentPersonality(agent.personality || '')
- setEditAgentWorkspace(
- agent.workspace === 'repo_active'
- ? 'c:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57'
- : agent.workspace || 'c:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57'
- )
- setEditAgentEngine(agent.engine || 'opencode_run')
- setEditAgentModel(agent.model || 'opencode/nemotron-3-ultra-free')
- setEditAgentTools([...(agent.tools || [])])
- const currentSkills = availableSkills.filter((s) =>
- agent.specialty?.toLowerCase().includes(s.id.toLowerCase())
- ).map((s) => s.id)
- setEditAgentSkills(currentSkills.length > 0 ? currentSkills : ['opencode', 'website_build'])
- setIsEditAgentOpen(true)
- playOfficeFoley('click', soundEnabled)
- }
-
- const handleSaveEditAgent = () => {
- if (!selectedAgent) return
- const updatedName = editAgentName.trim() || selectedAgent.name
- const updatedRole = editAgentRole.trim() || selectedAgent.role
-
- setAgents((prev) =>
- prev.map((ag) => {
- if (ag.id !== selectedAgent.id) return ag
- return {
- ...ag,
- name: updatedName,
- role: updatedRole,
- status: ag.status,
- personality: editAgentPersonality.trim() || ag.personality,
- workspace: editAgentWorkspace.trim() || ag.workspace,
- engine: editAgentEngine,
- model: editAgentModel,
- tools: editAgentTools.length > 0 ? editAgentTools : ag.tools,
- specialty: `${editAgentEngine}, ${editAgentSkills.join(', ')}`,
- logs: [
- ...ag.logs,
- `[${new Date().toLocaleTimeString()}] Config updated: Engine=${editAgentEngine}, Model=${editAgentModel}, Workspace=${editAgentWorkspace}`,
- ],
- }
- })
- )
- setIsEditAgentOpen(false)
- playOfficeFoley('success', soundEnabled)
- triggerToast(`Agent ${updatedName} configuration updated!`)
-
- api.saveAgent({
- id: selectedAgent.id,
- name: updatedName,
- role: updatedRole,
- specialty: `${editAgentEngine}, ${editAgentSkills.join(', ')}`,
- color: selectedAgent.color,
- default_tool: editAgentEngine,
- risk_tier: selectedAgent.safetyTier || 'L1_MUTATION',
- model_id: editAgentModel,
- worktree: editAgentWorkspace,
- allowed_tools: editAgentTools.length > 0 ? editAgentTools : selectedAgent.tools,
- allowed_skills: editAgentSkills,
- prompt_prefix: editAgentPersonality.trim() || selectedAgent.personality,
- } as any).then(() => {
- loadFleet()
- }).catch((err) => {
- console.error('Failed to update agent:', err)
- })
- }
-
- const toggleEditSkill = (skill: string) => {
- setEditAgentSkills((prev) =>
- prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
- )
- }
-
- const toggleEditTool = (tool: string) => {
- setEditAgentTools((prev) =>
- prev.includes(tool) ? prev.filter((t) => t !== tool) : [...prev, tool]
- )
- }
+	const handleOpenEditModal = (agent: AgentOfficeMember) => {
+		setSelectedAgentId(agent.id)
+		setIsEditAgentOpen(true)
+		playOfficeFoley('click', soundEnabled)
+	}
 
  const toggleSkill = (skill: string) => {
  setNewAgentSelectedSkills((prev) =>
@@ -2907,336 +2822,18 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  </div>
  )}
 
- {/* ── Edit Agent Modal Dialog ── */}
- {isEditAgentOpen && (
- <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-150">
- <Frame className="w-full max-w-lg border-[var(--border)] max-h-[90vh] flex flex-col">
- <FramePanel className="bg-[var(--card)] border-[var(--border)] p-0 overflow-hidden flex flex-col max-h-[90vh]">
- {/* Header */}
- <FrameHeader className="p-3 border-b border-[var(--border)] flex flex-row items-center justify-between shrink-0">
- <div className="flex items-center gap-2">
- <FrameTitle className="text-sm font-semibold text-[var(--foreground)]">
- Edit Agent: {selectedAgent.name}
- </FrameTitle>
- </div>
- <Button
- variant="ghost"
- size="sm"
- onClick={() => setIsEditAgentOpen(false)}
- className="h-6 w-6 p-0 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
- >
- <X className="w-4 h-4" />
- </Button>
- </FrameHeader>
-
- {/* Scrollable Form Content */}
- <ScrollArea className="flex-1 p-4 overflow-y-auto">
- <div className="space-y-3.5 pr-1">
- {/* 1. AVATAR & NAME */}
- <div className="space-y-1.5">
- <label className="text-xs font-mono text-[var(--muted-foreground)] uppercase">Agent Name & Identity</label>
- <div className="flex items-center gap-3 p-2.5 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] bg-[var(--input)]/30 border border-[var(--border)]">
- <div className="w-14 h-14 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] overflow-hidden flex items-center justify-center border border-[var(--border)] bg-[var(--card)] shrink-0 p-1">
- <Blobatar name={editAgentName || selectedAgent.name} size={48} animate="always" className="w-full h-full object-contain" />
- </div>
- <div className="flex-1 space-y-2 min-w-0">
- <input
- type="text"
- value={editAgentName}
- onChange={(e) => setEditAgentName(e.target.value)}
- placeholder="Agent Name..."
- className="w-full h-8 px-2.5 text-xs rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
- />
- {/* Avatar Presets */}
- <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-0.5 scrollbar-thin">
- {AVATAR_PRESETS.map((preset) => {
- const isPicked = editAgentName === preset
- return (
- <button
- key={preset}
- type="button"
- onClick={() => setEditAgentName(preset)}
- className={`w-8 h-8 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] flex items-center justify-center shrink-0 border transition-all ${
- isPicked
- ? 'border-[var(--primary)] ring-2 ring-[var(--primary)]/30 bg-[var(--primary)]/10 scale-105'
- : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--muted-foreground)] opacity-75 hover:opacity-100'
- }`}
- title={preset}
- >
- <Blobatar name={preset} size={24} animate="hover" className="w-full h-full object-contain" />
- </button>
- )
- })}
- </div>
- </div>
- </div>
- </div>
-
- {/* 2. ROLE */}
- <div className="space-y-1">
- <label className="text-xs font-mono text-[var(--muted-foreground)] uppercase">Role / Title</label>
- <input
- type="text"
- value={editAgentRole}
- onChange={(e) => setEditAgentRole(e.target.value)}
- placeholder="e.g. Lead Software Architect, Tech Lead..."
- className="w-full h-8 px-2.5 text-xs rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
- />
- </div>
-
- {/* 3. INSTRUCTIONS / PERSONALITY */}
- <div className="space-y-1">
- <label className="text-xs font-mono text-[var(--muted-foreground)] uppercase">Instructions / Personality</label>
- <textarea
- rows={3}
- value={editAgentPersonality}
- onChange={(e) => setEditAgentPersonality(e.target.value)}
- placeholder="Agent behavior rules and guidelines..."
- className="w-full p-2.5 text-xs font-mono rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] resize-none"
- />
- </div>
-
- {/* 4. WORKSPACE FOLDER */}
- <div className="space-y-1.5 pt-1">
- <div className="flex items-center justify-between">
- <label className="text-xs font-mono text-[var(--muted-foreground)] uppercase flex items-center gap-1.5">
- <FolderOpen className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
- <span>Workspace Folder</span>
- </label>
- <button
- type="button"
- onClick={() => setEditAgentWorkspace('c:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57')}
- className="text-[10px] font-mono text-[var(--muted-foreground)] hover:underline opacity-80 hover:opacity-100"
- >
- Reset to Active Repo
- </button>
- </div>
-
- <div className="flex items-center gap-2">
- <input
- type="file"
- ref={editFolderInputRef}
- className="hidden"
- // @ts-expect-error webkitdirectory is standard in modern Chromium/desktop browsers
- webkitdirectory=""
- directory=""
- onChange={(e) => {
- const files = e.target.files
- if (files && files.length > 0) {
- const folderPath = files[0].webkitRelativePath?.split('/')[0] || files[0].name || 'Selected Folder'
- setEditAgentWorkspace(folderPath)
- }
- }}
- />
- <div className="relative flex-1 min-w-0">
- <input
- type="text"
- value={editAgentWorkspace}
- onChange={(e) => setEditAgentWorkspace(e.target.value)}
- placeholder="c:/path/to/workspace..."
- className="w-full h-8 pl-8 pr-2.5 text-xs font-mono rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
- />
- <Folder className="w-3.5 h-3.5 text-[var(--muted-foreground)] absolute left-2.5 top-2.5" />
- </div>
-
- <Button
- type="button"
- variant="outline"
- size="sm"
- onClick={() => editFolderInputRef.current?.click()}
- className="h-8 text-xs font-mono px-3 gap-1.5 shrink-0 bg-[var(--input)]/40 hover:bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]"
- >
- <FolderOpen className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
- <span>Browse</span>
- </Button>
- </div>
- </div>
-
- {/* 5. ENGINE & TARGET MODEL */}
- <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
- <div className="space-y-1">
- <label className="text-xs font-mono text-[var(--muted-foreground)] uppercase">Engine</label>
- <Select
- value={editAgentEngine}
- onValueChange={(val) => {
- setEditAgentEngine(val)
- const available = ENGINE_MODELS_MAP[val]
- if (available && available.length > 0) {
- setEditAgentModel(available[0].id)
- }
- }}
- >
- <SelectTrigger className="h-8 text-xs font-mono">
- <SelectValue />
- </SelectTrigger>
- <SelectContent>
- <SelectItem value="opencode_run">OpenCode</SelectItem>
- <SelectItem value="kilo_run">KiloCode</SelectItem>
- <SelectItem value="antigravity_run">Antigravity</SelectItem>
- <SelectItem value="groq">Groq</SelectItem>
- </SelectContent>
- </Select>
- </div>
-
- <div className="space-y-1">
- <label className="text-xs font-mono text-[var(--muted-foreground)] uppercase">Target Model</label>
- <Select value={editAgentModel} onValueChange={setEditAgentModel}>
- <SelectTrigger className="h-8 text-xs font-mono">
- <SelectValue />
- </SelectTrigger>
- <SelectContent>
- {(ENGINE_MODELS_MAP[editAgentEngine] || ENGINE_MODELS_MAP['opencode_run']).map((m) => (
- <SelectItem key={m.id} value={m.id}>
- {m.label}
- </SelectItem>
- ))}
- </SelectContent>
- </Select>
- </div>
- </div>
-
- {/* 6. SKILLS & TOOLS TABS */}
- <div className="space-y-2 pt-1">
- <Tabs defaultValue="skills" className="w-full">
- <div className="flex items-center justify-between pb-1.5">
- <TabsList className="h-7.5 p-0.5 bg-[var(--input)]/80 border border-[var(--border)]">
- <TabsTrigger value="skills" className="text-xs h-6.5 px-3 gap-1.5 font-mono">
- <Sparkles className="w-3 h-3 text-[var(--muted-foreground)]" />
- <span>Skills ({editAgentSkills.length})</span>
- </TabsTrigger>
- <TabsTrigger value="tools" className="text-xs h-6.5 px-3 gap-1.5 font-mono">
- <Wrench className="w-3 h-3 text-[var(--muted-foreground)]" />
- <span>Tools ({editAgentTools.length})</span>
- </TabsTrigger>
- </TabsList>
- <div className="flex items-center gap-1.5">
- <button
- type="button"
- onClick={() => {
- if (editAgentSkills.length === availableSkills.length) {
- setEditAgentSkills([])
- } else {
- setEditAgentSkills(availableSkills.map((s) => s.id))
- }
- }}
- className="text-[10px] font-mono text-[var(--muted-foreground)] hover:text-[var(--foreground)] px-2 py-0.5 rounded border border-[var(--border)] bg-[var(--input)]/30 hover:bg-[var(--muted)]"
- >
- {editAgentSkills.length === availableSkills.length ? 'Clear Skills' : 'All Skills'}
- </button>
- <button
- type="button"
- onClick={() => {
- if (editAgentTools.length === AVAILABLE_TOOLS.length) {
- setEditAgentTools([])
- } else {
- setEditAgentTools(AVAILABLE_TOOLS.map((t) => t.id))
- }
- }}
- className="text-[10px] font-mono text-[var(--muted-foreground)] hover:text-[var(--foreground)] px-2 py-0.5 rounded border border-[var(--border)] bg-[var(--input)]/30 hover:bg-[var(--muted)]"
- >
- {editAgentTools.length === AVAILABLE_TOOLS.length ? 'Clear Tools' : 'All Tools'}
- </button>
- </div>
- </div>
-
- {/* SKILLS TAB */}
- <TabsContent value="skills" className="mt-1">
- <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
- {availableSkills.map((skill) => {
- const isSelected = editAgentSkills.includes(skill.id)
- return (
- <button
- key={skill.id}
- type="button"
- onClick={() => toggleEditSkill(skill.id)}
- className={`flex flex-col items-start p-2 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] border text-left transition-all ${
- isSelected
- ? 'bg-[var(--primary)]/15 border-[var(--primary)] text-[var(--foreground)] ring-1 ring-[var(--primary)]/30'
- : 'bg-[var(--input)]/30 border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--input)]/50'
- }`}
- >
- <div className="flex items-center justify-between w-full gap-1">
- <span className="text-xs font-mono font-semibold text-[var(--foreground)] truncate">
- {isSelected ? '✓ ' : '+ '}{skill.name}
- </span>
- {isSelected && (
- <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-[var(--primary)]/20 text-[var(--muted-foreground)] shrink-0 font-bold">
- ACTIVE
- </span>
- )}
- </div>
- <span className="text-[10px] text-[var(--muted-foreground)] line-clamp-1 mt-0.5">
- {skill.desc}
- </span>
- </button>
- )
- })}
- </div>
- </TabsContent>
-
- {/* TOOLS TAB */}
- <TabsContent value="tools" className="mt-1">
- <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
- {AVAILABLE_TOOLS.map((tool) => {
- const isSelected = editAgentTools.includes(tool.id)
- return (
- <button
- key={tool.id}
- type="button"
- onClick={() => toggleEditTool(tool.id)}
- className={`flex flex-col items-start p-2 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] border text-left transition-all ${
- isSelected
- ? 'bg-cyan-500/15 border-cyan-500 text-[var(--foreground)] ring-1 ring-cyan-500/30'
- : 'bg-[var(--input)]/30 border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--input)]/50'
- }`}
- >
- <div className="flex items-center justify-between w-full gap-1">
- <span className="text-xs font-mono font-semibold text-[var(--foreground)] truncate">
- {isSelected ? '✓ ' : '+ '}{tool.name}
- </span>
- {isSelected && (
- <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-cyan-500/20 text-[var(--muted-foreground)] shrink-0 font-bold">
- ACTIVE
- </span>
- )}
- </div>
- <span className="text-[10px] text-[var(--muted-foreground)] line-clamp-1 mt-0.5">
- {tool.desc}
- </span>
- </button>
- )
- })}
- </div>
- </TabsContent>
- </Tabs>
- </div>
- </div>
- </ScrollArea>
-
- {/* Modal Footer */}
- <div className="p-3 border-t border-[var(--border)] flex items-center justify-end gap-2 shrink-0 bg-[var(--card)]">
- <Button
- variant="outline"
- size="sm"
- onClick={() => setIsEditAgentOpen(false)}
- className="h-7 text-xs px-3"
- >
- Cancel
- </Button>
- <Button
- variant="default"
- size="sm"
- onClick={handleSaveEditAgent}
- className="h-7 text-xs px-3 gap-1"
- >
- <Save className="w-3.5 h-3.5" />
- <span>Save Changes</span>
- </Button>
- </div>
- </FramePanel>
- </Frame>
- </div>
- )}
+			{/* ── Edit Agent Config Modal Dialog (ReUI AgentConfigModal) ── */}
+			<AgentConfigModal
+				isOpen={isEditAgentOpen}
+				onClose={() => setIsEditAgentOpen(false)}
+				agent={selectedAgent}
+				onSave={(updated) => {
+					setAgents((prev) => prev.map((ag) => (ag.id === updated.id ? updated : ag)))
+					playOfficeFoley('success', soundEnabled)
+					triggerToast(`Agent ${updated.name} configuration updated!`)
+					loadFleet()
+				}}
+			/>
 
  {/* ── Modal: Manage Files & Soul Live Editor (100% ReUI Component Architecture) ── */}
  {isFilesModalOpen && (

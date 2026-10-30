@@ -199,8 +199,14 @@ class FleetDispatcher:
         """
         effective_subtask = is_subtask or bool(parent_task_id)
 
-        # Check if Michael orchestrator should auto-decompose multi-faceted full-stack tasks
-        if not effective_subtask and agent_id.upper() in ("MICHAEL", "MANAGER") and any(
+        # Check if orchestrator agent should auto-decompose multi-faceted full-stack tasks
+        target_pre = self._get_agent(agent_id)
+        is_orchestrator = target_pre and (
+            getattr(target_pre, "is_core", False)
+            or any(cap in (getattr(target_pre, "capabilities", []) or []) for cap in ("task_decomposition", "fleet_orchestration"))
+            or any(w in (getattr(target_pre, "role", "") or "").lower() for w in ("orchestrator", "architect", "manager"))
+        )
+        if not effective_subtask and is_orchestrator and any(
             w in prompt.lower() for w in ("full-stack", "fullstack", "entire app", "both frontend and backend")
         ):
             if hasattr(self.registry, "decompose_and_dispatch"):
@@ -217,12 +223,20 @@ class FleetDispatcher:
                 "error": f"Agent '{agent_id}' is not in the active fleet. Registered agents: {', '.join(registered_names)}",
             }
 
-        # Overflow Load Balancing: If Verve is at capacity (>= 3 active tasks), auto-route to Flux
-        if agent.id in ("VERVE", "ALI") and self._get_agent_active_task_count(agent.id) >= 3:
-            flux = self._get_agent("FLUX") or self._get_agent("HAIDER")
-            if flux and self._get_agent_active_task_count(flux.id) < 3:
-                logger.info("[FleetDispatcher] Verve at max capacity (3 tasks). Auto-routing task to Flux.")
-                agent = flux
+        # Dynamic Overflow Load Balancing: If agent is at capacity (>= 3 active tasks), auto-route to another active specialist
+        if self._get_agent_active_task_count(agent.id) >= 3:
+            agents_dict = getattr(self.registry, "agents", {})
+            if isinstance(agents_dict, dict):
+                agent_skills = set(getattr(agent, "allowed_skills", []) or [])
+                agent_caps = set(getattr(agent, "capabilities", []) or [])
+                for alt_agent in agents_dict.values():
+                    if alt_agent.id != agent.id and self._get_agent_active_task_count(alt_agent.id) < 3:
+                        if (agent_skills and set(alt_agent.allowed_skills or []) & agent_skills) or (
+                            agent_caps and set(alt_agent.capabilities or []) & agent_caps
+                        ) or (getattr(agent, "default_tool", None) and alt_agent.default_tool == agent.default_tool):
+                            logger.info("[FleetDispatcher] Agent %s at capacity (>=3 tasks). Auto-routing to %s.", agent.name, alt_agent.name)
+                            agent = alt_agent
+                            break
 
         # Capability check via Circuit Breaker
         from core.circuit_breaker import circuit_breaker

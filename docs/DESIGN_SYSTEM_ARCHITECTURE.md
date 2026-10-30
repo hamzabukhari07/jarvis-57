@@ -330,3 +330,7 @@ Expected output:
 
 [SUCCESS] All 7 Design System & Antigravity Verification Tests Passed!
 ```
+
+
+> [!IMPORTANT]
+> The bloated synthetic template and DSL generators (core/ai_design_generator.py, core/design_cache.py, core/design_resolver.py, core/master_template_builder.py, core/design_md_generator.py) have been permanently purged. Design token extraction and DESIGN.md specification generation are now handled via the official declarative SOP skill skills/generate_design_md/SKILL.md powered by atomic tool extract_design_system (ctions/design_extractor.py).

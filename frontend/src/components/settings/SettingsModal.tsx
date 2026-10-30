@@ -39,6 +39,7 @@ import {
   Trash2,
   Loader2,
   Terminal,
+  Wrench,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { api } from '../../lib/api'
@@ -46,6 +47,7 @@ import type { AudioDeviceState } from '../../hooks/useZezoSocket'
 import { QiviAvatarVisualizer } from '../canvas/QiviAvatarVisualizer'
 import type { QiviShape } from 'qivi-react'
 import { SkillsSettingsTab } from './SkillsSettingsTab'
+import { ToolsSettingsTab } from './ToolsSettingsTab'
 import { CodeEnginesSettingsTab } from './CodeEnginesSettingsTab'
 import { MemoryGraphCanvas, type GraphNode, type GraphLink } from '../memory/MemoryGraphCanvas'
 import { MemoryInspectorDrawer } from '../memory/MemoryInspectorDrawer'
@@ -72,6 +74,7 @@ type SectionId =
   | 'appearance'
   | 'memory'
   | 'skills'
+  | 'tools'
   | 'code-engines'
   | 'about'
 
@@ -906,6 +909,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         { id: 'appearance' as SectionId, label: 'Appearance', keywords: ['appearance', 'theme', 'accent', 'color', 'dark', 'light', 'avatar'], icon: Palette },
         { id: 'memory' as SectionId, label: 'Memory', keywords: ['memory', 'intelligence', 'graph', 'sqlite', 'vector', 'notes'], icon: Atom },
         { id: 'skills' as SectionId, label: 'Skills', keywords: ['skills', 'plugins', 'tools', 'declarative'], icon: Sparkles },
+        { id: 'tools' as SectionId, label: 'Tools', keywords: ['tools', 'actions', 'automation', 'browser', 'desktop', 'files', 'system', 'research'], icon: Wrench },
         { id: 'code-engines' as SectionId, label: 'Code Engines', keywords: ['code', 'engines', 'cli', 'antigravity', 'opencode', 'kilo', 'coding'], icon: Terminal },
       ],
     },
@@ -1894,6 +1898,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* ──────────────── 7. SKILLS & AUTONOMOUS CAPABILITIES ──────────────── */}
               {activeSection === 'skills' && (
                 <SkillsSettingsTab />
+              )}
+
+              {/* ──────────────── 7a. TOOLS MANAGEMENT ──────────────── */}
+              {activeSection === 'tools' && (
+                <ToolsSettingsTab />
               )}
 
               {/* ──────────────── 7b. CODE ENGINES ──────────────── */}

@@ -1490,11 +1490,11 @@ class ZezoLive:
         fleet_ctx = ""
         try:
             from core.fleet_manager import fleet_manager
-            deck = fleet_manager.get_fleet_deck_state()
-            if deck:
+            active_agents = fleet_manager.get_all_agents()
+            if active_agents:
                 roster_lines = [
-                    f"- {a['id']} ({a['name']}): {a['role']} [Engine: {a.get('default_tool', 'opencode_run')}]"
-                    for a in deck
+                    f"- {a.id} ({a.name}): {a.role} [Engine/Tool: {a.default_tool or a.engine or 'opencode_run'}, Skills: {', '.join(a.allowed_skills or [])}]"
+                    for a in active_agents
                 ]
                 fleet_ctx = (
                     "[ACTIVE AUTONOMOUS FLEET ROSTER]\n"
@@ -1505,10 +1505,10 @@ class ZezoLive:
                     "ONLY assign work to agents currently listed above. Never guess, invent, or use decommissioned agents.\n"
                     "- ZERO VERBAL SIMULATION: You have NO ability to assign, dispatch, or reassign tasks by speaking alone. "
                     "You MUST call fleet_control(action='dispatch', ...) in the exact same turn. "
-                    "NEVER say 'Assigning...', 'Flux is building...', or 'I\'ve dispatched...' unless a tool call was executed.\n"
+                    "NEVER say 'Assigning...', 'Working on it...', or 'I\'ve dispatched...' unless a tool call was executed.\n"
                     "- UNNAMED REASSIGNMENT: If the user says an agent is not working or asks to assign to 'someone else' "
-                    "('kisi or ko task assign kr de', 'switch agent'), automatically pick the matching alternative specialist "
-                    "(VERVE <-> FLUX for frontend) and immediately invoke fleet_control(action='dispatch', agent_id='FLUX', task=..., confirmed=true).\n"
+                    "('kisi or ko task assign kr de', 'switch agent'), dynamically pick an alternative active specialist "
+                    "sharing the required skill/capabilities from the active roster above and immediately invoke fleet_control(action='dispatch', agent_id=..., task=..., confirmed=true).\n"
                     "- If user says task is not showing, NEVER claim 'display lag'. Immediately verify via task_status or dispatch.\n\n"
                 )
         except Exception as e:

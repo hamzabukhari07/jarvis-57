@@ -51,6 +51,7 @@ class SkillRecord:
     version: str = "1.0"
     tags: list[str] = field(default_factory=list)
     triggers: list[str] = field(default_factory=list)
+    required_tools: list[str] = field(default_factory=list)
     auto_activate: bool = True
     pinned: bool = False
     disabled: bool = False
@@ -65,6 +66,7 @@ class SkillRecord:
             "version": self.version,
             "tags": self.tags,
             "triggers": self.triggers,
+            "required_tools": self.required_tools,
             "auto_activate": self.auto_activate,
             "pinned": self.pinned,
             "disabled": self.disabled,
@@ -111,7 +113,7 @@ def _parse_yaml_frontmatter(raw_yaml: str) -> dict[str, Any]:
     return meta
 
 
-EXCLUDED_SKILL_NAMES = {"antigravity_agent", "kilo_code", "opencode", "custom_skill_10", "hamza_taste"}
+EXCLUDED_SKILL_NAMES = {"antigravity_agent", "kilo_code", "opencode"}
 
 
 def _infer_domain_from_name_and_tags(name: str, tags: list[str], folder: Path) -> str:
@@ -250,6 +252,7 @@ class SkillRegistry:
                         version = str(meta.get("version") or "1.0").strip()
                         tags = meta.get("tags") if isinstance(meta.get("tags"), list) else []
                         triggers = meta.get("triggers") if isinstance(meta.get("triggers"), list) else []
+                        required_tools = meta.get("required_tools") if isinstance(meta.get("required_tools"), list) else []
                         domain = str(meta.get("domain") or "").strip()
                     else:
                         name = item_folder.name
@@ -259,6 +262,7 @@ class SkillRegistry:
                         version = "1.0"
                         tags = []
                         triggers = []
+                        required_tools = []
                         domain = ""
 
                     if not domain:
@@ -283,6 +287,7 @@ class SkillRegistry:
                         version=version,
                         tags=tags,
                         triggers=triggers,
+                        required_tools=required_tools,
                         auto_activate=auto_activate,
                         pinned=pinned,
                         disabled=disabled,

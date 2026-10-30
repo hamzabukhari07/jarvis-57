@@ -38,7 +38,7 @@ def _infer_agent_defaults(role: str, specialty: str) -> Dict[str, Any]:
         return {
             "engine": "",
             "default_tool": "agent_reach",
-            "allowed_tools": ["agent_reach", "web_search", "web_read_page", "web_reader", "file_processor"],
+            "allowed_tools": ["agent_reach", "web_search", "web_read_page", "file_processor"],
             "allowed_skills": ["web_scraper", "social_research", "web_research_pipeline"],
             "capabilities": ["web_research", "media_extraction", "content_analysis"],
         }
@@ -213,36 +213,49 @@ class FleetRegistry:
                     }
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(export, f, indent=2)
+            try:
+                self._last_mtime = self.config_path.stat().st_mtime
+            except OSError:
+                pass
             return True
         except Exception as e:
             logger.error("[FleetRegistry] Failed to save fleet config: %s", e)
             return False
 
-    def get_agent(self, name_or_id: str) -> Optional[FleetAgent]:
-        key = name_or_id.upper().strip()
-        alias_map = {"ALI": "VERVE", "HAIDER": "FLUX"}
-        lookup_key = alias_map.get(key, key)
+    def resolve_agent_for_skill(self, skill_name: str) -> Optional[FleetAgent]:
+        """Dynamically resolve which live agent currently possesses the assigned skill."""
+        candidates = []
         with self._lock:
             self.refresh_if_modified()
-            if lookup_key in self.agents:
-                return self.agents[lookup_key]
+            for agent in self.agents.values():
+                if skill_name in (agent.allowed_skills or []):
+                    candidates.append(agent)
+        if not candidates:
+            return None
+        return min(candidates, key=lambda a: self.get_agent_active_task_count(a.id))
+
+    def get_all_agents(self) -> List[FleetAgent]:
+        """Return list of all currently active agents."""
+        with self._lock:
+            self.refresh_if_modified()
+            return list(self.agents.values())
+
+    def get_agent(self, name_or_id: str) -> Optional[FleetAgent]:
+        key = name_or_id.upper().strip()
+        with self._lock:
+            self.refresh_if_modified()
             if key in self.agents:
                 return self.agents[key]
             for a in self.agents.values():
-                if lookup_key == a.name.upper() or lookup_key.startswith(a.name.upper()) or lookup_key in a.name.upper().split():
-                    return a
-                if key == a.name.upper() or a.name.upper().startswith(key) or key in a.name.upper().split():
+                name_up = a.name.upper()
+                if key == name_up or key.startswith(name_up) or key in name_up.split() or name_up.startswith(key):
                     return a
         return None
 
     def resolve_agent_by_mention_or_capability(self, query: str) -> Optional[FleetAgent]:
         """
-        Intelligently resolves an agent by explicit name mention, role alias, or capability keyword fallback.
-        Examples:
-          - "Ali build landing page" -> ALI
-          - "Tell Dwight to verify" -> DWIGHT
-          - "Research AI frameworks" -> KELLY (Social & Deep Web Researcher)
-          - "Build PostgreSQL models" -> AHMAD (Full-Stack & Backend Specialist)
+        Dynamically resolves an agent by explicit name mention, active skill, or capability keyword fallback.
+        Never resurrects or returns decommissioned ghost agents.
         """
         if not query or not query.strip():
             return None
@@ -250,10 +263,11 @@ class FleetRegistry:
         q = query.strip()
         words = re.findall(r"\b[A-Za-z0-9_]+\b", q)
 
-        # 1. Direct Name / ID match in words (e.g. 'Ali', 'Ahmad', 'Dwight', 'Pam', 'Oscar', 'Kelly', 'Michael', 'Jim')
-        stop_words = {"agent", "agents", "app", "file", "task", "tasks", "tool", "tools", "the", "a", "an", "is", "for", "to", "in", "on", "and", "or", "not"}
         with self._lock:
             self.refresh_if_modified()
+
+            # 1. Direct Name / ID match in words against currently live registered agents only
+            stop_words = {"agent", "agents", "app", "file", "task", "tasks", "tool", "tools", "the", "a", "an", "is", "for", "to", "in", "on", "and", "or", "not"}
             for w in words:
                 if w.lower() in stop_words:
                     continue
@@ -261,68 +275,75 @@ class FleetRegistry:
                 for agent_id, agent in self.agents.items():
                     if w_up == agent_id.upper() or w.lower() == agent.name.lower():
                         return agent
-                if w_up in ("OSCAR", "JIM", "STANLEY", "CREED", "ANGELA", "TOBY", "ANDY", "RYAN", "DARRELL", "KELLY"):
-                    return FleetAgent(id=w_up, name=w.title(), role="Fleet Specialist", specialty="General task execution", color="#eab308", avatar_pixel="pixel.png", default_tool="agent_reach" if w_up == "KELLY" else "opencode_run", risk_tier="L0_READ_ONLY", prompt_prefix="")
 
-        low = q.lower()
+            # 2. Match exact skill name if mentioned in query
+            for agent in self.agents.values():
+                for skill in (agent.allowed_skills or []):
+                    if skill.lower() in q.lower():
+                        return agent
 
-        # 2. Known Role / Alias Mapping
-        role_map = {
-            "manager": "MICHAEL",
-            "orchestrator": "MICHAEL",
-            "frontend": "VERVE",
-            "ui": "VERVE",
-            "designer": "VERVE",
-            "backend": "AHMAD",
-            "database": "AHMAD",
-            "fullstack": "AHMAD",
-            "full-stack": "AHMAD",
-            "qa": "DWIGHT",
-            "tester": "DWIGHT",
-            "auditor": "DWIGHT",
-            "security": "DWIGHT",
-            "tokens": "PAM",
-            "metrics": "OSCAR",
-            "accountant": "OSCAR",
-            "complexity": "OSCAR",
-            "developer": "DEVDYNAMO",
-            "scaffold": "DEVDYNAMO",
-            "rebuild": "DEVDYNAMO",
-        }
-        for alias, agent_id in role_map.items():
-            if re.search(r"\b" + re.escape(alias) + r"\b", low):
-                agent = self.get_agent(agent_id)
-                if agent:
-                    return agent
-                if agent_id in ("OSCAR", "JIM", "STANLEY", "CREED", "ANGELA", "TOBY", "KELLY"):
-                    return FleetAgent(id=agent_id, name=agent_id.title(), role="Specialist", specialty="General", color="#eab308", avatar_pixel="pixel.png", default_tool="opencode_run", risk_tier="L0_READ_ONLY", prompt_prefix="")
+            # 3. Dynamic domain capability resolution against active agents with word-boundary awareness
+            low = q.lower()
+            low_words = set(re.findall(r"\b[a-z0-9_-]+\b", low))
 
-        # 3. Domain Fallback Heuristics
-        if any(w in low for w in ("token", "tokens", "palette", "design system", "extract design")):
-            return self.get_agent("PAM")
-        if any(w in low for w in ("html", "css", "landing", "page", "react", "tailwind", "component", "studio", "ui", "frontend", "website", "portfolio", "web-project")):
-            verve = self.get_agent("VERVE") or self.get_agent("ALI")
-            flux = self.get_agent("FLUX") or self.get_agent("HAIDER")
-            if verve and self.get_agent_active_task_count(verve.id) >= 3:
-                if flux and self.get_agent_active_task_count(flux.id) < 3:
-                    return flux
-            return verve or flux
-        if any(w in low for w in ("fastapi", "postgres", "sql", "api", "endpoint", "schema", "microservice", "auth", "backend", "database")):
-            return self.get_agent("AHMAD")
-        if any(w in low for w in ("test", "verify", "audit", "regression", "pytest", "edge case", "security")):
-            return self.get_agent("DWIGHT")
-        if any(w in low for w in ("scrape", "transcribe", "summary", "web search", "market research", "research", "social", "trend", "trends")):
-            return self.get_agent("KELLY") or FleetAgent(id="KELLY", name="Kelly", role="Research Specialist", specialty="Research", color="#e11d48", avatar_pixel="pixel.png", default_tool="agent_reach", risk_tier="L0_READ_ONLY", prompt_prefix="")
+            def has_kw(*keywords: str) -> bool:
+                for kw in keywords:
+                    if " " in kw or "-" in kw:
+                        if kw in low:
+                            return True
+                    elif kw in low_words:
+                        return True
+                return False
 
-        # 4. Default dispatch fallback: Verve for UI/frontend, Ahmad for general coding
-        if any(w in low for w in ("build", "create", "make", "design", "develop", "code", "program")):
-            verve = self.get_agent("VERVE") or self.get_agent("ALI")
-            flux = self.get_agent("FLUX") or self.get_agent("HAIDER")
-            if verve and self.get_agent_active_task_count(verve.id) >= 3:
-                if flux and self.get_agent_active_task_count(flux.id) < 3:
-                    return flux
-            return verve or flux or self.get_agent("AHMAD")
-        return None
+            def match_candidates(predicate):
+                matches = [a for a in self.agents.values() if predicate(a)]
+                if matches:
+                    return min(matches, key=lambda a: self.get_agent_active_task_count(a.id))
+                return None
+
+            # Design tokens & palettes
+            if has_kw("token", "tokens", "palette", "design system", "extract design"):
+                token_agent = match_candidates(lambda a: "extract_design_system" in (a.allowed_tools or []) or "design_token_extraction" in (a.capabilities or []))
+                if token_agent:
+                    return token_agent
+
+            # Frontend / UI / Web Design
+            if has_kw("html", "css", "landing", "page", "react", "tailwind", "component", "studio", "ui", "frontend", "website", "portfolio", "web-project"):
+                fe_agent = match_candidates(lambda a: "website_build" in (a.allowed_skills or []) or any(c in (a.capabilities or []) for c in ("web_design", "frontend_coding", "ui_refactor")) or "frontend" in (a.role or "").lower() or "ui" in (a.role or "").lower())
+                if fe_agent:
+                    return fe_agent
+
+            # Backend / APIs / Database
+            if has_kw("fastapi", "postgres", "sql", "api", "endpoint", "schema", "microservice", "auth", "backend", "database"):
+                be_agent = match_candidates(lambda a: any(c in (a.capabilities or []) for c in ("backend_architecture", "api_development", "database_design")) or "backend" in (a.role or "").lower() or "database" in (a.role or "").lower())
+                if be_agent:
+                    return be_agent
+
+            # Testing / QA / Refactoring
+            if has_kw("test", "verify", "audit", "regression", "pytest", "edge case", "security", "qa"):
+                qa_agent = match_candidates(lambda a: any(c in (a.capabilities or []) for c in ("qa_testing", "security_audit", "code_refactor")) or "qa" in (a.role or "").lower() or "tester" in (a.role or "").lower())
+                if qa_agent:
+                    return qa_agent
+
+            # Research / Scraping / Social
+            if has_kw("scrape", "transcribe", "summary", "web search", "market research", "research", "social", "trend", "trends"):
+                res_agent = match_candidates(lambda a: any(s in (a.allowed_skills or []) for s in ("social_research", "web_scraper", "web_research_pipeline")) or any(c in (a.capabilities or []) for c in ("deep_web_research", "market_research", "web_research")) or "research" in (a.role or "").lower())
+                if res_agent:
+                    return res_agent
+
+            # Orchestrator / Architecture
+            if has_kw("decompose", "architect", "orchestrate", "lead", "plan project"):
+                orch_agent = match_candidates(lambda a: a.is_core or any(c in (a.capabilities or []) for c in ("task_decomposition", "fleet_orchestration")) or "architect" in (a.role or "").lower() or "orchestrator" in (a.role or "").lower())
+                if orch_agent:
+                    return orch_agent
+
+            # Default dynamic fallback: find any coding agent with lowest load
+            if has_kw("build", "create", "make", "design", "develop", "code", "program"):
+                code_agent = match_candidates(lambda a: a.default_tool in ("antigravity_run", "opencode_run", "kilo_run") or a.engine in ("antigravity", "opencode", "kilo"))
+                if code_agent:
+                    return code_agent
+
+            return None
 
     def get_agent_active_task_count(self, agent_id: str) -> int:
         """Returns the number of currently active (running/queued) tasks assigned to an agent."""

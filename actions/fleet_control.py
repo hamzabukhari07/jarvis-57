@@ -47,7 +47,8 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
     # ── Stateless Greenfield Intake & Confirmation Gate for Fleet Builds ────
     target_agent = fleet_manager.get_agent(agent_id)
     canonical_agent_id = target_agent.id.upper() if target_agent else agent_id.upper()
-    is_web_agent = canonical_agent_id in ("VERVE", "FLUX") or agent_id.upper() in ("VERVE", "FLUX", "ALI", "HAIDER")
+    agent_skills = getattr(target_agent, "allowed_skills", []) or []
+    is_web_agent = bool(set(agent_skills) & {"website_build", "web_design", "web_development"})
     is_web_task = any(k in task.lower() for k in ("build website", "create website", "make a website", "make website", "build a website", "create a website", "build landing page", "create landing page", "build a landing page", "create a landing page", "build portfolio", "create portfolio", "build a portfolio", "create a portfolio", "make a portfolio", "new website", "new landing page", "new portfolio"))
 
     if not target_path and not (is_web_agent or is_web_task):
@@ -130,10 +131,13 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
     if not res.get("success"):
         return f"Fleet dispatch failed: {res.get('error', 'Unknown error')}"
 
-    # Handle Michael multi-task decomposition result
-    if res.get("orchestrator") == "MICHAEL":
+    # Handle multi-task decomposition result
+    if res.get("orchestrator") or res.get("decomposed_count", 0) > 1:
         count = res.get("decomposed_count", 0)
-        return f"Michael Scott decomposed and dispatched {count} specialist tasks to the fleet."
+        orch_name = res.get("orchestrator", "Orchestrator")
+        if str(orch_name).upper() == "MICHAEL":
+            orch_name = "Michael Scott"
+        return f"{orch_name} decomposed and dispatched {count} specialist tasks to the fleet."
 
     task_id = res.get("task_id")
     agent_name = res.get("agent_name", agent_id)
@@ -334,7 +338,10 @@ def _handle_decompose(params: Dict[str, Any]) -> str:
         "base_path": res.get("base_path"),
     })
 
-    return f"Michael Scott decomposed and dispatched {count} specialist tasks:\n" + "\n".join(task_summaries)
+    orch_name = res.get("orchestrator", "Orchestrator")
+    if str(orch_name).upper() == "MICHAEL":
+        orch_name = "Michael Scott"
+    return f"{orch_name} decomposed and dispatched {count} specialist tasks:\n" + "\n".join(task_summaries)
 
 
 _ACTION_DISPATCH: Dict[str, Callable[[Dict[str, Any]], str]] = {

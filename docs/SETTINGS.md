@@ -9,7 +9,7 @@
 
 ## 🧭 Overview
 
-ZEZO provides a unified, reactive **9-Tab ReUI Settings Hub** (`frontend/src/components/settings/SettingsModal.tsx`). It consolidates runtime interaction behavior, speech and audio hardware routing, autonomous coding engines, declarative agent skills, themes, remote Cloudflare tunnels, credentials, and telemetry into a single cohesive control center.
+ZEZO provides a unified, reactive **10-Tab ReUI Settings Hub** (`frontend/src/components/settings/SettingsModal.tsx`). It consolidates runtime interaction behavior, speech and audio hardware routing, autonomous coding engines, declarative agent skills, themes, remote Cloudflare tunnels, credentials, and telemetry into a single cohesive control center.
 
 All configuration updates persist atomically to `config/api_keys.json` with multi-attempt transactional staging (`os.replace`) to guarantee zero corruption even during sudden restarts or concurrent background writes.
 
@@ -34,7 +34,7 @@ All configuration updates persist atomically to `config/api_keys.json` with mult
 
 ---
 
-## 🗂️ The 9 Modular ReUI Settings Tabs
+## 🗂️ The 10 Modular ReUI Settings Tabs
 
 ### 1. ⚙️ General & Quick Controls
 Configures conversational turn-taking, startup lifecycle, and reasoning:

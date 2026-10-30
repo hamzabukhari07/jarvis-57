@@ -19,6 +19,10 @@ export interface AgentProfile {
   state?: 'idle' | 'working' | 'walking' | 'talking' | 'break'
   isBusy?: boolean
   logs?: string[]
+  allowed_tools?: string[]
+  allowed_skills?: string[]
+  prompt_prefix?: string
+  desk_coordinates?: { x: number; y: number }
 }
 
 export interface ZezoTelemetry {

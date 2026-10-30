@@ -65,6 +65,116 @@ def _scan_folder(root: Path, cap: int = 5000) -> tuple[list[str], int, bool]:
     return rel_paths, total, truncated
 
 
+
+_USER_FACING_TOOLS: list[dict[str, Any]] = [
+    {
+        "id": "agent_reach",
+        "name": "agent_reach",
+        "label": "Deep Social Research",
+        "category": "Research & Intelligence",
+        "description": "Deep extraction: YouTube transcripts, Reddit threads, Twitter/X, GitHub repos, TikTok/Instagram audio, and cross-platform reports",
+    },
+    {
+        "id": "browser_control",
+        "name": "browser_control",
+        "label": "Browser Control",
+        "category": "Web & Automation",
+        "description": "Playwright automated browser (clicks, typing, forms)",
+    },
+    {
+        "id": "web_search",
+        "name": "web_search",
+        "label": "Web Search",
+        "category": "Web & Intelligence",
+        "description": "DuckDuckGo live internet search",
+    },
+    {
+        "id": "web_read_page",
+        "name": "web_read_page",
+        "label": "Web Page Reader",
+        "category": "Web & Intelligence",
+        "description": "Web page DOM scraping and reading",
+    },
+    {
+        "id": "computer_control",
+        "name": "computer_control",
+        "label": "Desktop Automation",
+        "category": "Desktop & OS",
+        "description": "Native mouse clicks, typing, screen coordinates",
+    },
+    {
+        "id": "desktop_control",
+        "name": "desktop_control",
+        "label": "Window Manager",
+        "category": "Desktop & OS",
+        "description": "Window focus, minimize, maximize, resize",
+    },
+    {
+        "id": "computer_settings",
+        "name": "computer_settings",
+        "label": "System Settings",
+        "category": "Desktop & OS",
+        "description": "OS volume, brightness, Wi-Fi, bluetooth control",
+    },
+    {
+        "id": "open_app",
+        "name": "open_app",
+        "label": "App Launcher",
+        "category": "Desktop & OS",
+        "description": "Launch local applications (Chrome, VS Code, etc.)",
+    },
+    {
+        "id": "file_controller",
+        "name": "file_controller",
+        "label": "File Controller",
+        "category": "Files & Code",
+        "description": "Read, write, create, list local directory files",
+    },
+    {
+        "id": "file_processor",
+        "name": "file_processor",
+        "label": "Batch File Processor",
+        "category": "Files & Code",
+        "description": "Bulk file analysis, transforms, batch updates",
+    },
+    {
+        "id": "quick_snippet",
+        "name": "quick_snippet",
+        "label": "Quick Snippets",
+        "category": "Files & Code",
+        "description": "Save, recall, and search code snippets",
+    },
+    {
+        "id": "reminder",
+        "name": "reminder",
+        "label": "Smart Reminders",
+        "category": "Daily Utilities",
+        "description": "Set alarms, countdowns, and system reminders",
+    },
+    {
+        "id": "weather_report",
+        "name": "weather_report",
+        "label": "Weather Forecast",
+        "category": "Daily Utilities",
+        "description": "Live atmospheric metrics and forecasts",
+    },
+    {
+        "id": "flight_finder",
+        "name": "flight_finder",
+        "label": "Flight Finder",
+        "category": "Daily Utilities",
+        "description": "Search flight availability and airline schedules",
+    },
+    {
+        "id": "youtube_video",
+        "name": "youtube_video",
+        "label": "YouTube Player",
+        "category": "Daily Utilities",
+        "description": "Search and stream YouTube audio/video",
+    },
+]
+
+
 class ZezoUIServer:
     """Thread-safe local WebSocket & Static file server for the desktop Web UI."""
 
@@ -130,10 +240,14 @@ class ZezoUIServer:
         app.router.add_get("/ws", self._ws_handler)
         app.router.add_get("/api/health", self._health_handler)
         app.router.add_get("/api/tools", self._tools_inspection_handler)
+        app.router.add_post("/api/tools/{name}/toggle", self._tool_toggle_handler)
+        app.router.add_post("/api/engines/{engine}/test", self._engine_test_handler)
+        app.router.add_get("/api/engines/{engine}/test", self._engine_test_handler)
         app.router.add_get("/api/tasks", self._tasks_list_handler)
         app.router.add_get("/api/fleet/state", self._fleet_state_handler)
         app.router.add_get("/api/fleet/agent", self._fleet_agent_profile_handler)
         app.router.add_post("/api/fleet/save_agent", self._fleet_save_agent_handler)
+        app.router.add_post("/api/fleet/agents", self._fleet_save_agent_handler)
         app.router.add_post("/api/fleet/save_soul", self._fleet_save_soul_handler)
         app.router.add_post("/api/fleet/dispatch_task", self._fleet_dispatch_task_handler)
         app.router.add_post("/api/fleet/chat", self._fleet_chat_handler)
@@ -245,17 +359,175 @@ class ZezoUIServer:
         return web.json_response({"status": "ok", "app": "ZEZO", "port": self.port})
 
     async def _tools_inspection_handler(self, request: web.Request) -> web.Response:
-        """Inspect allowed and filtered tools with reasons, optionally scoped by agent_id or mode."""
+        """Returns the list of 15 user-facing tools, their categories, descriptions, and active enabled/disabled states."""
         agent_id = request.query.get("agent_id") or request.query.get("agent")
         mode = request.query.get("mode")
         try:
             from core.action_loader import get_action_registry
             reg = get_action_registry()
-            res = reg.filter_tools(agent_id=agent_id, mode=mode)
-            return web.json_response({"status": "success", "data": res})
+
+            filter_diag = None
+            if agent_id or mode:
+                filter_diag = reg.filter_tools(agent_id=agent_id, mode=mode)
+
+            tools_status = reg.get_tools_status(as_dict=True) if hasattr(reg, "get_tools_status") else {}
+
+            tools_list = []
+            for t in _USER_FACING_TOOLS:
+                tool_id = t["id"]
+                rec = reg.get(tool_id) if hasattr(reg, "get") else None
+                status_info = tools_status.get(tool_id, {}) if isinstance(tools_status, dict) else {}
+
+                is_enabled = True
+                if rec is not None:
+                    is_enabled = bool(getattr(rec, "enabled", True))
+                elif "enabled" in status_info:
+                    is_enabled = bool(status_info["enabled"])
+                elif hasattr(reg, "_disabled_tools"):
+                    is_enabled = tool_id not in reg._disabled_tools
+
+                tools_list.append({
+                    "id": tool_id,
+                    "name": tool_id,
+                    "label": t.get("label", tool_id),
+                    "category": t.get("category", getattr(rec, "category", "General")),
+                    "description": t.get("description", getattr(rec, "description", "")),
+                    "enabled": is_enabled,
+                    "risk": getattr(rec, "risk", "local_mutation"),
+                })
+
+            resp_payload = {
+                "status": "success",
+                "tools": tools_list,
+                "data": {
+                    "allowed_tools": [t for t in tools_list if t["enabled"]],
+                    "filtered_tools": [{"tool": t["id"], "reason": "tool_disabled"} for t in tools_list if not t["enabled"]],
+                    **(filter_diag or {}),
+                },
+            }
+            return web.json_response(resp_payload)
         except Exception as e:
             logger.exception("Error in /api/tools handler: %s", e)
             return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _tool_toggle_handler(self, request: web.Request) -> web.Response:
+        """Expects {enabled: bool} or toggles current state. Calls ActionRegistry.toggle_tool(name, enabled)."""
+        name = request.match_info.get("name", "").strip()
+        if not name:
+            return web.json_response({"success": False, "error": "Tool name required."}, status=400)
+        try:
+            data = {}
+            if request.can_read_body:
+                try:
+                    data = await request.json()
+                except Exception:
+                    data = {}
+
+            from core.action_loader import get_action_registry
+            reg = get_action_registry()
+
+            if "enabled" in data and isinstance(data["enabled"], bool):
+                enabled = data["enabled"]
+            else:
+                rec = reg.get(name) if hasattr(reg, "get") else None
+                current = getattr(rec, "enabled", True) if rec else (name not in getattr(reg, "_disabled_tools", set()))
+                enabled = not current
+
+            if hasattr(reg, "toggle_tool"):
+                reg.toggle_tool(name, enabled)
+            else:
+                rec = reg.get(name)
+                if rec:
+                    rec.enabled = enabled
+
+            self.broadcast("tools_updated", {"tool": name, "enabled": enabled})
+            return web.json_response({"success": True, "tool": name, "enabled": enabled})
+        except Exception as e:
+            logger.exception("Error in /api/tools/{name}/toggle handler: %s", e)
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _engine_test_handler(self, request: web.Request) -> web.Response:
+        """Performs a non-blocking 2-second connectivity ping to verify binary path exists and executes cleanly."""
+        engine = request.match_info.get("engine", "").strip().lower()
+        if not engine and request.can_read_body:
+            try:
+                body = await request.json()
+                engine = str(body.get("engine", "")).strip().lower()
+            except Exception:
+                pass
+
+        if not engine:
+            return web.json_response({"success": False, "error": "Engine name required."}, status=400)
+
+        norm_engine = engine.replace("_run", "").replace("_agent", "")
+
+        def _ping() -> dict[str, Any]:
+            from core.code_engines import resolve_binary, ENGINES
+            bin_path = resolve_binary(norm_engine)
+            if not bin_path or not Path(bin_path).exists():
+                return {
+                    "success": False,
+                    "engine": norm_engine,
+                    "latency_ms": 0,
+                    "binary": bin_path or "",
+                    "error": f"Binary for engine '{norm_engine}' not found on system.",
+                }
+
+            engine_def = ENGINES.get(norm_engine)
+            version_args = list(engine_def.version_argv) if engine_def else ["--version"]
+            cmd = [bin_path] + version_args
+
+            t0 = time.perf_counter()
+            try:
+                res = subprocess.run(
+                    cmd,
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True,
+                    text=True,
+                    timeout=2.0,
+                    creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0,
+                )
+                latency_ms = int(round((time.perf_counter() - t0) * 1000))
+                if res.returncode == 0:
+                    return {
+                        "success": True,
+                        "engine": norm_engine,
+                        "latency_ms": latency_ms,
+                        "binary": bin_path,
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "engine": norm_engine,
+                        "latency_ms": latency_ms,
+                        "binary": bin_path,
+                        "error": f"Process exited with code {res.returncode}: {res.stderr or res.stdout}",
+                    }
+            except subprocess.TimeoutExpired:
+                latency_ms = int(round((time.perf_counter() - t0) * 1000))
+                return {
+                    "success": False,
+                    "engine": norm_engine,
+                    "latency_ms": latency_ms,
+                    "binary": bin_path,
+                    "error": "Engine connectivity ping timed out after 2 seconds.",
+                }
+            except Exception as ex:
+                latency_ms = int(round((time.perf_counter() - t0) * 1000))
+                return {
+                    "success": False,
+                    "engine": norm_engine,
+                    "latency_ms": latency_ms,
+                    "binary": bin_path,
+                    "error": str(ex),
+                }
+
+        try:
+            result = await asyncio.to_thread(_ping)
+            return web.json_response(result)
+        except Exception as e:
+            logger.exception("Error in /api/engines/{engine}/test handler: %s", e)
+            return web.json_response({"success": False, "engine": norm_engine, "error": str(e)}, status=500)
 
     async def _tasks_list_handler(self, request: web.Request) -> web.Response:
         """Fetch all background tasks categorized for Kanban boards and monitoring."""
@@ -1018,201 +1290,75 @@ class ZezoUIServer:
         except Exception as e:
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
-    @staticmethod
-    def _is_actionable_task(text: str) -> bool:
-        """Detect whether incoming direct chat message is an actionable coding/creation directive."""
-        t = (text or "").strip().lower()
-        if not t:
-            return False
-
-        conceptual_starters = (
-            "what is", "what are", "what was", "what were", "what do", "what does",
-            "what can", "what would", "how does", "how do i", "how can i", "how should i",
-            "how to", "why is", "why does", "why do", "why would",
-            "who is", "who are", "who made", "who created",
-            "tell me about", "explain", "describe", "can you explain",
-            "do you know", "is it possible", "should i",
-        )
-        if any(t.startswith(cs) for cs in conceptual_starters):
-            return False
-
-        strong_phrases = (
-            "create website", "create a website", "build website", "build a website",
-            "make website", "make a website", "make landing page", "make a landing page",
-            "build landing page", "create landing page", "generate app", "generate an app",
-            "create app", "build app", "make app", "scaffold", "clone website", "clone the website"
-        )
-        if any(sp in t for sp in strong_phrases):
-            return True
-
-        action_verbs = {
-            "build", "create", "make", "generate", "scaffold", "develop",
-            "implement", "code", "write", "fix", "refactor", "redesign",
-            "clone", "craft", "deploy", "setup"
-        }
-        code_targets = {
-            "website", "web", "site", "landing page", "landing", "page",
-            "app", "application", "component", "ui", "frontend", "backend",
-            "dashboard", "api", "server", "script", "code", "repo",
-            "project", "feature", "button", "modal", "view", "bug",
-            "issue", "error", "database", "endpoint", "pipeline", "portfolio",
-            "saas", "store", "ecommerce", "shop", "blog"
-        }
-
-        words = set(re.findall(r"[a-z]+", t))
-        has_verb = bool(words & action_verbs)
-        has_target = bool(words & code_targets)
-
-        if has_verb and has_target:
-            return True
-
-        tokens = t.split()
-        if tokens and tokens[0] in ("build", "create", "scaffold", "generate", "redesign", "refactor", "implement") and len(tokens) > 1:
-            return True
-
-        return False
-
     async def _fleet_chat_handler(self, request: web.Request) -> web.Response:
-        """Interactive real-time conversational chat response from a fleet agent."""
+        """Interactive real-time conversational chat response from a fleet agent.
+        Routes the prompt directly and verbatim to fleet_manager.dispatch_task using the agent's configured engine.
+        """
         try:
             data = await request.json()
             agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
             prompt = str(data.get("prompt") or data.get("message") or "").strip()
             engine_override = (data.get("engine") or "").strip() or None
             model_override = (data.get("model") or "").strip() or None
+            path = data.get("path")
+
+            if not prompt:
+                return web.json_response({"success": False, "error": "Prompt cannot be empty."}, status=400)
 
             from core.fleet_manager import fleet_manager
+            self._reload_fleet_if_modified(fleet_manager)
             agent = fleet_manager.get_agent(agent_id) or fleet_manager.resolve_agent_by_mention_or_capability(agent_id)
             if not agent:
-                if agent_id.lower() in ("zezo", "os", "assistant", ""):
-                    name = "Zezo"
-                    role = "Autonomous Desktop AI Operating System"
-                    soul_prompt = "You are Zezo, an autonomous AI desktop operating system built by Hamza Bukhari."
-                    specialty = "Desktop control, multi-agent coordination, voice directives, coding pipelines"
-                    active_engine = (engine_override or "antigravity_run").strip()
-                    active_model = (model_override or "gemini-3.8-flash-low").strip()
-                else:
-                    return web.json_response({"success": False, "error": f"Agent '{agent_id}' not found."}, status=404)
-            else:
-                name = agent.displayName if hasattr(agent, "displayName") and agent.displayName else agent.name
-                role = agent.role or "Autonomous Specialist"
-                soul_prompt = agent.prompt_prefix or f"You are {name}, {role}."
-                specialty = getattr(agent, "specialty", "") or ""
-                active_engine = (engine_override or agent.default_tool or "antigravity_run").strip()
-                active_model = (model_override or agent.model_id or "").strip()
+                return web.json_response({"success": False, "error": f"Agent '{agent_id}' not found."}, status=404)
 
-            # Bridge actionable coding/creation requests directly to fleet background execution
-            if self._is_actionable_task(prompt):
-                target_agent_id = agent.id if agent else "VERVE"
-                logger.info("[FleetChat] Actionable task detected for %s: %s", target_agent_id, prompt[:60])
-                dispatch_res = fleet_manager.dispatch_task(target_agent_id, prompt)
-                self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
-                task_id = dispatch_res.get("task_id") if isinstance(dispatch_res, dict) else None
-                if not task_id and isinstance(dispatch_res, dict) and dispatch_res.get("tasks"):
-                    tasks = dispatch_res.get("tasks")
-                    if isinstance(tasks, list) and len(tasks) > 0:
-                        task_id = tasks[0].get("task_id")
+            # Resolve configured engine tool (antigravity_run, opencode_run, kilo_run)
+            raw_engine = engine_override or getattr(agent, "engine", None) or getattr(agent, "default_tool", None) or "antigravity_run"
+            engine_name = raw_engine.replace("_run", "").replace("_agent", "")
+            engine_tool = f"{engine_name}_run"
 
-                if task_id:
-                    reply_text = f"I have started building that for you in the background! (Task ID: {task_id}). You can follow my live progress on my desk monitor or ask for status."
-                else:
-                    reply_text = "I have started building that for you in the background! You can follow my live progress on my desk monitor or ask for status."
+            # Apply engine override to agent if specified
+            if engine_override:
+                agent.engine = engine_name
+                agent.default_tool = engine_tool
 
-                return web.json_response({
-                    "success": True,
-                    "agent_id": agent.name if agent else name,
-                    "reply": reply_text,
-                    "task_id": task_id,
-                    "engine": active_engine,
-                    "model": active_model,
-                })
-
-            sys_prompt = (
-                f"{soul_prompt}\n"
-                f"Your role is {role}. Specialty: {specialty}.\n"
-                f"You are conversing directly with Hamza (the User & Architect). "
-                f"Give concise, intelligent, authentic, and helpful responses matching your persona. "
-                f"If asked to write code or plan architecture, provide clean actionable markdown with snippets."
+            logger.info("[FleetChat] Routing prompt for agent %s directly to engine %s: %s", agent.id, engine_tool, prompt[:60])
+            dispatch_res = fleet_manager.dispatch_task(
+                agent_id=agent.id,
+                prompt=prompt,
+                path=path,
+                model_override=model_override,
             )
+            self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
 
-            response_text = ""
+            if isinstance(dispatch_res, dict) and dispatch_res.get("success") is False:
+                err_msg = dispatch_res.get("error") or "Task dispatch failed."
+                return web.json_response({
+                    "success": False,
+                    "error": err_msg,
+                    "reply": f"Could not start task: {err_msg}",
+                    "agent_id": agent.id,
+                }, status=500)
 
-            # Instant Intelligent Conversational Engine
-            # Chat is conversational — we route directly to high-speed LLM endpoints matching the selected engine/model,
-            # avoiding heavy multi-file CLI cold-start overhead (12-35s) on Windows.
-            if "antigravity" in active_engine.lower() or "gemini" in active_model.lower():
-                try:
-                    from core import gemini
-                    # Call Gemini directly with the agent's persona
-                    full_convo = f"{sys_prompt}\n\nHamza: {prompt}\n\n{name}:"
-                    response_text = gemini.text(
-                        full_convo,
-                        tier=gemini.FAST,
-                        timeout_ms=5000,
-                        allow_groq=True,
-                        default=""
-                    )
-                except Exception as e:
-                    logger.debug("[FleetChat] Direct Gemini chat failed: %s", e)
+            task_id = dispatch_res.get("task_id") if isinstance(dispatch_res, dict) else None
+            if not task_id and isinstance(dispatch_res, dict) and dispatch_res.get("tasks"):
+                tasks = dispatch_res.get("tasks")
+                if isinstance(tasks, list) and len(tasks) > 0:
+                    task_id = tasks[0].get("task_id")
 
-            elif "opencode" in active_engine.lower() or "kilo" in active_engine.lower():
-                # For OpenCode and Kilo agents, use llm_router with instant streaming/generation
-                try:
-                    from core import llm_router
-                    response_text = llm_router.generate_text(
-                        prompt=prompt,
-                        system=sys_prompt,
-                        tier=llm_router.FAST,
-                        timeout_ms=5000,
-                    )
-                except Exception as e:
-                    logger.debug("[FleetChat] OpenCode/Kilo router failed: %s", e)
-            elif "groq" in active_engine.lower():
-                try:
-                    from core.llm_client import call_groq_text
-                    response_text = call_groq_text(
-                        prompt=prompt,
-                        system=sys_prompt,
-                        model=active_model if (active_model and "groq" not in active_model) else "llama-3.3-70b-versatile",
-                        timeout=15,
-                    )
-                except Exception as e:
-                    logger.debug("[FleetChat] Groq call_groq_text failed: %s", e)
-
-            # Fallback to ultra-fast Gemini/Groq ladder
-            if not response_text:
-                try:
-                    from core import gemini
-                    response_text = gemini.text(
-                        f"{sys_prompt}\n\nHamza: {prompt}\n\n{name}:",
-                        tier=gemini.FAST,
-                        timeout_ms=5000,
-                        allow_groq=True,
-                        default=""
-                    )
-                except Exception as e:
-                    logger.debug("[FleetChat] Fallback Gemini fast call failed: %s", e)
-
-            if not response_text:
-                try:
-                    from core import llm_router
-                    response_text = llm_router.generate_text(
-                        prompt=prompt,
-                        system=sys_prompt,
-                        timeout_ms=4000,
-                    )
-                except Exception as e:
-                    logger.debug("[FleetChat] llm_router fallback failed: %s", e)
-
-            if not response_text:
-                response_text = f"Hello Hamza! I am {name}. I received your message: '{prompt}'. Ready to assist on {role}."
+            agent_display_name = getattr(agent, "displayName", None) or getattr(agent, "name", agent.id)
+            if task_id:
+                reply_text = f"I have started working on your task using {engine_tool}! (Task ID: {task_id}). You can follow my live progress on my desk monitor or ask for status."
+            else:
+                reply_text = f"Directive dispatched for {agent_display_name} using {engine_tool}."
 
             return web.json_response({
                 "success": True,
-                "agent_id": agent.name if agent else name,
-                "reply": response_text.strip(),
-                "engine": active_engine,
-                "model": active_model,
+                "agent_id": agent.id,
+                "agent_name": agent_display_name,
+                "reply": reply_text,
+                "task_id": task_id,
+                "engine": engine_tool,
+                "model": model_override or getattr(agent, "model_id", ""),
             })
         except Exception as e:
             logger.exception("Error in _fleet_chat_handler: %s", e)

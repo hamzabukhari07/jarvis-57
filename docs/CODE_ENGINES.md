@@ -171,3 +171,14 @@ ZEZO's Antigravity integration uses a decoupled architecture separating Gemini t
    - **Live Progress & Streaming:** Drains stdout lines in a daemon thread, streaming live task lines (`ctx.report(pct, line[:80])`) and advancing progress dynamically (30% → 45% → 60% → 80% → 95%) rather than freezing.
    - **Recursive Diffing:** Employs `_tree_snapshot(repo)` to detect newly created deliverables (e.g. `index.html`) recursively across subdirectories.
    - **Smart Preview System:** Automatically starts local HTTP servers (ports 9400-9480) or Vite dev servers upon build completion.
+
+---
+
+## 🌉 Transparent CLI Execution Bridges
+
+All three engines (ntigravity_agent.py, opencode_agent.py, kilo_agent.py) operate strictly as **pure, transparent human-like CLI bridges**:
+- **Zero Micromanagement**: Prompt micromanagement, archetype guessing (detect_archetype), fake prompt synthesizers, and synthetic template injection have been completely purged.
+- **Natural Prompt Execution**: Spawns the native binary with natural prompts via -p, polite Windows Job Object CPU throttling, CREATE_NO_WINDOW, and real-time stdout telemetry streamed to ctx.report().
+- **Bridge Connectivity Probe (POST /api/engines/{engine}/test)**:
+  - Live latency probe verifying binary resolution and quick ping.
+  - Return contract: {'success': true, 'engine': str, 'latency_ms': int, 'binary': str}.

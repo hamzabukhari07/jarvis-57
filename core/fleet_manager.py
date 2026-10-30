@@ -89,6 +89,14 @@ class FleetManager:
         """Resolve agent by @mention, name, role keywords, or capability."""
         return self.registry.resolve_agent_by_mention_or_capability(query)
 
+    def resolve_agent_for_skill(self, skill_name: str) -> Optional[FleetAgent]:
+        """Dynamically resolve which live agent currently possesses the assigned skill."""
+        return self.registry.resolve_agent_for_skill(skill_name)
+
+    def get_all_agents(self) -> List[FleetAgent]:
+        """Return list of all currently active agents."""
+        return self.registry.get_all_agents()
+
     def get_agent_active_task_count(self, agent_id: str) -> int:
         """Count how many tasks this agent currently has active in task_manager."""
         return self.registry.get_agent_active_task_count(agent_id)
@@ -259,6 +267,16 @@ def resolve_agent_by_mention_or_capability(query: str) -> Optional[str]:
     """Helper to resolve agent ID by query string."""
     agent = fleet_manager.resolve_agent_by_mention_or_capability(query)
     return agent.id if agent else None
+
+
+def resolve_agent_for_skill(skill_name: str) -> Optional[FleetAgent]:
+    """Helper to resolve agent by assigned skill dynamically."""
+    return fleet_manager.resolve_agent_for_skill(skill_name)
+
+
+def get_all_agents() -> List[FleetAgent]:
+    """Helper to retrieve all currently active FleetAgent instances."""
+    return fleet_manager.get_all_agents()
 
 
 def get_agent(name_or_id: str) -> Optional[Dict[str, Any]]:

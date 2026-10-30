@@ -216,43 +216,101 @@ class FleetOrchestrator:
         low = prompt.lower()
         is_deliverable = any(arch in low for arch in DELIVERABLE_ARCHETYPES)
 
+        # Dynamically discover active specialist agents from registry
+        live_agents = list(getattr(self.registry, "agents", {}).values()) if hasattr(self.registry, "agents") else []
+
+        def find_agent(predicate, fallback=None):
+            matches = [a for a in live_agents if predicate(a)]
+            if matches:
+                count_fn = getattr(self.registry, "get_agent_active_task_count", lambda x: 0)
+                return min(matches, key=lambda a: count_fn(a.id))
+            return fallback
+
+        # Frontend agents
+        fe_agents = [
+            a for a in live_agents
+            if "website_build" in (a.allowed_skills or [])
+            or any(c in (a.capabilities or []) for c in ("web_design", "frontend_coding", "ui_refactor"))
+            or any(w in (a.role or "").lower() for w in ("frontend", "ui", "design"))
+        ]
+        fe_primary = fe_agents[0] if fe_agents else None
+        fe_secondary = fe_agents[1] if len(fe_agents) > 1 else fe_primary
+
+        # Backend agent
+        be_agent = find_agent(
+            lambda a: any(c in (a.capabilities or []) for c in ("backend_architecture", "api_development", "database_design"))
+            or any(w in (a.role or "").lower() for w in ("backend", "full-stack", "fullstack", "database"))
+        )
+
+        # QA agent
+        qa_agent = find_agent(
+            lambda a: any(c in (a.capabilities or []) for c in ("qa_testing", "security_audit", "code_refactor"))
+            or any(w in (a.role or "").lower() for w in ("qa", "test", "auditor", "refactoring"))
+        )
+
+        # Research agent
+        research_agent = find_agent(
+            lambda a: any(s in (a.allowed_skills or []) for s in ("social_research", "web_scraper", "web_research_pipeline"))
+            or any(c in (a.capabilities or []) for c in ("deep_web_research", "market_research", "web_research"))
+            or any(w in (a.role or "").lower() for w in ("research", "social", "scrape"))
+        )
+
+        # Orchestrator agent
+        orchestrator_agent = find_agent(
+            lambda a: getattr(a, "is_core", False)
+            or any(c in (a.capabilities or []) for c in ("task_decomposition", "fleet_orchestration"))
+            or any(w in (a.role or "").lower() for w in ("orchestrator", "architect", "lead"))
+        )
+
+        fallback_agent = fe_primary or be_agent or orchestrator_agent or (live_agents[0] if live_agents else None)
+        fallback_id = fallback_agent.id if fallback_agent else "AGENT"
+
         if is_deliverable:
             shared_group_id = parent_task_id or group_id or f"swarm_{uuid.uuid4().hex[:8]}"
-            subtasks = [
-                (
-                    "VERVE",
+            subtasks = []
+            if fe_primary:
+                subtasks.append((
+                    fe_primary.id,
                     "Design and build core responsive page layout, hero section, navigation, and theme styling: " + prompt,
                     "frontend",
-                ),
-                (
-                    "FLUX",
+                ))
+            if fe_secondary and (fe_secondary.id != getattr(fe_primary, "id", None) or len(subtasks) == 1):
+                subtasks.append((
+                    fe_secondary.id,
                     "Build interactive UI components, project showcase cards, skill badges, and micro-interactions: " + prompt,
                     "frontend/components",
-                ),
-                (
-                    "AHMAD",
+                ))
+            if be_agent:
+                subtasks.append((
+                    be_agent.id,
                     "Implement backend contact form API endpoint (/api/contact), input validation, and data schema: " + prompt,
                     "backend",
-                ),
-                (
-                    "DWIGHT",
+                ))
+            if qa_agent:
+                subtasks.append((
+                    qa_agent.id,
                     "Conduct end-to-end verification, link integrity check, and responsive breakpoint testing: " + prompt,
                     "tests",
-                ),
-            ]
+                ))
+            if not subtasks and fallback_agent:
+                subtasks.append((fallback_id, prompt, ""))
         else:
             shared_group_id = parent_task_id or group_id
             if any(w in low for w in ("research", "scrape", "youtube", "investigate", "find")):
-                subtasks = [("KELLY", "Perform deep research and gather key technical requirements: " + prompt, "research")]
+                target = research_agent or fallback_agent
+                subtasks = [(target.id if target else fallback_id, "Perform deep research and gather key technical requirements: " + prompt, "research")]
             elif any(w in low for w in ("ui", "frontend", "css", "html", "react", "view", "component", "styling", "page")):
-                frontend_id = "VERVE" if self._get_agent("VERVE") else ("FLUX" if self._get_agent("FLUX") else "ALI")
-                subtasks = [(frontend_id, "Design and build responsive frontend user interface: " + prompt, "frontend")]
+                target = fe_primary or fallback_agent
+                subtasks = [(target.id if target else fallback_id, "Design and build responsive frontend user interface: " + prompt, "frontend")]
             elif any(w in low for w in ("api", "backend", "database", "crud", "endpoint", "server", "model", "auth")):
-                subtasks = [("AHMAD", "Implement robust backend APIs, database schemas, and service logic: " + prompt, "backend")]
+                target = be_agent or fallback_agent
+                subtasks = [(target.id if target else fallback_id, "Implement robust backend APIs, database schemas, and service logic: " + prompt, "backend")]
             elif any(w in low for w in ("test", "qa", "verify", "audit", "security", "bug", "check", "lint")):
-                subtasks = [("DWIGHT", "Conduct end-to-end test verification, security review, and edge case audit: " + prompt, "tests")]
+                target = qa_agent or fallback_agent
+                subtasks = [(target.id if target else fallback_id, "Conduct end-to-end test verification, security review, and edge case audit: " + prompt, "tests")]
             else:
-                subtasks = [("AHMAD", prompt, "")]
+                target = fallback_agent
+                subtasks = [(target.id if target else fallback_id, prompt, "")]
 
         if path:
             base_dir = Path(path).resolve()
@@ -319,7 +377,7 @@ class FleetOrchestrator:
 
         result: Dict[str, Any] = {
             "success": True,
-            "orchestrator": "MICHAEL",
+            "orchestrator": orchestrator_agent.id if orchestrator_agent else "ORCHESTRATOR",
             "decomposed_count": len(dispatched),
             "tasks": dispatched,
             "base_path": str(base_dir),

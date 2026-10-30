@@ -1,6 +1,149 @@
 ---
 
 # LEARNING JOURNAL (active — last 25 entries)
+
+## [2026-10-29] — Dynamic Autonomous Fleet Management & Ghost Agent Elimination
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  1. **Complete Elimination of Ghost Agents:**
+     - `core/fleet/registry.py` had fallback returns (`if agent_id in ("OSCAR", "JIM", ...): return FleetAgent(...)`) that spontaneously re-created deleted/decommissioned agents in memory.
+     - Hardcoded mappings (`alias_map = {"ALI": "VERVE", "HAIDER": "FLUX"}`) and static role maps (`role_map = {"frontend": "VERVE", "backend": "AHMAD", ...}`) prevented true dynamic fleet management.
+     - Deleting an agent did not guarantee they remained dead if queried by mention or capability.
+  2. **100% Dynamic Capability & Skill Resolution:**
+     - Fleet routing now dynamically queries currently live registered agents in `self.agents`.
+     - Implemented `resolve_agent_for_skill(skill_name)` to match live agents via `allowed_skills` with automatic load balancing by active task count.
+     - Implemented `get_all_agents()` returning live `FleetAgent` instances for clean system-wide roster consumption.
+  3. **Decoupled Dispatcher & Swarm Orchestrator:**
+     - `core/fleet/dispatcher.py` overflow load balancing replaced static `VERVE -> FLUX` logic with dynamic discovery of live alternative specialists sharing skills/capabilities.
+     - `core/fleet/orchestrator.py` `decompose_and_dispatch` dynamically discovers live frontend, backend, QA, research, and orchestrator agents.
+  4. **Dynamic Fleet Control & Live System Prompt Roster:**
+     - `actions/fleet_control.py` replaced hardcoded check `canonical_agent_id in ("VERVE", "FLUX")` with inspection of target agent's `allowed_skills` (`website_build`, etc.).
+     - `main.py` replaced hardcoded `VERVE <-> FLUX` prompt string with dynamic live roster injection from `fleet_manager.get_all_agents()` without touching any audio pipeline parameters (Rule 6).
+  5. **Config Schema Hygiene:**
+     - Cleaned up `config/fleet_agents.json`: removed leaked tool names (`web_search`, `file_processor`, etc.) from `allowed_skills` into `allowed_tools`, and corrected `web_reader` typo to `web_read_page`.
+- **Key Files Touched:**
+  - `core/fleet/registry.py`
+  - `core/fleet_manager.py`
+  - `core/fleet/dispatcher.py`
+  - `core/fleet/orchestrator.py`
+  - `actions/fleet_control.py`
+  - `main.py`
+  - `config/fleet_agents.json`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed on all modified files.
+  - Layer 2 (Runtime): Verified no ghost agents resurrect, dynamic skill resolution (`website_build`, `social_research`) succeeds, dynamic decomposition succeeds, and temporary agent hire & permanent deletion lifecycle succeeds.
+
+
+## [2026-10-29] — Dedicated Tools Management Settings Tab & Interactive ReUI Grid
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  1. **User Control over Autonomous Action Capabilities:**
+     - ZEZO required a dedicated, first-class Tools tab under the Settings Modal (WORKSPACE section) alongside Skills.
+     - Users need full visibility and granular toggle control over the 15 system tools organized into intuitive functional categories.
+  2. **Harmonized ReUI Design System:**
+     - Tool inspection required collapsible accordion categories, responsive card grids, ReUI Switch toggles, live status badges (ACTIVE / OFF), instant search/filtering, and optimistic local state updates with server synchronization.
+- **Execution & Changes Applied:**
+  - Created rontend/src/components/settings/ToolsSettingsTab.tsx:
+    - Grouped 15 user-facing tools into 5 collapsible categories:
+      1. Research & Intelligence: agent_reach (Deep Social & Media Research).
+      2. Browser & Web Automation: browser_control (Browser Automation), web_search (Web Search), web_read_page (Web Page Reader).
+      3. Desktop & System Control: computer_control (Desktop Automation), desktop_control (Window Manager), computer_settings (System Settings), open_app (App Launcher).
+      4. Files & Coding Helpers: file_controller (File Controller), file_processor (Batch File Processor), quick_snippet (Quick Snippets).
+      5. Lifestyle & Utilities: reminder (Smart Reminders), weather_report (Weather Forecast), flight_finder (Flight Finder), youtube_video (YouTube Player).
+    - Built with ReUI Card, Badge, Callout, Switch, and Input components following design tokens.
+    - Added real-time search, expand/collapse all controls, per-category bulk enable/disable actions, and informative callout banner.
+    - Integrated optimistic state toggle dispatching to POST /api/tools/{name}/toggle and initial hydration via GET /api/tools with localStorage fallback.
+  - Updated rontend/src/components/settings/SettingsModal.tsx:
+    - Added SectionId 'tools', nav item with Lucide Wrench icon under WORKSPACE group, and mounted <ToolsSettingsTab />.
+  - Updated rontend/src/lib/api.ts:
+    - Added pi.getTools() and pi.toggleTool(name, enabled) methods.
+- **Verification:**
+  - Ran 
+pm --prefix frontend run build (tsc -b && vite build) with 0 errors.
+- **Key Files Touched:**
+  - rontend/src/components/settings/ToolsSettingsTab.tsx
+  - rontend/src/components/settings/SettingsModal.tsx
+  - rontend/src/lib/api.ts
+  - LEARNING_JOURNAL.md
+
+## [2026-10-29] — Pure Natural Engine Bridges for Antigravity, OpenCode, and Kilo Code
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  1. **Elimination of Fake Prompt Synthesis & Template Slot Hacks:**
+     - `core/antigravity_runner.py` and `actions/antigravity_agent.py` previously contained 700+ lines of artificial prompt synthesis (`synthesize_prompt`), archetype guessing (`detect_archetype`: `PORTFOLIO`, `DASHBOARD`), greenfield gates (`check_greenfield_gate`), synthetic `DESIGN.md` DSL injection, and brittle `master-template.html` slot hacks (`<!-- SLOT:HERO_START -->`).
+     - This caused prompt bloating, synthetic artifacts, and brittle coupling to deleted design resolvers.
+  2. **Standardization on Transparent, Pure Human-Like CLI Engine Bridges:**
+     - The AI coding CLIs (Antigravity `agy`, OpenCode `opencode`, and Kilo Code `kilo`) are fully autonomous agents capable of direct natural prompt comprehension.
+     - ZEZO now provides a transparent, zero-slop bridge contract across all three engines:
+       - Inputs: `prompt` (natural user prompt, with optional SKILL.md directives prefixed), `project_path` (target workspace), and `model` (e.g. `gemini-3.8-flash-medium`, `opencode/...`, `kilo/...`).
+       - Discovery: Checks `tools/<engine>/<bin>` and PATH (`shutil.which`).
+       - Execution: Spawns subprocess in `project_path` with `CREATE_NO_WINDOW` and polite Windows Job Object CPU throttling.
+       - Telemetry: Streams stdout/stderr lines in real time to TaskManager progress.
+       - Delivery: Returns status, exit code, affected files, and execution output directly upon process completion.
+- **Execution & Changes Applied:**
+  - Stripped all prompt synthesis, archetype guessing, greenfield gate checks, and slot injection from `core/antigravity_runner.py` and `actions/antigravity_agent.py`.
+  - Refactored `core/antigravity_runner.py` into a clean, lightweight (~220 lines) transparent CLI worker supporting direct `-p` prompt passing, Job Object throttling, live stdout telemetry streaming, before/after tree diffing, and smart preview.
+  - Standardized `actions/opencode_agent.py` and `actions/kilo_agent.py` on the exact same transparent bridge contract (stripped `_prepare_cli_task`, `TASK_SPEC.md` hacks, and fake theme re-skinning directives).
+  - Verified static compilation across all 4 touched files (`python -m py_compile`), verified binary discovery on Windows (`agy.EXE`, `opencode.CMD`, `kilo.CMD`), and verified runtime action dispatching and error handling.
+- **Key Files Touched:**
+  - `core/antigravity_runner.py`
+  - `actions/antigravity_agent.py`
+  - `actions/opencode_agent.py`
+  - `actions/kilo_agent.py`
+  - `LEARNING_JOURNAL.md`
+
+## [2026-10-29] — ActionRegistry Execution Gate & Settings-Driven Tool State Persistence
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  1. **Enforce Settings > Tools Execution Boundary:**
+     - While tool declarations were previously filtered during Gemini session configuration (`rec.enabled`), execution attempts (`ActionRegistry.run()`) did not enforce an explicit execution gate for disabled tools.
+     - Needed runtime execution blocking with an informative error message directing users to Settings > Tools.
+  2. **Tool State Persistence:**
+     - Disabled tool configurations required persistent storage in `config/tools_state.json` so user tool toggles persist across application restarts.
+  3. **Standardized Tool Status API:**
+     - Needed `get_tools_status()` to report tool names, categories, risks, descriptions, and enabled states for UI settings tabs and system diagnostics.
+- **Execution & Changes Applied:**
+  - Updated `core/action_loader.py`:
+    - Enforced execution gate in `ActionRegistry.run()`: returns `Error: Tool '{name}' not found.` if missing, and `Execution Blocked: Tool '{name}' is currently disabled in Settings. Enable it in Settings > Tools to use this capability.` if disabled.
+    - Added `load_tool_state()` and `save_tool_state()` in `ActionRegistry` backed by `config/tools_state.json`.
+    - Implemented `toggle_tool(name: str, enabled: bool)` to update live `rec.enabled` and persist state.
+    - Added `get_tools_status()` returning registered tools with `name`, `category`, `risk`, `description`, and `enabled`. Added `_infer_category()` mapping tools to `coding`, `web`, `system`, and `mcp`.
+    - Added clean default `config/tools_state.json` (`{"disabled": []}`).
+  - Layer 1 (Static): `python -m py_compile core/action_loader.py` passed with 0 errors.
+  - Layer 2 (Runtime): Tested non-existent tool gating, tool toggling, persistent file save/load, and execution gate blocking on live registry.
+  - Layer 3 (Regression): Confirmed all 31 actions discovered and valid.
+- **Key Files Touched:**
+  - `core/action_loader.py`
+  - `config/tools_state.json`
+  - `LEARNING_JOURNAL.md`
+## [2026-10-29] — Prune Skills to 3 Core Skills Standard & Clean Skill Loader
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  1. **Skill Sprawl & Redundancy Pruning:**
+     - The skills/ directory contained 10 obsolete or redundant skill directories that diluted trigger indexing and added unnecessary overhead.
+  2. **Standardization on 3 Production Core Skills:**
+     - Standardized on 3 core skills: website_build, website_clone, and generate_design_md.
+  3. **Uncage Hybrid Engine Formalization:**
+     - Created skills/website_clone/SKILL.md documenting Path A (clone_website Python tool) and Path B (uncage.js CLI) with a 5-Phase SOP.
+  4. **Design Token DSL Formalization:**
+     - Created skills/generate_design_md/SKILL.md documenting token extraction from URLs/HTML, WCAG contrast audits, and canonical <design-context> synthesis.
+  5. **Skill Loader Cleanup:**
+     - Cleaned EXCLUDED_SKILL_NAMES in core/skill_loader.py removing deleted legacy skills (custom_skill_10, hamza_taste) and adding first-class support for required_tools metadata.
+- **Execution & Changes Applied:**
+  - Removed 10 obsolete skill directories from skills/.
+  - Created skills/website_clone/SKILL.md and skills/generate_design_md/SKILL.md.
+  - Updated core/skill_loader.py (EXCLUDED_SKILL_NAMES, required_tools parsing and serialization).
+  - Updated docs/SKILLS_SYSTEM.md with 3 core skills standard and required_tools schema.
+  - Verified static compilation (py_compile) and dynamic registry discovery (3 declarative skills across 3 domains).
+- **Key Files Touched:**
+  - skills/website_clone/SKILL.md (new)
+  - skills/generate_design_md/SKILL.md (new)
+  - skills/website_build/SKILL.md (verified intact)
+  - core/skill_loader.py
+  - docs/SKILLS_SYSTEM.md
+  - LEARNING_JOURNAL.md
+
 ## [2026-10-28] — Reference Normalization, Settings-Driven Engine Pipeline & Master Template Calibration
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Why this was built / Root Cause & Motivation:**
@@ -2070,3 +2213,29 @@ ami landing page.html).
   - Layer 1 (Static): `python -m py_compile` on all touched core and test files passed with 0 errors. `compileall` on `core/`, `actions/`, and `tests/` confirmed no broken imports.
   - Layer 2 (Runtime): `python -m core._self_test` (9/9 passed).
   - Layer 3 (Regression): `pytest tests/ -k "design or exemplar"` (10/10 passed), `pytest tests/test_master_template_builder.py` (7/7 passed), and `python tests/run_reference_test.py` passed live verification against real reference templates.
+
+### [2026-10-29] Dual-AI Skill Runner Subsystem & Action Dispatcher
+- **Built/Fixed**: Implemented the Dual-AI Skill Runner Subsystem uniting Groq LPU speed with resilient Gemini stateful fallback.
+  1. `core/llm_client.py`: Implemented `call_groq_tools(messages, tools, model, timeout)` with native OpenAI-compatible tool calling over `https://api.groq.com/openai/v1/chat/completions`. Handles recursive Gemini-to-OpenAI schema sanitization (uppercase `OBJECT`/`STRING` normalization), parses tool calls into standardized `{name, arguments}` format, and re-raises standard HTTP 429/timeout exceptions.
+  2. `core/skill_runner.py`: Implemented `SkillRunner` class with Smart Tool Scoping (scoping 3-5 tools from `required_tools` and `SKILL.md` body), Memory Guard (truncating tool returns to max 1500 chars), real-time `TaskManager` progress reporting, and dual-AI orchestration. Primary engine runs on Groq (`llama-3.3-70b-versatile`); upon 429 or timeout, stateful handover seamlessly resumes on Gemini (`gemini-3.8-flash`) without repeating step 1.
+  3. `actions/run_skill.py`: Exported Gemini `TOOL` declaration and `handler`. Checks skill existence, dispatches to `FleetDispatcher.dispatch_task()` when configured for fleet delegation, or runs in background thread via `task_manager.submit("run_skill", worker_fn, params)`, returning in <50ms.
+- **Key Files**: `core/llm_client.py`, `core/skill_runner.py`, `actions/run_skill.py`, `tests/test_skill_runner.py`, `docs/TOOLS.md`, `docs/SKILLS_SYSTEM.md`.
+- **Architectural Context**: Retains `completed_steps` as single source of truth across LLM provider switches. Prevents tool explosion by filtering action declarations dynamically per skill.
+
+
+## [2026-10-29] Decoupled Skills Hub & Dedicated Tools Management Architecture (Option 4 Refinement)
+- **Built/Fixed**: Completed end-to-end implementation of the decoupled Option 4 architecture across frontend, backend, and documentation:
+  1. **Minimalist Skills Hub**: Transformed rontend/src/components/settings/SkillsSettingsTab.tsx. Removed all toggle switches (skills are procedural guidelines, not togglable tools). Removed 260-line hardcoded DEFAULT_SKILLS array. Standardized strictly on 3 core skills (website_build, website_clone, generate_design_md) while permanently deleting 10 obsolete skill directories. Added + Create Skill modal with auto-slug formatting and slide-over Markdown SOP editor drawer.
+  2. **Dedicated Tools Management UI**: Built rontend/src/components/settings/ToolsSettingsTab.tsx grouping 15 user-facing tools across 5 categories (Research & Intelligence, Browser & Web Automation, Desktop & System Control, Files & Coding Helpers, Lifestyle & Utilities) with individual ReUI <Switch /> toggles and bulk category controls. Mounted tab in SettingsModal.tsx under WORKSPACE.
+  3. **ActionRegistry Execution Gate**: Sealed 
+ec.enabled execution gate in core/action_loader.py:ActionRegistry.run() returning immediate blocked messages when tools are disabled. Toggling persists to config/tools_state.json. Added GET /api/tools and POST /api/tools/{name}/toggle in core/ui_server.py.
+  4. **Pure Natural Engine Bridges**: Stripped 700+ lines of prompt micromanagement, archetype guessing (detect_archetype), fake prompt synthesizers (synthesize_prompt), greenfield gates, synthetic DESIGN.md DSL injection, and template slot hacks from core/antigravity_runner.py and ctions/antigravity_agent.py. Standardized ctions/opencode_agent.py and ctions/kilo_agent.py on the exact same transparent human-like CLI bridge contract. Added POST /api/engines/{engine}/test bridge ping endpoint.
+  5. **Dynamic Fleet Management & Ghost Agent Purge**: Permanently eliminated ghost agent fallbacks (OSCAR, JIM, STANLEY, CREED, ANGELA, TOBY, KELLY) and in-memory phantom re-creations (core/fleet/registry.py:298). Replaced static role/alias maps with dynamic capability resolution against gent.allowed_skills and gent.role. Stripped (VERVE <-> FLUX for frontend) from main.py:1511 and injected dynamic live roster. Added llowed_skills multi-select badge checklist to AgentConfigModal.tsx.
+  6. **Agent Desk Chat Verbatim Pass-Through**: Stripped _is_actionable_task(prompt) regex heuristic and VERVE hardcoded fallbacks in core/ui_server.py so prompts pass verbatim to configured engine CLIs.
+  7. **Codebase Bloat Purge**: Permanently deleted 5 bloated design files (core/ai_design_generator.py, core/design_cache.py, core/design_resolver.py, core/master_template_builder.py, core/design_md_generator.py) and dead code in ctions/website_cloner.py:2314-2358.
+- **Key Files**: rontend/src/components/settings/SkillsSettingsTab.tsx, rontend/src/components/settings/ToolsSettingsTab.tsx, rontend/src/components/settings/SettingsModal.tsx, rontend/src/components/office/AgentConfigModal.tsx, core/action_loader.py, core/skill_loader.py, core/skill_runner.py, ctions/run_skill.py, core/ui_server.py, core/antigravity_runner.py, ctions/antigravity_agent.py, ctions/opencode_agent.py, ctions/kilo_agent.py, core/fleet/registry.py, core/fleet/dispatcher.py, core/fleet/orchestrator.py, main.py, config/fleet_agents.json, config/tools_state.json.
+- **Verification**:
+  - Layer 1 (Static): python -m py_compile passed across all modified Python files with 0 errors. 
+pm --prefix frontend run build passed with 0 errors (Vite production bundle generated in 2.38s).
+  - Layer 2 (Runtime): Verified ActionRegistry disabled gate blocks execution, GET /api/tools returns 15 tools across 5 categories, SkillRegistry discovers exactly 3 core skills, deleted agents stay permanently dead and cannot resurrect, engine test pings pass.
+  - Layer 3 (Regression): pytest tests/test_skill_runner.py passed (7/7 passed in 2.78s).

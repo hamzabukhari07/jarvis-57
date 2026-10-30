@@ -2311,52 +2311,6 @@ section, header, footer, main, [class*="section-"] {{
     return master_html
 
 
-def generate_design_system_md(design_tokens: dict, original_url: str, page_title: str) -> str:
-    """Generates a clean studio-grade DESIGN.md specification file."""
-    # ASCII-safe headers — no emoji, prevents cp1252 corruption on Windows
-    lines = [
-        f"# DESIGN SYSTEM SPECIFICATION: {page_title or original_url}",
-        f"> **Source URL:** `{original_url}`  ",
-        f"> **Extracted:** `{time.strftime('%Y-%m-%d %H:%M:%S')}`  \n",
-        "## Color Palette Tokens",
-    ]
-    for color, count in design_tokens.get("palette", {}).get("text_colors", []):
-        lines.append(f"- **Text Color:** `{color}` (used {count}x)")
-    for color, count in design_tokens.get("palette", {}).get("background_colors", []):
-        lines.append(f"- **Background Color:** `{color}` (used {count}x)")
-
-    lines.append("\n## Typography & Type Scale")
-    for f in design_tokens.get("typography", {}).get("font_families", []):
-        lines.append(f"- **Font Family:** `{f}`")
-    lines.append(f"- **Font Sizes:** {', '.join(design_tokens.get('typography', {}).get('font_sizes', []))}")
-    lines.append(f"- **Font Weights:** {', '.join(design_tokens.get('typography', {}).get('font_weights', []))}")
-    lh = design_tokens.get('typography', {}).get('line_heights', [])
-    if lh:
-        lines.append(f"- **Line Heights:** {', '.join(lh)}")
-    ls = design_tokens.get('typography', {}).get('letter_spacings', [])
-    if ls:
-        lines.append(f"- **Letter Spacings:** {', '.join(ls)}")
-
-    lines.append("\n## Spacing & Shape Matrix")
-    lines.append(f"- **Base Spacing Unit:** `{design_tokens.get('spacing', {}).get('base_unit', '16px')}`")
-    gaps = design_tokens.get('spacing', {}).get('common_gaps', [])
-    if gaps:
-        lines.append(f"- **Common Gaps:** {', '.join(gaps)}")
-    pads = design_tokens.get('spacing', {}).get('common_paddings', [])
-    if pads:
-        lines.append(f"- **Common Paddings:** {', '.join(pads[:8])}")
-    lines.append(f"- **Border Radii:** {', '.join(design_tokens.get('shape', {}).get('border_radii', []))}")
-    lines.append(f"- **Shadows:** {', '.join(design_tokens.get('shape', {}).get('shadows', []))}")
-
-    css_vars = design_tokens.get('css_variables', {})
-    if css_vars:
-        lines.append("\n## CSS Custom Properties (:root)")
-        for k, v in list(css_vars.items())[:20]:
-            lines.append(f"- `{k}`: `{v}`")
-
-    return "\n".join(lines)
-
-
 def _fetch_html_and_visual_data_playwright(
     url: str,
     clone_dir: Path,

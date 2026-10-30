@@ -75,7 +75,7 @@ export const api = {
   },
 
   async saveAgent(agent: AgentProfile): Promise<{ status: string }> {
-    const res = await fetch(`${API_BASE}/api/fleet/save_agent`, {
+    const res = await fetch(`${API_BASE}/api/fleet/agents`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(agent),
@@ -433,6 +433,25 @@ export const api = {
       body: JSON.stringify({ engine_id: engineId }),
     })
     if (!res.ok) throw new Error(`Failed to set default engine: ${res.statusText}`)
+    return res.json()
+  },
+  async getTools(params?: { agent_id?: string; mode?: string }): Promise<any> {
+    const q = new URLSearchParams()
+    if (params?.agent_id) q.set('agent_id', params.agent_id)
+    if (params?.mode) q.set('mode', params.mode)
+    const qs = q.toString() ? `?${q.toString()}` : ''
+    const res = await fetch(`${API_BASE}/api/tools${qs}`)
+    if (!res.ok) throw new Error(`Failed to fetch tools: ${res.statusText}`)
+    return res.json()
+  },
+
+  async toggleTool(name: string, enabled?: boolean): Promise<any> {
+    const res = await fetch(`${API_BASE}/api/tools/${encodeURIComponent(name)}/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(enabled !== undefined ? { enabled } : {}),
+    })
+    if (!res.ok) throw new Error(`Failed to toggle tool ${name}: ${res.statusText}`)
     return res.json()
   },
 }

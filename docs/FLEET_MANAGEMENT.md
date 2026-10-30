@@ -194,6 +194,8 @@ flowchart TD
 - **Subdirectory Domain Isolation:** Subtasks are explicitly dispatched into dedicated subdirectories (`base_path/frontend/`, `base_path/backend/`, `base_path/tests/`) under the project root. This prevents file collision races and Git worktree merge conflicts.
 - **Direct-Execution Guarantee:** Forbids intermediate Python builder scripts (`build_index.py`, `generate.py`). Code is emitted directly to final target files, preventing multi-minute latency penalties.
 - **Upstream Deliverable Piping:** When peer delegation occurs (`delegate_peer_task`), design tokens, extracted schemas, and candidate metadata are automatically serialized and prepended to downstream agent prompts.
+- **Dynamic Capability & Skill Resolution:** Tasks dispatched without hardcoded assignments resolve dynamically via `resolve_agent_for_skill(skill_name)` and capability inspection across currently registered live agents (`fleet_manager.get_all_agents()`), with load balancing across active tasks.
+- **Anti-Ghost Lifecycle:** Decommissioned agents are permanently deleted from `config/fleet_agents.json`, their worktrees torn down, and removed from `self.agents`. Memory fallback recreation of deleted agents is strictly prohibited.
 
 ---
 
