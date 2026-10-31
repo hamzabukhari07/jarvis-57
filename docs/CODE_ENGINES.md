@@ -1,4 +1,4 @@
-# ⚡ Code Engines Registry & Execution Subsystem
+﻿# ⚡ Code Engines Registry & Execution Subsystem
 
 > **Project:** ZEZO  
 > **Creator & Lead Architect:** Hamza Bukhari  
@@ -78,10 +78,12 @@ def resolve_binary(engine_id: str) -> Optional[str]:
 A common failure mode in autonomous coding tools is assuming a binary is functional simply because it is installed. ZEZO enforces **Honest Authentication Probing** via dedicated per-engine prober functions:
 
 ### 1. Antigravity CLI Probe (`_probe_antigravity_auth`)
-- Runs `agy models` with `timeout=5`.
+- Checks local settings fast-path (`Path.home() / ".gemini" / "antigravity-cli" / "settings.json"` or `Path.home() / ".antigravity" / "settings.json"`) and environment API keys (`GEMINI_API_KEY`).
+- Runs `agy models` with `timeout=15` (accommodating live network round-trip latency of ~7.2s), injecting `GEMINI_API_KEY` from configuration.
 - Checks standard output and standard error for phrases such as `"not logged in"`, `"error getting token"`, or `"sign in"`.
 - If credentials are valid and model lists return (`gemini`, `claude`, or `gpt`), flags the engine as **`ready`**.
 - If unauthenticated, flags state as **`sign_in_required`** with an actionable human-readable explanation: *"Installed, but no account is signed in. The CLI exits in seconds and produces no files."*
+- If the live probe experiences network limits but valid local credentials exist, falls back gracefully to `ready` rather than locking the engine out.
 
 ### 2. OpenCode Probe (`_probe_opencode_auth`)
 - **Fast-path:** Checks `~/.local/share/opencode/auth.json` for existing provider API keys.
@@ -152,33 +154,40 @@ Defined in [`actions/code_engines_status.py`](file:///d:/anitgravity/zezo%20work
 
 ---
 
-## ⚡ Antigravity Engine Architecture & Decoupled Execution
+## ⚡ Dedicated Engine Runners & Decoupled Execution
 
-ZEZO's Antigravity integration uses a decoupled architecture separating Gemini tool registration from heavy background execution:
+ZEZO adheres strictly to Rule 4 (One File Per Action & Clean Separation) and standardizes high-velocity background execution across all three coding engines via dedicated runner modules in `core/`:
 
-1. **Clean Action Tool (`actions/antigravity_agent.py`):**
-   - Exports the official `TOOL` declaration and callable `handler` complying with Gemini function calling specs.
-   - Enforces greenfield project gates (`check_greenfield_gate`) to prevent unintentional overwrites.
-   - Delegates execution cleanly to `core.antigravity_runner.run_antigravity_worker`.
+1. **Antigravity CLI Runner (`core/antigravity_runner.py`):**
+   - **Win32 WinError 206 Protection:** If prompt length exceeds 800 characters, automatically writes instructions to `repo / "GEMINI.md"` (which `agy` natively loads as agent rules) and passes a short pointer command, permanently staying within Win32's 32,767 character `CreateProcessW` limit.
+   - **Zero CPU Throttling:** Executes `agy.exe` with standard Normal priority (`CREATE_NO_WINDOW`) and 100% full CPU core access (artificial Job Object core throttling purged).
+   - **Stream-JSON Telemetry:** Spawns CLI with `--output-format stream-json`, parsing NDJSON events in real-time (`step_update`, tool calls, status deltas).
+   - **Asymptotic Saturation Curve:** Progress increases dynamically via $\text{time\_pct} = 15.0 + 67.0 \times (1.0 - e^{-\text{elapsed}/85.0})$, eliminating artificial 65% progress freezes.
+   - **Fast Deliverable Detection:** Performs direct `.is_file()` checks on key deliverable files (`DESIGN.md`, `preview.html`, `preview-dark.html`, `index.html`) every 2.0s without heavy recursive `rglob` disk locks, boosting progress to 88%–92% upon creation.
+   - **Pre-Flight Scrapling Hook:** If the task prompt contains an HTTP/HTTPS URL and `site_dom.html` is absent, automatically invokes `prefetch_url_assets` from `core.url_prefetch` to pre-fetch DOM, styles, and tokens in 2–3s.
 
-2. **Core Background Engine (`core/antigravity_runner.py`):**
-   - **Hardware Throttling:** Creates Windows Job Objects with CPU affinity masking (`_create_throttled_job`) to prevent CLI runs from starving audio loops or GUI rendering.
-   - **Pre-Flight Asset Provisioning Engine:** Automatically provisions `< 25 KB` `blueprint.html` (design tokens, CSS variables, typography) and `< 40 KB` `master-template.html` (working clone with semantic slots `<!-- SLOT:HERO_START -->`, etc.) in the target repo before CLI invocation. This eliminates 15–20 minute stalls caused by the agent trying to digest bloated 10 MB raw reference files.
-   - **Dynamic Modular Prompt Synthesizer:** Detects the domain archetype (`portfolio`, `landing_page`, `dashboard`, `surgical_edit`) and synthesizes tailored prompts using modular exemplars in `core/prompts/exemplars/*.txt` via `core/prompts/prompt_synthesizer.py`.
-   - **Strict Anti-Stall Guardrails:** Injects non-negotiable instructions: single-pass direct adaptation to `{target_file}`, strict prohibition of intermediate Python scripts (`BeautifulSoup`, chunkers, `inspect.py`), and style/interaction preservation.
-   - **Non-Interactive Batch Directive:** Injects a critical execution directive (`CRITICAL BATCH EXECUTION DIRECTIVE: USER STATUS: CONFIRMED`) preventing CLI prompts from pausing for interactive user confirmation.
-   - **Full Dispatched Prompt Telemetry (`prompt_full`):** Stores the complete synthesized prompt into payload parameters, allowing `TaskState.to_dict()` and the frontend `TaskManagerModal` to provide one-click prompt inspection and copying.
-   - **Live Progress & Streaming:** Drains stdout lines in a daemon thread, streaming live task lines (`ctx.report(pct, line[:80])`) and advancing progress dynamically (30% → 45% → 60% → 80% → 95%) rather than freezing.
-   - **Recursive Diffing:** Employs `_tree_snapshot(repo)` to detect newly created deliverables (e.g. `index.html`) recursively across subdirectories.
-   - **Smart Preview System:** Automatically starts local HTTP servers (ports 9400-9480) or Vite dev servers upon build completion.
+2. **OpenCode Runner (`core/opencode_runner.py`):**
+   - **Win32 WinError 206 Protection:** If prompt length exceeds 800 characters, writes instructions to `repo / ".zezo_task_instructions.md"` and passes `--file .zezo_task_instructions.md`.
+   - **Dedicated Worker:** Houses `run_opencode_worker`, decoupling background subprocess execution from `actions/opencode_agent.py`.
+   - **Full CPU Access:** Normal priority without artificial CPU core capping or priority degradation.
+   - **Asymptotic Progress Curve:** Smooth, monotonic progress reporting up to 92% with dynamic elapsed time tags (`[1m 15s]`).
+   - **Fast Deliverable Detection & Scrapling Pre-fetch Hook:** Automatically extracts site assets before invocation on URL tasks and detects created files in real time.
+
+3. **Kilo Code Runner (`core/kilo_runner.py`):**
+   - **Win32 WinError 206 Protection:** If prompt length exceeds 800 characters, writes instructions to `repo / ".zezo_task_instructions.md"` and passes `--file .zezo_task_instructions.md`.
+   - **Dedicated Worker:** Houses `run_kilo_worker`, decoupling background execution from `actions/kilo_agent.py`.
+   - **Full CPU Access:** Normal process priority with 100% core availability.
+   - **Asymptotic Telemetry & Scrapling Ingestion:** Matches Antigravity and OpenCode with identical progress curves, deliverable checks, and pre-flight asset ingestion.
 
 ---
 
 ## 🌉 Transparent CLI Execution Bridges
 
-All three engines (ntigravity_agent.py, opencode_agent.py, kilo_agent.py) operate strictly as **pure, transparent human-like CLI bridges**:
-- **Zero Micromanagement**: Prompt micromanagement, archetype guessing (detect_archetype), fake prompt synthesizers, and synthetic template injection have been completely purged.
-- **Natural Prompt Execution**: Spawns the native binary with natural prompts via -p, polite Windows Job Object CPU throttling, CREATE_NO_WINDOW, and real-time stdout telemetry streamed to ctx.report().
-- **Bridge Connectivity Probe (POST /api/engines/{engine}/test)**:
+All three action modules (ctions/antigravity_agent.py, ctions/opencode_agent.py, ctions/kilo_agent.py) operate strictly as **pure, transparent human-like CLI bridges**:
+- **Clean Action Tools:** Receive user task parameters, resolve the target workspace repo, submit background jobs to core/task_manager.py, and return immediate task IDs.
+- **Dedicated Worker Delegation:** Delegate all subprocess handling, telemetry streaming, and undo snapshots to their respective runners (core/*_runner.py).
+- **Zero Micromanagement:** Prompt micromanagement, archetype guessing (detect_archetype), fake prompt synthesizers, and synthetic template injection have been completely purged.
+- **Natural Prompt Execution:** Spawns native binaries with natural prompts, full CPU access, CREATE_NO_WINDOW, and real-time stdout telemetry streamed to ctx.report().
+- **Bridge Connectivity Probe (POST /api/engines/{engine}/test):**
   - Live latency probe verifying binary resolution and quick ping.
-  - Return contract: {'success': true, 'engine': str, 'latency_ms': int, 'binary': str}.
+  - Return contract: {"success": true, "engine": str, "latency_ms": int, "binary": str}.

@@ -10,8 +10,10 @@ from __future__ import annotations
 import ctypes
 import json
 import logging
+import math
 import os
 import platform
+import re
 import shutil
 import subprocess
 import threading
@@ -28,9 +30,7 @@ logger = logging.getLogger("zezo.antigravity_runner")
 
 if platform.system() == "Windows":
     _WIN_HIDE = {
-        "creationflags": (
-            subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS
-        )
+        "creationflags": subprocess.CREATE_NO_WINDOW
     }
 else:
     _WIN_HIDE = {}
@@ -297,15 +297,60 @@ def run_antigravity_worker(payload: dict, ctx: Optional[TaskContext] = None) -> 
     except Exception as e:
         logger.debug("Failed to set prompt_full on TaskState: %s", e)
 
+    # Pre-fetch fallback hook: if prompt contains an HTTP/HTTPS URL and site_dom.html missing
+    url_match = re.search(r"https?://[^\s\"'>]+", prompt)
+    if url_match and not (repo / "site_dom.html").exists():
+        target_url = url_match.group(0).rstrip(".,;)")
+        try:
+            from core.url_prefetch import prefetch_url_assets
+            prefetch_url_assets(target_url, repo, ctx)
+        except ImportError:
+            logger.debug("core.url_prefetch not available to prefetch assets for %s", target_url)
+        except Exception as e_pref:
+            logger.warning("prefetch_url_assets failed for %s: %s", target_url, e_pref)
+
     before_tree = _tree_snapshot(repo)
 
-    # CLI Invocation: direct prompt passed via -p argument
-    cmd = [agy_bin, "-p", prompt, "--add-dir", str(repo), "--dangerously-skip-permissions"]
+    # Protect against Win32 CreateProcessW 32,767 character limit ([WinError 206])
+    effective_prompt = prompt
+    if len(prompt) > 800:
+        try:
+            gemini_md_path = repo / "GEMINI.md"
+            gemini_md_path.write_text(prompt, encoding="utf-8")
+            effective_prompt = (
+                "Follow all requirements, specifications, and directives in GEMINI.md to complete the task in this workspace."
+            )
+            logger.info(
+                "[AntigravityRunner] Large prompt (%d chars) written to GEMINI.md to protect against WinError 206",
+                len(prompt),
+            )
+        except Exception as e_gem:
+            logger.warning("[AntigravityRunner] Could not write GEMINI.md: %s", e_gem)
+
+    # CLI Invocation: direct prompt passed via -p argument with stream-json
+    cmd = [
+        agy_bin,
+        "-p",
+        effective_prompt,
+        "--add-dir",
+        str(repo),
+        "--dangerously-skip-permissions",
+        "--output-format",
+        "stream-json",
+    ]
     if resolved_model:
         cmd.extend(["--model", resolved_model])
 
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
+    try:
+        from memory.config_manager import load_api_keys
+        cfg_keys = load_api_keys()
+        gem_key = cfg_keys.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY", "")
+        if gem_key:
+            env["GEMINI_API_KEY"] = gem_key
+    except Exception as e_key:
+        logger.debug("Could not inject GEMINI_API_KEY to Antigravity CLI env: %s", e_key)
 
     proc = subprocess.Popen(
         cmd,
@@ -323,22 +368,13 @@ def run_antigravity_worker(payload: dict, ctx: Optional[TaskContext] = None) -> 
 
     ctx.set_pid(proc.pid)
 
-    # Windows Job Object CPU throttling
-    hJob = None
-    try:
-        import psutil
-        total_cores = psutil.cpu_count(logical=True) or 4
-        cap_cores = max(2, total_cores // 2) if total_cores > 4 else total_cores
-        mask = (1 << cap_cores) - 1
-        hJob = _create_throttled_job(mask, 0x00000040)
-        if hJob:
-            _assign_pid_to_job(hJob, proc.pid)
-    except Exception as e:
-        logger.debug("Could not assign Job Object throttling: %s", e)
-
     start_time = time.time()
     last_pct = 10
+    last_reported_pct = 0
+    last_report_time = start_time
+    last_diff_time = start_time
     stdout_lines: List[str] = []
+    latest_telemetry: List[str] = []
 
     def _reader():
         try:
@@ -347,8 +383,37 @@ def run_antigravity_worker(payload: dict, ctx: Optional[TaskContext] = None) -> 
                 if not line:
                     break
                 txt = line.rstrip()
-                if txt:
-                    stdout_lines.append(txt)
+                if not txt:
+                    continue
+                stdout_lines.append(txt)
+
+                # Parse stream-json telemetry
+                if txt.startswith("{"):
+                    try:
+                        ev = json.loads(txt)
+                        if isinstance(ev, dict):
+                            step = ev.get("step_update") or ev.get("step") or ev.get("update")
+                            tool = ev.get("tool") or ev.get("tool_name") or ev.get("tool_status") or ev.get("tool_use")
+                            status = ev.get("status") or ev.get("state")
+                            text_out = ev.get("text") or ev.get("content") or ev.get("message") or ev.get("output")
+
+                            msg = ""
+                            if step:
+                                msg = str(step)
+                            elif tool:
+                                tool_desc = ev.get("description") or ev.get("input") or status or ""
+                                msg = f"Tool: {tool} {tool_desc}".strip()
+                            elif text_out:
+                                last_seg = str(text_out).strip().splitlines()[-1] if str(text_out).strip() else ""
+                                if last_seg:
+                                    msg = last_seg
+                            elif status:
+                                msg = f"Status: {status}"
+
+                            if msg:
+                                latest_telemetry.append(msg[:80])
+                    except Exception:
+                        pass
         except Exception:
             pass
 
@@ -358,13 +423,7 @@ def run_antigravity_worker(payload: dict, ctx: Optional[TaskContext] = None) -> 
     try:
         while proc.poll() is None:
             if ctx.cancelled():
-                if hJob:
-                    try:
-                        ctypes.WinDLL("kernel32", use_last_error=True).TerminateJobObject(hJob, 1)
-                    except Exception:
-                        pass
-                else:
-                    proc.terminate()
+                proc.terminate()
                 return {"status": "cancelled", "repo": str(repo)}
 
             time.sleep(0.5)
@@ -372,25 +431,54 @@ def run_antigravity_worker(payload: dict, ctx: Optional[TaskContext] = None) -> 
             elapsed = now - start_time
 
             line_count = len(stdout_lines)
-            latest_line = stdout_lines[-1][:80] if stdout_lines else f"Running Antigravity CLI ({model_display})..."
+            if latest_telemetry:
+                latest_line = latest_telemetry[-1]
+            elif stdout_lines:
+                latest_line = stdout_lines[-1][:80]
+            else:
+                latest_line = f"Running Antigravity CLI ({model_display})..."
 
-            # Incremental progress reporting based on elapsed time and line output
-            pct = min(92, int(15 + min(50, elapsed * 0.8) + min(25, line_count * 0.5)))
+            # Asymptotic saturation curve for progress
+            time_pct = 15.0 + 67.0 * (1.0 - math.exp(-elapsed / 85.0))
+            line_pct = min(10.0, line_count * 0.2)
+            pct = min(92, int(time_pct + line_pct))
             pct = max(pct, last_pct)
-            last_pct = pct
 
-            ctx.report(pct, latest_line)
+            # Deliverable direct checks every 2.0 seconds (zero disk recursion lag)
+            if now - last_diff_time >= 2.0:
+                last_diff_time = now
+                deliverable_names = ("DESIGN.md", "preview.html", "preview-dark.html", "index.html")
+                found_deliverables = [
+                    name for name in deliverable_names
+                    if (repo / name).is_file() and name not in before_tree
+                ]
+                if found_deliverables:
+                    boost = min(92, 88 + len(found_deliverables))
+                    pct = max(pct, boost)
+                    latest_line = f"Created deliverable: {found_deliverables[-1]}"
+
+            pct = max(pct, last_pct)
+
+            # Dynamic elapsed time formatting: [1m 15s] or [45s]
+            mins = int(elapsed) // 60
+            secs = int(elapsed) % 60
+            time_tag = f"[{mins}m {secs:02d}s]" if mins > 0 else f"[{secs}s]"
+
+            # Throttle progress heartbeats to ctx.report:
+            # Report when pct > last_reported_pct or every 3.5s with dynamic elapsed time
+            if (pct > last_reported_pct) or (now - last_report_time >= 3.5):
+                report_msg = f"{latest_line} {time_tag}"
+                ctx.report(pct, report_msg)
+                last_reported_pct = pct
+                last_report_time = now
+
+            last_pct = pct
     finally:
         try:
             proc.wait(timeout=10)
         except Exception:
             try:
                 proc.kill()
-            except Exception:
-                pass
-        if hJob:
-            try:
-                ctypes.WinDLL("kernel32", use_last_error=True).CloseHandle(hJob)
             except Exception:
                 pass
 

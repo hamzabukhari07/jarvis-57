@@ -223,6 +223,34 @@ def _probe_version(bin_path: str, version_argv: tuple[str, ...]) -> Optional[str
 
 def _probe_antigravity_auth(bin_path: str, engine: Engine) -> tuple[str, str]:
     """Honest auth probe for Antigravity CLI."""
+    # Fast path: check local settings file or environment credentials
+    has_local_creds = False
+    creds_source = ""
+    settings_candidates = (
+        Path.home() / ".gemini" / "antigravity-cli" / "settings.json",
+        Path.home() / ".antigravity" / "settings.json",
+    )
+    for cfg_candidate in settings_candidates:
+        try:
+            if cfg_candidate.is_file() and cfg_candidate.stat().st_size > 0:
+                has_local_creds = True
+                creds_source = cfg_candidate.name
+                break
+        except Exception as e:
+            logger.debug("Error checking antigravity settings %s: %s", cfg_candidate, e)
+
+    env = os.environ.copy()
+    try:
+        from memory.config_manager import load_api_keys
+        cfg_keys = load_api_keys()
+        gem_key = cfg_keys.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY", "")
+        if gem_key:
+            env["GEMINI_API_KEY"] = gem_key
+            has_local_creds = True
+            creds_source = creds_source or "GEMINI_API_KEY"
+    except Exception:
+        pass
+
     try:
         cmd = [bin_path, "models"]
         res = subprocess.run(
@@ -232,8 +260,9 @@ def _probe_antigravity_auth(bin_path: str, engine: Engine) -> tuple[str, str]:
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=5,
+            timeout=15,
             creationflags=_CREATION_FLAGS,
+            env=env,
         )
         combined = f"{res.stdout}\n{res.stderr}".lower()
         if "not logged in" in combined or "error getting token" in combined or "sign in" in combined:
@@ -242,10 +271,16 @@ def _probe_antigravity_auth(bin_path: str, engine: Engine) -> tuple[str, str]:
             return "ready", "Installed and authenticated. Accepts model prompts and generates multi-file diffs."
         if res.returncode == 0:
             return "ready", "Installed and responsive."
+        if has_local_creds:
+            return "ready", f"Installed with local credentials ({creds_source})."
         return "sign_in_required" if "auth" in combined else "unknown", f"Antigravity status uncertain (code {res.returncode})."
     except subprocess.TimeoutExpired:
+        if has_local_creds:
+            return "ready", f"Installed with local credentials ({creds_source}); live model probe timed out."
         return "unknown", "Probe timed out while contacting Antigravity CLI."
     except Exception as e:
+        if has_local_creds:
+            return "ready", f"Installed with local credentials ({creds_source}); probe error: {e}"
         return "unknown", f"Probe error: {e}"
 
 

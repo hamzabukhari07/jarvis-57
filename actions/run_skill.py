@@ -44,7 +44,15 @@ TOOL = {
             },
             "fleet_agent": {
                 "type": "STRING",
-                "description": "Optional fleet agent ID to delegate to (e.g., 'verve', 'flux', 'nexus').",
+                "description": "Optional fleet agent ID to delegate to (e.g., 'pam', 'verve', 'flux', 'nexus'). Omit or pass 'zezo' for direct execution by Zezo.",
+            },
+            "executor": {
+                "type": "STRING",
+                "description": "Optional execution mode: 'zezo' to execute directly without sub-agents, or 'fleet' to delegate.",
+            },
+            "direct": {
+                "type": "BOOLEAN",
+                "description": "Set to true to force Zezo to execute the skill directly without fleet delegation.",
             },
         },
         "required": ["skill_name"],
@@ -109,45 +117,78 @@ def handler(parameters: dict, **kwargs: Any) -> str:
     if params.get("task"):
         raw_user_params["task"] = params.get("task")
 
+    fleet_target: Optional[str] = (params.get("fleet_agent") or params.get("agent_id") or "").strip()
+    user_task = params.get("task") or f"Execute skill {resolved_name}"
+    is_direct: bool = (
+        bool(params.get("direct"))
+        or str(params.get("executor", "")).lower() in ("zezo", "self", "direct", "local")
+        or str(fleet_target).lower() in ("zezo", "none", "self")
+        or any(k in user_task.lower() for k in ("khud", "zezo khud", "yourself", "direct"))
+    )
+
     # ── 2. Check for Engine-Only or Fleet Delegation ─────────────────────────
     # Engine skills (generate_design_md, website_build, website_clone) use the Universal Skill Prompt Engineer
     if resolved_name in ("generate_design_md", "website_build", "website_clone"):
-        try:
-            from core.fleet_manager import get_fleet_manager
-            from core.skill_prompt_engineer import craft_skill_engine_prompt
+        sop_content = skill_reg.read_skill(resolved_name)
+        target_dir = params.get("path") or params.get("project_path") or "."
 
-            fm = get_fleet_manager()
-            target_agent = fm.resolve_agent_for_skill(resolved_name)
-            fallback_agent = "VERVE" if resolved_name == "website_build" else "PAM"
-            agent_id = target_agent.id if target_agent else fallback_agent
-            engine_name = getattr(target_agent, "engine", "antigravity") if target_agent else "antigravity"
+        if is_direct:
+            # Direct Zezo execution: reads SKILL.md, invokes coding engine directly without fleet/worktree quarantine
+            try:
+                from core.skill_prompt_engineer import craft_skill_engine_prompt
+                from actions.antigravity_agent import antigravity_action
 
-            sop_content = skill_reg.read_skill(resolved_name)
-            target_dir = params.get("path") or params.get("project_path") or "."
-            user_task = params.get("task") or f"Execute skill {resolved_name}"
+                full_prompt = craft_skill_engine_prompt(
+                    skill_name=resolved_name,
+                    skill_sop=sop_content,
+                    user_task=user_task,
+                    target_dir=target_dir,
+                    context=raw_user_params,
+                    engine="antigravity",
+                )
+                logger.info("[run_skill] Executing skill '%s' directly by Zezo", resolved_name)
+                direct_res = antigravity_action({
+                    "prompt": full_prompt,
+                    "project_path": target_dir,
+                    "task": user_task,
+                }, player=kwargs.get("player"), speak=kwargs.get("speak"))
+                return f"Zezo is executing skill '{resolved_name}' directly: {direct_res}"
+            except Exception as e_dir:
+                logger.warning("[run_skill] Direct engine execution failed, falling back: %s", e_dir)
+        else:
+            # Fleet delegation to Scranton specialist
+            try:
+                from core.fleet_manager import get_fleet_manager
+                from core.skill_prompt_engineer import craft_skill_engine_prompt
 
-            full_prompt = craft_skill_engine_prompt(
-                skill_name=resolved_name,
-                skill_sop=sop_content,
-                user_task=user_task,
-                target_dir=target_dir,
-                context=raw_user_params,
-                engine=engine_name,
-            )
+                fm = get_fleet_manager()
+                target_agent = fm.get_agent(fleet_target) if fleet_target else fm.resolve_agent_for_skill(resolved_name)
+                fallback_agent = "VERVE" if resolved_name == "website_build" else "PAM"
+                agent_id = target_agent.id if target_agent else fallback_agent
+                engine_name = getattr(target_agent, "engine", "antigravity") if target_agent else "antigravity"
 
-            dispatch_res = fm.dispatcher.dispatch_task(
-                agent_id=agent_id,
-                prompt=full_prompt,
-                path=target_dir,
-                session_memory=kwargs.get("session_memory"),
-            )
-            task_id = dispatch_res.get("task_id") or "active"
-            return (
-                f"Dispatched engine skill '{resolved_name}' to agent '{agent_id}' via coding engine "
-                f"(task: {task_id})."
-            )
-        except Exception as e:
-            logger.warning("[run_skill] Engine delegation for %s failed: %s", resolved_name, e)
+                full_prompt = craft_skill_engine_prompt(
+                    skill_name=resolved_name,
+                    skill_sop=sop_content,
+                    user_task=user_task,
+                    target_dir=target_dir,
+                    context=raw_user_params,
+                    engine=engine_name,
+                )
+
+                dispatch_res = fm.dispatcher.dispatch_task(
+                    agent_id=agent_id,
+                    prompt=full_prompt,
+                    path=target_dir,
+                    session_memory=kwargs.get("session_memory"),
+                )
+                task_id = dispatch_res.get("task_id") or "active"
+                return (
+                    f"Dispatched engine skill '{resolved_name}' to agent '{agent_id}' via coding engine "
+                    f"(task: {task_id})."
+                )
+            except Exception as e:
+                logger.warning("[run_skill] Engine delegation for %s failed: %s", resolved_name, e)
 
     fleet_target: Optional[str] = (params.get("fleet_agent") or params.get("agent_id") or "").strip()
 

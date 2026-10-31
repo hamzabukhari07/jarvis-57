@@ -56,7 +56,7 @@ flowchart TD
 2. **`core/fleet/dispatcher.py` (`FleetDispatcher`):**
    - Validates risk tiers (`L0_READ_ONLY`, `L1_MUTATION`, `L2_DESTRUCTIVE`) and circuit breaker status.
    - Dynamically injects declarative skills (`agent.allowed_skills`) and spawns background tasks via `TaskManager`.
-   - **Universal Skill Prompt Engineer Integration:** Automatically intercepts coding engine dispatches (ntigravity_run, opencode_run, kilo_run) and synthesizes bespoke 5-block execution directives via Groq LPU / Gemini Flash (core/skill_prompt_engineer.py) with zero dummy fallback prompts.
+   - **Universal Skill Prompt Engineer Integration:** Automatically intercepts coding engine dispatches (`antigravity_run`, `opencode_run`, `kilo_run`), detects task mode (Mode 1: Live URL with Scrapling pre-flight ingestion vs Mode 2: Local Codebase direct inspection), and synthesizes dynamic execution directives via Groq LPU / Gemini Flash (`core/skill_prompt_engineer.py`) adhering directly to `SKILL.md` blueprints with zero forced schemas and strictly optional subagents.
    - Wraps progress callbacks with rate-limited (`>= 1.0s` or completion) `fleet_updated` deck broadcasts for UI synchronization.
 3. **`core/fleet/orchestrator.py` (`FleetOrchestrator`):**
    - Handles multi-agent workflow decomposition (`decompose_and_dispatch`) and peer-to-peer delegation (`delegate_peer_task`).
@@ -143,9 +143,11 @@ To ensure absolute codebase integrity, agents operate under strict permissions:
 
 ### 2. Git Worktree Sandbox (`core/git_sandbox.py`)
 When a mutation task is dispatched:
-1. ZEZO creates an isolated Git worktree under `.agent_worktrees/<task_id>/` on a dedicated branch (`agent/<clean_task_id>`).
+1. ZEZO creates an isolated Git worktree under `.agent_worktrees/<task_id>/` on a dedicated branch (`agent/<clean_task_id>`). Paths containing `.agent_worktrees` are explicitly exempted from `core/repo_context.py:is_zezo_source_dir` isolation rules to allow safe execution without throwing false Zezo source tree collision errors.
 2. The agent executes all edits, builds, and tests inside this quarantined directory.
 3. Once the task succeeds (`prog == 100`), `complete_task(agent.id, task_id, merge_changes=True, worktree_id=...)` automatically runs a **4-gate safe teardown and merges changes to the main branch** under `_merge_lock`, preventing code loss.
+4. **Honest Error Contract:** In `core/fleet/dispatcher.py`, task results are strictly validated against error patterns (`tool '...' failed:`, `winerror`, `failed:`, `exception`). Action crashes immediately trigger `task_failed` telemetry, invoke `task_ctx.on_fail()`, and record circuit breaker failures, strictly preventing false positive `100 Completed successfully` broadcasts.
+5. **Direct Mode vs. Fleet Delegation:** If the user specifies direct execution (`"zezo khud karo"`, `direct=True`, `executor="zezo"`), `actions/run_skill.py` executes directly via native tools without routing through Scranton floor specialists or creating unneeded worktree quarantine directories.
 
 ### 3. Declarative Skill Injection
 In `core/fleet_manager.py:dispatch_task`, when an agent defines skills in `agent.allowed_skills` (such as `website_build`), ZEZO automatically queries `core.skill_loader.get_skill_registry()` and injects the full declarative instructions under an `[ACTIVE SKILL: <name>]` block directly into the enriched execution prompt.
@@ -196,6 +198,7 @@ flowchart TD
 - **Direct-Execution Guarantee:** Forbids intermediate Python builder scripts (`build_index.py`, `generate.py`). Code is emitted directly to final target files, preventing multi-minute latency penalties.
 - **Upstream Deliverable Piping:** When peer delegation occurs (`delegate_peer_task`), design tokens, extracted schemas, and candidate metadata are automatically serialized and prepended to downstream agent prompts.
 - **Dynamic Capability & Skill Resolution:** Tasks dispatched without hardcoded assignments resolve dynamically via `resolve_agent_for_skill(skill_name)` and capability inspection across currently registered live agents (`fleet_manager.get_all_agents()`), with load balancing across active tasks.
+- **Pre-Flight Asset Extraction for Design Audit:** When dispatching `generate_design_md`, `FleetDispatcher` checks for live URLs (`re.search(r'https?://[^\s\'"<>]+', prompt)`). If detected (Mode 1: URL), `core/url_prefetch.prefetch_url_assets` extracts the DOM, primary stylesheets (≤ 5 CSS files, < 3s), and `:root` tokens into `site_dom.html`, `site_styles.css`, and `site_tokens.json`, injecting them into the prompt synthesis context (`prefetched_assets`); if no URL is present (Mode 2: Local Codebase), it passes `mode: 'local'` and `target_dir`.
 - **Anti-Ghost Lifecycle:** Decommissioned agents are permanently deleted from `config/fleet_agents.json`, their worktrees torn down, and removed from `self.agents`. Memory fallback recreation of deleted agents is strictly prohibited.
 
 ---

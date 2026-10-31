@@ -2,6 +2,178 @@
 
 # LEARNING JOURNAL (active — last 25 entries)
 
+## [2026-10-31] — Fix for Engine Runner WinError 206, Worktree Path Collision, False Success Telemetry & Direct Zezo Skill Execution
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - A live execution asking Zezo to extract design md of `https://vayli.in/` failed across multiple points:
+    1. **WinError 206 Crash:** In `core/antigravity_runner.py`, passing large enriched prompts directly to `-p` exceeded the Win32 `CreateProcessW` limit (32,767 chars), crashing with `[WinError 206] The filename or extension is too long`.
+    2. **False 100% Success Telemetry:** When `antigravity_run` crashed, `core/fleet/dispatcher.py` checked only if result started with `error:` or `failed:`. It missed `Tool '...' failed:`, falsely logging `100 Completed successfully` before reporting failure.
+    3. **Worktree Path Collision:** Sandboxed Git worktrees under `.agent_worktrees/<task_id>` were rejected by `core/repo_context.py:is_zezo_source_dir()` because `.agent_worktrees` is inside `_ZEZO_ROOT`, prompting DevDynamo to ask for a folder on the Desktop.
+    4. **Groq Prompt Synthesis Gate Failure:** Groq LPU outputted a 1-line CLI command that failed strict keyword gating in `core/skill_prompt_engineer.py`, falling back to Gemini candidates which experienced 429 quota exhaustion.
+    5. **Forced Fleet Delegation:** `actions/run_skill.py` unconditionally forced delegation of engine skills to Scranton sub-agents (Pam Beesly) even when the user asked Zezo to do the task directly.
+- **Execution & Changes Applied:**
+  - **`core/antigravity_runner.py`:**
+    - If prompt length > 800 chars, writes prompt to `repo / "GEMINI.md"` (natively auto-loaded by `agy` as agent rules) and passes a short pointer string to `-p`, permanently eliminating `[WinError 206]`.
+  - **`core/opencode_runner.py` & `core/kilo_runner.py`:**
+    - If prompt length > 800 chars, writes prompt to `repo / ".zezo_task_instructions.md"` and passes `--file .zezo_task_instructions.md`.
+  - **`core/repo_context.py`:**
+    - Added explicit exemption `if ".agent_worktrees" in cand.parts: return False` in `is_zezo_source_dir()`, allowing sandboxed worktrees to execute without false source-tree rejections.
+  - **`core/fleet/dispatcher.py`:**
+    - Expanded error detection in `_dispatch_worker` string result checking to cover `tool '...' failed:`, `winerror`, `failed:`, `exception`, and `is not installed`, preventing false `100 Completed successfully` broadcasts on action failures.
+  - **`core/skill_prompt_engineer.py`:**
+    - Updated `PROMPT_ENGINEER_SYSTEM` to explicitly forbid 1-line shell commands and mandate full multi-section prompts.
+    - Broadened `_is_valid_synthesized_prompt()` with task-oriented keywords.
+    - Updated Gemini fallback candidate models to real GenAI models (`gemini-2.5-flash`, `gemini-2.0-flash`).
+    - Added deterministic `_generate_blueprint_fallback()` based on `SKILL.md` blueprints to guarantee zero task crashes on LLM quota or network dropouts.
+  - **`actions/run_skill.py`:**
+    - Added Direct Mode support (`is_direct` when `direct=True`, `executor="zezo"`, or task contains "khud"). Zezo reads `SKILL.md` via `SkillRegistry` and executes directly via `antigravity_action` without routing to Scranton fleet agents or creating `.agent_worktrees`.
+- **Verification:**
+  - Static: `python -m py_compile` across all touched files (0 errors).
+  - Runtime: Targeted tests for worktree exemption, large prompt file writing, prompt validator, and direct execution handler.
+  - Regression: `pytest tests/test_skill_runner.py` (7/7 passed). Zero voice/audio pipeline files touched.
+- **Key Files Touched:**
+  - `core/antigravity_runner.py`
+  - `core/opencode_runner.py`
+  - `core/kilo_runner.py`
+  - `core/repo_context.py`
+  - `core/fleet/dispatcher.py`
+  - `core/skill_prompt_engineer.py`
+  - `actions/run_skill.py`
+  - `docs/FLEET_MANAGEMENT.md`
+  - `docs/CODE_ENGINES.md`
+  - `LEARNING_JOURNAL.md`
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - While Antigravity had its own dedicated runner (`core/antigravity_runner.py`), OpenCode and Kilo Code had monolithic execution logic embedded directly in their action tool files (`actions/opencode_agent.py`, `actions/kilo_agent.py`).
+  - Both engines suffered from identical artificial CPU throttling (`BELOW_NORMAL_PRIORITY_CLASS`, 50% CPU core limits via Windows Job Object, and linear progress stalls).
+  - Direct execution lacked the Scrapling URL pre-fetch hook and fast deliverable checks.
+- **Execution & Changes Applied:**
+  - **`core/opencode_runner.py`:**
+    - Created dedicated OpenCode CLI execution runner (`run_opencode_worker`).
+    - Standard Normal process priority (`CREATE_NO_WINDOW`), zero core throttling (100% full CPU cores).
+    - Asymptotic progress curve matching Antigravity runner.
+    - Integrated automatic URL Scrapling pre-fetch hook and lightweight deliverable detection.
+  - **`core/kilo_runner.py`:**
+    - Created dedicated Kilo Code CLI execution runner (`run_kilo_worker`).
+    - Standard Normal process priority, zero CPU core throttling.
+    - Asymptotic progress curve with live heartbeat telemetry and deliverable detection.
+    - Integrated automatic URL Scrapling pre-fetch hook.
+  - **`actions/opencode_agent.py` & `actions/kilo_agent.py`:**
+    - Refactored into clean, lightweight Action Handlers (Rule 4 compliant), delegating execution to `core/opencode_runner.py` and `core/kilo_runner.py`.
+- **Verification:**
+  - Static: `python -m py_compile core/opencode_runner.py core/kilo_runner.py actions/opencode_agent.py actions/kilo_agent.py` (0 errors).
+  - Regression: `pytest tests/test_skill_runner.py` (7/7 passed). Zero voice/audio pipeline files touched.
+- **Key Files Touched:**
+  - `core/opencode_runner.py` (new)
+  - `core/kilo_runner.py` (new)
+  - `actions/opencode_agent.py`
+  - `actions/kilo_agent.py`
+  - `LEARNING_JOURNAL.md`
+
+## [2026-10-31] — Elimination of Antigravity CLI CPU Throttling, Low Priority & I/O Lag
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Running Antigravity CLI manually in PowerShell was lightning fast (~30–45s), but executing through ZEZO suffered massive latency (taking multiple minutes).
+  - Root cause investigation revealed 3 severe performance bottlenecks inside `core/antigravity_runner.py`:
+    1. Subprocess was explicitly throttled with `BELOW_NORMAL_PRIORITY_CLASS`, causing Windows to starve `agy.exe` of CPU cycles whenever other apps were running.
+    2. A Windows Job Object (`hJob`) was created that artificially restricted CPU affinity to 50% of available cores (`cap_cores = max(2, total_cores // 2)`).
+    3. Every 2.5 seconds, the runner was performing a heavy recursive directory traversal (`repo.rglob('*')`), causing disk I/O lockup on Windows while `agy.exe` was writing files.
+- **Execution & Changes Applied:**
+  - **`core/antigravity_runner.py`:**
+    - Removed `subprocess.BELOW_NORMAL_PRIORITY_CLASS` from `_WIN_HIDE`, running `agy.exe` with standard Normal priority.
+    - Completely bypassed the artificial Job Object CPU core affinity throttling (`hJob`), allowing `agy.exe` full 100% access to all CPU cores exactly like a native manual terminal run.
+    - Replaced the heavy recursive `rglob('*')` polling with instant direct `.is_file()` checks on key deliverable files (`DESIGN.md`, `preview.html`, etc.), eliminating disk I/O lag.
+- **Verification:**
+  - Static: `python -m py_compile core/antigravity_runner.py` (0 errors).
+  - Regression: `pytest tests/test_skill_runner.py` passed (7/7). Zero voice/audio files touched.
+- **Key Files Touched:**
+  - `core/antigravity_runner.py`
+  - `LEARNING_JOURNAL.md`
+
+## [2026-10-30] — High-Speed URL Pre-Flight Asset Extraction & Dispatcher Skill Injection
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Tasks dispatched to fleet agents for `generate_design_md` involving live URLs required pre-fetched DOM, stylesheets, and extracted tokens in the target directory so downstream coding engines don't have to launch heavy, slow web scrapers inside the workspace.
+  - Needed a resilient sub-second extraction module utilizing `scrapling` (Fetcher/StealthyFetcher with curl_cffi impersonation) and graceful urllib fallback.
+  - Dispatcher needed automated detection of live URLs in `generate_design_md` prompts to route into Mode 1 (URL prefetch with manifest injection into prompt crafting) or Mode 2 (Local Codebase).
+- **Execution & Changes Applied:**
+  - **`core/url_prefetch.py`:**
+    - Created `prefetch_url_assets(url: str, target_dir: Path, ctx: Optional[Any] = None) -> dict[str, str]`.
+    - Integrated high-speed extraction via `scrapling` (`Fetcher.get` with curl_cffi) and graceful fallback to `urllib.request`.
+    - Fetches and writes HTML DOM to `site_dom.html`.
+    - Parses `<link rel="stylesheet">` tags (capped at 5 primary CSS files, fetched concurrently to complete in <3s) plus inline `<style>` blocks, saving combined CSS to `site_styles.css`.
+    - Extracts CSS design tokens from `:root { ... }` blocks into `site_tokens.json`.
+    - Telemetry: reports progress via `ctx.report(10, f"Pre-fetched site DOM and styles via Scrapling ({target_dir.name})...")`.
+    - Error resilience: catches all network and parse failures gracefully, writing minimal fallback files without crashing callers.
+  - **`core/fleet/dispatcher.py`:**
+    - In `_worker_fn`, detected if `primary_skill == "generate_design_md"`.
+    - Checked prompt for HTTP/HTTPS URLs via `re.search(r'https?://[^\s\'"<>]+', req_prompt)`.
+    - If URL found: triggers `prefetch_url_assets` into `Path(w_target_dir)` with `task_ctx`, setting `context_dict["mode"] = "url"`, `"url"`, and `"prefetched_assets"`.
+    - If no URL found: sets `context_dict["mode"] = "local"` and `"target_dir" = w_target_dir`.
+  - **`docs/FLEET_MANAGEMENT.md`:** Documented the pre-flight asset extraction and dual-mode dispatch mechanism for design audit workflows.
+- **Key Files Touched:**
+  - `core/url_prefetch.py`
+  - `core/fleet/dispatcher.py`
+  - `docs/FLEET_MANAGEMENT.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile core/url_prefetch.py core/fleet/dispatcher.py` passed with zero errors.
+  - Layer 2 (Runtime): Tested `prefetch_url_assets` against both live external URLs and local HTTP test servers (verifying DOM, concurrent CSS stylesheets, inline styles, and `:root` token JSON outputs). Tested regex matching across multiple URL prompt formats.
+  - Layer 3 (Regression): `pytest tests/test_skill_runner.py` passed 7/7 in 2.82s. Zero audio/voice pipeline files touched.
+
+## [2026-10-30] — Blueprint-Driven Skill Prompt Architect & Antigravity Telemetry / Progress Overhaul
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - `PROMPT_ENGINEER_SYSTEM` previously enforced a rigid 5-block schema and mandatory 5-to-7 subagent decomposition, which restricted natural workflow execution and created unnecessary subagent overhead for simple or single-file design audit tasks.
+  - The validation gate in `craft_skill_engine_prompt` was overly rigid, rejecting valid prompt responses that adopted dynamic templates.
+  - Antigravity CLI invocations lacked stream-json formatting, and the linear progress calculation capped progress at 65% when stdout line counts were zero. Heartbeats spammed the progress stream every 0.5s without dynamic elapsed timers.
+  - Tasks targeting live URLs lacked automated pre-fetching of DOM and stylesheets when pre-extracted assets were missing from the repo directory.
+- **Execution & Changes Applied:**
+  - **`core/skill_prompt_engineer.py`:**
+    - Replaced `PROMPT_ENGINEER_SYSTEM`: removed rigid 5-block schema and mandatory subagent decomposition (making subagents strictly optional for complex multi-package tasks). Instructed the architect (Groq LPU / Gemini fallback) to faithfully adopt the exact deliverables and Blueprints from `SKILL.md`.
+    - Defined explicit execution modes: Mode 1 (URL with pre-fetched assets `site_dom.html`, `site_styles.css`, `site_tokens.json` without web scraping scripts) and Mode 2 (local codebase inspection of system sources, UI primitives, and target files).
+    - Enforced zero-tolerance Anti-Slop negative filters (no generic AI purple gradients, no hallucinated icons, auditable traceability, visual restraint).
+    - Updated validation gates (`_is_valid_synthesized_prompt`): ensures prompt is non-empty, substantive (>100 chars), and contains actionable instructions (`DESIGN.md`, `preview.html`, `You are`, `audit`, or `directive`).
+  - **`core/antigravity_runner.py`:**
+    - Line 303: added `--output-format stream-json` to the Antigravity CLI invocation command.
+    - Updated reader thread to parse incoming JSON telemetry for `step_update`, tool status, or text output.
+    - Replaced linear progress calculation with asymptotic saturation curve (`time_pct = 15.0 + 67.0 * (1.0 - math.exp(-elapsed / 85.0))`, `line_pct = min(10.0, line_count * 0.2)`).
+    - Added deliverable diffing every 2.5s: diffs workspace against `before_tree`; boosts progress to 88%–92% and reports created deliverables when `DESIGN.md`, `preview.html`, `preview-dark.html`, or `index.html` appear.
+    - Throttled progress heartbeats: reports when `pct > last_reported_pct` or every 3.5s with dynamic elapsed time (`[1m 15s]`).
+    - Added pre-fetch fallback hook: detects HTTP/HTTPS URLs in prompt and invokes `prefetch_url_assets` from `core.url_prefetch` before CLI launch if `site_dom.html` is absent.
+  - **`docs/CODE_ENGINES.md`:** Synchronized documentation for stream-json telemetry, asymptotic progress, deliverable diffing, and prompt synthesis.
+- **Key Files Touched:**
+  - `core/skill_prompt_engineer.py`
+  - `core/antigravity_runner.py`
+  - `docs/CODE_ENGINES.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile core/skill_prompt_engineer.py core/antigravity_runner.py` passed with zero errors.
+  - Layer 2 (Runtime): Unit tests validated `_is_valid_synthesized_prompt`, `PROMPT_ENGINEER_SYSTEM` directives, asymptotic math curve calculations, and `core.url_prefetch` integration.
+  - Layer 3 (Regression): `pytest tests/test_skill_runner.py` passed 7/7 in 2.77s. Zero audio/voice pipeline files touched.
+
+## [2026-10-30] — Antigravity Subprocess GEMINI_API_KEY Environment Injection Fix
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Running fleet tasks with Antigravity CLI (`agy`) failed with `modelProvider is set to "gemini" in settings.json, but the GEMINI_API_KEY environment variable is not set`.
+  - When `agy.exe` executes on Windows with `modelProvider: "gemini"`, it strictly inspects `os.environ["GEMINI_API_KEY"]`.
+  - `core/antigravity_runner.py` spawned `proc = subprocess.Popen(cmd, env=env)` with only a shallow copy of host system environment variables. Because `gemini_api_key` is stored in ZEZO's `config/api_keys.json` and not permanently exported to Windows host user environment, the CLI subprocess failed immediately.
+  - Similarly, `core/code_engines.py` `_probe_antigravity_auth` ran `subprocess.run([bin_path, "models"])` without passing `env`, triggering the same missing key failure during health checks.
+- **Execution & Changes Applied:**
+  - In `core/antigravity_runner.py` (`run_antigravity_worker`): Loaded `gemini_api_key` via `memory.config_manager.load_api_keys()` and injected `env["GEMINI_API_KEY"] = gem_key` before launching `subprocess.Popen`.
+  - In `core/code_engines.py` (`_probe_antigravity_auth`): Injected `env["GEMINI_API_KEY"]` and passed `env=env` into `subprocess.run()`.
+  - Synchronized `docs/CODE_ENGINES.md` to reflect the honest authentication probe with environment key injection.
+- **Key Files Touched:**
+  - `core/antigravity_runner.py`
+  - `core/code_engines.py`
+  - `docs/CODE_ENGINES.md`
+  - `LEARNING_JOURNAL.md`
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile core/antigravity_runner.py core/code_engines.py` passed with zero errors.
+  - Layer 2 (Runtime): Real execution of `probe_engine('antigravity', force=True)` verified live — return state changed from `error` to `ready` with reason `'Installed and authenticated. Accepts model prompts and generates multi-file diffs.'`.
+  - Layer 3 (Regression): `pytest tests/test_skill_runner.py` passed 7/7.
+
+
 ## [2026-10-30] — Skill Prompt Engineer: Complete Purge of Hardcoded/Dummy Fallback Prompts
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Why this was built / Root Cause & Motivation:**

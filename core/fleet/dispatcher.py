@@ -481,6 +481,23 @@ class FleetDispatcher:
                                 "entity_content": w_entity_content,
                                 "key_sections": w_key_sections,
                             }
+                            if primary_skill == "generate_design_md":
+                                req_prompt = w_prompt or prompt or ""
+                                url_match = re.search(r'https?://[^\s\'"<>]+', req_prompt)
+                                if url_match:
+                                    found_url = url_match.group(0)
+                                    from core.url_prefetch import prefetch_url_assets
+                                    manifest = prefetch_url_assets(
+                                        found_url,
+                                        Path(w_target_dir) if w_target_dir else Path("."),
+                                        task_ctx,
+                                    )
+                                    context_dict["mode"] = "url"
+                                    context_dict["url"] = found_url
+                                    context_dict["prefetched_assets"] = manifest
+                                else:
+                                    context_dict["mode"] = "local"
+                                    context_dict["target_dir"] = w_target_dir
                             engine_name = getattr(w_agent, "engine", "antigravity") or "antigravity"
                             crafted = craft_skill_engine_prompt(
                                 skill_name=primary_skill,
@@ -561,7 +578,18 @@ class FleetDispatcher:
                                     err_msg = str(parsed_json.get("error") or parsed_json.get("message") or "Task execution failed")
                         except Exception:
                             pass
-                    if not is_error and (low_res.startswith("error:") or low_res.startswith("failed:") or low_res.startswith("please provide")):
+                    if not is_error and (
+                        low_res.startswith("error:")
+                        or low_res.startswith("failed:")
+                        or low_res.startswith("tool '")
+                        or low_res.startswith("tool \"")
+                        or "failed:" in low_res
+                        or "exception" in low_res
+                        or "winerror" in low_res
+                        or "is not installed" in low_res
+                        or "refusing to use" in low_res
+                        or low_res.startswith("please provide")
+                    ):
                         is_error = True
                         err_msg = res
 

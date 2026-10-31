@@ -37,6 +37,9 @@ def is_zezo_source_dir(p: Path | str) -> bool:
     """True if p is the Zezo assistant's own codebase/installation folder, which must NEVER be used as a target user repo."""
     try:
         cand = Path(p).resolve()
+        # Allow sandboxed agent worktrees located within .agent_worktrees/
+        if ".agent_worktrees" in cand.parts:
+            return False
         if cand == _ZEZO_ROOT or _ZEZO_ROOT in cand.parents:
             return True
         # Also check signature files of Zezo repo
