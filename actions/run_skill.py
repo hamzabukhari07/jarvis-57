@@ -14,8 +14,11 @@ work in background worker threads via TaskManager.
 
 from __future__ import annotations
 
+import importlib
 import json
 import logging
+import re
+from pathlib import Path
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -130,7 +133,64 @@ def handler(parameters: dict, **kwargs: Any) -> str:
     # Engine skills (generate_design_md, website_build, website_clone) use the Universal Skill Prompt Engineer
     if resolved_name in ("generate_design_md", "website_build", "website_clone"):
         sop_content = skill_reg.read_skill(resolved_name)
-        target_dir = params.get("path") or params.get("project_path") or "."
+        raw_target = (params.get("path") or params.get("project_path") or "").strip()
+        url_match = re.search(r"https?://[^\s\"'>]+", f"{user_task} {raw_user_params}")
+        target_url = url_match.group(0).rstrip(".,;)") if url_match else None
+
+        if not raw_target or raw_target in (".", "Desktop", "desktop"):
+            from core.repo_context import get_unique_project_dir
+            if target_url:
+                try:
+                    import urllib.parse
+                    domain_hint = urllib.parse.urlparse(target_url).netloc.replace("www.", "").split(".")[0]
+                    target_dir = str(get_unique_project_dir(f"{domain_hint} clone" if resolved_name == "website_clone" else f"{domain_hint} {resolved_name}"))
+                except Exception:
+                    target_dir = str(get_unique_project_dir(user_task or resolved_name))
+            else:
+                target_dir = str(get_unique_project_dir(user_task or resolved_name))
+        else:
+            target_dir = raw_target
+
+        # Generic Pre-Flight Execution Hook (Zero Hardcoding via Dynamic Dispatch)
+        pre_flight = getattr(skill_record, "pre_flight_action", None)
+        pre_flight_ok = True
+        if pre_flight:
+            try:
+                # Dynamically import handler based on frontmatter tag
+                # e.g., if pre_flight is "uncage_capture", it imports actions.uncage_capture_handler
+                handler_module = importlib.import_module(f"actions.{pre_flight}_handler")
+
+                td_path = Path(target_dir).resolve()
+                td_path.mkdir(parents=True, exist_ok=True)
+
+                if hasattr(handler_module, "execute"):
+                    pre_flight_ok = handler_module.execute(url=target_url, output_dir=td_path, params=raw_user_params)
+                    if pre_flight_ok:
+                        logger.info("[run_skill] Pre-flight action '%s' completed successfully.", pre_flight)
+                    else:
+                        logger.warning("[run_skill] Pre-flight action '%s' returned failure status.", pre_flight)
+            except ImportError:
+                logger.warning("[run_skill] No handler found for pre_flight action: %s", pre_flight)
+                pre_flight_ok = False
+            except Exception as e_pref:
+                logger.error("[run_skill] Pre-flight action '%s' failed: %s", pre_flight, e_pref)
+                pre_flight_ok = False
+
+        # Resolve optional directive header from skill record
+        directive_hdr = getattr(skill_record, "agent_directive_section", None)
+
+        try:
+            from core.pending_intent import set_pending_intent
+            set_pending_intent(
+                task=user_task,
+                action="run_skill",
+                params=raw_user_params,
+                target_dir=str(target_dir),
+                skill_name=resolved_name,
+                engine="antigravity",
+            )
+        except Exception as _ep:
+            logger.debug("[run_skill] Pending intent note: %s", _ep)
 
         if is_direct:
             # Direct Zezo execution: reads SKILL.md, invokes coding engine directly without fleet/worktree quarantine
@@ -145,6 +205,7 @@ def handler(parameters: dict, **kwargs: Any) -> str:
                     target_dir=target_dir,
                     context=raw_user_params,
                     engine="antigravity",
+                    directive_header=directive_hdr,
                 )
                 logger.info("[run_skill] Executing skill '%s' directly by Zezo", resolved_name)
                 direct_res = antigravity_action({
@@ -174,6 +235,7 @@ def handler(parameters: dict, **kwargs: Any) -> str:
                     target_dir=target_dir,
                     context=raw_user_params,
                     engine=engine_name,
+                    directive_header=directive_hdr,
                 )
 
                 dispatch_res = fm.dispatcher.dispatch_task(

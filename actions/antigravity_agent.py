@@ -57,18 +57,24 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
         repo = get_unique_project_dir(prompt)
         source = "new_project"
 
-    if repo is None:
-        return (
-            "I need to know which project to work in. "
-            "Which folder should Antigravity build the code in? "
-            "Give me the path, for example 'Desktop/website'."
-        )
+    if repo is None or _is_root_dir(Path(repo)):
+        repo = get_unique_project_dir(prompt or "project")
+        source = "auto_subfolder"
+        remember_repo(str(repo))
+        logger.info("[antigravity_agent] Auto-resolved root or missing project dir to: %s", repo)
 
-    if _is_root_dir(Path(repo)):
-        return (
-            "Please point me at a specific subfolder, not the Desktop root "
-            "(for example 'Desktop/website' or a dedicated project folder)."
+    try:
+        from core.pending_intent import set_pending_intent
+        set_pending_intent(
+            task=prompt,
+            action="antigravity_action",
+            params={"prompt": prompt, "project_path": str(repo)},
+            target_dir=str(repo),
+            engine="antigravity",
+            status="running",
         )
+    except Exception as _e:
+        logger.debug("[antigravity_agent] Pending intent set note: %s", _e)
 
     model = _resolve_model(parameters.get("model") or parameters.get("model_id"))
     task_ctx = parameters.get("task_ctx")

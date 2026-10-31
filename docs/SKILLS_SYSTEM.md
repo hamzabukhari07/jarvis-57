@@ -75,6 +75,32 @@ auto_activate: true
 - **`required_tools`**: List of atomic actions required by the skill (e.g. `[clone_website, browser_control, web_read_page, file_controller]`).
 - **`triggers`**: List of intent-matching keywords used by `core/skill_loader.py` to index when the skill should be surfaced.
 - **`auto_activate`**: Whether the skill is dynamically eligible for automatic prompt injection upon trigger match.
+- **`pre_flight_action`**: (Optional) Action module name dynamically invoked before coding engine dispatch (e.g., `uncage_capture` dynamically loads `actions/uncage_capture_handler.py`, `scrapling_extract` loads `actions/scrapling_extract_handler.py`). Pure dynamic dispatch with zero hardcoded orchestrator branches.
+- **`agent_directive_section`**: (Optional) Title of the markdown section (e.g., `"Agent Directive"`) to isolate and extract for autonomous coding engine synthesis (`craft_skill_engine_prompt`), cleanly filtering out CLI commands, environment setup, and reference architecture notes from agent prompts.
+
+---
+
+## ⚡ Two-Phase Engine Skill Pipeline (Dynamic Pre-Flight & Directive Extraction)
+
+To cleanly separate **pre-flight asset preparation** (asset scraping, offline cloning, DOM extraction handled by Python backend tooling) from **autonomous coding engine execution** (AntiGravity, OpenCode, Kilo Code inspecting real files and synthesizing code), ZEZO implements a declarative two-phase pipeline:
+
+```mermaid
+flowchart TD
+    A["Skill Triggered: website_clone / generate_design_md"] --> B["SkillRegistry.get_skill()"]
+    B --> C{"pre_flight_action defined?"}
+    C -- "Yes" --> D["Dynamic Module Dispatch:<br/>importlib.import_module('actions.<action>_handler')"]
+    D --> E["Handler Executes Ingestion Tooling<br/>(Uncage CLI / Scrapling Asset Prefetch)"]
+    E --> F["Assets Ingested to Target Directory"]
+    C -- "No" --> G["Bypass Ingestion"]
+    F --> H["craft_skill_engine_prompt(..., directive_header=...)"]
+    G --> H
+    H --> I["_extract_agent_directive()<br/>Isolate '## 🤖 Agent Directive'"]
+    I --> J["Groq LPU Prompt Synthesis<br/>(Grounding on real workspace files)"]
+    J --> K["Autonomous Coding Engine Dispatched<br/>(AntiGravity / OpenCode / Kilo)"]
+```
+
+1. **Zero-Hardcoding Dynamic Dispatch:** `actions/run_skill.py` does not contain any skill-specific branching (`if pre_flight == 'uncage_capture'`). Instead, it dynamically imports `actions.<pre_flight_action>_handler` via `importlib`. New pre-flight handlers can be added without modifying the core orchestrator.
+2. **Directive Extraction with Smart Fallback:** `_extract_agent_directive()` in `core/skill_prompt_engineer.py` regex-isolates the specified directive section. If the named header is omitted or missing, it safely falls back to the final markdown section to eliminate CLI command leakage.
 
 ---
 
@@ -82,7 +108,7 @@ auto_activate: true
 
 ZEZO standardizes on 3 production core skills:
 1. **`website_build` (`skills/website_build/`)**: Greenfield UI creation protocol with catalog-driven references, anti-slop quality gates, live preview servers, and authoritative taste prompts in Section 2.5 (Scenario 1: Portfolio, Scenario 2: SaaS Landing Page, Scenario 3: CloudFleet Analytics Dashboard, embedding 6 negative rejection gates and 4 visual authority guards).
-2. **`website_clone` (`skills/website_clone/`)**: High-fidelity offline website capture, asset localization, and reverse-engineering rebuilds via the Uncage Hybrid Engine (Path A: Python tool `clone_website`; Path B: direct CLI `node tools/uncage/bin/uncage.js`), featuring Section 4 Master System Directives (Scenario A: Single-File Raw HTML, Scenario B: Clean Modular React/Next.js Framework).
+2. **`website_clone` (`skills/website_clone/`)**: High-fidelity offline website capture, asset localization, and reverse-engineering rebuilds via the Uncage Ingestion Engine and autonomous coding agents, featuring Phase 1 Uncage CLI ingestion, physical verification gates, and Phase 2 Master System Directives (Scenario A: Single-File Raw HTML, Scenario B: Clean Modular React/Next.js Framework).
 3. **`generate_design_md` (`skills/generate_design_md/`)**: Studio design token extraction and DSL `<design-context>` generator from URLs or HTML templates with WCAG accessibility contrast audits.
 
 ---
@@ -195,16 +221,13 @@ Procedural declarative skills (`SKILL.md`) are executed by the **Dual-AI Skill R
 
 ---
 
-## 🛠️ Universal AI Skill Prompt Engineer (core/skill_prompt_engineer.py)
+## 🛠️ Pure AI-Driven Skill Prompt Synthesizer (core/skill_prompt_engineer.py)
 
-For downstream autonomous coding engines (Google Antigravity CLI \gy\, OpenCode, Kilo Code, Claude Code, Cursor, Windsurf), the **Universal AI Skill Prompt Engineer** synthesizes bespoke, executable master directives on the fly:
+For downstream autonomous coding engines (Google Antigravity CLI gy, OpenCode, Kilo Code), the **Skill Prompt Synthesizer** dynamically constructs clean, natural, tailored instruction prompts using live AI:
+- **Zero Hardcoded Bloat**: No artificial personas, theatrical roleplay, rigid 5-block schemas, or ghost file declarations (site_dom.html, site_tokens.json) are hardcoded into the synthesizer.
+- **Physical Workspace Disk Grounding**: _inspect_workspace_state(target_dir) inspects the target directory on disk before invoking the AI. It informs the LLM whether the workspace is brand new/empty or contains specific existing files, preventing hallucinated file dependencies that stall coding engines.
 - **Dual-AI Live Engine Orchestration**:
-  1. **Primary Engine**: Groq LPU (\llama-3.3-70b-versatile\) with ultra-fast latency (~150–200ms, \	imeout=12s\, \max_tokens=2048\, \	emperature=0.2\).
-  2. **Secondary Fallback**: Google Gemini 3.8 Flash (\gemini-3.8-flash\ via \core.gemini.client\) for instant failover if Groq experiences rate limits or network issues.
-  3. **Strict Live AI Mandate**: Zero dummy or hardcoded prompts are permitted. Every prompt is synthesized live from scratch. If both Groq and Gemini fail, a clean \RuntimeError\ is raised rather than falling back to fake templates.
-- **Enforced 5-Block Standard Schema**:
-  1. \[TASK DIRECTIVE]\: Mission statement, target directory, deliverable files, and execution engine.
-  2. \[DESIGN REFERENCES]\: Design DNA, token scales, typography, and reference catalog standards.
-  3. \[USER REQUIREMENTS & AUTHENTIC CONTENT]\: User directives and mandatory authentic domain copy (strictly no Lorem Ipsum).
-  4. \[SUBAGENTS WORKSPACE DECOMPOSITION]\: 5 to 7 parallel subagents with clear non-overlapping ownership for maximum velocity.
-  5. \[CRITICAL DIRECT-EXECUTION CONSTRAINTS & ANTI-SLOP GATES]\: Direct single-pass writing, no intermediate helper scripts, anti-slop visual gates, and atomic delivery.
+  1. **Primary Engine**: Groq LPU (llama-3.3-70b-versatile) with ultra-fast latency (~150–200ms, 	imeout=12s, max_tokens=2048, 	emperature=0.2).
+  2. **Secondary Fallback**: Google Gemini Flash (gemini-2.5-flash, gemini-2.0-flash via core.gemini.client) for instant failover if Groq experiences rate limits or network issues.
+  3. **Natural Dynamic Fallback**: If live LLMs are unreachable, a minimal, universal fallback derived purely from user_task, skill_name, and actual workspace status is generated.
+- **Pre-Flight Asset Extraction Sync**: In ctions/run_skill.py, if a live URL is present in the task/parameters, core.url_prefetch.prefetch_url_assets captures the live DOM and styles into 	arget_dir before prompt generation, ensuring that when the prompt references local files, those files genuinely exist on disk.

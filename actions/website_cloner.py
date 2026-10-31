@@ -853,6 +853,10 @@ def run_uncage_exporter(
     return False, "Uncage produced no output bundle."
 
 
+# Defensive alias for pre-flight handlers and external callers
+run_uncage_direct = run_uncage_exporter
+
+
 # ── 3-Tier HTML Fetching Engine ─────────────────────────────────────────────
 
 def _fetch_html_tier1_playwright(url: str, timeout_ms: int = 15000) -> Tuple[str, str]:

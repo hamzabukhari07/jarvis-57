@@ -2,34 +2,22 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("zezo.skill_prompt_engineer")
 
-PROMPT_ENGINEER_SYSTEM = """You are the Elite Staff UI & Systems Prompt Architect on ZEZO (Creator: Hamza Bukhari).
-Your sole mandate is to synthesize an uncompromising, direct CLI execution directive for a downstream autonomous coding engine (Google Antigravity CLI 'agy', OpenCode, or Kilo Code).
+PROMPT_ENGINEER_SYSTEM = """You are an AI Prompt Architect for autonomous coding engines (Google Antigravity 'agy', OpenCode, Kilo Code).
+Your sole purpose is to translate the user's task request and skill guidelines into a clear, direct, and actionable execution prompt for the coding agent.
 
-CORE DIRECTIVES:
-1. Blueprint Adoption:
-   Examine the provided SKILL SOP & Taste Examples and faithfully adopt the exact structure, deliverables, and Blueprints specified in the SKILL.md (e.g. canonical DESIGN.md schema, preview.html, preview-dark.html, or task-specific deliverables).
-2. Execution Modes:
-   - Mode 1 (URL with pre-fetched assets): If the task targets a live URL or web clone, direct the coding agent to inspect the local pre-fetched assets directly: 'site_dom.html', 'site_styles.css', and 'site_tokens.json' located in the workspace root. Strictly forbid writing web scraping/crawling scripts or making external network requests.
-   - Mode 2 (Local Codebase / Folder / File): If the task targets a local project, direct the coding agent to inspect local source files in order: system sources ('tailwind.config.*', theme tokens, CSS variables in ':root' / '.dark', 'globals.css' / 'app.css'), shared UI primitives ('components/ui/*', 'components/primitives/*'), and target files before writing deliverables.
-3. Subagents Policy:
-   Subagents are strictly OPTIONAL. Do NOT enforce a mandatory 5 to 7 subagents requirement. Decompose into subagents only if a complex, multi-package task genuinely benefits from parallel execution; otherwise, provide a single, highly focused, cohesive direct-execution flow.
-4. Anti-Slop & Quality Gates:
-   Enforce zero-tolerance Anti-Slop negative filters:
-   - Zero generic AI purple/pink glowing gradients or neon blobs.
-   - Zero hallucinated icons or non-existent package utilities.
-   - Auditable traceability: every token, color, and component spec must trace directly to authentic source code or pre-fetched assets.
-   - Visual restraint: authentic spacing, density, and contrast matching the source.
-   - Direct execution: perform the work immediately without asking questions, prompting for confirmations, or leaving placeholder TODOs.
-   - Zero intermediate Python helper scripts or temporary scrap files.
-5. Output Formatting:
-   - Output the complete, multi-section instruction prompt text (at least 200-400 words) specifying the agent's role, task directive, inspected files, exact schema, and anti-slop rules according to the Blueprint.
-   - Do NOT output a one-line terminal command like 'agy ...' or 'opencode run ...'. The coding agent is an LLM receiving an instruction prompt.
-   - Never wrap in conversational preamble, meta-commentary, or markdown greetings."""
+Core Principles:
+1. Natural & Actionable: Tell the coding agent directly what needs to be created, modified, or extracted in the workspace. Avoid artificial personas, theatrical roleplay, or bureaucratic essays.
+2. Respect User Scope: Focus strictly on what the user asked for. Do not mandate unrequested extra files, schemas, or arbitrary deliverables.
+3. Ground in Actual Files: Refer only to files that actually exist in the workspace directory. Never assume pre-fetched assets exist unless confirmed in the workspace context.
+4. Autonomous Execution: Direct the coding agent to complete the task thoroughly and self-contained without asking intermediate questions or leaving placeholder TODOs.
+5. Output Format: Output only the instruction prompt text for the coding agent. Never include conversational greetings or meta-commentary."""
 
 
 def _is_valid_synthesized_prompt(prompt_out: Optional[str]) -> bool:
@@ -37,18 +25,42 @@ def _is_valid_synthesized_prompt(prompt_out: Optional[str]) -> bool:
     if not prompt_out:
         return False
     stripped = prompt_out.strip()
-    if len(stripped) <= 80:
+    if len(stripped) <= 40:
         return False
     # Reject accidental one-line shell commands
     if stripped.startswith("agy ") or stripped.startswith("opencode ") or stripped.startswith("kilo "):
         return False
-    lower = stripped.lower()
-    keywords = (
-        "design", "preview", "audit", "token", "style", "css", "html",
-        "directive", "component", "spec", "inspect", "you are", "task",
-        "build", "extract", "role", "guideline", "source", "output", "deliverable"
-    )
-    return any(k in lower for k in keywords)
+    return True
+
+
+def _inspect_workspace_state(target_dir: str) -> Dict[str, Any]:
+    """Inspect actual workspace files to prevent prompt hallucination."""
+    try:
+        p = Path(target_dir).resolve() if target_dir else None
+        if not p or not p.exists():
+            return {
+                "exists": False,
+                "existing_files": [],
+                "summary": "Workspace directory does not exist yet (fresh project).",
+            }
+        files = [f.name for f in p.iterdir() if f.is_file() and not f.name.startswith(".")]
+        if not files:
+            return {
+                "exists": True,
+                "existing_files": [],
+                "summary": "Workspace directory is empty (fresh project).",
+            }
+        return {
+            "exists": True,
+            "existing_files": files[:25],
+            "summary": f"Existing files in workspace: {', '.join(files[:25])}",
+        }
+    except Exception as e:
+        return {
+            "exists": False,
+            "existing_files": [],
+            "summary": f"Could not inspect workspace: {e}",
+        }
 
 
 def _generate_blueprint_fallback(
@@ -59,49 +71,40 @@ def _generate_blueprint_fallback(
     context: Optional[Dict[str, Any]] = None,
     engine: str = "antigravity",
 ) -> str:
-    """Deterministic fallback prompt generator built directly from SKILL.md blueprints."""
-    ctx = context or {}
-    mode = ctx.get("mode", "local")
-    target_url = ctx.get("url") or ""
+    """Deterministic, natural fallback prompt derived from the user task and skill."""
+    ws = _inspect_workspace_state(target_dir)
+    ws_notes = f"\nWorkspace Status: {ws['summary']}" if ws.get("summary") else ""
+    return (
+        f"You are an autonomous coding agent ({engine.upper()}) working in: {target_dir}\n\n"
+        f"Task: {user_task}\n"
+        f"Skill: {skill_name}\n"
+        f"{ws_notes}\n\n"
+        "Directives:\n"
+        "1. Inspect the workspace directory and review any existing files.\n"
+        "2. Complete the requested task directly, creating all necessary functional files.\n"
+        "3. Ensure the implementation is complete, authentic, self-contained, and free of placeholder TODOs.\n"
+    ).strip()
 
-    if mode == "url" or target_url:
-        return (
-            "You are a Senior Frontend Design-Systems Auditor and UI Documentation Agent.\n"
-            "Your mandate is to reverse-engineer the visual design system from the pre-fetched site assets into a faithful, machine-readable specification.\n\n"
-            f"Target URL: {target_url}\n"
-            "Pre-fetched authentic site assets are available in this workspace:\n"
-            "- `site_dom.html` (Full rendered HTML DOM)\n"
-            "- `site_styles.css` (Bundled external and inline stylesheets)\n"
-            "- `site_tokens.json` (Pre-indexed CSS variables and tokens)\n\n"
-            "Directly inspect these local files and produce three canonical artifacts:\n"
-            "1. `DESIGN.md` — Following the exact markdown specification in the SOP.\n"
-            "2. `preview.html` — Self-contained visual catalog (light theme) with interactive dark/light toggle.\n"
-            "3. `preview-dark.html` — Static dark catalog rendered with obsidian dark surfaces.\n\n"
-            "Execution Constraints:\n"
-            "- Do NOT write Python web-crawling or scraping scripts; the assets are already local.\n"
-            "- Do NOT make network calls.\n"
-            "- Enforce Anti-Slop Directives: zero generic purple gradients, zero hallucinated icons, auditable traceability.\n"
-            "- Perform the work immediately without asking questions or leaving placeholder TODOs."
-        )
-    else:
-        return (
-            "You are a Senior Frontend Design-Systems Auditor and UI Documentation Agent.\n"
-            "Your mandate is to reverse-engineer the visual design system from the local frontend codebase into a faithful, machine-readable specification.\n\n"
-            f"Target Directory: {target_dir}\n"
-            f"Task: {user_task}\n\n"
-            "Source Files to Inspect:\n"
-            "- Theme & Token definitions: `tailwind.config.*`, `theme.*`, `tokens.json`\n"
-            "- Global styles & variables: `globals.css`, `app.css`, `index.css`, `:root` blocks\n"
-            "- Component primitives: `components/ui/*`, `src/components/*`\n\n"
-            "Directly inspect the local source files and produce three canonical artifacts:\n"
-            "1. `DESIGN.md` — Following the exact markdown specification in the SOP.\n"
-            "2. `preview.html` — Self-contained visual catalog (light theme) with interactive dark/light toggle.\n"
-            "3. `preview-dark.html` — Static dark catalog rendered with obsidian dark surfaces.\n\n"
-            "Execution Constraints:\n"
-            "- Authenticity over invention: extract real tokens from source files. Do not fabricate values.\n"
-            "- Enforce Anti-Slop Directives: zero generic purple gradients, zero hallucinated icons, auditable traceability.\n"
-            "- Perform the work immediately without asking questions or leaving placeholder TODOs."
-        )
+
+def _extract_agent_directive(sop_text: str, directive_header: Optional[str] = None) -> str:
+    """Extracts the agent directive section if specified, else returns safe instructions."""
+    if not sop_text:
+        return ""
+    if directive_header:
+        clean_hdr = re.escape(directive_header.strip())
+        # Match ## [optional emoji/prefix] <Header> ... until next ## or EOF
+        pattern = rf"(?i)(?:^|\n)##\s*[^\n]*?{clean_hdr}[^\n]*\n(.*?)(?=\n##\s|\Z)"
+        match = re.search(pattern, sop_text, re.DOTALL)
+        if match and match.group(1).strip():
+            return match.group(1).strip()
+
+        # Smart Fallback: If named header missing, grab the last ## section
+        # (where deliverables/prompts are positioned) to prevent CLI leak
+        sections = re.findall(r"(?i)(?:^|\n)##\s*[^\n]+\n(.*?)(?=\n##\s|\Z)", sop_text, re.DOTALL)
+        if sections:
+            return sections[-1].strip()
+
+    return sop_text
 
 
 def craft_skill_engine_prompt(
@@ -111,20 +114,22 @@ def craft_skill_engine_prompt(
     target_dir: str,
     context: Optional[Dict[str, Any]] = None,
     engine: str = "antigravity",
+    directive_header: Optional[str] = None,
 ) -> str:
-    """Synthesizes a bespoke execution prompt strictly using live AI models.
+    """Synthesizes a bespoke execution prompt using live AI models (Groq LPU / Gemini Flash).
 
     Order of execution:
       1. Primary: Groq LPU (llama-3.3-70b-versatile, ~150-200ms)
-      2. Secondary: Google Gemini Flash (gemini-3.8-flash, gemini-3.6-flash)
-    
-    If both fail, raises RuntimeError. No dummy or hardcoded prompts are ever returned.
+      2. Secondary: Google Gemini Flash (gemini-2.5-flash, gemini-2.0-flash)
+      3. Fallback: Natural dynamic blueprint prompt based on actual workspace files.
     """
     ctx = context or {}
     start_t = time.time()
 
-    # Build prompt crafting briefing
-    sop_body = (skill_sop or "").strip()
+    ws = _inspect_workspace_state(target_dir)
+
+    # Filter by agent directive section if specified to prevent pre-flight/CLI leak
+    sop_body = _extract_agent_directive((skill_sop or "").strip(), directive_header)
     if len(sop_body) > 6500:
         sop_body = sop_body[:6300] + "\n\n... [SOP truncated for prompt synthesis] ..."
 
@@ -132,11 +137,12 @@ def craft_skill_engine_prompt(
         f"=== TARGET SKILL: {skill_name.upper()} ===\n"
         f"Target Engine: {engine.upper()}\n"
         f"Target Directory: {target_dir}\n"
+        f"Workspace Status: {ws['summary']}\n"
         f"User Task Request: {user_task}\n\n"
         f"Context Details:\n{json.dumps(ctx, indent=2)}\n\n"
-        f"=== SKILL SOP & TASTE GUIDELINES ===\n"
+        f"=== SKILL GUIDELINES ===\n"
         f"{sop_body}\n\n"
-        "Synthesize the complete, surgical master directive for the coding agent now:"
+        "Synthesize a clear, direct, natural instruction prompt for the coding agent now:"
     )
 
     groq_error: Optional[Exception] = None
@@ -155,7 +161,7 @@ def craft_skill_engine_prompt(
         )
         if _is_valid_synthesized_prompt(prompt_out):
             logger.info(
-                "[SkillPromptEngineer] Synthesized prompt via Groq LPU in %.2fs (%d chars)",
+                "[SkillPromptEngineer] Synthesized natural prompt via Groq LPU in %.2fs (%d chars)",
                 time.time() - start_t,
                 len(prompt_out),
             )
@@ -167,7 +173,7 @@ def craft_skill_engine_prompt(
             e,
         )
 
-    # ── 2. Secondary Engine: Gemini 3.8 Flash Fallback ──────────────────────
+    # ── 2. Secondary Engine: Gemini Flash Fallback ──────────────────────────
     gemini_error: Optional[Exception] = None
     try:
         from core.gemini import client as get_gemini_client
@@ -195,7 +201,7 @@ def craft_skill_engine_prompt(
                 text_out = getattr(resp, "text", "") or ""
                 if _is_valid_synthesized_prompt(text_out):
                     logger.info(
-                        "[SkillPromptEngineer] Synthesized prompt via Gemini (%s) in %.2fs",
+                        "[SkillPromptEngineer] Synthesized natural prompt via Gemini (%s) in %.2fs",
                         model_name,
                         time.time() - start_t,
                     )
@@ -215,10 +221,10 @@ def craft_skill_engine_prompt(
             e,
         )
 
-    # ── 3. Deterministic Blueprint Fallback on LLM Quota / Network Errors ───
+    # ── 3. Natural Fallback on LLM Quota / Network Errors ──────────────────
     logger.warning(
         "[SkillPromptEngineer] Live LLM synthesis unavailable (Groq: %s, Gemini: %s). "
-        "Falling back to canonical Blueprint prompt from SKILL.md",
+        "Using natural blueprint prompt fallback.",
         groq_error,
         gemini_error,
     )

@@ -66,18 +66,25 @@ def opencode_agent(parameters: dict, player=None, speak=None) -> str:
     )
     repo, source = resolve(explicit=explicit_path)
 
-    if repo is None:
-        return (
-            "I need to know which project to work in. "
-            "Which folder should OpenCode edit? "
-            "Give me the path, for example 'E:/projects/myapp'."
-        )
+    if repo is None or _is_root_dir(Path(repo)):
+        from core.repo_context import get_unique_project_dir, remember_repo
+        repo = get_unique_project_dir(prompt or "project")
+        source = "auto_subfolder"
+        remember_repo(str(repo))
+        logger.info("[opencode_agent] Auto-resolved root or missing project dir to: %s", repo)
 
-    if _is_root_dir(Path(repo)):
-        return (
-            "Please point me at a specific subfolder, not the Desktop root "
-            "(for example 'Desktop/my_project' or a dedicated repo folder)."
+    try:
+        from core.pending_intent import set_pending_intent
+        set_pending_intent(
+            task=prompt,
+            action="opencode_agent",
+            params={"prompt": prompt, "project_path": str(repo)},
+            target_dir=str(repo),
+            engine="opencode",
+            status="running",
         )
+    except Exception as _e:
+        logger.debug("[opencode_agent] Pending intent set note: %s", _e)
 
     opencode_bin = _find_opencode_bin()
     if not opencode_bin:

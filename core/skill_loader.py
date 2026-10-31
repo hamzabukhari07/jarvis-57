@@ -55,6 +55,8 @@ class SkillRecord:
     auto_activate: bool = True
     pinned: bool = False
     disabled: bool = False
+    pre_flight_action: Optional[str] = None
+    agent_directive_section: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -71,6 +73,8 @@ class SkillRecord:
             "pinned": self.pinned,
             "disabled": self.disabled,
             "folder": str(self.folder_path),
+            "pre_flight_action": self.pre_flight_action,
+            "agent_directive_section": self.agent_directive_section,
         }
 
 
@@ -254,6 +258,8 @@ class SkillRegistry:
                         triggers = meta.get("triggers") if isinstance(meta.get("triggers"), list) else []
                         required_tools = meta.get("required_tools") if isinstance(meta.get("required_tools"), list) else []
                         domain = str(meta.get("domain") or "").strip()
+                        pre_flight_action = str(meta.get("pre_flight_action") or "").strip() or None
+                        agent_directive_section = str(meta.get("agent_directive_section") or "").strip() or None
                     else:
                         name = item_folder.name
                         desc = f"Skill for {item_folder.name}"
@@ -264,6 +270,8 @@ class SkillRegistry:
                         triggers = []
                         required_tools = []
                         domain = ""
+                        pre_flight_action = None
+                        agent_directive_section = None
 
                     if not domain:
                         domain = _infer_domain_from_name_and_tags(name, tags, item_folder)
@@ -291,6 +299,8 @@ class SkillRegistry:
                         auto_activate=auto_activate,
                         pinned=pinned,
                         disabled=disabled,
+                        pre_flight_action=pre_flight_action,
+                        agent_directive_section=agent_directive_section,
                     )
                 except Exception as e:
                     self._logger(f"⚠️ Failed to parse {skill_file}: {e}")
@@ -317,6 +327,18 @@ class SkillRegistry:
             if domain and domain.upper() != "ALL":
                 skills = [s for s in skills if s.domain.upper() == domain.upper()]
             return [s.to_dict() for s in skills]
+
+    def get_skill(self, name: str) -> Optional[SkillRecord]:
+        """Retrieve the SkillRecord for a specific skill."""
+        with _lock:
+            self.refresh_if_modified()
+            clean_name = (name or "").strip()
+            if clean_name in self._skills:
+                return self._skills[clean_name]
+            for k, s in self._skills.items():
+                if clean_name.lower() in k.lower() or k.lower() in clean_name.lower():
+                    return s
+            return None
 
     def read_skill(self, name: str) -> str:
         """Retrieve full markdown instructions for a specific skill."""

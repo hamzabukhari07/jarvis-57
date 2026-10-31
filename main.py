@@ -47,6 +47,7 @@ for _stream in ("stdout", "stderr"):
 # ─────────────────────────────────────────────────────────────────────────────
 
 import asyncio
+import logging
 import re
 import threading
 import time
@@ -56,6 +57,8 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+
+logger = logging.getLogger("zezo.main")
 
 import sounddevice as sd
 import numpy as np
@@ -674,6 +677,7 @@ class ZezoLive:
         self._last_user_in_logged = ""             # deduplication for user text/voice input
         self._last_user_text_ts: float = 0.0       # timestamp of last typed command for debounce
         self._session_log: list[str] = []          # conversation turns for end-of-session summary
+        self._rolling_recent_turns: list[str] = [] # un-wiped rolling turn history across reconnects
         self._summary_watermark: str | None = None  # last turn ts already summarised (window boundary)
         self._tool_busy: bool = False              # pauses audio streaming during tool execution
         self._awaiting_tool_reply: bool = False    # true while waiting for Gemini to answer after tool execution
@@ -1023,6 +1027,15 @@ class ZezoLive:
         manual = self._dashboard.get_manual_url()
         return url, key, f"{url}/auto-login?key={key}", manual
 
+    def _append_session_log(self, entry: str) -> None:
+        """Record turn entry in session summary log and rolling reconnect history buffer."""
+        self._session_log.append(entry)
+        if not hasattr(self, "_rolling_recent_turns"):
+            self._rolling_recent_turns = []
+        self._rolling_recent_turns.append(entry)
+        if len(self._rolling_recent_turns) > 20:
+            self._rolling_recent_turns = self._rolling_recent_turns[-20:]
+
     def _on_text_command(self, text: str):
         if not self._loop or not self.session:
             return
@@ -1032,7 +1045,7 @@ class ZezoLive:
         self._last_user_in_logged = clean_text
         self._last_user_text_ts = time.monotonic()
         self.ui.write_log(f"You: {text}")
-        self._session_log.append(f"User: {text}")
+        self._append_session_log(f"User: {text}")
         if not getattr(self.ui, "muted", False):
             self.ui.set_state("THINKING")
         self._arm_silence_watchdog(clean_text)
@@ -1525,9 +1538,83 @@ class ZezoLive:
                 f"When the user asks which folder is selected or asks to inspect/work on their project, refer to this directory.\n\n"
             )
 
+        # Recent Conversation History Injection (Active Session Reconnect Continuity)
+        history_ctx = ""
+        recent_turns: list[str] = []
+        if hasattr(self, "_rolling_recent_turns") and self._rolling_recent_turns:
+            recent_turns = list(self._rolling_recent_turns[-10:])
+        elif hasattr(self, "_session_log") and self._session_log:
+            recent_turns = list(self._session_log[-10:])
+        else:
+            try:
+                from memory import sqlite_memory
+                db_turns = sqlite_memory.get_recent_turns(limit=8, newest_first=False)
+                if db_turns:
+                    for t in db_turns:
+                        role = (t.get("role") or "").lower()
+                        content = t.get("content") or ""
+                        tool_name = t.get("tool_name") or ""
+                        tool_res = (t.get("tool_result") or "")[:100]
+                        if role == "user" and content:
+                            recent_turns.append(f"User: {content}")
+                        elif role == "assistant" and content:
+                            recent_turns.append(f"{self._asst_name}: {content}")
+                        elif role == "tool" and tool_name:
+                            recent_turns.append(f"Tool {tool_name} → {tool_res}")
+            except Exception as _e_hist:
+                logger.debug("[_build_config] Recent turns fetch: %s", _e_hist)
+
+        if recent_turns:
+            turns_formatted = "\n".join(f"- {t}" for t in recent_turns)
+            history_ctx = (
+                "[RECENT CONVERSATION HISTORY (ACTIVE SESSION RECONNECTED)]\n"
+                "The live connection was recently reconnected. Here are the immediate prior turns from this conversation:\n"
+                f"{turns_formatted}\n"
+                "CRUCIAL INSTRUCTION: Maintain seamless continuity with the user. Do NOT mention reconnection, "
+                "disconnection, or that you lost connection unless specifically asked. You remember everything.\n\n"
+            )
+
+        # Active Pending Intent Injection (Multi-turn confirmation & continuation)
+        intent_ctx = ""
+        try:
+            from core.pending_intent import get_pending_intent
+            pending = get_pending_intent()
+            if pending:
+                task_desc = pending.get("task", "")
+                p_action = pending.get("action", "")
+                p_dir = pending.get("target_dir", "")
+                p_skill = pending.get("skill_name", "")
+                p_engine = pending.get("engine", "")
+                p_status = pending.get("status", "awaiting_confirmation")
+                if p_status == "running":
+                    p_instr = (
+                        "INSTRUCTION: This task was recently submitted and is currently running in the background. "
+                        "If the user asks about it or asks for progress, confirm that it is already running or inspect via task_status.\n\n"
+                    )
+                else:
+                    p_instr = (
+                        "INSTRUCTION: If the user says 'do it', 'shuru karo', 'haan karo', 'proceed', "
+                        "or confirms folder preparation, execute this pending task immediately using the appropriate tool "
+                        f"({p_action or 'run_skill'} / antigravity_run) without asking 'do what?' or 'what task?'.\n\n"
+                    )
+                intent_ctx = (
+                    "[ACTIVE PENDING TASK AWAITING CONFIRMATION OR EXECUTION]\n"
+                    f"- Pending Task: '{task_desc}'\n"
+                    f"- Action/Skill: {p_skill or p_action} (Engine: {p_engine})\n"
+                    f"- Target Directory: {p_dir}\n"
+                    f"- Status: {p_status}\n"
+                    f"{p_instr}"
+                )
+        except Exception as _e_intent:
+            logger.debug("[_build_config] Pending intent check: %s", _e_intent)
+
         parts = [time_ctx, identity_ctx]
         if ws_ctx:
             parts.append(ws_ctx)
+        if intent_ctx:
+            parts.append(intent_ctx)
+        if history_ctx:
+            parts.append(history_ctx)
         if fleet_ctx:
             parts.append(fleet_ctx)
         if mem_str:
@@ -1954,8 +2041,8 @@ class ZezoLive:
             self.ui.write_log(f"ERR: {name} — {str(e)[:120]}")
 
         print(f"[Zezo] 📤 {name} → {str(result)[:80]}")
-        self._session_log.append(f"Tool call: {name}({args})")
-        self._session_log.append(f"Tool result: {name} → {str(result)}")
+        self._append_session_log(f"Tool call: {name}({args})")
+        self._append_session_log(f"Tool result: {name} → {str(result)}")
         try:
             sqlite_memory.log_turn("tool", str(result), tool_name=name, tool_args=args, tool_result=str(result))
         except Exception:
@@ -2371,7 +2458,7 @@ class ZezoLive:
                                 full_in = " ".join(in_buf).strip()
                                 if full_in and not in_logged:
                                     self._last_user_in_logged = full_in
-                                    self._session_log.append(f"User: {full_in}")
+                                    self._append_session_log(f"User: {full_in}")
                                     try:
                                         sqlite_memory.log_turn("user", full_in)
                                     except Exception:
@@ -2410,7 +2497,7 @@ class ZezoLive:
                                     if cmd_part and cmd_part.strip():
                                         self.ui.write_log(f"You: {cmd_part.strip()}")
                                         self.ui.stream_transcript("user", cmd_part.strip(), done=True)
-                                        self._session_log.append(f"User: {cmd_part.strip()}")
+                                        self._append_session_log(f"User: {cmd_part.strip()}")
                                         try:
                                             sqlite_memory.log_turn("user", cmd_part.strip())
                                         except Exception:
@@ -2452,7 +2539,7 @@ class ZezoLive:
                                 self._last_out_logged = full_out
                                 self.ui.write_log(f"{self._asst_name}: {full_out}")
                                 self.ui.stream_transcript("zezo", full_out, done=True)
-                                self._session_log.append(f"{self._asst_name}: {full_out}")
+                                self._append_session_log(f"{self._asst_name}: {full_out}")
                                 try:
                                     sqlite_memory.log_turn("assistant", full_out)
                                 except Exception:
@@ -3137,7 +3224,11 @@ class ZezoLive:
             try:
                 memory       = await asyncio.to_thread(load_memory)
                 monitors     = await asyncio.to_thread(list_monitors)
-                recent_turns = self._session_log[-8:] if self._session_log else []
+                recent_turns = (
+                    self._rolling_recent_turns[-8:]
+                    if getattr(self, "_rolling_recent_turns", None)
+                    else (self._session_log[-8:] if self._session_log else [])
+                )
                 prompt = self._proactive.build_prompt(
                     memory       = memory,
                     monitors     = monitors or None,

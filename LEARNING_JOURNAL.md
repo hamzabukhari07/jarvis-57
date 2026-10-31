@@ -2,6 +2,153 @@
 
 # LEARNING JOURNAL (active — last 25 entries)
 
+## [2026-11-01] — Full End-to-End Automation & Streamlined Architecture for `website_clone`
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Hamza Bukhari's real manual workflow for cloning websites was simple and surgical:
+    1. Allocate a project folder.
+    2. Run Uncage CLI to download and localize site assets.
+    3. Open AntiGravity in that same folder with the master reverse-engineering prompt.
+    4. AntiGravity inspects the files on disk and outputs a 100% clean raw HTML rebuild.
+  - Previous `skills/website_clone/SKILL.md` was bloated with over-complicated legacy text (Path A vs Path B tables, 2-step confirmation gates, 200ms HTTP probes, and fake filenames like `antigravity_clone.html`).
+  - In `actions/uncage_capture_handler.py`, an invalid import (`run_uncage_direct` instead of `run_uncage_exporter`) caused an `ImportError` on execution, silently failing pre-flight capture.
+  - `actions/run_skill.py` needed domain-aware folder naming (`Desktop/<domain>-clone`) and an asset verification gate ensuring `index.html` exists before AntiGravity launches.
+- **Execution & Changes Applied:**
+  - **`skills/website_clone/SKILL.md` (Streamlined 1:1 with Manual Workflow):**
+    - Removed all Path A vs B diagrams, 2-step confirmation gates, and speculative HTTP probes.
+    - Standardized on a lean 2-Phase workflow: Phase 1 (Ingestion & Asset Capture via Uncage CLI) and Phase 2 (Master Reverse-Engineering Rebuild via AntiGravity).
+    - Preserved exact Master Directives in `## 🤖 Agent Directive` for Scenario A (Single-File Raw HTML) and Scenario B (Modular React/Next.js).
+  - **`actions/website_cloner.py`:**
+    - Exported `run_uncage_direct = run_uncage_exporter` as a safety alias.
+  - **`actions/uncage_capture_handler.py`:**
+    - Connected directly to `run_uncage_exporter(url, output_dir, timeout_sec=120, ctx=task_ctx)`.
+    - Added URL normalization (`https://`) and verification gate confirming `(output_dir / "index.html").exists()` before returning `True`.
+  - **`actions/run_skill.py`:**
+    - Added domain-aware project folder allocation (e.g. `https://linear.app` ➔ `Desktop/linear-clone`).
+    - Added pre-flight status tracking ensuring downstream coding engines are never dispatched to empty or un-ingested workspaces.
+  - **`scripts/test_website_clone_pipeline.py` (New Automated Integration Test):**
+    - Built comprehensive 3-step test verifying Uncage asset capture simulation on disk, prompt directive extraction without CLI leaks, and AntiGravity dispatch contract.
+  - **`docs/SKILLS_SYSTEM.md`:**
+    - Updated documentation to reflect the streamlined 2-phase pipeline.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` across all touched files passed with 0 errors.
+  - Layer 2 (Runtime): `python scripts/test_website_clone_pipeline.py` and `python scripts/test_website_clone_prompt.py` passed with 100% success.
+  - Layer 3 (Regression): `pytest tests/` (12/12 passed with 0 failures).
+- **Key Files Touched:**
+  - `skills/website_clone/SKILL.md`
+  - `actions/website_cloner.py`
+  - `actions/uncage_capture_handler.py`
+  - `actions/run_skill.py`
+  - `scripts/test_website_clone_pipeline.py`
+  - `docs/SKILLS_SYSTEM.md`
+  - `LEARNING_JOURNAL.md`
+
+## [2026-10-31] — Declarative Two-Phase Engine Skill Pipeline & Zero-Hardcoding Pre-Flight Dispatch
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - When testing `skills/website_clone` with `core/skill_prompt_engineer.py`, the AI synthesizer generated bash commands for AntiGravity (`node tools/uncage/bin/uncage.js ...`), confusing CLI preparation tooling with autonomous coding engine execution.
+  - Autonomous coding engines (AntiGravity `agy`, OpenCode, Kilo Code) are reverse-engineering and code-synthesis agents, NOT CLI scrapers. The workflow requires a strict two-phase separation:
+    - **Phase 1 (Pre-Flight Asset Preparation):** Ingestion tooling (e.g. Uncage asset capture, Scrapling DOM/token extraction) executed by the Python backend before engine dispatch.
+    - **Phase 2 (Coding Engine Execution):** Coding agent inspects captured files and executes reverse-engineering rebuilds based on the master directive.
+  - **Strict Architectural Mandate — Zero Hardcoding:** Hamza Bukhari strictly prohibited adding static `if skill == 'website_clone'` or `if pre_flight == 'uncage_capture'` dispatch logic inside orchestrators (`run_skill.py`, `skill_prompt_engineer.py`). The architecture had to be 100% extensible and declarative via `SKILL.md` frontmatter.
+- **Execution & Changes Applied:**
+  - **`skills/website_clone/SKILL.md`:**
+    - Declared `pre_flight_action: "uncage_capture"` and `agent_directive_section: "Agent Directive"` in frontmatter.
+    - Restructured body into `## 📚 Pre-Flight Ingestion & Reference Architecture` (CLI/tool docs) and `## 🤖 Agent Directive` (master rebuild directives for Single-File HTML and modular frameworks).
+  - **`skills/generate_design_md/SKILL.md`:**
+    - Declared `pre_flight_action: "scrapling_extract"` in frontmatter.
+  - **`actions/uncage_capture_handler.py` & `actions/scrapling_extract_handler.py` (New Modular Handlers):**
+    - Created standalone execution modules implementing `execute(url, output_dir, params)` to decouple all ingestion tooling from core routing.
+  - **`core/skill_loader.py`:**
+    - Extended `SkillRecord` dataclass and frontmatter parsing with `pre_flight_action` and `agent_directive_section`.
+    - Added `SkillRegistry.get_skill(name)` helper for clean record retrieval.
+  - **`actions/run_skill.py` (Pure Dynamic Dispatch):**
+    - Replaced static prefetching with pure dynamic module loading: `importlib.import_module(f"actions.{pre_flight}_handler")`.
+    - Passes `directive_hdr` directly into `craft_skill_engine_prompt(..., directive_header=directive_hdr)`.
+  - **`core/skill_prompt_engineer.py`:**
+    - Added `directive_header: Optional[str] = None` to `craft_skill_engine_prompt()` signature.
+    - Implemented `_extract_agent_directive(sop_text, directive_header)` with regex header extraction and smart fallback (falling back to the last markdown section if the named header is omitted) to prevent CLI command leakage into coding prompts.
+  - **`docs/SKILLS_SYSTEM.md` & `docs/TOOLS.md`:**
+    - Documented frontmatter fields, dynamic dispatch pattern, and two-phase architecture.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed across all modified and new files with 0 errors.
+  - Layer 2 (Runtime): `python scripts/test_website_clone_prompt.py` generated the pure reverse-engineering rebuild directive with 0 Uncage bash commands leaked.
+  - Layer 3 (Regression): `pytest tests/` (12/12 passed with 0 failures).
+- **Key Files Touched:**
+  - `skills/website_clone/SKILL.md`
+  - `skills/generate_design_md/SKILL.md`
+  - `actions/uncage_capture_handler.py`
+  - `actions/scrapling_extract_handler.py`
+  - `core/skill_loader.py`
+  - `actions/run_skill.py`
+  - `core/skill_prompt_engineer.py`
+  - `scripts/test_website_clone_prompt.py`
+  - `docs/SKILLS_SYSTEM.md`
+  - `docs/TOOLS.md`
+
+## [2026-10-31] — Pure AI-Driven Natural Skill Prompt Synthesizer & AntiGravity Thinking Loop Fix
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - `core/skill_prompt_engineer.py` had become overly rigid and burdened with hardcoded assumptions:
+    1. **Hardcoded Persona & Rigid Over-Engineering:** A hardcoded `PROMPT_ENGINEER_SYSTEM` forced every coding prompt into an artificial "Senior Frontend Design-Systems Auditor" roleplay, regardless of what the user requested.
+    2. **Pre-Flight Ghost File Hallucination:** Prompts fabricated assertions that three pre-flight extraction files (`site_dom.html`, `site_styles.css`, `site_tokens.json`) already existed in the workspace root and explicitly forbade network requests. When the target folder was fresh/empty, autonomous coding engines (specifically Google Antigravity `agy`) became trapped in an indefinite thinking/stall loop trying to resolve non-existent files.
+    3. **Hardcoded Fallback:** `_generate_blueprint_fallback()` unconditionally returned rigid `DESIGN.md`, `preview.html`, and `preview-dark.html` templates for any skill or user task.
+- **Execution & Changes Applied:**
+  - **`core/skill_prompt_engineer.py` (Complete Refactor):**
+    - Stripped out all hardcoded personas, rigid schemas, and ghost file references.
+    - Implemented a clean, natural Prompt Architect system instruction directing Groq LPU (`llama-3.3-70b-versatile`) to generate direct, concise, natural task instructions.
+    - Added physical workspace inspection (`_inspect_workspace_state(target_dir)`) to ground prompts in actual files on disk before calling the LLM.
+    - Replaced the hardcoded fallback with a dynamic, universal prompt derived directly from `user_task`, `skill_name`, and actual workspace status.
+  - **`skills/generate_design_md/SKILL.md`:**
+    - Removed mandatory `preview-dark.html` deliverable from frontmatter, body, and blueprints. Kept `DESIGN.md` as primary and `preview.html` as optional catalog with interactive toggle.
+  - **`actions/run_skill.py`:**
+    - Added pre-flight URL extraction hook before prompt synthesis so that if a live URL is present in the task, assets are pre-fetched to disk before the coding engine runs.
+  - **`docs/SKILLS_SYSTEM.md`:**
+    - Updated documentation to reflect the pure AI-driven prompt synthesizer, disk grounding, and pre-flight synchronization.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile core/skill_prompt_engineer.py actions/run_skill.py` passed with 0 errors.
+  - Layer 2 (Runtime): Added `tests/test_natural_skill_prompt.py` verifying clean dynamic fallback without hardcoded ghost files and live Groq LPU natural prompt synthesis.
+  - Layer 3 (Regression): `pytest tests/` (12/12 passed with 0 failures).
+- **Key Files Touched:**
+  - `core/skill_prompt_engineer.py`
+  - `skills/generate_design_md/SKILL.md`
+  - `actions/run_skill.py`
+  - `tests/test_natural_skill_prompt.py`
+  - `docs/SKILLS_SYSTEM.md`
+
+## [2026-10-31] — Fix for Gemini Live Session Reconnect Amnesia & Multi-Turn Task Intent Tracking
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - In live conversational operation with ZEZO, two issues degraded the user experience:
+    1. **Session Reconnect Amnesia:** When Gemini Live WebSockets experienced transient network disconnects (1011, 1008, 1006, goaway, or policy resets), `main.py` dropped `self._resume_handle = None` and initiated a fresh session. Simultaneously, `_save_session_summary()` wiped `self._session_log = []`. `main.py:_build_config()` did not inject prior conversational context into `system_instruction`, causing ZEZO to completely forget what was being discussed immediately before the reconnect.
+    2. **Thinking State Stall & Desktop Root Rejection:** When executing direct skill or coding tasks without an explicit subfolder, `target_dir` defaulted to `.` or Desktop root. Coding agents checked `_is_root_dir()` and returned an error prompt asking the user for a specific subfolder.
+    3. **Lost Intent on Continuation ("Do what exactly?"):** When the user followed up with folder setup (`"desktop pr context dev folder bana do"`) and confirmation (`"do it"`), ZEZO had no persistent task memory slot in the session context, losing track of the original task intent.
+- **Execution & Changes Applied:**
+  - **`core/pending_intent.py` (New Subsystem Module):**
+    - Built a thread-safe multi-turn intent tracking module with 15-minute TTL, persisting active task state (`task`, `action`, `params`, `target_dir`, `skill_name`, `engine`, `status`) to `memory/pending_intent.json` so state survives WebSocket reconnects and process renewal.
+  - **`actions/run_skill.py`, `actions/antigravity_agent.py`, `actions/opencode_agent.py`, `actions/kilo_agent.py`:**
+    - Replaced the hard blocker in root checks with automatic safe subfolder derivation via `core.repo_context.get_unique_project_dir()`, persisting to `remember_repo()` and automatically isolating projects under `Desktop/<slug>` without stalling.
+    - Added pending intent registration (`set_pending_intent`) whenever tasks/skills are initiated or executed.
+  - **`main.py`:**
+    - Maintained an un-wiped `self._rolling_recent_turns: list[str] = []` rolling buffer alongside `_session_log` so end-of-session summaries do not erase recent history needed for reconnect continuity.
+    - Updated `_append_session_log` across all text and audio transcript logging call sites.
+    - Updated `_build_config()` to inject `[RECENT CONVERSATION HISTORY (ACTIVE SESSION RECONNECTED)]` (from `_rolling_recent_turns` or SQLite fallback) and `[ACTIVE PENDING TASK AWAITING CONFIRMATION OR EXECUTION]` (from `core/pending_intent.py`) into `system_instruction`.
+    - Maintained strict hands-off policy for live audio loops per AGENTS.md Rule 6.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile main.py actions/run_skill.py actions/antigravity_agent.py actions/opencode_agent.py actions/kilo_agent.py core/pending_intent.py` passed with 0 errors.
+  - Layer 2 (Runtime): Built `tests/test_live_reconnect_intent.py` verifying pending intent persistence, auto-slug subfolder resolution, and prompt injection across reconnect simulations. All passed!
+  - Layer 3 (Regression): `pytest tests/` (10/10 passed).
+- **Key Files Touched:**
+  - `core/pending_intent.py` (New)
+  - `main.py`
+  - `actions/run_skill.py`
+  - `actions/antigravity_agent.py`
+  - `actions/opencode_agent.py`
+  - `actions/kilo_agent.py`
+  - `tests/test_live_reconnect_intent.py`
+  - `docs/TOOLS.md`
+  - `LEARNING_JOURNAL.md`
+
 ## [2026-10-31] — Fix for Engine Runner WinError 206, Worktree Path Collision, False Success Telemetry & Direct Zezo Skill Execution
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Why this was built / Root Cause & Motivation:**

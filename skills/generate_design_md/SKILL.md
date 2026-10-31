@@ -1,16 +1,17 @@
 ---
 name: generate_design_md
-description: "Master studio protocol for reverse-engineering design systems and generating canonical DESIGN.md, preview.html, and preview-dark.html specifications via autonomous coding engines."
+description: "Master studio protocol for reverse-engineering design systems and generating canonical DESIGN.md and preview.html specifications via autonomous coding engines."
 domain: design
 author: "Hamza Bukhari"
 version: "2.1.0"
 execution_mode: "engine_only"
 supported_engines: ["antigravity", "opencode", "kilo"]
 supported_modes: ["url", "local"]
+pre_flight_action: "scrapling_extract"
 pre_flight_ingestion: "scrapling_extract"
 ingested_files: ["site_dom.html", "site_styles.css", "site_tokens.json"]
 required_tools: ["antigravity_run", "opencode_run", "kilo_run", "browser_control", "file_controller"]
-output_files: ["DESIGN.md", "preview.html", "preview-dark.html"]
+output_files: ["DESIGN.md", "preview.html"]
 triggers: ["generate design md", "extract design tokens", "extract design system", "create design spec", "analyze styling", "design system extraction", "audit design", "design tokens", "design system"]
 tags: ["design", "tokens", "preview", "audit", "engine_only", "anti_slop", "dual_mode"]
 auto_activate: true
@@ -29,11 +30,10 @@ auto_activate: true
 
 You are a **Senior Frontend Design-Systems Auditor and UI Documentation Agent**. Your mandate is to reverse-engineer an existing frontend codebase, component folder, standalone file, or live URL into an authoritative, machine-readable design system specification.
 
-You produce **three mandatory deliverables**:
+You produce the following deliverables:
 
 1. `DESIGN.md` — The canonical design-system specification markdown document that downstream coding agents read as their design source of truth.
-2. `preview.html` — A self-contained visual design catalog (light theme) featuring an interactive Dark/Light toggle switch, live color swatches with contrast badges, typography scale specimen, and an interactive UI component playground.
-3. `preview-dark.html` — A static self-contained HTML visual catalog pre-rendered with obsidian dark surfaces (`#09090b` / `#18181b`) and dark palette tokens for instant verification without JavaScript dependencies.
+2. `preview.html` (Optional companion catalog) — A self-contained visual design catalog featuring an interactive Dark/Light toggle switch, live color swatches with contrast badges, typography scale specimen, and an interactive UI component playground.
 
 ---
 
@@ -84,17 +84,17 @@ When conflicting token values exist in the codebase, apply these rules in strict
 
 Unlike `website_build` (which decomposes into 5-7 parallel builder subagents for simultaneous section construction), `generate_design_md` is an analytical, precision auditing task where token consistency, cross-file verification, and single-source-of-truth coherence are paramount.
 
-- **Default Execution:** A single focused coding agent performs the complete audit, synthesizes `DESIGN.md`, and builds both `preview.html` and `preview-dark.html`.
+- **Default Execution:** A single focused coding agent performs the complete audit, synthesizes `DESIGN.md`, and builds `preview.html`.
 - **Dual-Worker Option (Optional):** If parallel decomposition is genuinely beneficial (e.g., in large monorepos with hundreds of components), divide work between at most **two** focused workers:
   - *Worker A (System & Token Auditor):* Analyzes system sources and writes `DESIGN.md`.
-  - *Worker B (Visual Catalog Architect):* Reads `DESIGN.md` and builds `preview.html` and `preview-dark.html`.
+  - *Worker B (Visual Catalog Architect):* Reads `DESIGN.md` and builds `preview.html`.
 - **Forbidden:** Forcing 5-7 subagents onto a token extraction task causes race conditions, conflicting token naming, hallucinated divergences, and unnecessary file locks.
 
 ---
 
 ## 📄 4. Output Contract
 
-Every extraction run must deliver the following three files in the target directory:
+Every extraction run delivers the following deliverables in the target directory:
 
 ### Deliverable 1: `DESIGN.md`
 
@@ -161,7 +161,7 @@ Derived exclusively from observed codebase patterns — not personal opinions:
 List every file actually read, with a one-line description of its role. This section is mandatory for auditability.
 ````
 
-### Deliverable 2: `preview.html`
+### Deliverable 2: `preview.html` (Optional companion catalog)
 
 - **Self-Contained Single File:** Zero external build dependencies. All styles embedded in `<style>` and scripts in `<script>`.
 - **Interactive Light/Dark Toggle:** A functional toggle switch in the header that seamlessly switches the preview between light and dark palettes.
@@ -172,12 +172,6 @@ List every file actually read, with a one-line description of its role. This sec
   - Form controls (Text input with focus ring, select dropdown, checkbox, switch).
   - Card elevation specimens with authentic padding, border, and shadows.
   - Status badges (Success, Warning, Destructive, Info).
-
-### Deliverable 3: `preview-dark.html`
-
-- **Static Obsidian Dark Catalog:** Pre-rendered with obsidian dark surfaces (`#09090b` / `#18181b` / `#121214`) and zinc borders.
-- **Zero JavaScript Dependencies:** Does not rely on client-side JS to render the dark theme.
-- **Deterministic Rendering:** Ensures immediate visual verification in headless environments, static previews, and code review diffs.
 
 ---
 
@@ -221,13 +215,11 @@ EXECUTION STEPS:
    - Spacing rhythm, corner radius scale, and elevation shadows.
    - Component primitives (Button variants, form inputs, cards, badges, navigation).
 3. Generate 'DESIGN.md' following the canonical specification template.
-4. Generate 'preview.html' as a self-contained visual design catalog with an interactive Dark/Light toggle, color swatches with contrast badges, typography specimen, and live component playground.
-5. Generate 'preview-dark.html' as a static zero-JS catalog pre-rendered with obsidian dark surfaces (#09090b / #18181b).
+4. Generate 'preview.html' as an interactive visual design catalog with Dark/Light toggle, color swatches with contrast badges, typography specimen, and live component playground.
 
 OUTPUT DELIVERABLES:
 1. DESIGN.md
 2. preview.html
-3. preview-dark.html
 
 Deliver production-quality, auditable files directly in the target directory now.
 ```
@@ -262,13 +254,11 @@ CRITICAL CONSTRAINTS:
 EXECUTION STEPS:
 1. Scan and inspect all system configuration files, stylesheets, and UI primitives.
 2. Synthesize the complete visual DNA into 'DESIGN.md' following the canonical template.
-3. Build 'preview.html' as a self-contained visual design catalog with an interactive Dark/Light toggle, color swatches with contrast badges, typography specimen, and live component playground.
-4. Build 'preview-dark.html' as a static zero-JS catalog pre-rendered with obsidian dark surfaces (#09090b / #18181b).
+3. Build 'preview.html' as an interactive visual design catalog with Dark/Light toggle, color swatches with contrast badges, typography specimen, and live component playground.
 
 OUTPUT DELIVERABLES:
 1. DESIGN.md
 2. preview.html
-3. preview-dark.html
 
 Deliver production-quality, auditable files directly in '{target_dir}' now.
 ```
