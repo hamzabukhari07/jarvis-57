@@ -85,132 +85,72 @@ When executing a greenfield website build task, execute the master directive mat
 
 ### Scenario 1: Personal & Engineer Portfolio (Single-File HTML)
 ````markdown
-[TASK DIRECTIVE]
-Build a clean, high-performance, responsive single-file engineer portfolio for Hamza Bukhari (Staff AI Systems & Autonomous Agents Architect) in standalone HTML5 with embedded CSS and vanilla JavaScript.
-Work within the existing target directory and output the deliverable directly as index.html with zero build or npm dependencies.
+You are an expert Web Designer, UI/UX Designer, and Senior Frontend Engineer. Your task is to build a complete, clean, high-performance, responsive single-file engineer portfolio in standalone HTML5 with embedded CSS and vanilla JavaScript. Work within the target workspace directory and output the deliverable directly as 'index.html' with zero external build or npm dependencies.
 
-[DESIGN REFERENCES]
-Use skills/website_build/references/3_portfolios/Hairline Grid Portfolio.html as the primary visual reference.
-Study its hairline grid layout, typography, monospace metadata hierarchy, spacing rhythm, card geometry, and clean technical aesthetic.
-Preserve the reference's visual identity (monochromatic palette, 1px hairline borders, subtle border hover glows) while adapting it to the engineer portfolio requirements.
-Use its existing design patterns instead of introducing an unrelated design theme.
-Do not copy unrelated personal data or project links from the reference.
+Use this reference file (skills/website_build/references/3_portfolios/Hairline Grid Portfolio.html) for building UI Design. Inspect the reference file directly to extract its layout structure, styling, typography, spacing rhythm, card geometry, and visual DNA. Do not modify or overwrite the reference file.
 
-[USER REQUIREMENTS & AUTHENTIC CONTENT]
-Entity / Persona: Hamza Bukhari
-Role: Creator & Lead Architect of ZEZO | Staff AI Systems & Autonomous Agents Engineer
-Required Portfolio Sections:
-Hero & Status Beacon: Full name, title, live availability status pill, concise technical bio, and quick-action links (Resume, GitHub, Email, Contact).
-Architecture & Systems Grid: Showcase flagship platforms (e.g. ZEZO Autonomous Voice & Agentic OS, Uncage Reverse-Engineering Cloner, Neural Memory Subsystem, Distributed Task Engine).
-Technical Skills & Stack: Grouped monospace skill tags (Python, TypeScript, React, Next.js, Rust, Distributed Systems, WebSockets, LLM Orchestration).
-Experience & Milestones Timeline: Chronological roles, achievements, high-throughput systems scaling, and lead architect milestones.
-Publications / Architecture Notes: Technical writing entries or deep dives with reading times and tags.
-Contact & Footer: Verified mailto link, GitHub profile link, LinkedIn, and clean 1px hairline terminal footer.
-Content Authenticity:
-Use authentic project titles, real tech stacks, and realistic metrics.
-Never inject placeholder buzzwords, fake corporate logos, or lorem ipsum filler.
+USER REQUIREMENTS & SECTIONS:
+- Hero & Status Beacon: Full name, title, live availability status beacon, concise technical bio, and quick-action links (Resume, GitHub, Email, Contact).
+- Architecture & Systems Grid: Showcase flagship platforms, projects, and architecture notes with real metrics.
+- Technical Skills & Stack: Grouped monospace skill tags (languages, frameworks, distributed systems, orchestration).
+- Experience & Milestones Timeline: Chronological roles, achievements, high-throughput systems scaling, and milestones.
+- Contact & Footer: Verified mailto link, GitHub profile link, LinkedIn, and clean 1px hairline terminal footer.
+- Content Authenticity: Write authentic domain-accurate copy. Never use placeholder dummy names, fake corporate buzzwords, or lorem ipsum filler.
 
-[EXECUTION & SUBAGENT STRATEGY]
-Inspect the reference template structure, embedded styles, font imports, and scripts before writing code.
-Recreate the website as a single, self-contained standalone HTML file containing all HTML, CSS, and vanilla JS.
-Use semantic HTML5 elements, CSS Grid, and Flexbox for responsive desktop, tablet, and mobile viewing.
-Preserve the reference's authentic fonts, SVG icons, and clean micro-interactions.
-Do not introduce external npm dependencies, build tools, or complex multi-file abstractions.
-
-[VALIDATION & QUALITY REQUIREMENTS]
-Verify that index.html opens and renders flawlessly in standard browsers with zero external script or font errors.
-Verify responsive behavior across 375px, 768px, 1024px, and 1440px viewports without horizontal scrollbars.
-Test smooth anchor scrolling for all navigation links and verify no dead href="#" links exist.
-Verify subtle hover transitions on cards and project rows without jarring scale jumps.
-Ensure all copy is authentic, coherent, and reflects the engineer's domain.
-Deliverable: A complete, responsive, self-contained single-file HTML portfolio ready for instant browser preview.
+ANTI-SLOP QUALITY RULES:
+- Layouts: Absolute positioning hacks are strictly banned. Use CSS Grid or Flexbox with standard breakpoints (375px, 768px, 1024px, 1280px+); zero horizontal scrollbars.
+- Controls: Raw default browser controls are forbidden. Custom hover, active, and accessible focus states styled to match the reference.
+- Restraint: Banned harsh black drop-shadows (use subtle 1px hairline borders); banned jumpy hover:scale-105 animations (use 150-200ms ease-out transitions and active:scale-[0.98]).
+- Visuals: Banned generic AI purple/indigo gradients and plain 90s RGB primaries.
+- Anchors: No dead href="#" links; all anchors smoothly scroll to their actual sections.
+- Deliverable: Exactly ONE self-contained index.html with all CSS and vanilla JS embedded, ready for instant preview.
 ````
 
-### Scenario 2: High-Converting SaaS Marketing Landing Page (React 18 + TypeScript + Tailwind CSS)
+### Scenario 2: High-Converting SaaS Marketing Landing Page (Single-File HTML or React + Tailwind)
 ````markdown
-[TASK DIRECTIVE]
-Build a high-converting, production-ready SaaS marketing landing page for CloudMetrics (Autonomous Cloud Observability Platform) using React 18, TypeScript, Tailwind CSS, and Lucide React icons.
-Work within the Vite + React architecture under src/ and preserve modular component organization.
+You are an expert Web Designer, UI/UX Designer, and Senior Frontend Engineer. Your task is to build a modern, high-converting SaaS marketing landing page for the user's product or application. Work within the target workspace directory and output production-quality, responsive code.
 
-[DESIGN REFERENCES]
-Use skills/website_build/references/1_landing_pages/saas.html as the primary visual reference.
-Study its high-converting structure, Plus Jakarta Sans typography, dark obsidian glassmorphism, pill badges, feature grids, and button micro-interactions.
-Preserve the reference's visual identity, color tokens, borders, and ambient specular highlights while adapting it to the CloudMetrics platform.
-Use its existing design patterns instead of introducing an unrelated theme or generic templates.
-Do not copy unrelated marketing copy or brand assets from the reference.
+Use this reference file (skills/website_build/references/1_landing_pages/saas.html) for building UI Design. Inspect the reference file directly to extract its layout structure, styling, typography, spacing rhythm, card geometry, and visual DNA. Do not modify or overwrite the reference file.
 
-[USER REQUIREMENTS & AUTHENTIC CONTENT]
-Application / Product: CloudMetrics (Autonomous Cloud Observability & Telemetry Engine)
-Required Landing Page Sections:
-Announcement Bar & Header: Sticky blur navbar with brand logo, product navigation dropdowns, docs link, and high-contrast pill CTA ("Start Free Trial").
-Hero Section: High-converting headline, crisp value proposition subhead, primary CTA, secondary "Watch Interactive Demo" button, and an interactive telemetry frame mockup.
-Social Proof / Logo Ticker: Trusted enterprise badges with clean grayscale SVG logos.
-Bento Feature Grid: 4-card interactive bento layout showcasing real-time traces, AI anomaly detection, zero-overhead eBPF agents, and automated root-cause analysis.
-Metrics & Telemetry Counter: Verified operational metrics with animated counter cards.
-Interactive Pricing Matrix: Monthly / Annual toggle (with "Save 20%" discount badge), 3 tier cards (Starter, Pro, Enterprise) with feature checkmarks and distinct primary tier highlight.
-Testimonials Carousel: Authentic customer testimonials with avatars, names, titles, and verified company tags.
-FAQ Accordion: Interactive expand/collapse FAQ questions addressing security, data residency, integration, and pricing.
-Final Conversion CTA & Footer: High-impact dark obsidian CTA banner and comprehensive 5-column footer with legal and status links.
-Content Authenticity:
-Use domain-accurate cloud observability terminology (eBPF, OpenTelemetry, p99 latency, anomaly isolation).
-Never use fake cringe claims like "1000000x faster than reality" or generic lorem ipsum text.
+USER REQUIREMENTS & SECTIONS:
+- Announcement Bar & Header: Sticky blur navbar with brand logo, product navigation, docs link, and high-contrast pill CTA.
+- Hero Section: High-converting headline, crisp value proposition subhead, primary CTA, secondary interactive demo button, and a product UI frame mockup.
+- Social Proof / Logo Ticker: Trusted enterprise badges with clean grayscale SVG logos.
+- Feature Grid & Bento Cards: Interactive bento layout showcasing core capabilities with icons and concise value copy.
+- Metrics & Counter: Verified operational metrics with clean stat counter cards.
+- Pricing Matrix: Monthly / Annual toggle (with discount badge) and tier cards with feature checkmarks and distinct recommended plan highlight.
+- Testimonials Carousel / Grid: Authentic customer testimonials with avatars, names, titles, and verified company tags.
+- FAQ Accordion: Interactive expand/collapse FAQ questions addressing key features, integration, and pricing.
+- Final Conversion CTA & Footer: High-impact CTA banner and clean multi-column footer with legal and status links.
+- Content Authenticity: Write authentic, product-specific copy. Never use cringe claims like "1000000x faster than reality" or generic lorem ipsum text.
 
-[EXECUTION & SUBAGENT STRATEGY]
-Inspect the existing project setup, Tailwind configuration, and component directory structure before implementation.
-Modularize into clean, reusable components under src/components/ (e.g., Navbar, Hero, FeatureGrid, BentoCard, PricingTable, FAQAccordion, Footer).
-Use TypeScript interfaces for all component props and state models; ensure zero type errors.
-Use Lucide React icons for crisp, unified iconography.
-Implement interactive states (pricing annual/monthly switch, FAQ accordion toggles, mobile hamburger navigation) with clean React hooks (useState).
-
-[VALIDATION & QUALITY REQUIREMENTS]
-Verify that the development server starts cleanly and renders without runtime or React hydration warnings.
-Confirm zero TypeScript compilation errors (tsc --noEmit passes).
-Test mobile responsive layout down to 375px; verify mobile navigation drawer opens, closes, and navigates cleanly.
-Confirm interactive states: annual/monthly toggle accurately updates pricing numbers, FAQ items expand and collapse smoothly.
-Verify that all buttons and links have active tactile compression and valid destinations.
-Ensure visual hierarchy matches the reference: subtle 1px hairline borders, optical specular glows, and no muddy heavy drop-shadows.
-Deliverable: A complete, responsive, modular React 18 + TypeScript + Tailwind CSS landing page ready for production deployment.
+ANTI-SLOP QUALITY RULES:
+- Layouts: Absolute positioning hacks are strictly banned. Use CSS Grid or Flexbox with standard breakpoints (375px, 768px, 1024px, 1280px+); zero horizontal scrollbars.
+- Controls: Raw default browser controls are forbidden. Custom hover, active, and accessible focus states styled to match the reference.
+- Restraint: Banned harsh black drop-shadows (use subtle 1px hairline borders); banned jumpy hover:scale-105 animations (use 150-200ms ease-out transitions and active:scale-[0.98]).
+- Visuals: Banned generic AI purple/indigo gradients and plain 90s RGB primaries.
+- Anchors: No dead href="#" links; all anchors smoothly scroll to their actual sections with working JS mobile menu and accordion toggles.
+- Deliverable: Deliver complete, fully functional, production-ready implementation with zero placeholder TODOs.
 ````
 
-### Scenario 3: Operational Analytics Dashboard (Next.js App Router, TypeScript, Tailwind, Lucide)
+### Scenario 3: Operational Analytics Dashboard (Next.js / Modular Framework)
 ````markdown
-[TASK DIRECTIVE]
-Build a responsive operational analytics dashboard for CloudFleet Command Console using Next.js App Router, TypeScript, Tailwind CSS, and Lucide icons.
-Work within the existing project directory and preserve its current architecture where practical.
+You are an expert Web Designer, UI/UX Designer, and Senior Frontend Systems Architect. Your task is to build a responsive operational analytics dashboard console. Work within the target workspace directory and preserve clean component architecture.
 
-[DESIGN REFERENCES]
-Use skills/website_build/references/4_dashboards/orbit admin.html as the primary visual reference.
-Study its dashboard layout, navigation, typography, data density, spacing, panels, and visual hierarchy.
-Preserve the reference's visual identity while adapting it to the dashboard requirements.
-Use its existing design patterns instead of introducing an unrelated dashboard theme.
-Do not copy unrelated branding or data from the reference.
+Use this reference file (skills/website_build/references/4_dashboards/orbit admin.html) for building UI Design. Inspect the reference file directly to extract its layout structure, styling, typography, spacing rhythm, card geometry, and visual DNA. Do not modify or overwrite the reference file.
 
-[USER REQUIREMENTS & AUTHENTIC CONTENT]
-Application: CloudFleet Command Console
-Required Dashboard Areas:
-Cluster Health: Display the health status of infrastructure clusters.
-Worker Nodes: Show worker-node status and relevant operational details.
-Queue Latency: Present latency data in clear, readable charts.
-Audit Logs: Provide a readable log panel with timestamps, severity, and event details.
-Task Management: Display a task table with useful columns, status indicators, and working filters.
-Data Behavior:
-Use available real data if the project provides it. Otherwise, use clearly identified sample data for preview.
-Do not present simulated values as live production telemetry.
-Ensure charts, tables, and status indicators accurately reflect the data being displayed.
+USER REQUIREMENTS & SECTIONS:
+- Cluster Health & Infrastructure: Health status beacons and cluster overview stats.
+- Telemetry & Analytics Grid: Latency, throughput, and error rates presented in clear, readable charts and metric stat cards.
+- Activity & Audit Logs: Readable event log panel with timestamps, severity badges, and structured details.
+- Task / Resource Table: Functional table with clear status indicators, column headers, and working filter controls.
+- Content Authenticity: Use domain-accurate data. Clearly identify sample preview data vs live metrics.
 
-[EXECUTION & SUBAGENT STRATEGY]
-Inspect the existing project, routes, components, and dependencies before implementation.
-Use subagents only when useful for independent work (layout, charts, tables).
-Use reusable components where appropriate without overengineering.
-Use client components only where interactive behavior requires them.
-Preserve existing functionality and avoid unrelated refactoring.
-
-[VALIDATION & QUALITY REQUIREMENTS]
-Verify that the dashboard starts and renders correctly.
-Test task filters, navigation, and other implemented interactions.
-Confirm charts render correctly and display the intended data.
-Check responsive behavior and prevent accidental horizontal overflow.
-Ensure readable tables, clear status indicators, and consistent visual hierarchy.
-Resolve relevant TypeScript errors, runtime errors, and broken interactions.
-Deliverable: A working, responsive Next.js dashboard with functional interactions and clearly presented operational data.
+ANTI-SLOP QUALITY RULES:
+- Layouts: Use CSS Grid or Flexbox with standard breakpoints; prevent accidental horizontal overflow.
+- Controls: Fully styled inputs, dropdowns, table rows, and status indicators matching the reference design language.
+- Restraint: Subtle 1px hairline borders and crisp data density; no muddy black drop-shadows.
+- Micro-Interactions: Smooth hover transitions, table row highlights, and active button compression.
+- Visuals: Calibrated dark console theme; no garish neon purple gradients.
+- Deliverable: Deliver a working, responsive dashboard with functional interactions and clearly presented data.
 ````

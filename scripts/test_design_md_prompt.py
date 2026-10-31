@@ -53,8 +53,10 @@ def test_design_md_prompt_synthesis():
         assert "preview.html" in prompt, "FAIL: Deliverable preview.html missing from prompt!"
         print("  ✅ Directive extraction verified: isolated '## 🤖 Agent Directive'.")
         print("  ✅ Pre-flight files referenced cleanly.")
-        print(f"  Snippet: {prompt[:200]}...")
-        print("\n" + "=" * 80)
+        print("\n--- [FULL GENERATED PROMPT FOR ANTIGRAVITY] ---")
+        print(prompt)
+        print("--- [END OF PROMPT] ---\n")
+        print("=" * 80)
         print("🎉 GENERATE_DESIGN_MD PROMPT TEST PASSED!")
         print("=" * 80)
     finally:

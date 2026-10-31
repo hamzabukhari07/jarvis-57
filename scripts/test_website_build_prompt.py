@@ -1,27 +1,30 @@
 from pathlib import Path
+from core.skill_loader import get_skill_registry
 from core.skill_prompt_engineer import craft_skill_engine_prompt
 
 def test_website_build():
-    # 1. Read real SKILL.md for website_build
-    skill_file = Path("skills/website_build/SKILL.md")
-    if not skill_file.exists():
-        print(f"Error: {skill_file} not found!")
+    skill_reg = get_skill_registry()
+    skill_record = skill_reg.get_skill("website_build")
+    if not skill_record:
+        print("Error: website_build skill not found in registry!")
         return
 
-    skill_sop = skill_file.read_text(encoding="utf-8")
+    skill_sop = skill_record.instructions
+    directive_hdr = skill_record.agent_directive_section
 
-    # 2. Your actual test task & target directory
+    # Actual test task & target directory
     user_task = "Build a modern high-converting SaaS landing page for an AI voice assistant named Zezo"
     target_dir = "C:/Users/Hamza Bukhari/Desktop/zezo-saas-website"
 
     print("=" * 80)
     print("🌐 TESTING SKILL PROMPT ENGINEER: website_build")
-    print(f"Skill: website_build")
-    print(f"Task:  {user_task}")
-    print(f"Path:  {target_dir}")
+    print(f"Skill:             website_build")
+    print(f"Directive Section: {directive_hdr}")
+    print(f"Task:              {user_task}")
+    print(f"Path:              {target_dir}")
     print("=" * 80 + "\n")
 
-    # 3. Generate prompt using AI (Groq LPU)
+    # Generate prompt using AI (Groq LPU) passing directive_header
     prompt = craft_skill_engine_prompt(
         skill_name="website_build",
         skill_sop=skill_sop,
@@ -33,6 +36,7 @@ def test_website_build():
             "color_theme": "dark_modern",
         },
         engine="antigravity",
+        directive_header=directive_hdr,
     )
 
     print("--- [GENERATED PROMPT FOR ANTIGRAVITY] ---")
