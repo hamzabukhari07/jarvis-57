@@ -106,10 +106,10 @@ flowchart TD
 
 ## 🏛️ The 3 Core Skills Standard
 
-ZEZO standardizes on 3 production core skills:
-1. **`website_build` (`skills/website_build/`)**: Greenfield UI creation protocol with catalog-driven references, anti-slop quality gates, live preview servers, and authoritative taste prompts in Section 2.5 (Scenario 1: Portfolio, Scenario 2: SaaS Landing Page, Scenario 3: CloudFleet Analytics Dashboard, embedding 6 negative rejection gates and 4 visual authority guards).
-2. **`website_clone` (`skills/website_clone/`)**: High-fidelity offline website capture, asset localization, and reverse-engineering rebuilds via the Uncage Ingestion Engine and autonomous coding agents, featuring Phase 1 Uncage CLI ingestion, physical verification gates, and Phase 2 Master System Directives (Scenario A: Single-File Raw HTML, Scenario B: Clean Modular React/Next.js Framework).
-3. **`generate_design_md` (`skills/generate_design_md/`)**: Studio design token extraction and DSL `<design-context>` generator from URLs or HTML templates with WCAG accessibility contrast audits.
+ZEZO standardizes on 3 production core skills, all unified under the declarative two-phase architecture and standardized `agent_directive_section: "Agent Directive"` contract:
+1. **`website_build` (`skills/website_build/`)**: Greenfield UI creation protocol with catalog-driven references, anti-slop quality gates, live preview servers, and authoritative taste prompts in `## 🤖 Agent Directive` (Scenario 1: Portfolio, Scenario 2: SaaS Landing Page, Scenario 3: CloudFleet Analytics Dashboard, embedding 6 negative rejection gates and 4 visual authority guards).
+2. **`website_clone` (`skills/website_clone/`)**: High-fidelity offline website capture, asset localization, and reverse-engineering rebuilds via the Uncage Ingestion Engine and autonomous coding agents, featuring Phase 1 Uncage CLI ingestion (`pre_flight_action: "uncage_capture"`), physical verification gates, and Phase 2 Master System Directives (Scenario A: Single-File Raw HTML, Scenario B: Clean Modular React/Next.js Framework).
+3. **`generate_design_md` (`skills/generate_design_md/`)**: Studio design token extraction and canonical specification generator (`DESIGN.md` & `preview.html`) via Scrapling pre-flight ingestion (`pre_flight_action: "scrapling_extract"`), featuring Scenario A (Live URL Mode via pre-flight ingested assets) and Scenario B (Local Codebase / Workspace Mode).
 
 ---
 

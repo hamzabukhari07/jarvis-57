@@ -2,6 +2,36 @@
 
 # LEARNING JOURNAL (active — last 25 entries)
 
+## [2026-11-01] — Standardized Architecture & Streamlined Directives for `generate_design_md` and `website_build`
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Following the `website_clone` streamlining, both `generate_design_md` and `website_build` needed the exact same standard:
+    1. In `generate_design_md`, `agent_directive_section` was absent and the directive was under `## 📋 6. Reference Prompt Blueprints`, which caused inconsistent directive isolation. Furthermore, the markdown contained bloated theoretical debates on 5-7 subagents that distracted coding agents.
+    2. In `website_build`, directives (Scenario 1 Portfolio, Scenario 2 SaaS Landing Page, Scenario 3 Dashboard) were nested inside an H3 subheading (`### 2.5`), preventing the H2 regex parser in `core/skill_prompt_engineer.py` from isolating them cleanly, which leaked the 400-line catalog and dev-server bash commands into AntiGravity prompts.
+- **Execution & Changes Applied:**
+  - **`skills/generate_design_md/SKILL.md`:**
+    - Declared `agent_directive_section: "Agent Directive"` in frontmatter alongside `pre_flight_action: "scrapling_extract"`.
+    - Renamed and elevated the blueprints section to `## 🤖 Agent Directive` with Scenario A (Live URL Mode via pre-flight ingested assets) and Scenario B (Local Codebase / Workspace Mode).
+    - Removed speculative multi-subagent arguments, preserving clean single-run auditing rules and anti-slop guidelines.
+  - **`skills/website_build/SKILL.md`:**
+    - Declared `agent_directive_section: "Agent Directive"` in frontmatter.
+    - Elevated the 3 taste directives (Scenario 1: Portfolio, Scenario 2: SaaS Landing Page, Scenario 3: Operational Dashboard) to top-level `## 🤖 Agent Directive` (H2 level) at the end of the file.
+    - Preserved catalog reference index, intake discovery pillars, 6 negative rejection gates, 4 visual authority guards, and non-blocking preview server rules.
+  - **`scripts/test_design_md_prompt.py` (New Automated Test):**
+    - Created end-to-end prompt synthesis test verifying that `generate_design_md` isolates `## 🤖 Agent Directive` and correctly references `site_dom.html`, `site_styles.css`, and `site_tokens.json`.
+  - **`docs/SKILLS_SYSTEM.md`:**
+    - Updated documentation for the 3 core skills to reflect unified `agent_directive_section` compliance.
+- **Verification:**
+  - Layer 1 (Static): Skill registry discovery verified both skills now expose `agent_directive_section == 'Agent Directive'`.
+  - Layer 2 (Runtime): `python scripts/test_design_md_prompt.py` and `python scripts/test_website_build_prompt.py` executed successfully with 0 CLI leaks.
+  - Layer 3 (Regression): `pytest tests/` (12/12 passed) and `python scripts/test_website_clone_pipeline.py` (all steps passed).
+- **Key Files Touched:**
+  - `skills/generate_design_md/SKILL.md`
+  - `skills/website_build/SKILL.md`
+  - `scripts/test_design_md_prompt.py`
+  - `docs/SKILLS_SYSTEM.md`
+  - `LEARNING_JOURNAL.md`
+
 ## [2026-11-01] — Full End-to-End Automation & Streamlined Architecture for `website_clone`
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Why this was built / Root Cause & Motivation:**
