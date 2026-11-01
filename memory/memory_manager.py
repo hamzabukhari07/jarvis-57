@@ -2,8 +2,9 @@ import json
 import os
 import re
 import shutil
+import time
 from datetime import datetime
-from threading import Lock
+from threading import Lock, RLock
 from pathlib import Path
 import sys
 
@@ -17,7 +18,7 @@ def get_base_dir() -> Path:
 BASE_DIR         = get_base_dir()
 _env_mem         = os.environ.get("ZEZO_MEMORY_PATH")
 MEMORY_PATH      = Path(_env_mem) if _env_mem else BASE_DIR / "memory" / "long_term.json"
-_lock            = Lock()
+_lock            = RLock()
 MAX_VALUE_LENGTH = 380
 
 # ── Why there are two very different numbers here ────────────────────────────
@@ -142,15 +143,32 @@ def save_memory(memory: dict) -> None:
     serialized = json.dumps(memory, indent=2, ensure_ascii=False)
     if not serialized or len(serialized.strip()) < 2:
         return
-    tmp_path = MEMORY_PATH.with_suffix(".tmp")
+    tmp_path = MEMORY_PATH.with_suffix(f".tmp.{os.getpid()}_{time.time_ns()}")
     with _lock:
-        tmp_path.write_text(serialized, encoding="utf-8")
-        if tmp_path.exists() and tmp_path.stat().st_size > 0:
-            tmp_path.replace(MEMORY_PATH)
-            try:
-                shutil.copy2(MEMORY_PATH, MEMORY_PATH.with_suffix(".json.bak"))
-            except Exception:
-                pass
+        try:
+            tmp_path.write_text(serialized, encoding="utf-8")
+            if tmp_path.exists() and tmp_path.stat().st_size > 0:
+                replaced = False
+                for attempt in range(5):
+                    try:
+                        os.replace(tmp_path, MEMORY_PATH)
+                        replaced = True
+                        break
+                    except (PermissionError, OSError):
+                        time.sleep(0.04 * (attempt + 1))
+                if replaced:
+                    try:
+                        shutil.copy2(MEMORY_PATH, MEMORY_PATH.with_suffix(".json.bak"))
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"[Memory] ⚠️ save_memory error: {e}")
+        finally:
+            if tmp_path.exists():
+                try:
+                    tmp_path.unlink()
+                except Exception:
+                    pass
     try:
         from memory import sqlite_memory
         sqlite_memory.sync_facts_from_dict(memory)
@@ -197,11 +215,12 @@ def update_memory_entry(category: str, key: str, value: str) -> None:
 def update_memory(memory_update: dict) -> dict:
     if not isinstance(memory_update, dict) or not memory_update:
         return load_memory()
-    memory = load_memory()
-    if _recursive_update(memory, memory_update):
-        save_memory(memory)
-        print(f"[Memory] 💾 Saved: {list(memory_update.keys())}")
-    return memory
+    with _lock:
+        memory = load_memory()
+        if _recursive_update(memory, memory_update):
+            save_memory(memory)
+            print(f"[Memory] 💾 Saved: {list(memory_update.keys())}")
+        return memory
 
 def _entry_value(entry) -> str:
     """Accept both the {'value': ..., 'updated': ...} shape and a bare string,

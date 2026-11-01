@@ -30,6 +30,7 @@ ZEZO centralizes all persistent application settings, provider credentials, hard
   "assistant_name": "Zezo",
   "user_name": "Hamza Bukhari",
   "voice_name": "Charon",
+  "voice_accent": "auto",
   "response_language": "auto",
   "theme": "copper",
   "accent": "#ea580c",
@@ -60,13 +61,14 @@ The frontend settings interface (`frontend/src/components/settings/SettingsModal
 
 1. **⚙️ General**: Turn-taking mode selection (`always_listening`, `wake_word`, `push_to_talk`), Windows autostart daemon, morning briefing, and extended reasoning (`thinking_enabled`).
 2. **🎙️ Audio/Voice**: Microphone and speaker endpoint configuration (`input_device`, `output_device`), live mic volume RMS test meter, and hardware disconnect resilience.
-3. **💻 Code Engines**: Readiness probing and defaults for local coding CLIs (Antigravity CLI, OpenCode, Kilo Code). Backed by `GET /api/code_engines`.
-4. **✨ Skills**: Declarative skill packages (`skills/<name>/SKILL.md`), security scanner, and in-place directive editor. Backed by `GET /api/skills`.
-5. **🎨 Appearance**: OKLCH perceptual color palettes (`copper`, `emerald`, `arctic-teal`, `cobalt`, `indigo`) and Qivi 3D WebGL point-cloud avatar companion visualizer.
-6. **🌐 Cloudflare Tunnel**: Zero-config reverse tunnels via `cloudflared`, public DNS verification via `dns.google`, and QR code mobile pairing.
-7. **🔑 Providers**: Centralized API keys hub with pre-flight validation probes (Gemini, Groq, ElevenLabs, Tavily).
-8. **📊 Telemetry**: Live latency instrumentation (STT, LLM TTFT, TTS TTFA), WebSocket event log bus, and system load monitors.
-9. **ℹ️ About**: Creator attribution (**Hamza Bukhari**), software version, and architectural overview.
+3. **🤖 Persona**: Identity (`assistant_name`), Live voice profile (`voice_name`), Voice accent & dialect enunciation (`voice_accent`), response language mode (`response_language`), and 3D companion avatar presets.
+4. **💻 Code Engines**: Readiness probing and defaults for local coding CLIs (Antigravity CLI, OpenCode, Kilo Code). Backed by `GET /api/code_engines`.
+5. **✨ Skills**: Declarative skill packages (`skills/<name>/SKILL.md`), security scanner, and in-place directive editor. Backed by `GET /api/skills`.
+6. **🎨 Appearance**: OKLCH perceptual color palettes (`copper`, `emerald`, `arctic-teal`, `cobalt`, `indigo`) and Qivi 3D WebGL point-cloud avatar companion visualizer.
+7. **🌐 Cloudflare Tunnel**: Zero-config reverse tunnels via `cloudflared`, public DNS verification via `dns.google`, and QR code mobile pairing.
+8. **🔑 Providers**: Centralized API keys hub with pre-flight validation probes (Gemini, Groq, ElevenLabs, Tavily).
+9. **📊 Telemetry**: Live latency instrumentation (STT, LLM TTFT, TTS TTFA), WebSocket event log bus, and system load monitors.
+10. **ℹ️ About**: Creator attribution (**Hamza Bukhari**), software version, and architectural overview.
 
 ---
 

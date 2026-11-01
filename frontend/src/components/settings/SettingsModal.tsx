@@ -51,7 +51,6 @@ import { ToolsSettingsTab } from './ToolsSettingsTab'
 import { CodeEnginesSettingsTab } from './CodeEnginesSettingsTab'
 import { MemoryGraphCanvas, type GraphNode, type GraphLink } from '../memory/MemoryGraphCanvas'
 import { MemoryInspectorDrawer } from '../memory/MemoryInspectorDrawer'
-import { NewMemoryModal } from '../memory/NewMemoryModal'
 import { ConfirmDialog } from '../reui/confirm-dialog'
 import { Frame, FramePanel } from '../reui/frame'
 
@@ -62,6 +61,7 @@ interface SettingsModalProps {
   onSaveAudioDevices?: (inputDev: string, outputDev: string) => void
   onWakeToggle?: (enable: boolean) => void
   onPttToggle?: (enable: boolean) => void
+  initialState?: { voice_accent?: string; [key: string]: any }
 }
 
 export type InteractionMode = 'always_listening' | 'wake_word' | 'push_to_talk'
@@ -329,6 +329,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSaveAudioDevices,
   onWakeToggle,
   onPttToggle,
+  initialState,
 }) => {
   // Navigation & Search
   const [activeSection, setActiveSection] = useState<SectionId>('general')
@@ -363,8 +364,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [graphNodes, setGraphNodes] = useState<GraphNode[]>([])
   const [graphLinks, setGraphLinks] = useState<GraphLink[]>([])
   const [selectedGraphNode, setSelectedGraphNode] = useState<GraphNode | null>(null)
+  const [drawerMode, setDrawerMode] = useState<'inspect' | 'create' | null>(null)
   const [isGraphLoading, setIsGraphLoading] = useState(false)
-  const [isNewMemoryModalOpen, setIsNewMemoryModalOpen] = useState(false)
   const [isPlayingVoice, setIsPlayingVoice] = useState(false)
   const [selectedInputDev, setSelectedInputDev] = useState('')
   const [selectedOutputDev, setSelectedOutputDev] = useState('')
@@ -510,6 +511,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // ── 4. Assistant Persona & Avatar ──
   const [voiceName, setVoiceName] = useState('Charon')
+  const [voiceAccent, setVoiceAccent] = useState<string>(() => initialState?.voice_accent || 'auto')
   const [responseLanguage, setResponseLanguage] = useState('auto')
   const [avatarPreset, setAvatarPreset] = useState<string>(() => localStorage.getItem('zezo_avatar_preset') || 'qivi')
   const [avatarShape, setAvatarShape] = useState<QiviShape>(() => (localStorage.getItem('zezo_avatar_shape') as QiviShape) || 'blob')
@@ -590,6 +592,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     )
     if (target) {
       setSelectedGraphNode(target)
+      setDrawerMode('inspect')
     }
   }
 
@@ -663,6 +666,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             if (cfg.elevenlabs_key || cfg.elevenlabs_api_key_masked) setElevenLabsKey(cfg.elevenlabs_key || cfg.elevenlabs_api_key_masked)
             if (cfg.tavily_key || cfg.tavily_api_key_masked) setTavilyKey(cfg.tavily_key || cfg.tavily_api_key_masked)
             if (cfg.voice_name) setVoiceName(cfg.voice_name)
+            if (cfg.voice_accent) setVoiceAccent(cfg.voice_accent || 'auto')
+            else if (initialState?.voice_accent) setVoiceAccent(initialState.voice_accent || 'auto')
             if (cfg.response_language) {
               const langMap: Record<string, string> = {
                 en: 'English Strict',
@@ -829,6 +834,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             antigravity_model: antigravityModel,
             assistant_name: assistantName,
             voice_name: voiceName,
+            voice_accent: voiceAccent,
             response_language: responseLanguage,
           })
         } catch (e) {
@@ -839,6 +845,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           await api.saveAssistantSettings({
             assistant_name: assistantName,
             voice_name: voiceName,
+            voice_accent: voiceAccent,
             response_language: responseLanguage,
             avatar_preset: avatarPreset,
             avatar_shape: avatarShape,
@@ -888,6 +895,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     elevenLabsKey,
     tavilyKey,
     voiceName,
+    voiceAccent,
     responseLanguage,
     selectedInputDev,
     selectedOutputDev,
@@ -900,7 +908,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         { id: 'general' as SectionId, label: 'General', keywords: ['general', 'controls', 'startup', 'brief', 'hotkey', 'push-to-talk', 'wake word'], icon: Sliders },
         { id: 'audio' as SectionId, label: 'Audio', keywords: ['audio', 'mic', 'microphone', 'speaker', 'volume', 'sound'], icon: AudioWaveform },
         { id: 'providers' as SectionId, label: 'API & Keys', keywords: ['providers', 'keys', 'gemini', 'groq', 'tavily', 'elevenlabs', 'api'], icon: Key },
-        { id: 'persona' as SectionId, label: 'Persona', keywords: ['persona', 'assistant', 'name', 'voice', 'language', 'hamza'], icon: Bot },
+        { id: 'persona' as SectionId, label: 'Persona', keywords: ['persona', 'assistant', 'name', 'voice', 'accent', 'dialect', 'language', 'hamza'], icon: Bot },
       ],
     },
     {
@@ -1058,7 +1066,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <Button
                     type="button"
                     size="sm"
-                    onClick={() => setIsNewMemoryModalOpen(true)}
+                    onClick={() => {
+                      setSelectedGraphNode(null)
+                      setDrawerMode('create')
+                    }}
                     className="h-8 text-xs font-mono px-3 gap-1.5 shadow-sm"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -1076,18 +1087,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         nodes={graphNodes}
                         links={graphLinks}
                         selectedNodeId={selectedGraphNode?.id || null}
-                        onSelectNode={(node) => setSelectedGraphNode(node)}
+                        onSelectNode={(node) => {
+                          setSelectedGraphNode(node)
+                          if (node) {
+                            setDrawerMode('inspect')
+                          } else {
+                            setDrawerMode(null)
+                          }
+                        }}
                         onRefresh={loadMemoryGraph}
                         isLoading={isGraphLoading}
                       />
                     </div>
 
-                    {/* Slide-Out Inspector Drawer */}
-                    {selectedGraphNode && (
+                    {/* Unified Spatial Right Drawer with Dynamic Key Reset (Zero Ghost Data) */}
+                    {drawerMode && (
                       <div className="w-full lg:w-96 shrink-0 h-full rounded-2xl overflow-hidden border border-border shadow-xl">
                         <MemoryInspectorDrawer
+                          key={drawerMode === 'create' ? 'create-mode' : (selectedGraphNode?.id || 'empty')}
+                          mode={drawerMode}
                           node={selectedGraphNode}
-                          onClose={() => setSelectedGraphNode(null)}
+                          onClose={() => {
+                            setSelectedGraphNode(null)
+                            setDrawerMode(null)
+                          }}
                           onNodeUpdated={() => {
                             loadMemoryGraph()
                           }}
@@ -1098,17 +1121,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 </FramePanel>
               </Frame>
-
-              {/* New Memory Modal */}
-              <NewMemoryModal
-                isOpen={isNewMemoryModalOpen}
-                onClose={() => setIsNewMemoryModalOpen(false)}
-                onCreated={() => {
-                  loadMemoryGraph()
-                  setMemoryToast('New memory node created in vault ✓')
-                  setTimeout(() => setMemoryToast(null), 3000)
-                }}
-              />
 
               {/* ReUI Confirmation Dialog for Total Memory Wipe */}
               <ConfirmDialog
@@ -1507,11 +1519,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* ──────────────── 4. ASSISTANT PERSONA & AVATAR ──────────────── */}
               {activeSection === 'persona' && (
                 <>
-                  <div>
-                    <h2 className="text-xl font-bold text-foreground tracking-tight">Assistant Persona & Hologram</h2>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Customize identity naming, vocal timbre, holographic companion archetype, and particle physics.
-                    </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl font-bold text-foreground tracking-tight">Assistant Persona & Hologram</h2>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Customize identity naming, vocal timbre, holographic companion archetype, and particle physics.
+                      </p>
+                    </div>
+                    {memoryToast && (
+                      <span className="text-xs font-mono text-primary bg-primary/10 border border-primary/30 px-2.5 py-1 rounded-md animate-in fade-in">
+                        {memoryToast}
+                      </span>
+                    )}
                   </div>
 
                   {/* 1. Vocal & Identity Profile */}
@@ -1566,6 +1585,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             <Volume2 className="w-3.5 h-3.5" />
                             <span>{isPlayingVoice ? 'Playing...' : 'Test'}</span>
                           </Button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3.5 hover:bg-muted/30 transition-colors">
+                        <div>
+                          <div className="text-xs font-semibold text-foreground">Voice Accent & Dialect</div>
+                          <div className="text-[11px] text-muted-foreground mt-0.5">
+                            Guides pronunciation, cadence, and dialect. Note: Base vocal timbre (e.g., Charon, Puck) remains consistent.
+                          </div>
+                        </div>
+                        <div className="w-64">
+                          <Select
+                            value={voiceAccent}
+                            onValueChange={(val) => {
+                              setVoiceAccent(val)
+                              setMemoryToast('Adjusting vocal profile... Applying new accent')
+                              setTimeout(() => setMemoryToast(null), 2500)
+                            }}
+                          >
+                            <SelectTrigger className="h-8 bg-input/60 border-border text-foreground text-xs">
+                              <SelectValue placeholder="Select accent" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-popover border-border text-popover-foreground text-xs">
+                              <SelectItem value="auto">Auto / Adaptive (Neutral Stable)</SelectItem>
+                              <SelectItem value="american">US Accent (General American)</SelectItem>
+                              <SelectItem value="british">UK Accent (Received Pronunciation)</SelectItem>
+                              <SelectItem value="pakistani">Pakistani / South Asian Accent</SelectItem>
+                              <SelectItem value="australian">Australian Accent</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
 

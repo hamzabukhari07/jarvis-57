@@ -29,6 +29,7 @@ def get_base_dir() -> Path:
 
 BASE_DIR = get_base_dir()
 VAULT_DIR = BASE_DIR / "memory" / "vault"
+VAULT_INDEX_FILE = VAULT_DIR / "vault_index.json"
 LEGACY_MEMORY_JSON = BASE_DIR / "memory" / "long_term.json"
 
 _vault_lock = threading.Lock()
@@ -323,7 +324,8 @@ class VaultEngine:
                         f"title: {primary_topic}",
                         "category: knowledge",
                         f"updated: {date_str}",
-                        f"tags: [conversation, {turn_count}_turns]",
+                        "tags: [conversation]",
+                        f"turn_count: {turn_count}",
                         "auto_generated: true",
                         "---",
                         "",
@@ -349,15 +351,52 @@ class VaultEngine:
 
         return written_count
 
+    def _load_vault_index(self) -> Dict[str, Any]:
+        """Read vault_index.json cache safely."""
+        try:
+            if VAULT_INDEX_FILE.exists():
+                return json.loads(VAULT_INDEX_FILE.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"[VaultEngine] Warning reading vault_index.json: {e}")
+        return {"version": 1, "notes": {}}
+
+    def _save_vault_index(self, index_data: Dict[str, Any]) -> None:
+        """Atomically persist vault_index.json with staging file and retry."""
+        try:
+            self.vault_dir.mkdir(parents=True, exist_ok=True)
+            tmp_path = VAULT_INDEX_FILE.with_suffix(f".tmp.{os.getpid()}_{time.time_ns()}")
+            serialized = json.dumps(index_data, indent=2, ensure_ascii=False)
+            tmp_path.write_text(serialized, encoding="utf-8")
+            for attempt in range(5):
+                try:
+                    os.replace(tmp_path, VAULT_INDEX_FILE)
+                    return
+                except (PermissionError, OSError):
+                    time.sleep(0.04 * (attempt + 1))
+            if tmp_path.exists():
+                try:
+                    tmp_path.unlink()
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[VaultEngine] Warning writing vault_index.json: {e}")
+
     def _parse_frontmatter(self, text: str) -> tuple[Dict[str, Any], str]:
-        """Extract yaml-style frontmatter headers from markdown content."""
+        """Extract yaml-style frontmatter headers strictly from the start of markdown.
+
+        Tweak 2 invariant: Horizontal rules (---) inside markdown body must NEVER
+        be confused with frontmatter. Only leading --- block is parsed.
+        """
         meta: Dict[str, Any] = {}
-        body = text
-        if text.startswith("---"):
-            parts = text.split("---", 2)
-            if len(parts) >= 3:
-                header = parts[1]
-                body = parts[2].lstrip()
+        body = text or ""
+
+        # Strict pattern: starts with --- on first line, closes with --- on a later line
+        if text and (text.startswith("---\n") or text.startswith("---\r\n")):
+            # Split once at the second delimiter that is on its own line
+            m = re.match(r"^---\r?\n(.*?)\r?\n---\r?\n?(.*)$", text, re.DOTALL)
+            if m:
+                header = m.group(1)
+                body = m.group(2)
                 for line in header.splitlines():
                     if ":" in line:
                         k, v = line.split(":", 1)
@@ -372,18 +411,32 @@ class VaultEngine:
         return meta, body
 
     def get_all_notes(self) -> List[Dict[str, Any]]:
-        """List all markdown notes with metadata and excerpt."""
+        """List all markdown notes using incremental vault_index.json mtime cache."""
         with _vault_lock:
-            notes = []
+            index_data = self._load_vault_index()
+            cached_notes = index_data.get("notes", {})
+            current_files = set()
+            dirty = False
+
             for file_path in sorted(self.vault_dir.glob("*.md")):
+                fname = file_path.name
+                current_files.add(fname)
                 try:
+                    st = file_path.stat()
+                    mtime = st.st_mtime
+                    cached = cached_notes.get(fname)
+
+                    # Reuse cached metadata if mtime is unchanged
+                    if cached and cached.get("_mtime") == mtime:
+                        continue
+
+                    # Otherwise, re-parse note
                     raw_text = file_path.read_text(encoding="utf-8")
                     meta, body = self._parse_frontmatter(raw_text)
                     file_stem = file_path.stem
                     title = meta.get("title") or file_stem.replace("_", " ").title()
                     category = meta.get("category", "knowledge").lower()
-                    
-                    # Create excerpt (first non-heading, non-empty line)
+
                     snippet = ""
                     for line in body.splitlines():
                         trimmed = line.strip()
@@ -391,18 +444,53 @@ class VaultEngine:
                             snippet = trimmed[:180]
                             break
 
-                    notes.append({
+                    turn_cnt = 0
+                    if "turn_count" in meta and meta["turn_count"]:
+                        try:
+                            turn_cnt = int(meta["turn_count"])
+                        except (ValueError, TypeError):
+                            turn_cnt = 0
+                    if not turn_cnt:
+                        for tag in meta.get("tags", []):
+                            if str(tag).lower().endswith("_turns"):
+                                try:
+                                    turn_cnt = int(str(tag).split("_")[0])
+                                    break
+                                except (ValueError, IndexError):
+                                    pass
+
+                    cached_notes[fname] = {
                         "id": meta.get("id") or file_stem,
-                        "file": file_path.name,
+                        "file": fname,
                         "title": title,
                         "category": category,
                         "tags": meta.get("tags", []),
-                        "updated": meta.get("updated", file_path.stat().st_mtime),
+                        "turn_count": turn_cnt,
+                        "updated": meta.get("updated", mtime),
                         "snippet": snippet or "Markdown memory note",
                         "size": len(raw_text),
-                    })
+                        "_mtime": mtime,
+                    }
+                    dirty = True
                 except Exception as e:
-                    print(f"[VaultEngine] Warning parsing {file_path.name}: {e}")
+                    print(f"[VaultEngine] Warning parsing {fname}: {e}")
+
+            # Prune deleted files
+            to_delete = [f for f in cached_notes if f not in current_files]
+            for f in to_delete:
+                del cached_notes[f]
+                dirty = True
+
+            if dirty:
+                index_data["notes"] = cached_notes
+                self._save_vault_index(index_data)
+
+            # Return list formatted without internal _mtime
+            notes = []
+            for n in cached_notes.values():
+                item = dict(n)
+                item.pop("_mtime", None)
+                notes.append(item)
             return notes
 
     def get_note_content(self, file_name_or_id: str) -> Optional[Dict[str, Any]]:
@@ -432,12 +520,28 @@ class VaultEngine:
             meta, body = self._parse_frontmatter(raw_text)
             links = [match.group(1).strip() for match in WIKILINK_PATTERN.finditer(body)]
             
+            turn_cnt = 0
+            if "turn_count" in meta and meta["turn_count"]:
+                try:
+                    turn_cnt = int(meta["turn_count"])
+                except (ValueError, TypeError):
+                    turn_cnt = 0
+            if not turn_cnt:
+                for tag in meta.get("tags", []):
+                    if str(tag).lower().endswith("_turns"):
+                        try:
+                            turn_cnt = int(str(tag).split("_")[0])
+                            break
+                        except (ValueError, IndexError):
+                            pass
+
             return {
                 "id": meta.get("id") or target_file.stem,
                 "file": target_file.name,
                 "title": meta.get("title") or target_file.stem.replace("_", " ").title(),
                 "category": meta.get("category", "knowledge").lower(),
                 "tags": meta.get("tags", []),
+                "turn_count": turn_cnt,
                 "updated": meta.get("updated", ""),
                 "content": raw_text,
                 "body": body,
@@ -464,6 +568,35 @@ class VaultEngine:
                 flags=re.MULTILINE,
             )
             target_path.write_text(content, encoding="utf-8")
+
+            # Immediately update vault_index cache
+            try:
+                index_data = self._load_vault_index()
+                meta, body = self._parse_frontmatter(content)
+                file_stem = target_path.stem
+                title = meta.get("title") or file_stem.replace("_", " ").title()
+                category = meta.get("category", "knowledge").lower()
+                snippet = ""
+                for line in body.splitlines():
+                    trimmed = line.strip()
+                    if trimmed and not trimmed.startswith("#") and not trimmed.startswith("---"):
+                        snippet = trimmed[:180]
+                        break
+                index_data.setdefault("notes", {})[safe_name] = {
+                    "id": meta.get("id") or file_stem,
+                    "file": safe_name,
+                    "title": title,
+                    "category": category,
+                    "tags": meta.get("tags", []),
+                    "updated": meta.get("updated", datetime.now().strftime("%Y-%m-%d")),
+                    "snippet": snippet or "Markdown memory note",
+                    "size": len(content),
+                    "_mtime": target_path.stat().st_mtime,
+                }
+                self._save_vault_index(index_data)
+            except Exception as e:
+                print(f"[VaultEngine] Warning updating index on save: {e}")
+
             return {"status": "success", "file": safe_name}
 
     def create_note(self, title: str, category: str, content: str, tags: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -490,34 +623,118 @@ class VaultEngine:
             ]
             full_text = "\n".join(header)
             target_path.write_text(full_text, encoding="utf-8")
+
+            # Immediately update vault_index cache
+            try:
+                index_data = self._load_vault_index()
+                index_data.setdefault("notes", {})[file_name] = {
+                    "id": slug,
+                    "file": file_name,
+                    "title": clean_title,
+                    "category": category.lower(),
+                    "tags": tag_list,
+                    "updated": datetime.now().strftime("%Y-%m-%d"),
+                    "snippet": (content.strip() or "New memory node created in ZEZO Brain.")[:180],
+                    "size": len(full_text),
+                    "_mtime": target_path.stat().st_mtime,
+                }
+                self._save_vault_index(index_data)
+            except Exception as e:
+                print(f"[VaultEngine] Warning updating index on create: {e}")
+
             return {"status": "success", "file": file_name, "id": slug, "title": clean_title}
 
     def delete_note(self, file_name: str) -> Dict[str, Any]:
-        """Delete a memory note file."""
+        """Delete a memory note file and permanently purge associated SQLite session turns.
+
+        Tweak 1 invariant: Inspect YAML frontmatter first for session_id before falling back
+        to filename regex, so even renamed notes purge SQLite turns and never auto-resurrect.
+        """
         with _vault_lock:
             safe_name = file_name.strip()
             if not safe_name.endswith(".md"):
                 safe_name += ".md"
             target_path = self.vault_dir / safe_name
+            target_file: Optional[Path] = None
+
             if target_path.exists():
-                target_path.unlink()
-                return {"status": "success", "deleted": safe_name}
+                target_file = target_path
+            else:
+                # Fallback: search by stem or frontmatter id
+                base_query = file_name.strip().replace(".md", "").lower()
+                for f in self.vault_dir.glob("*.md"):
+                    if f.stem.lower() == base_query:
+                        target_file = f
+                        break
+                    try:
+                        meta, _ = self._parse_frontmatter(f.read_text(encoding="utf-8"))
+                        if str(meta.get("id", "")).strip().lower() == base_query:
+                            target_file = f
+                            break
+                    except Exception:
+                        pass
 
-            # Fallback: search by stem or frontmatter id
-            base_query = file_name.strip().replace(".md", "").lower()
-            for f in self.vault_dir.glob("*.md"):
-                if f.stem.lower() == base_query:
-                    f.unlink()
-                    return {"status": "success", "deleted": f.name}
-                try:
-                    meta, _ = self._parse_frontmatter(f.read_text(encoding="utf-8"))
-                    if str(meta.get("id", "")).strip().lower() == base_query:
-                        f.unlink()
-                        return {"status": "success", "deleted": f.name}
-                except Exception:
-                    pass
+            if not target_file or not target_file.exists():
+                return {"status": "error", "message": "File not found"}
 
-            return {"status": "error", "message": "File not found"}
+            deleted_name = target_file.name
+
+            # 1. Frontmatter-First Session ID Extraction (Tweak 1)
+            raw_text = ""
+            session_to_purge: Optional[str] = None
+            try:
+                raw_text = target_file.read_text(encoding="utf-8")
+                meta, _ = self._parse_frontmatter(raw_text)
+
+                # Check explicit frontmatter keys
+                explicit_sess = str(meta.get("session_id") or "").strip()
+                if explicit_sess:
+                    session_to_purge = explicit_sess
+                else:
+                    candidate_id = str(meta.get("id") or "").strip()
+                    if candidate_id.startswith("conv_") or "conv_" in deleted_name or meta.get("category") == "conversation":
+                        session_to_purge = candidate_id or deleted_name.replace(".md", "")
+            except Exception as e:
+                print(f"[VaultEngine] Warning reading note before deletion: {e}")
+
+            # Fallback to filename regex if frontmatter had no session ID
+            if not session_to_purge and "conv_" in deleted_name:
+                session_to_purge = deleted_name.replace(".md", "")
+
+            # 2. Permanently purge SQLite turns so sync_real_conversations_from_db never resurrects it
+            if session_to_purge:
+                raw_slug = session_to_purge.replace("conv_", "").replace("sess_", "").replace(".md", "").strip()
+                db_file = BASE_DIR / "memory" / "zezo_brain.db"
+                if db_file.exists() and raw_slug:
+                    try:
+                        import sqlite3
+                        with sqlite3.connect(str(db_file), timeout=5.0) as conn:
+                            cursor = conn.cursor()
+                            cursor.execute(
+                                "DELETE FROM turns WHERE session_id = ? OR session_id = ? OR session_id = ? OR session_id LIKE ?",
+                                (raw_slug, f"sess_{raw_slug}", f"conv_{raw_slug}", f"%{raw_slug}%"),
+                            )
+                            conn.commit()
+                            print(f"[VaultEngine] 🗑️ Permanently purged SQLite turns for session {raw_slug} ({cursor.rowcount} turns deleted)")
+                    except Exception as e:
+                        print(f"[VaultEngine] Warning purging turns for session {raw_slug}: {e}")
+
+            # 3. Delete markdown file from disk
+            try:
+                target_file.unlink()
+            except Exception as e:
+                return {"status": "error", "message": f"Failed to delete file: {e}"}
+
+            # 4. Remove from vault_index.json cache
+            try:
+                index_data = self._load_vault_index()
+                if deleted_name in index_data.get("notes", {}):
+                    del index_data["notes"][deleted_name]
+                    self._save_vault_index(index_data)
+            except Exception as e:
+                print(f"[VaultEngine] Warning removing from vault_index: {e}")
+
+            return {"status": "success", "deleted": deleted_name}
 
     def get_graph(self) -> Dict[str, Any]:
         """
@@ -572,6 +789,16 @@ class VaultEngine:
                     except Exception:
                         node_ts = 0.0
 
+            turn_cnt = n.get("turn_count", 0)
+            if not turn_cnt:
+                for tag in n.get("tags", []):
+                    if str(tag).lower().endswith("_turns"):
+                        try:
+                            turn_cnt = int(str(tag).split("_")[0])
+                            break
+                        except (ValueError, IndexError):
+                            pass
+
             nodes.append({
                 "id": node_id,
                 "label": n["title"],
@@ -581,6 +808,7 @@ class VaultEngine:
                 "color": color,
                 "size": max(14, min(36, 12 + (n["size"] // 80))),
                 "tags": n.get("tags", []),
+                "turn_count": turn_cnt,
                 "updated": n.get("updated", ""),
                 "date": node_date,
                 "timestamp": node_ts,

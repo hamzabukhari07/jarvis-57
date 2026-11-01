@@ -470,6 +470,30 @@ def save_response_language(lang: str) -> None:
     _atomic_write_config(data)
 
 
+# ── Assistant voice accent & dialect ─────────────────────────────────────────
+AVAILABLE_VOICE_ACCENTS = ["auto", "american", "british", "pakistani", "australian"]
+DEFAULT_VOICE_ACCENT = "auto"
+
+
+def get_voice_accent() -> str:
+    """Return configured speech accent; self-heals corrupted/missing config values."""
+    raw = load_api_keys().get("voice_accent", DEFAULT_VOICE_ACCENT)
+    val = str(raw or DEFAULT_VOICE_ACCENT).strip().lower()
+    if val not in AVAILABLE_VOICE_ACCENTS:
+        save_voice_accent(DEFAULT_VOICE_ACCENT)
+        return DEFAULT_VOICE_ACCENT
+    return val
+
+
+def save_voice_accent(accent: str) -> None:
+    """Persist validated speech accent."""
+    ensure_config_dir()
+    data: dict = load_api_keys()
+    val = str(accent or "").strip().lower()
+    data["voice_accent"] = val if val in AVAILABLE_VOICE_ACCENTS else DEFAULT_VOICE_ACCENT
+    _atomic_write_config(data)
+
+
 def get_wake_word_enabled() -> bool:
     """Whether local wake-word gating is on (assistant sleeps until its wake phrase)."""
     return load_api_keys().get("wake_word_enabled", False)

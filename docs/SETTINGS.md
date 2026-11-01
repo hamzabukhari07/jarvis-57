@@ -56,7 +56,15 @@ Hardware endpoints and acoustic signal calibration:
 - **Explicit Sample Rate**: Enforces `types.Blob(data=..., mime_type="audio/pcm;rate=16000")`.
 - **Zero-Crash Disconnect Fallback**: Graceful fallback to silent/text/remote mode if hardware is unplugged.
 
-### 3. 💻 Autonomous Code Engines
+### 3. 🤖 Assistant Persona & Hologram
+Identity, voice profile, dialect, and companion customization:
+- **Assistant Name (`assistant_name`)**: Sets the identity and wake phrase (*"Hey Zezo"*).
+- **Live Voice Profile (`voice_name`)**: Selects Gemini Live vocal timbre (`Charon`, `Puck`, `Kore`, `Fenrir`, `Aoede`) with interactive audio sample preview.
+- **Voice Accent & Dialect (`voice_accent`)**: Selects speech accent and cadence (`auto` Adaptive Neutral, `american` US General American, `british` UK Received Pronunciation, `pakistani` Pakistani/South Asian, `australian` Australian) while preserving base vocal timbre.
+- **Response Language Mode (`response_language`)**: Matches spoken and written output language (`auto`, `English Strict`, `Urdu`, `Hindi`, `Spanish`, `French`, `German`, `Arabic`, `Turkish`).
+- **Holographic Avatar Presets**: Controls companion archetype (`qivi`, `nova`, `sol`, `ember`, `sage`, `atlas`), geometry shape, theme match, and lighting.
+
+### 4. 💻 Autonomous Code Engines
 Manages external agentic coding CLIs:
 - **Engines Managed**: Google DeepMind Antigravity CLI (`antigravity`), OpenCode (`opencode`), Kilo Code (`kilo`).
 - **Readiness Probing**: Status detection (`ready`, `sign_in_required`, `not_installed`, `off`).

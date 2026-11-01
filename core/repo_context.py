@@ -17,10 +17,16 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import threading
+import time
+import urllib.parse
 from pathlib import Path
 from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+_REPO_LOCK = threading.RLock()
 
 _STORE_KEY = "last_active_repo"
 # Production store by default. Tests point ZEZO_REPO_CONTEXT_STORE at a temp file so a
@@ -53,22 +59,54 @@ def is_zezo_source_dir(p: Path | str) -> bool:
 # ── store ────────────────────────────────────────────────────────
 
 def _load() -> dict:
-    try:
-        if _STORE_PATH.exists():
-            return json.loads(_STORE_PATH.read_text(encoding="utf-8"))
-    except Exception as e:
-        logger.warning("repo_context: read failed: %s", e)
-    return {}
+    with _REPO_LOCK:
+        try:
+            if _STORE_PATH.exists():
+                return json.loads(_STORE_PATH.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.warning("repo_context: read failed: %s", e)
+        return {}
 
 
 def _save(data: dict) -> None:
+    """Safely persist repo context via unique staging file and atomic replace with Windows lock retry."""
     try:
         _STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _STORE_PATH.write_text(
-            json.dumps(data, indent=2), encoding="utf-8"
-        )
+        with _REPO_LOCK:
+            tmp_file = _STORE_PATH.with_suffix(
+                f".tmp.{os.getpid()}_{threading.get_ident()}_{time.time_ns()}"
+            )
+            payload = json.dumps(data, indent=2)
+
+            last_err = None
+            for attempt in range(5):
+                try:
+                    tmp_file.write_text(payload, encoding="utf-8")
+                    break
+                except (PermissionError, OSError) as e:
+                    last_err = e
+                    time.sleep(0.04 * (attempt + 1))
+            else:
+                if last_err:
+                    raise last_err
+
+            for attempt in range(5):
+                try:
+                    os.replace(tmp_file, _STORE_PATH)
+                    return
+                except (PermissionError, OSError) as e:
+                    last_err = e
+                    time.sleep(0.05 * (attempt + 1))
+
+            if tmp_file.exists():
+                try:
+                    tmp_file.unlink()
+                except Exception:
+                    pass
+            if last_err:
+                raise last_err
     except Exception as e:
-        logger.warning("repo_context: write failed: %s", e)
+        logger.warning("repo_context: atomic write failed: %s", e)
 
 
 def remember_repo(path: str) -> None:
@@ -412,5 +450,62 @@ def register_rebuild(rebuild_path: str | Path, entrypoint: str = "index.html") -
     except Exception:
         pass
     return p
+
+
+def guard_domain_workspace(prompt: str, target_path: Optional[str] = None) -> Optional[Path]:
+    """Detects if prompt targets an external URL whose domain is missing from target_path.
+
+    Smart Guard against context hallucination:
+    If a URL is present and:
+      - target_path is omitted or empty, OR
+      - target_path does not contain the URL's domain name (stale previous workspace reuse),
+    this guard overrides the path and allocates a fresh, domain-isolated project workspace.
+    """
+    if not prompt:
+        return None
+
+    url_match = re.search(r"https?://[^\s>\"']+", prompt)
+    if not url_match:
+        return None
+
+    try:
+        raw_url = url_match.group(0).rstrip(".,;)\"'")
+        parsed = urllib.parse.urlparse(raw_url)
+        netloc = parsed.netloc.replace("www.", "")
+        new_domain = netloc.split(".")[0].lower() if netloc else ""
+    except Exception:
+        new_domain = ""
+
+    if not new_domain or len(new_domain) < 2:
+        return None
+
+    prompt_lower = prompt.lower()
+    if any(w in prompt_lower for w in ("clone", "cloner", "copy site")):
+        task_type = "clone"
+    elif any(w in prompt_lower for w in ("design", "spec", "token", "audit")):
+        task_type = "design-spec"
+    else:
+        task_type = "project"
+
+    if target_path:
+        path_str = str(target_path).lower().replace("\\", "/")
+        folder_name = Path(target_path).name.lower()
+        if new_domain not in folder_name and new_domain not in path_str:
+            logger.info(
+                "[DomainGuard] Mismatch detected: URL domain '%s' not in path '%s'. Allocating fresh workspace.",
+                new_domain,
+                target_path,
+            )
+            return get_unique_project_dir(f"{new_domain} {task_type}")
+    else:
+        logger.info(
+            "[DomainGuard] New URL detected without explicit path. Allocating fresh '%s' workspace for '%s'.",
+            task_type,
+            new_domain,
+        )
+        return get_unique_project_dir(f"{new_domain} {task_type}")
+
+    return None
+
 
 

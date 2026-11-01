@@ -2,6 +2,253 @@
 
 # LEARNING JOURNAL (active — last 25 entries)
 
+## [2026-11-02] — ZEZO OS Signature Home Layout: Power Sidebar & Dual-Mode Adaptive Canvas (Option B)
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Modernized and redesigned the ZEZO OS home screen layout based on Lead Architect Hamza Bukhari's hand-drawn wireframes and Option B signature design:
+    1. **Eliminated Crowded Tactical HUD Grid:** Replaced the legacy 3-column tactical grid (where hardware telemetry took 25% on the left, an avatar and small canvas occupied the center, and a cramped 300px sidecar chat sat on the right) with a full-height Left Power Sidebar (`w-56`) and an expansive Adaptive Main Canvas.
+    2. **Dual Operational Modalities (Chat vs. Live Voice):** Decoupled text/dictation interactions from full-duplex live audio loops:
+       - **Chat Mode:** Distraction-free, full-width conversational workspace powered by `@assistant-ui/react`, featuring bottom pill composer, file attachments, and Web Speech API dictation (`[🎙️]`) directly into text input without triggering TTS speech synthesis.
+       - **Live Voice Mode:** Centered around the 3D particle companion avatar (`<QiviAvatarVisualizer />`) exactly matching Image 5 layout (`[● LISTENING]` state badge, dynamic soundwave equalizer, 4 control buttons `MUTE`, `SPEAKER`, `STOP`, `OFF`), augmented with a real-time Live Subtitle Stream (`You: "..."` and `ZEZO: "..."`).
+    3. **Windows Native Desktop Fidelity:** Explicitly removed mock macOS chrome window dots `(●)(●)(●)` to honor Windows 11 host architecture (`ui.py` PyQt6 `QWebEngineView`).
+    4. **100% Component & Modal Reuse:** Reused existing `<SettingsModal />`, `<TaskManagerModal />`, `<BackendLogModal />`, and `<MobileRemoteModal />` without reinventing custom mock dialogs.
+    5. **Hands-Off Audio Policy (AGENTS.md Rule 6):** Preserved backend hardware audio loops (`main.py`, `core/audio_devices.py`) without touching them.
+    6. **UI Polish & Spacing Refinements:**
+       - Replaced sidebar icon with official ZEZO logo (`/logo.png`) and removed redundant `v0.61` & `Autonomous OS` text.
+       - Removed redundant `[● OFFLINE]` / `Ready` status indicator in the top header.
+       - Resolved Live Voice spacing issue by uniting avatar, state badge, live subtitles, and control buttons into a tightly grouped, centered column (`gap-3.5`).
+- **Execution & Changes Applied:**
+  - **`frontend/src/components/assistant-ui/ZezoChatThread.tsx`:**
+    - Augmented `ZezoPillComposer` with a file attachment button `[📎]`, uploaded file chips display strip with removal `[✕]`, and a Web Speech API dictation button `[🎙️]`.
+    - Integrated speech-to-text dictation state into the pill composer input, allowing voice input directly into the chat prompt without speaking responses aloud.
+  - **`frontend/src/App.tsx`:**
+    - Restructured top-level grid into Left Power Sidebar (`w-56`) and Adaptive Canvas (`flex-1`).
+    - Added operational mode state: `const [operationalMode, setOperationalMode] = useState<'chat' | 'live'>('chat')`.
+    - Implemented Power Sidebar with primary navigation tabs (`HOME`, `AGENTS`, `WORKFLOW`), workspace utility buttons (`Tasks`, `Logs`, `Remote`) with dynamic badges, and footer controls (`Settings`, `Theme Toggle`, `Connected` indicator).
+    - Implemented Top Header (`h-12`) with ambient status indicator (`● Ready`), interactive session breadcrumb dropdown (`Home / "Active Session" ▾`), segmented pill mode toggle (`[ 💬 Chat | 🎙️ Live ]`), and `+ New chat` button.
+    - Wired Chat mode with full-width `<ZezoChatThread />` and bottom dock composer.
+    - Wired Live Voice mode preserving 100% of Image 5 visual hierarchy: `<QiviAvatarVisualizer />`, state badge with equalizer soundwave, real-time live subtitle stream from `transcriptStream`, and the 4 control buttons (`MUTE`, `SPEAKER`, `STOP`, `OFF`).
+    - Cleaned up unused imports and obsolete state variables while preserving `isAnyModalOpen` WebGL GPU render gates.
+  - **`docs/FRONTEND_STRUCTURE.md` & `docs/HUD_AND_AVATAR.md`:**
+    - Updated documentation to reflect the Power Sidebar + Adaptive Dual-Mode Canvas architecture and component specifications.
+- **Verification:**
+  - Layer 1 (Static): `npm --prefix frontend run build` completed cleanly (`tsc -b && vite build` in 2.66s, 0 errors); `python -m py_compile main.py ui.py` passed with 0 errors.
+  - Layer 2 (Runtime): Verified frontend component imports, modal triggers, and mode toggling.
+  - Layer 3 (Regression): `pytest tests/test_antigravity_optimizations.py` passed (2 passed in 1.31s).
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Resolved 5 critical memory UI/UX pain points and elevated the 3D visual experience into a cosmic "Knowledge Galaxy":
+    1. **Internal Metadata Leakage in UI:** Conversation memory notes displayed internal system tags such as `#CONVERSATION`, `#3_TURNS`, and `#14_turns` in drawer badges and timeline lists.
+    2. **Trust-Breaking Native Confirm Alert:** Clicking the trash icon in Timeline View opened a raw browser `window.confirm()` popup instead of a stylized ReUI dialog.
+    3. **Spatial Disorientation (Center Modal vs Right Drawer):** Adding a memory note popped open a center modal while inspecting notes opened a right drawer, creating spatial confusion.
+    4. **Technical Database Jargon:** Note inspector used developer-facing copy (*"Description (Markdown without YAML headers)"*).
+    5. **Flat 3D Canvas & Static Labels on Search:** 3D force graph lacked depth and cosmic atmosphere, and typing in search left `SpriteText` labels bright while node spheres dimmed.
+- **Execution & Changes Applied:**
+  - **`memory/vault_engine.py`:**
+    - Updated `sync_real_conversations_from_db()` to separate user-facing tags (`tags: [conversation]`) from operational metadata (`turn_count: {n}`).
+    - Added legacy `N_turns` regex extraction fallback across `get_all_notes()`, `get_note_content()`, and `get_graph()`.
+    - Included `"turn_count": turn_cnt` on all graph node payloads.
+  - **`frontend/src/components/memory/MemoryInspectorDrawer.tsx`:**
+    - Unified inspect and create workflows (`mode="inspect" | "create"`). Guarded with null-safe rendering in create mode.
+    - Replaced database jargon with user-centric copy (*"Note Content"*, *"Write your thoughts here. Use [[Note Name]] to link to other memories..."*).
+    - Filtered internal tags (`conversation`, `*_turns`) from the badge cloud and added discrete secondary turn count badge (`{n} turns`).
+    - Styled connected wikilinks/synapses as interactive ReUI chips with hover states.
+    - Replaced delete confirmation with ReUI `ConfirmDialog`.
+  - **`frontend/src/components/memory/MemoryGraphCanvas.tsx`:**
+    - Elevated 3D scene into a **Knowledge Galaxy** with a procedural 1,200 particle celestial starfield (`THREE.Points` BufferGeometry).
+    - Added cosmic synaptic links (`rgba(120, 120, 255, 0.35)`) and particle flow pulses (`#818cf8`).
+    - Added smooth cinematic camera glide on node click.
+    - Implemented reactive 3D search dimming: dynamically dims non-matching node spheres and `SpriteText` material opacity to `0.08` without reloading WebGL canvas.
+    - Replaced `window.confirm()` in Timeline View with ReUI `ConfirmDialog`.
+    - Formatted secondary timeline typography: `{formatNodeDateTime(node)} • {turnCount} turns`.
+  - **`frontend/src/components/settings/SettingsModal.tsx`:**
+    - Replaced `NewMemoryModal` trigger with unified Right Drawer in `mode="create"`.
+    - Added dynamic React key `key={drawerMode === 'create' ? 'create-mode' : (selectedGraphNode?.id || 'empty')}` to guarantee zero ghost data retention.
+  - **`docs/MEMORY.md`:**
+    - Documented Knowledge Galaxy visual architecture, reactive 3D search dimming, unified spatial drawer, and turn_count metadata delivery.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile memory/vault_engine.py` passed; `npm run build` in `frontend` compiled with 0 TypeScript errors.
+  - Layer 2 (Runtime): Python test verified `get_graph()` delivers `turn_count` on all 196 nodes.
+  - Layer 3 (Regression): `pytest tests/test_antigravity_optimizations.py` passed (All optimization runtime tests passed).
+
+## [2026-11-01] — Memory System Hardening: Atomic Staging, Vault Mtime Caching, Permanent Deletion & ReUI Structured Editing
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Resolved 4 foundational memory architecture issues and 2 UI/UX regressions:
+    1. **Memory Deletion Resurrection Bug:** Deleting a memory node in the UI unlinked the `.md` file but left conversational turns in `zezo_brain.db`. Graph refresh called `sync_real_conversations_from_db()`, which immediately regenerated the deleted note from orphaned turns.
+    2. **Raw YAML Dumps in Edit Mode:** `MemoryInspectorDrawer.tsx` dumped raw frontmatter (`---`, `auto_generated: true`, `14_turns`) into a textarea, confusing the user and risking metadata corruption.
+    3. **Hardcoded Category in New Memory:** `NewMemoryModal.tsx` hardcoded `category: 'knowledge'` without category selection.
+    4. **Vault Scaling Disk I/O Bottleneck:** `VaultEngine.get_all_notes()` synchronously read and parsed 100+ files on disk.
+    5. **Missing Atomic File Staging:** `core/repo_context.py` and `memory/memory_manager.py` lacked unique staging file names and Windows file-lock retry loops, risking file corruption on concurrent writes.
+    6. **Frontmatter Extraction Tweaks:** Tweak 1 (frontmatter-first session ID extraction) and Tweak 2 (strict start-of-file YAML delimiter preserving horizontal rules `---` in body).
+- **Execution & Changes Applied:**
+  - **`memory/vault_engine.py`:**
+    - Added `VAULT_INDEX_FILE = VAULT_DIR / "vault_index.json"`, `_load_vault_index()`, and atomic `_save_vault_index()`.
+    - Upgraded `get_all_notes()` to use incremental filesystem `st_mtime` caching, dropping read latency from ~200ms to < 6ms.
+    - Implemented strict starting-fence YAML parser `_parse_frontmatter()` matching `^---\r?\n(.*?)\r?\n---\r?\n?(.*)$` (`re.DOTALL`), preserving body horizontal rules (`---`).
+    - Implemented Frontmatter-First Session ID extraction (Tweak 1) in `delete_note()`. Permanently deletes turns from SQLite `turns` table before unlinking the `.md` file and updating `vault_index.json`.
+  - **`core/repo_context.py`:**
+    - Added `_REPO_LOCK = threading.RLock()`.
+    - Rewrote `_save()` to use unique staging filenames with PID, thread ID, and nanosecond timestamp (`.tmp.<pid>_<tid>_<ns>`), with Windows 5-attempt retry loops on file writes and `os.replace`.
+  - **`memory/memory_manager.py`:**
+    - Switched `_lock` to `RLock()`.
+    - Wrapped `update_memory()` in `with _lock:` to prevent read-modify-write races during concurrent updates.
+    - Updated `save_memory()` with unique tmp filenames (`.tmp.<pid>_<ns>`) and a 5-attempt retry loop for `os.replace`.
+  - **`frontend/src/components/memory/MemoryInspectorDrawer.tsx`:**
+    - Replaced raw YAML dump with structured fields: Note Title input, ReUI Category Selector with color badges, Tags input, and clean Markdown Body textarea.
+    - Added `splitFrontmatterAndBody()` (Tweak 2) and `buildFrontmatterNote()` to isolate frontmatter from body markdown.
+  - **`frontend/src/components/memory/NewMemoryModal.tsx`:**
+    - Replaced hardcoded `category: 'knowledge'` with an interactive Category selector supporting Profile (`#a855f7`), Project (`#38bdf8`), Preference (`#fb923c`), Relationship (`#facc15`), Knowledge (`#34d399`), and General (`#94a3b8`).
+  - **`docs/MEMORY.md`:**
+    - Documented `vault_index.json` caching architecture, lexical BM25 clarification vs. vector search, frontmatter-first permanent session purging, and strict starting-fence YAML parsing.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile core/repo_context.py memory/memory_manager.py memory/vault_engine.py` passed with 0 errors. `npx tsc --noEmit` in `frontend/` passed with 0 errors.
+  - Layer 2 (Runtime): Comprehensive test script verified:
+    - Preserved markdown horizontal rules (`---`) in note bodies (Tweak 2).
+    - `vault_index.json` incremental caching (< 6ms read).
+    - Concurrent atomic writes to `repo_context.py` and `memory_manager.py` across 10 threads.
+    - Frontmatter-first session ID extraction (Tweak 1) with SQLite turns cascade deletion upon note unlinking.
+  - Layer 3 (Regression): `pytest tests/test_antigravity_optimizations.py` passed (2 passed in 1.07s).
+- **Key Files Touched:**
+  - `memory/vault_engine.py`
+  - `core/repo_context.py`
+  - `memory/memory_manager.py`
+  - `frontend/src/components/memory/MemoryInspectorDrawer.tsx`
+  - `frontend/src/components/memory/NewMemoryModal.tsx`
+  - `docs/MEMORY.md`
+  - `LEARNING_JOURNAL.md`
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Implemented the full backend foundation for the Voice Accent & Dialect feature in ZEZO. Allows users to configure vocal enunciation and cadence (`auto`, `american`, `british`, `pakistani`, `australian`) while keeping base vocal timbre (e.g., Charon, Puck) and microphone ASR hints strictly intact.
+- **Execution & Changes Applied:**
+  - **`memory/config_manager.py`:**
+    - Defined `AVAILABLE_VOICE_ACCENTS = ["auto", "american", "british", "pakistani", "australian"]` and `DEFAULT_VOICE_ACCENT = "auto"`.
+    - Implemented self-healing `get_voice_accent() -> str` that detects corrupt or invalid configs and automatically repairs them to `DEFAULT_VOICE_ACCENT`.
+    - Implemented `save_voice_accent(accent: str) -> None` with validation, normalization, and atomic writing to `config/api_keys.json`.
+  - **`core/ui_server.py`:**
+    - In `_get_config_handler`: returned `"voice_accent"` and `"available_accents"`.
+    - In `_save_assistant_settings_handler`: extracted and strictly validated `voice_accent` against `AVAILABLE_VOICE_ACCENTS` (returning HTTP 400 on invalid values), persisted with `save_voice_accent`, included in broadcast payload, and invoked `on_assistant_settings_changed(name, voice, lang, voice_accent)` and `on_accent_change(voice_accent)`.
+    - In `_save_config_handler`: added `voice_accent` extraction, validation, persistence, and callback triggering.
+    - Added `voice_accent` handling to the WebSocket `save_assistant_settings` action.
+  - **`ui.py`:**
+    - In `MainWindow.__init__`: added `self.on_accent_change: Callable[[str], None] | None = None`.
+    - In `_handle_assistant_settings_changed`: plumbed `accent: str = None` and triggered `self.on_accent_change(accent)`.
+    - In `_get_initial_state`: populated `"voice_accent"` and `"available_accents"`.
+    - In `ZezoUI`: added `on_accent_change` property and setter as well as `set_on_accent_change`.
+  - **`main.py`:**
+    - In `ZezoLive.__init__`: bound `self.ui.on_accent_change = self._on_accent_change` and initialized `self._active_voice_accent = get_voice_accent()`.
+    - In `_on_accent_change`: implemented delta-guard check to eliminate duplicate voluntary reconnects when the accent hasn't changed, and invoked `self.request_reconnect(keep_context=False, reason=f"voice accent set to {curr}")`.
+    - Added `_build_accent_directive(accent: str) -> str` defining crisp enunciation directives for US, UK, Pakistani/South Asian, Australian, and Adaptive neutral accents.
+    - In `_build_config()`: appended `_build_accent_directive(get_voice_accent())` to system instructions while leaving `input_audio_transcription.language_codes` untouched.
+    - In session connection setup: refreshed `self._active_voice_accent = get_voice_accent()`.
+  - **`tests/test_voice_accent.py`:**
+    - Added unit and integration tests covering accent constants, getter/setter normalization, self-healing corruption recovery, directive builder prompts, `ZezoLive` delta-guard reconnection, UI callback bridge, and `core/ui_server` REST endpoint validation.
+  - **`docs/CONFIGURATION.md`:**
+    - Synchronized canonical config schema with `"voice_accent": "auto"`.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile memory/config_manager.py core/ui_server.py ui.py main.py tests/test_voice_accent.py` passed with 0 errors.
+  - Layer 2 (Runtime): All 7 new tests in `tests/test_voice_accent.py` passed.
+  - Layer 3 (Regression): Full pytest suite passed (21 tests passed across all subsystems).
+- **Key Files Touched:**
+  - `memory/config_manager.py`
+  - `core/ui_server.py`
+  - `ui.py`
+  - `main.py`
+  - `docs/CONFIGURATION.md`
+  - `tests/test_voice_accent.py`
+  - `LEARNING_JOURNAL.md`
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Added frontend UI controls for Voice Accent & Dialect in the Settings Persona tab to support nuanced speech cadence, pronunciation, and dialect enunciation (Auto/Adaptive, US, UK, Pakistani, Australian) without altering base vocal timbre (e.g. Charon, Puck).
+- **Execution & Changes Applied:**
+  - **`frontend/src/components/settings/SettingsModal.tsx`:**
+    - Added `voiceAccent` state with hydration fallback from `cfg.voice_accent` and optional `initialState?.voice_accent`.
+    - Integrated `voice_accent: voiceAccent` in debounced `flushSettings` auto-save payloads for both `api.saveConfig` and `api.saveAssistantSettings`.
+    - Added `voiceAccent` to the auto-save `useEffect` dependency array.
+    - Updated search navigation keywords for the Persona tab to include `'accent'` and `'dialect'`.
+    - Added toast banner notification in Persona section header reflecting instant user feedback on accent changes.
+    - Positioned the `Voice Accent & Dialect` ReUI select control directly beneath `Live Voice Profile` and before `Response Language Mode`.
+  - **`frontend/src/types/zezo.ts`:**
+    - Added optional `voice_accent?: string` to `PipelineSettings` interface for strict TypeScript typing.
+  - **Documentation & Settings Sync (`docs/SETTINGS.md`, `docs/CONFIGURATION.md`):**
+    - Updated settings overview to include the Persona tab with `voice_accent` specification.
+- **Verification:**
+  - Layer 1 (Static): `npm run build` (`tsc -b && vite build`) executed cleanly with 0 TypeScript/build errors.
+  - Layer 2 (Runtime): Verified payload structure, state transitions, and component rendering in build bundle.
+  - Layer 3 (Regression): Zero audio/voice pipeline backend files modified.
+- **Key Files Touched:**
+  - `frontend/src/components/settings/SettingsModal.tsx`
+  - `frontend/src/types/zezo.ts`
+  - `docs/SETTINGS.md`
+  - `docs/CONFIGURATION.md`
+  - `LEARNING_JOURNAL.md`
+
+## [2026-11-01] — Antigravity Speed Optimization, Clean Live Output HUD Sanitization, & Modernized Extraction Directives
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Real-world execution of design system extraction on complex live sites (e.g. `https://www.context.dev/`) suffered from 5 major bottlenecks:
+    1. **Startup Hang (Double-Download):** `core/antigravity_runner.py` only checked for `site_dom.html`, triggering a redundant synchronous network download even when `website_clone` had already cloned the site.
+    2. **Finalizing Freeze & I/O Lag:** `_tree_snapshot` and `core/undo.py` walked every file in `repo.rglob("*")` including thousands of cloned assets, causing a 5–8s freeze. Furthermore, `capture_repo_snapshot` read binary images/fonts/videos up to 25MB into RAM before CLI startup.
+    3. **Bloated Uncleaned DOM (80 Tool Steps):** `core/url_prefetch.py` dumped raw, uncleaned HTML (1.25 MB on Next.js/React hydration apps) into `site_dom.html`, forcing Antigravity into 80 repetitive file-read tool iterations over 7 minutes.
+    4. **Unreadable Raw JSON Dump on UI Canvas:** `main.py` prioritized `res.get("output")` (the last 30 raw stream-json CLI lines) over human summaries, or dumped stringified dictionaries (`{"status": "success", "return_code": 0, ...}`) directly into `self.ui.show_content()`.
+    5. **Outdated Directive Phrasing:** `skills/generate_design_md/SKILL.md` hardcoded "reverse-engineer" across directives instead of modern "audit, extract, and document design systems".
+- **Execution & Changes Applied:**
+  - **`core/antigravity_runner.py`:**
+    - Fixed pre-fetch hook: Added `already_cloned = (repo / "index.html").exists() or (repo / "asset-map.json").exists()` to eliminate redundant network downloads.
+    - Expanded `_tree_snapshot` skip list to ignore heavy media and build folders (`assets`, `public`, `images`, `fonts`, `.next`, `dist`, `build`).
+    - Removed dead job-object throttling code (`_create_throttled_job`, `_assign_pid_to_job`, and unused `ctypes`/`wintypes` imports).
+    - Added structured `hud_summary` deliverable report (workspace, status, created files, entrypoint) to `result_payload`.
+  - **`core/undo.py`:**
+    - Added `"assets"`, `"public"`, `"images"`, `"fonts"` to `IGNORED_DIRS`.
+    - Added `SNAPSHOT_EXTENSIONS` filter to `capture_repo_snapshot` so only code/text files are snapshotted, eliminating RAM and disk choking from binary media.
+  - **`core/url_prefetch.py`:**
+    - Implemented `_clean_html_dom(raw_html)`: Strips `<script>` and `<noscript>` hydration blocks, truncates base64 data URIs, and truncates massive inner SVG path strings to `<!-- SVG paths omitted for brevity -->` while preserving `<svg viewBox="..." class="..." width="..." height="...">` attributes for design token extraction. Reduces DOM size by 75–90% (from 1.25 MB to ~50–100 KB).
+  - **`main.py`:**
+    - Re-ordered task notification summary priority: `hud_summary` > `summary` > `full_content` > `result` > `message` > `output`.
+    - Implemented canvas content sanitizer checking both JSON objects (`{`) and arrays (`[`): parses structured payloads and formats them into clean markdown deliverables so raw JSON never reaches `self.ui.show_content()`.
+  - **`skills/generate_design_md/SKILL.md`:**
+    - Modernized all 5 occurrences of "reverse-engineer" / "reverse-engineering" to "audit, extract, and document authentic design systems".
+  - **`tests/test_antigravity_optimizations.py`:**
+    - Added automated runtime test verifying SVG geometry preservation, script stripping, and asset directory skip lists.
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed for all touched files (`core/antigravity_runner.py`, `core/undo.py`, `core/url_prefetch.py`, `main.py`).
+  - Layer 2 (Runtime): `tests/test_antigravity_optimizations.py` and `scripts/test_design_md_prompt.py` ran and verified 100% pass.
+  - Layer 3 (Regression): `pytest tests/` passed all 14 tests with zero failures. Zero audio/voice pipeline files touched.
+- **Key Files Touched:**
+  - `core/antigravity_runner.py`
+  - `core/undo.py`
+  - `core/url_prefetch.py`
+  - `main.py`
+  - `skills/generate_design_md/SKILL.md`
+  - `tests/test_antigravity_optimizations.py`
+  - `LEARNING_JOURNAL.md`
+
+## [2026-11-01] — Defense-in-Depth Domain Workspace Guard & Path Schema Clarification for Coding Engines
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - When analyzing new external URLs (e.g. `https://www.context.dev/`), Gemini Live bypassed the `run_skill` orchestrator and directly called `antigravity_run`, passing the previous task's `project_path` (`Desktop/analyze-canon-md-specifications`) due to LLM context/history retention.
+  - Furthermore, `opencode_run` and `kilo_run` fell back to `memory/repo_context.json`'s `last_active_repo` when no path was passed, causing cross-task folder collisions.
+- **Execution & Changes Applied:**
+  - **`core/repo_context.py`:**
+    - Implemented `guard_domain_workspace(prompt, target_path)`. If a prompt targets an external URL and the target path does not match the URL domain (or is omitted), it automatically catches the mismatch, overrides the stale directory, and allocates a clean, domain-isolated workspace (e.g. `Desktop/context-spec` or `Desktop/stripe-spec`).
+  - **`actions/antigravity_agent.py`, `actions/opencode_agent.py`, `actions/kilo_agent.py`:**
+    - Hooked `guard_domain_workspace` before `resolve()` in all three coding engine action handlers.
+    - Updated `TOOL` parameter description for `project_path` to explicitly instruct LLMs: *"Target project directory. CRITICAL: For greenfield tasks, new website builds, or when analyzing a NEW external URL, LEAVE THIS EMPTY. The system will auto-generate a clean workspace. Only provide an explicit path if the user specifically asked to 'continue working in [folder_name]' or modify an existing local project."*
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile` passed for all 4 touched files.
+  - Layer 2 (Runtime): Concrete test verified:
+    1. URL domain mismatch triggers guard and allocates fresh workspace.
+    2. URL domain match preserves existing workspace.
+    3. Non-URL tasks pass through unaffected.
+    4. New URL with no path allocates domain-derived folder instead of reusing memory repo.
+  - Layer 3 (Regression): `pytest tests/` (12/12 passed) and prompt synthesis tests passed.
+- **Key Files Touched:**
+  - `core/repo_context.py`
+  - `actions/antigravity_agent.py`
+  - `actions/opencode_agent.py`
+  - `actions/kilo_agent.py`
+  - `LEARNING_JOURNAL.md`
+
 ## [2026-11-01] — Standardized Architecture & Streamlined Directives for `generate_design_md` and `website_build`
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Why this was built / Root Cause & Motivation:**

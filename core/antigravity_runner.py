@@ -2,12 +2,10 @@
 
 Transparent, pure human-like CLI bridge for Google Antigravity (agy).
 Spawns the native CLI binary, streams live stdout/stderr telemetry to the task
-manager, enforces polite Windows Job Object CPU throttling, and tracks created
-deliverables via before/after tree diffing.
+manager, and tracks created deliverables via before/after tree diffing.
 """
 from __future__ import annotations
 
-import ctypes
 import json
 import logging
 import math
@@ -18,7 +16,6 @@ import shutil
 import subprocess
 import threading
 import time
-from ctypes import wintypes
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -134,7 +131,10 @@ def _ensure_gitignore(repo_path: Path) -> None:
 def _tree_snapshot(repo: Path) -> dict[str, int]:
     """Map of relative path -> mtime_ns for every file under `repo`."""
     out: dict[str, int] = {}
-    skip = (".git", "node_modules", ".venv", "__pycache__")
+    skip = (
+        ".git", "node_modules", ".venv", "venv", "__pycache__",
+        "assets", "public", "images", "fonts", ".next", "dist", "build"
+    )
     try:
         for p in repo.rglob("*"):
             if p.is_file() and not any(part in skip for part in p.parts):
@@ -142,82 +142,6 @@ def _tree_snapshot(repo: Path) -> dict[str, int]:
     except Exception:
         pass
     return out
-
-
-# ── Windows Job Object Throttling (Hardware-Enforced) ─────────────────────────
-
-def _create_throttled_job(mask: int, priority: int = 0x00000040):
-    if platform.system() != "Windows":
-        return None
-    try:
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        hJob = kernel32.CreateJobObjectW(None, None)
-        if not hJob:
-            return None
-
-        class IO_COUNTERS(ctypes.Structure):
-            _fields_ = [
-                ("ReadOperationCount", ctypes.c_uint64),
-                ("WriteOperationCount", ctypes.c_uint64),
-                ("OtherOperationCount", ctypes.c_uint64),
-                ("ReadTransferCount", ctypes.c_uint64),
-                ("WriteTransferCount", ctypes.c_uint64),
-                ("OtherTransferCount", ctypes.c_uint64),
-            ]
-
-        class JOBOBJECT_BASIC_LIMIT_INFORMATION(ctypes.Structure):
-            _fields_ = [
-                ("PerProcessUserTimeLimit", ctypes.c_int64),
-                ("PerJobUserTimeLimit", ctypes.c_int64),
-                ("LimitFlags", wintypes.DWORD),
-                ("MinimumWorkingSetSize", ctypes.c_size_t),
-                ("MaximumWorkingSetSize", ctypes.c_size_t),
-                ("ActiveProcessLimit", wintypes.DWORD),
-                ("Affinity", ctypes.c_size_t),
-                ("PriorityClass", wintypes.DWORD),
-                ("SchedulingClass", wintypes.DWORD),
-            ]
-
-        class JOBOBJECT_EXTENDED_LIMIT_INFORMATION(ctypes.Structure):
-            _fields_ = [
-                ("BasicLimitInformation", JOBOBJECT_BASIC_LIMIT_INFORMATION),
-                ("IoInfo", IO_COUNTERS),
-                ("ProcessMemoryLimit", ctypes.c_size_t),
-                ("JobMemoryLimit", ctypes.c_size_t),
-                ("PeakProcessMemoryLimit", ctypes.c_size_t),
-                ("PeakJobMemoryLimit", ctypes.c_size_t),
-            ]
-
-        info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION()
-        info.BasicLimitInformation.LimitFlags = 0x00000010 | 0x00000020
-        info.BasicLimitInformation.Affinity = mask
-        info.BasicLimitInformation.PriorityClass = priority
-
-        ret = kernel32.SetInformationJobObject(
-            hJob, 9, ctypes.byref(info), ctypes.sizeof(info)
-        )
-        if not ret:
-            kernel32.CloseHandle(hJob)
-            return None
-        return hJob
-    except Exception as e:
-        logger.debug("Could not create Windows Job Object: %s", e)
-        return None
-
-
-def _assign_pid_to_job(hJob, pid: int) -> bool:
-    if not hJob or platform.system() != "Windows" or not isinstance(pid, int):
-        return False
-    try:
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        hProc = kernel32.OpenProcess(0x1F0FFF, False, pid)
-        if not hProc:
-            return False
-        ret = kernel32.AssignProcessToJobObject(hJob, hProc)
-        kernel32.CloseHandle(hProc)
-        return bool(ret)
-    except Exception:
-        return False
 
 
 class _DummyTaskContext:
@@ -298,8 +222,10 @@ def run_antigravity_worker(payload: dict, ctx: Optional[TaskContext] = None) -> 
         logger.debug("Failed to set prompt_full on TaskState: %s", e)
 
     # Pre-fetch fallback hook: if prompt contains an HTTP/HTTPS URL and site_dom.html missing
+    # Prevent redundant double-download if assets were already captured by website_cloner
+    already_cloned = (repo / "index.html").exists() or (repo / "asset-map.json").exists()
     url_match = re.search(r"https?://[^\s\"'>]+", prompt)
-    if url_match and not (repo / "site_dom.html").exists():
+    if url_match and not already_cloned and not (repo / "site_dom.html").exists():
         target_url = url_match.group(0).rstrip(".,;)")
         try:
             from core.url_prefetch import prefetch_url_assets
@@ -517,6 +443,17 @@ def run_antigravity_worker(payload: dict, ctx: Optional[TaskContext] = None) -> 
         else f"Antigravity CLI exited with code {proc.returncode}."
     )
 
+    # Build clean human-readable deliverables summary for HUD Canvas
+    deliverables = [f for f in ("DESIGN.md", "preview.html", "preview-dark.html", "index.html") if (repo / f).exists()]
+    files_created_summary = ", ".join(deliverables or created_list[:4])
+    hud_summary = (
+        f"### ✅ Antigravity Build Complete\n\n"
+        f"- **Workspace:** `{repo.name}`\n"
+        f"- **Status:** {'Success' if is_success else 'Finished with warnings'}\n"
+        f"- **Deliverables:** `{files_created_summary}`\n"
+        f"- **Entrypoint:** `{entry_point}`\n"
+    ) if files_created_summary else summary
+
     result_payload = {
         "status": "success" if is_success else "failed",
         "return_code": proc.returncode,
@@ -524,6 +461,7 @@ def run_antigravity_worker(payload: dict, ctx: Optional[TaskContext] = None) -> 
         "project_name": repo.name,
         "files": created_list,
         "entry_point": entry_point,
+        "hud_summary": hud_summary,
         "summary": summary,
         "output": "\n".join(stdout_lines[-30:]),
         "prompt_full": prompt,

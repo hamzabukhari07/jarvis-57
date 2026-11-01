@@ -17,7 +17,7 @@ from core.kilo_runner import (
     _find_kilo_bin,
     run_kilo_worker,
 )
-from core.repo_context import resolve
+from core.repo_context import guard_domain_workspace, remember_repo, resolve
 from core.task_manager import get_task_manager, TaskContext
 from memory.config_manager import get_kilo_model
 
@@ -56,7 +56,17 @@ def kilo_agent(parameters: dict, player=None, speak=None) -> str:
     explicit_path = (
         parameters.get("project_path") or parameters.get("path") or ""
     )
-    repo, source = resolve(explicit=explicit_path)
+    run_in_place = bool(parameters.get("run_in_place", False))
+
+    # Smart Guard: Detect domain mismatch / context hallucination for new URLs
+    domain_guarded_dir = guard_domain_workspace(prompt, explicit_path) if not run_in_place else None
+
+    if domain_guarded_dir:
+        repo = domain_guarded_dir
+        source = "domain_guard"
+        remember_repo(str(repo))
+    else:
+        repo, source = resolve(explicit=explicit_path)
 
     if repo is None or _is_root_dir(Path(repo)):
         from core.repo_context import get_unique_project_dir, remember_repo
@@ -167,8 +177,10 @@ TOOL = {
             "project_path": {
                 "type": "STRING",
                 "description": (
-                    "Absolute or relative path to the project folder. "
-                    "If omitted, resolves the active workspace repo."
+                    "Target project directory. CRITICAL: For greenfield tasks, new website builds, "
+                    "or when analyzing a NEW external URL, LEAVE THIS EMPTY. The system will auto-generate "
+                    "a clean workspace. Only provide an explicit path if the user specifically asked to "
+                    "'continue working in [folder_name]' or modify an existing local project."
                 ),
             },
             "model": {

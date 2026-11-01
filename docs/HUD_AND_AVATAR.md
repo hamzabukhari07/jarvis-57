@@ -9,26 +9,28 @@ The HUD (Heads-Up Display) is built with **PyQt6 QWebEngineView** hosting an ult
 
 **Files**: `ui.py`, `frontend/index.html`, `frontend/style.css`, `frontend/js/ui.js`
 
-## Tactical Cockpit Architecture
+## Tactical Cockpit & Signature Home Layout
 
-### Master 3-Column Workspace Layout
+### Power Sidebar + Adaptive Canvas Architecture
 
-| Column | Components | Purpose |
+ZEZO OS features a modern dashboard layout that maximizes screen real estate by separating navigation and system tools into a Left Power Sidebar and offering an Adaptive Dual-Mode Canvas:
+
+| Section | Components | Purpose |
 |---|---|---|
-| **Left Column** | `01 · Hardware Telemetry`<br>`02 · Autonomous Task Queue` | Live CPU, RAM, GPU, and Network meters + Active agent task progress |
-| **Center Column** | `Fluid Vortex Core`<br>`Unified Command Dock`<br>`03 · Live Display Canvas` | Visual state indicator, Mic/State/Stop/Power controls, and Expandable Multi-View Inspector |
-| **Right Column** | `04 · Activity Log Stream`<br>`Context Actions` | Live conversational exchanges, system actions, and clipboard intelligence |
+| **Left Power Sidebar (`w-56`)** | Primary Nav (`HOME`, `AGENTS`, `WORKFLOW`)<br>Workspace Utilities (`Tasks`, `Logs`, `Remote`)<br>Footer Controls (`Settings`, `Theme`, `Connection`) | Single vertical command spine providing instant modal access and root view transitions. |
+| **Top Header (`h-12`)** | Status Beacon (`● Ready`)<br>Session Breadcrumb (`Home / Session ▾`)<br>Segmented Pill Toggle (`[ 💬 Chat \| 🎙️ Live ]`)<br>`+ New chat` Button | Ambient system status, multi-session switching, and zero-latency modality transitions. |
+| **Adaptive Canvas: Chat Mode** | Assistant-UI Thread (`ZezoChatThread`)<br>Bottom Pill Composer Dock<br>Attachment Strip & Web Speech Dictation | Distraction-free, full-width conversational workspace with streaming markdown, file chips, and speech dictation. |
+| **Adaptive Canvas: Live Voice Mode** | 3D Point-Cloud Companion Avatar (`QiviAvatarVisualizer`)<br>State Badge & Audio Waveform<br>Real-time Live Subtitle Stream<br>4-Button Control Cluster (`MUTE`, `SPEAKER`, `STOP`, `OFF`) | Immersive companion interaction with live speech-to-text turns and direct hardware pipeline controls. |
 
 ---
 
 ## Center Display, Avatar Engines & Unified Command Dock
 
-The center tactical panel houses the primary visual focal point—switchable between the **Fluid Vortex Core** and the **Three.js Qivi WebGL Point-Cloud Avatar Visualizer**—anchored above the **Unified Command Dock**:
-1. **Mic Mute / Unmute**: Hardware-level microphone toggle.
-2. **Push-to-Talk Indicator**: Displays `Ctrl+Alt` chord status (blocking mic audio unless held).
-3. **2x3 Phosphor Matrix State Badge**: Real-time standby, listening, thinking, speaking status indicator.
-4. **Emergency Stop Button**: Instant abort and running task tree interruption.
-5. **Sleep & Power Mode**: Instant voice loop pause and sleep mode.
+In **Live Voice Mode**, the main canvas houses the visual focal point centered around the **Three.js Qivi WebGL Point-Cloud Avatar Visualizer** (or Fluid Vortex Core), accompanied by real-time speech subtitles and the 4-button hardware control cluster:
+1. **Mic Mute / Unmute (`MUTE`)**: Hardware-level microphone toggle.
+2. **Audio Speaker (`SPEAKER`)**: Toggle speech synthesis audio output.
+3. **Emergency Stop (`STOP`)**: Instant abort of running tasks and speech generation.
+4. **Sleep & Power Mode (`OFF`)**: Pause voice loop and transition to dormant state.
 
 ### Visualizer 1: Fluid Vortex Core (`VortexVisualizer.tsx`)
 - High-efficiency GPU-accelerated rotating vortex core with phosphor particle rings.

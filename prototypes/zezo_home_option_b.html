@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZEZO OS · Home Prototype (Chat & Live Modes)</title>
+  <meta name="claude:viewport-fit-sides" content="cover">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-window: #090a0c;
+      --bg-sidebar: #0d0e12;
+      --bg-main: #090a0c;
+      --bg-surface: #15171d;
+      --bg-surface-elevated: #1a1d24;
+      --bg-input: #121418;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-prominent: rgba(255, 255, 255, 0.16);
+      --text-primary: #f3f4f6;
+      --text-secondary: #949ba6;
+      --text-muted: #5e6573;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.2);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.25);
+      --amber: #f59e0b;
+      --danger: #ef4444;
+      --pill-active-bg: rgba(255, 255, 255, 0.06);
+      --pill-hover-bg: rgba(255, 255, 255, 0.03);
+      --radius-pill: 9999px;
+      --radius-card: 16px;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      color-scheme: dark;
+    }
+
+    :root[data-theme="light"] {
+      --bg-window: #f4f5f8;
+      --bg-sidebar: #eaecef;
+      --bg-main: #ffffff;
+      --bg-surface: #f0f2f5;
+      --bg-surface-elevated: #e4e7eb;
+      --bg-input: #f2f4f7;
+      --border-subtle: rgba(0, 0, 0, 0.08);
+      --border-prominent: rgba(0, 0, 0, 0.15);
+      --text-primary: #111827;
+      --text-secondary: #4b5563;
+      --text-muted: #9ca3af;
+      --accent: #2563eb;
+      --accent-glow: rgba(37, 99, 235, 0.15);
+      --pill-active-bg: rgba(0, 0, 0, 0.07);
+      --pill-hover-bg: rgba(0, 0, 0, 0.03);
+      color-scheme: light;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg-window);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Master App Container Window */
+    .app-window {
+      width: 100%;
+      max-width: 1260px;
+      height: 94vh;
+      max-height: 860px;
+      background: var(--bg-main);
+      border: 1px solid var(--border-subtle);
+      border-radius: 24px;
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      overflow: hidden;
+      box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border-subtle);
+      position: relative;
+    }
+
+    /* ── LEFT SIDEBAR ── */
+    .sidebar {
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px 18px;
+      position: relative;
+    }
+
+    .sidebar-header {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .window-controls {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding-left: 4px;
+    }
+    .window-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+    }
+    .dot-red { background: #ff5f56; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green { background: #27c93f; }
+
+    .nav-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .nav-pill {
+      appearance: none;
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      font-weight: 500;
+      padding: 10px 18px;
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.18s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+    }
+
+    .nav-pill:hover {
+      background: var(--pill-hover-bg);
+      color: var(--text-primary);
+      border-color: var(--border-prominent);
+    }
+
+    .nav-pill.active {
+      background: var(--pill-active-bg);
+      color: var(--text-primary);
+      border-color: var(--border-prominent);
+      font-weight: 600;
+    }
+
+    /* Sidebar Utilities Section */
+    .sidebar-utilities {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .utility-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: 0 8px 6px;
+    }
+
+    .utility-item {
+      appearance: none;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 7px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .utility-item:hover {
+      background: var(--pill-hover-bg);
+      color: var(--text-primary);
+    }
+
+    .utility-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-tag {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      padding: 2px 7px;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      font-weight: 600;
+    }
+
+    .badge-tag.pulse {
+      animation: pulse-glow 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .sidebar-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .sidebar-footer-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-settings {
+      flex: 1;
+    }
+
+    .btn-icon-square {
+      appearance: none;
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-pill);
+      color: var(--text-secondary);
+      padding: 8px 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+
+    .btn-icon-square:hover {
+      background: var(--pill-hover-bg);
+      color: var(--text-primary);
+      border-color: var(--border-prominent);
+    }
+
+    .connection-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      padding-left: 4px;
+      margin-top: 2px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 6px var(--emerald);
+    }
+
+    /* ── RIGHT MAIN CANVAS ── */
+    .main-canvas {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      position: relative;
+      background: var(--bg-main);
+    }
+
+    /* Top Navigation Bar with Segmented Toggle & Session Breadcrumb */
+    .top-header {
+      height: 60px;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+      flex-shrink: 0;
+      position: relative;
+      z-index: 20;
+    }
+
+    /* Status Dot & State */
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .header-status .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald-glow);
+      transition: all 0.2s ease;
+    }
+
+    .header-status.live-state .dot {
+      background: #10b981;
+      box-shadow: 0 0 12px #10b981;
+      animation: pulse-glow 1.2s infinite ease-in-out;
+    }
+
+    /* ── Session Breadcrumb Dropdown (Session Option B) ── */
+    .session-breadcrumb-container {
+      position: relative;
+    }
+
+    .session-trigger-btn {
+      appearance: none;
+      background: transparent;
+      border: 1px solid transparent;
+      padding: 5px 12px;
+      border-radius: var(--radius-pill);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .session-trigger-btn:hover {
+      background: var(--bg-surface);
+      border-color: var(--border-subtle);
+    }
+
+    .session-breadcrumb-title {
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    .session-active-name {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .session-dropdown-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%) translateY(-6px);
+      width: 320px;
+      background: #111318;
+      border: 1px solid var(--border-prominent);
+      border-radius: 14px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65);
+      padding: 10px;
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      backdrop-filter: blur(12px);
+    }
+
+    .session-dropdown-menu.open {
+      display: flex;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .session-search-box {
+      width: 100%;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      padding: 7px 10px;
+      outline: none;
+      margin-bottom: 4px;
+    }
+
+    .session-group-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 4px 8px 2px;
+    }
+
+    .session-list-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 10px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+
+    .session-list-item:hover, .session-list-item.active {
+      background: var(--bg-surface-elevated);
+      color: var(--text-primary);
+    }
+
+    .session-btn-new {
+      margin-top: 6px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent);
+      font-size: 12.5px;
+      font-weight: 500;
+      background: transparent;
+      border-bottom: none;
+      border-left: none;
+      border-right: none;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      padding-left: 8px;
+    }
+
+    /* ── Header Right: Mode Segmented Toggle (Option 1A) + New Chat ── */
+    .header-right-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mode-segmented-pill {
+      display: flex;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-pill);
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .mode-pill-btn {
+      appearance: none;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.18s ease;
+    }
+
+    .mode-pill-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .mode-pill-btn.active {
+      background: var(--bg-surface-elevated);
+      color: var(--text-primary);
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .mode-pill-btn.live-active {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      font-weight: 600;
+    }
+
+    .btn-new-chat {
+      appearance: none;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: color 0.15s ease;
+    }
+
+    .btn-new-chat:hover {
+      color: var(--text-primary);
+    }
+
+    /* ── VIEW 1: CHAT MODE (Default Scroll Container) ── */
+    .chat-view-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      scroll-behavior: smooth;
+    }
+
+    /* Message Bubbles */
+    .message-row-user {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .user-bubble {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      padding: 11px 18px;
+      border-radius: 18px 18px 4px 18px;
+      max-width: 70%;
+      font-size: 14px;
+      line-height: 1.5;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .message-row-assistant {
+      display: flex;
+      gap: 14px;
+      max-width: 85%;
+      align-items: flex-start;
+    }
+
+    .assistant-avatar-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .assistant-body {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-primary);
+    }
+
+    /* Agent Execution Accordion */
+    .agent-steps-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 4px;
+      transition: border-color 0.15s ease;
+    }
+
+    .agent-steps-card:hover {
+      border-color: var(--border-prominent);
+    }
+
+    .agent-steps-header {
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      font-size: 13px;
+      font-style: italic;
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.015);
+    }
+
+    .steps-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chevron-icon {
+      transition: transform 0.2s ease;
+      color: var(--text-muted);
+    }
+
+    .agent-steps-card.collapsed .chevron-icon {
+      transform: rotate(-90deg);
+    }
+
+    .agent-steps-card.collapsed .steps-list {
+      display: none;
+    }
+
+    .steps-list {
+      padding: 8px 14px 12px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .step-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .step-line .bullet {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    /* Bottom Input Dock with Dictate */
+    .input-dock-container {
+      padding: 16px 48px 24px;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .input-pill {
+      background: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-pill);
+      display: flex;
+      align-items: center;
+      padding: 6px 10px 6px 16px;
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.4);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .input-pill:focus-within {
+      border-color: var(--border-prominent);
+      box-shadow: 0 10px 35px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border-prominent);
+    }
+
+    .action-btn {
+      appearance: none;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .action-btn:hover {
+      color: var(--text-primary);
+      background: var(--pill-hover-bg);
+    }
+
+    .action-btn.dictating {
+      color: var(--emerald);
+      background: rgba(16, 185, 129, 0.15);
+      box-shadow: 0 0 12px var(--emerald-glow);
+      animation: pulse-glow 1.2s infinite ease-in-out;
+    }
+
+    .chat-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      padding: 8px 12px;
+    }
+
+    .chat-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .send-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--text-primary);
+      color: var(--bg-main);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .send-btn:hover {
+      transform: scale(1.05);
+    }
+
+    /* ── VIEW 2: LIVE MODE STAGE (Avatar + Live Subtitles + Control Dock) ── */
+    .live-view-stage {
+      flex: 1;
+      display: none; /* Active when mode is 'live' */
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 28px 48px 32px;
+      position: relative;
+      background: radial-gradient(circle at center, rgba(16, 185, 129, 0.05) 0%, transparent 70%);
+    }
+
+    .live-view-stage.active-stage {
+      display: flex;
+    }
+
+    /* Living Hero Avatar Canvas */
+    .live-avatar-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      width: 100%;
+    }
+
+    .avatar-orb-wrapper {
+      position: relative;
+      width: 190px;
+      height: 190px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pulsing-wave-ring {
+      position: absolute;
+      inset: -15px;
+      border-radius: 50%;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      animation: wave-expand 3s infinite ease-out;
+    }
+
+    .pulsing-wave-ring-2 {
+      position: absolute;
+      inset: -35px;
+      border-radius: 50%;
+      border: 1px dashed rgba(59, 130, 246, 0.25);
+      animation: wave-expand 3.8s infinite ease-out 0.8s;
+    }
+
+    @keyframes wave-expand {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      100% { transform: scale(1.35); opacity: 0; }
+    }
+
+    .avatar-central-figure {
+      width: 130px;
+      height: 130px;
+      border-radius: 40px;
+      background: linear-gradient(135deg, #facc15 0%, #eab308 100%);
+      box-shadow: 0 15px 45px rgba(250, 204, 21, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      animation: avatar-float 4s infinite ease-in-out;
+    }
+
+    @keyframes avatar-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .avatar-face {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .avatar-eyes {
+      display: flex;
+      gap: 22px;
+    }
+
+    .avatar-eye {
+      width: 10px;
+      height: 12px;
+      background: #1e1e24;
+      border-radius: 50%;
+    }
+
+    .avatar-mouth {
+      width: 16px;
+      height: 8px;
+      border-bottom: 3px solid #1e1e24;
+      border-radius: 0 0 10px 10px;
+      transition: all 0.2s ease;
+    }
+
+    .avatar-speaking .avatar-mouth {
+      height: 14px;
+      border-radius: 50%;
+      background: #1e1e24;
+      border: none;
+      animation: mouth-talk 0.3s infinite alternate;
+    }
+
+    @keyframes mouth-talk {
+      0% { transform: scaleY(0.7); }
+      100% { transform: scaleY(1.3); }
+    }
+
+    /* Live Voice Subtitles Ticker */
+    .live-subtitles-card {
+      width: 100%;
+      max-width: 640px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+      margin-bottom: 20px;
+    }
+
+    .subtitles-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 6px;
+    }
+
+    .subtitles-turn {
+      font-size: 13.5px;
+      line-height: 1.5;
+      display: flex;
+      gap: 10px;
+    }
+
+    .subtitles-turn.user {
+      color: #60a5fa;
+    }
+
+    .subtitles-turn.agent {
+      color: var(--text-primary);
+    }
+
+    /* Live Mode Controls Dock */
+    .live-controls-dock {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      padding: 8px 18px;
+      border-radius: var(--radius-pill);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .live-dock-btn {
+      appearance: none;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-pill);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 7px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      transition: all 0.15s ease;
+    }
+
+    .live-dock-btn:hover {
+      border-color: var(--border-prominent);
+      background: var(--bg-input);
+    }
+
+    .live-dock-btn.btn-end {
+      background: rgba(239, 68, 68, 0.12);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.28);
+    }
+
+    .live-dock-btn.btn-end:hover {
+      background: rgba(239, 68, 68, 0.22);
+    }
+
+    /* ── MODALS (For Sidebar Utilities) ── */
+    .modal-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(8px);
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-box {
+      background: #0f1015;
+      border: 1px solid var(--border-prominent);
+      border-radius: 18px;
+      width: 90%;
+      max-width: 480px;
+      overflow: hidden;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+      transform: translateY(12px) scale(0.98);
+      transition: transform 0.2s ease;
+    }
+
+    .modal-overlay.open .modal-box {
+      transform: translateY(0) scale(1);
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px;
+    }
+
+    .modal-close:hover {
+      color: var(--text-primary);
+    }
+
+    .modal-body {
+      padding: 20px;
+      color: var(--text-secondary);
+      font-size: 13px;
+      line-height: 1.6;
+      max-height: 380px;
+      overflow-y: auto;
+    }
+
+    .task-row {
+      padding: 10px 12px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .log-line {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="app-window" onclick="handleWindowClick(event)">
+
+  <!-- ── 1. LEFT SIDEBAR (Option B: Power Sidebar) ── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <!-- Window Controls -->
+      <div class="window-controls">
+        <span class="window-dot dot-red"></span>
+        <span class="window-dot dot-yellow"></span>
+        <span class="window-dot dot-green"></span>
+      </div>
+
+      <!-- Main Navigation Tabs (Pills matching Image 4) -->
+      <nav class="nav-group">
+        <button class="nav-pill active" id="tab-home" onclick="switchNavTab('home')">
+          <span>Home</span>
+        </button>
+        <button class="nav-pill" id="tab-agents" onclick="switchNavTab('agents')">
+          <span>Agents</span>
+        </button>
+        <button class="nav-pill" id="tab-workflow" onclick="switchNavTab('workflow')">
+          <span>workflow</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Middle/Lower Utilities Section -->
+    <div class="sidebar-utilities">
+      <div class="utility-label">Workspace</div>
+
+      <!-- Task Manager Button with Live Active Badge -->
+      <button class="utility-item" onclick="openModal('modal-tasks')">
+        <div class="utility-left">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span>Tasks</span>
+        </div>
+        <span class="badge-tag pulse" id="task-badge">2 Running</span>
+      </button>
+
+      <!-- Backend Logs Button -->
+      <button class="utility-item" onclick="openModal('modal-logs')">
+        <div class="utility-left">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <span>Logs</span>
+        </div>
+        <span style="font-size: 10px; color: var(--text-muted); font-family: var(--font-mono);">Live</span>
+      </button>
+
+      <!-- Mobile Remote QR Button -->
+      <button class="utility-item" onclick="openModal('modal-remote')">
+        <div class="utility-left">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span>Remote</span>
+        </div>
+        <span style="font-size: 10px; color: var(--text-muted);">QR</span>
+      </button>
+
+      <!-- Footer Buttons: Settings & Theme Mode -->
+      <div class="sidebar-footer">
+        <div class="sidebar-footer-row">
+          <button class="nav-pill btn-settings" onclick="openModal('modal-settings')">
+            <span>Settings</span>
+          </button>
+          <button class="btn-icon-square" onclick="toggleTheme()" title="Toggle Theme">
+            <svg id="theme-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </button>
+        </div>
+
+        <!-- Connection Status -->
+        <div class="connection-pill">
+          <span class="status-dot"></span>
+          <span>Connected · v0.61</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── 2. RIGHT MAIN CANVAS ── -->
+  <main class="main-canvas">
+
+    <!-- Top Navigation Bar: Status + Session Dropdown (Option B) + Mode Segmented Toggle (Option 1A) -->
+    <header class="top-header">
+      <!-- Status Indicator -->
+      <div class="header-status" id="header-status-badge">
+        <span class="dot"></span>
+        <span id="system-state-text">Ready</span>
+      </div>
+
+      <!-- Session Breadcrumb & Dropdown Menu (Session Option B) -->
+      <div class="session-breadcrumb-container">
+        <button class="session-trigger-btn" onclick="toggleSessionDropdown(event)" title="Switch or search conversations">
+          <span class="session-breadcrumb-title">Home /</span>
+          <span class="session-active-name" id="current-session-label">React To-Do App</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+
+        <!-- Dropdown Menu -->
+        <div class="session-dropdown-menu" id="session-dropdown" onclick="event.stopPropagation()">
+          <input type="text" class="session-search-box" placeholder="Search conversations..." id="session-search" oninput="filterSessions(this.value)">
+
+          <div class="session-group-label">Today</div>
+          <div class="session-list-item active" onclick="selectSession('React To-Do App')">
+            <span>• React To-Do App</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div class="session-list-item" onclick="selectSession('SFO Weather Check')">
+            <span>• SFO Weather Check</span>
+          </div>
+
+          <div class="session-group-label">Yesterday</div>
+          <div class="session-list-item" onclick="selectSession('Bug fix in main.py')">
+            <span>• Bug fix in main.py</span>
+          </div>
+          <div class="session-list-item" onclick="selectSession('Fleet Agent Setup')">
+            <span>• Fleet Agent Setup</span>
+          </div>
+
+          <button class="session-btn-new" onclick="startNewSession()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Start New Session</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Header Group: Segmented Mode Toggle (Option 1A) + New Chat -->
+      <div class="header-right-group">
+        <!-- Segmented Mode Toggle: [ 💬 Chat | 🎙️ Live ] -->
+        <div class="mode-segmented-pill">
+          <button class="mode-pill-btn active" id="btn-mode-chat" onclick="setOperationalMode('chat')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>Chat</span>
+          </button>
+          <button class="mode-pill-btn" id="btn-mode-live" onclick="setOperationalMode('live')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            <span>Live</span>
+          </button>
+        </div>
+
+        <!-- + New Chat button -->
+        <button class="btn-new-chat" onclick="startNewSession()">
+          <span>+ New chat</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ── 2A. CHAT VIEW (Active in Chat Mode) ── -->
+    <div class="chat-view-container" id="chat-mode-view">
+      <!-- Chat Messages Scroll Area -->
+      <div class="chat-scroll-area" id="chat-stream">
+
+        <!-- Turn 1: User Request -->
+        <div class="message-row-user">
+          <div class="user-bubble">
+            Make me a small to-do app in React and start it
+          </div>
+        </div>
+
+        <!-- Turn 1: Agent In-line Steps Accordion (From Image 4) -->
+        <div class="message-row-assistant">
+          <div class="assistant-avatar-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4zm-6 9a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v2a6 6 0 0 1-12 0v-2zm-2 5a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v1a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-1z"/></svg>
+          </div>
+          <div class="assistant-body" style="width: 100%;">
+            <div class="agent-steps-card" id="step-card-1">
+              <div class="agent-steps-header" onclick="toggleSteps('step-card-1')">
+                <div class="steps-title">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                  <span>Setting up a new React project in Projects\todo.</span>
+                </div>
+                <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+              <div class="steps-list">
+                <div class="step-line"><span class="bullet"></span><span>Ran a command: npm create vite@latest todo</span></div>
+                <div class="step-line"><span class="bullet"></span><span>Wrote C:\Users\sam\Projects\todo\src\App.jsx</span></div>
+                <div class="step-line"><span class="bullet"></span><span>Wrote C:\Users\sam\Projects\todo\src\index.css</span></div>
+                <div class="step-line"><span class="bullet"></span><span>Started npm run dev (http://localhost:5173)</span></div>
+                <div class="step-line"><span class="bullet"></span><span>Read webpage: Verified preview</span></div>
+              </div>
+            </div>
+
+            <div>
+              Your to-do app is running at <strong>http://localhost:5173</strong>. Add a task, tick it off, and it stays saved in the browser. The project is in Projects\todo, and the server runs in the Bigfoot tab on the Terminal page.
+            </div>
+          </div>
+        </div>
+
+        <!-- Turn 2: User follow up -->
+        <div class="message-row-user">
+          <div class="user-bubble">
+            What's 15% of 2,340?
+          </div>
+        </div>
+
+        <!-- Turn 2: Assistant answer -->
+        <div class="message-row-assistant">
+          <div class="assistant-avatar-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4zm-6 9a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v2a6 6 0 0 1-12 0v-2zm-2 5a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v1a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-1z"/></svg>
+          </div>
+          <div class="assistant-body">
+            351.
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Bottom Input Dock with Speech-to-Text Dictate -->
+      <div class="input-dock-container">
+        <div class="input-pill">
+          <!-- File Attach -->
+          <button class="action-btn" title="Attach file or drop into window" onclick="simulateFileUpload()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+
+          <!-- Speech-to-Text Dictate Button (Transcribes speech to text input box) -->
+          <button class="action-btn" id="btn-dictate" title="Click to dictate speech into input box" onclick="handleDictateVoice()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </button>
+
+          <!-- Text Input -->
+          <input
+            type="text"
+            class="chat-input"
+            id="user-input-field"
+            placeholder="Message Bigfoot (or tap mic to dictate)"
+            autocomplete="off"
+            onkeydown="if(event.key === 'Enter') handleSendMessage()"
+          />
+
+          <!-- Send Arrow Button -->
+          <button class="send-btn" onclick="handleSendMessage()" title="Send">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 2B. LIVE MODE STAGE (Active in Live Mode — Avatar + Live Subtitles + Control Dock) ── -->
+    <div class="live-view-stage" id="live-mode-stage">
+
+      <!-- Living 3D Companion Avatar Stage -->
+      <div class="live-avatar-container">
+        <div class="avatar-orb-wrapper">
+          <div class="pulsing-wave-ring"></div>
+          <div class="pulsing-wave-ring-2"></div>
+
+          <!-- Animated Avatar Figure -->
+          <div class="avatar-central-figure" id="live-avatar-figure">
+            <div class="avatar-face">
+              <div class="avatar-eyes">
+                <div class="avatar-eye"></div>
+                <div class="avatar-eye"></div>
+              </div>
+              <div class="avatar-mouth" id="avatar-mouth"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 24px; font-size: 13px; font-weight: 500; color: var(--emerald); display: flex; align-items: center; gap: 8px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--emerald); box-shadow: 0 0 8px var(--emerald);"></span>
+          <span id="live-audio-status">Listening continuously via Gemini Live</span>
+        </div>
+      </div>
+
+      <!-- Real-Time Ambient Subtitles / Live Transcription Stream -->
+      <div class="live-subtitles-card">
+        <div class="subtitles-header">
+          <span>LIVE TRANSCRIPTION STREAM</span>
+          <span>48kHz · LATENCY: 220ms</span>
+        </div>
+        <div class="subtitles-turn user">
+          <strong>You:</strong>
+          <span id="live-transcript-user">"Can you verify the dev server and list any background tasks?"</span>
+        </div>
+        <div class="subtitles-turn agent">
+          <strong>ZEZO:</strong>
+          <span id="live-transcript-agent">"Checking tasks now... The React to-do dev server is running on port 5173, and context indexing is complete."</span>
+        </div>
+      </div>
+
+      <!-- Live Voice Control Dock -->
+      <div class="live-controls-dock">
+        <!-- Mic Mute Toggle -->
+        <button class="live-dock-btn" id="live-mute-btn" onclick="toggleLiveMic()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          <span id="live-mute-text">Mute Mic</span>
+        </button>
+
+        <!-- Interrupt / Stop Speech -->
+        <button class="live-dock-btn" onclick="interruptLiveSpeech()" title="Stop Assistant Speaking">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12"/></svg>
+          <span>Interrupt</span>
+        </button>
+
+        <!-- End Live Session & Return to Chat -->
+        <button class="live-dock-btn btn-end" onclick="setOperationalMode('chat')" title="End Live Voice session and return to Chat">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <span>End Live Session</span>
+        </button>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ── 3. MODALS ── -->
+
+  <!-- Modal: Task Manager -->
+  <div class="modal-overlay" id="modal-tasks" onclick="if(event.target===this) closeModal('modal-tasks')">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">Autonomous Task Queue</div>
+        <button class="modal-close" onclick="closeModal('modal-tasks')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="task-row">
+          <div>
+            <div style="font-weight: 500; color: var(--text-primary); font-size: 13px;">React To-Do Dev Server</div>
+            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Running in Projects\todo</div>
+          </div>
+          <span class="badge-tag">IN_PROGRESS</span>
+        </div>
+        <div class="task-row">
+          <div>
+            <div style="font-weight: 500; color: var(--text-primary); font-size: 13px;">File Prefetch & Context Index</div>
+            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Optimized 18 repo files</div>
+          </div>
+          <span class="badge-tag" style="background: rgba(59, 130, 246, 0.15); color: var(--accent); border-color: rgba(59, 130, 246, 0.3);">INDEXED</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Backend Logs -->
+  <div class="modal-overlay" id="modal-logs" onclick="if(event.target===this) closeModal('modal-logs')">
+    <div class="modal-box" style="max-width: 540px;">
+      <div class="modal-header">
+        <div class="modal-title">Backend Execution Telemetry</div>
+        <button class="modal-close" onclick="closeModal('modal-logs')">&times;</button>
+      </div>
+      <div class="modal-body" style="background: #090a0d;">
+        <div class="log-line"><span style="color: var(--emerald);">[OK]</span> WebSocket connected on ws://127.0.0.1:8765/ws</div>
+        <div class="log-line"><span style="color: var(--accent);">[TASK]</span> Dispatched React To-Do generator to agent</div>
+        <div class="log-line"><span style="color: var(--text-muted);">[VITE]</span> Vite v5.2.0 dev server listening at :5173</div>
+        <div class="log-line"><span style="color: var(--emerald);">[AUDIO]</span> Gemini Live voice loop active at 48kHz</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Mobile Remote QR -->
+  <div class="modal-overlay" id="modal-remote" onclick="if(event.target===this) closeModal('modal-remote')">
+    <div class="modal-box" style="max-width: 380px; text-align: center;">
+      <div class="modal-header">
+        <div class="modal-title">Mobile Remote Gateway</div>
+        <button class="modal-close" onclick="closeModal('modal-remote')">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; align-items: center; gap: 14px;">
+        <div style="width: 160px; height: 160px; background: white; border-radius: 12px; padding: 12px; display: flex; align-items: center; justify-content: center;">
+          <svg viewBox="0 0 100 100" width="100%" height="100%">
+            <rect x="10" y="10" width="25" height="25" fill="#000"/>
+            <rect x="65" y="10" width="25" height="25" fill="#000"/>
+            <rect x="10" y="65" width="25" height="25" fill="#000"/>
+            <rect x="16" y="16" width="13" height="13" fill="#fff"/>
+            <rect x="71" y="16" width="13" height="13" fill="#fff"/>
+            <rect x="16" y="71" width="13" height="13" fill="#fff"/>
+            <rect x="42" y="10" width="8" height="35" fill="#000"/>
+            <rect x="45" y="55" width="20" height="10" fill="#000"/>
+            <rect x="65" y="65" width="15" height="25" fill="#000"/>
+            <rect x="42" y="75" width="10" height="15" fill="#000"/>
+          </svg>
+        </div>
+        <div style="font-size: 12px; color: var(--text-secondary);">Scan with your phone camera to control ZEZO remotely.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Settings -->
+  <div class="modal-overlay" id="modal-settings" onclick="if(event.target===this) closeModal('modal-settings')">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">Settings & Preferences</div>
+        <button class="modal-close" onclick="closeModal('modal-settings')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div>
+            <label style="font-size: 12px; font-weight: 500; color: var(--text-primary); display: block; margin-bottom: 6px;">Operational Mode</label>
+            <div style="font-size: 12px; color: var(--text-secondary);">Dual Mode: Text Chat (with speech dictation) or Gemini Live Voice.</div>
+          </div>
+          <div>
+            <label style="font-size: 12px; font-weight: 500; color: var(--text-primary); display: block; margin-bottom: 6px;">Agent Engine</label>
+            <div style="font-size: 12px; color: var(--text-secondary);">Google Gemini 2.5 Flash / Claude Fable 5.1</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let currentMode = 'chat'; // 'chat' or 'live'
+  let isLiveMicMuted = false;
+  let isDictating = false;
+
+  // Operational Mode Switcher (Option 1A)
+  function setOperationalMode(mode) {
+    currentMode = mode;
+    const btnChat = document.getElementById('btn-mode-chat');
+    const btnLive = document.getElementById('btn-mode-live');
+    const chatView = document.getElementById('chat-mode-view');
+    const liveStage = document.getElementById('live-mode-stage');
+    const headerStatus = document.getElementById('header-status-badge');
+    const stateText = document.getElementById('system-state-text');
+    const avatarMouth = document.getElementById('avatar-mouth');
+    const avatarFigure = document.getElementById('live-avatar-figure');
+
+    if (mode === 'live') {
+      btnLive.classList.add('live-active');
+      btnChat.classList.remove('active');
+      chatView.style.display = 'none';
+      liveStage.classList.add('active-stage');
+      headerStatus.classList.add('live-state');
+      stateText.textContent = 'Live Audio';
+      stateText.style.color = '#10b981';
+
+      // Start simulated speech pulsation
+      avatarFigure.classList.add('avatar-speaking');
+    } else {
+      btnChat.classList.add('active');
+      btnLive.classList.remove('live-active');
+      liveStage.classList.remove('active-stage');
+      chatView.style.display = 'flex';
+      headerStatus.classList.remove('live-state');
+      stateText.textContent = 'Ready';
+      stateText.style.color = 'var(--text-primary)';
+      avatarFigure.classList.remove('avatar-speaking');
+    }
+  }
+
+  // Session Dropdown Handlers (Session Option B)
+  function toggleSessionDropdown(event) {
+    event.stopPropagation();
+    const dropdown = document.getElementById('session-dropdown');
+    dropdown.classList.toggle('open');
+  }
+
+  function handleWindowClick(event) {
+    const dropdown = document.getElementById('session-dropdown');
+    if (dropdown && dropdown.classList.contains('open')) {
+      dropdown.classList.remove('open');
+    }
+  }
+
+  function selectSession(sessionName) {
+    document.getElementById('current-session-label').textContent = sessionName;
+    document.getElementById('session-dropdown').classList.remove('open');
+    document.querySelectorAll('.session-list-item').forEach(el => {
+      if (el.textContent.includes(sessionName)) el.classList.add('active');
+      else el.classList.remove('active');
+    });
+  }
+
+  function startNewSession() {
+    const newSessionName = 'New Session #' + Math.floor(Math.random() * 899 + 100);
+    document.getElementById('current-session-label').textContent = newSessionName;
+    document.getElementById('session-dropdown').classList.remove('open');
+
+    // Reset chat stream
+    const chatStream = document.getElementById('chat-stream');
+    chatStream.innerHTML = `
+      <div style="margin: auto; text-align: center; color: var(--text-muted); font-size: 13px;">
+        <div style="font-weight: 500; color: var(--text-primary); margin-bottom: 4px;">${newSessionName} Started</div>
+        <div>Ask ZEZO anything or click the mic button to dictate your message.</div>
+      </div>
+    `;
+  }
+
+  function filterSessions(query) {
+    const q = query.toLowerCase();
+    document.querySelectorAll('.session-list-item').forEach(el => {
+      const text = el.textContent.toLowerCase();
+      el.style.display = text.includes(q) ? 'flex' : 'none';
+    });
+  }
+
+  // Speech-to-Text Dictation (Chat Mode)
+  function handleDictateVoice() {
+    const btn = document.getElementById('btn-dictate');
+    const input = document.getElementById('user-input-field');
+
+    if (isDictating) return;
+    isDictating = true;
+    btn.classList.add('dictating');
+
+    const sampleSpokenPhrase = "Build a modern full-stack dashboard with dark theme and SQLite backend";
+    let index = 0;
+    input.value = "";
+    input.focus();
+
+    const interval = setInterval(() => {
+      if (index < sampleSpokenPhrase.length) {
+        input.value += sampleSpokenPhrase[index];
+        index++;
+      } else {
+        clearInterval(interval);
+        isDictating = false;
+        btn.classList.remove('dictating');
+      }
+    }, 35);
+  }
+
+  // Live Mode Controls
+  function toggleLiveMic() {
+    isLiveMicMuted = !isLiveMicMuted;
+    const btn = document.getElementById('live-mute-btn');
+    const text = document.getElementById('live-mute-text');
+    const status = document.getElementById('live-audio-status');
+
+    if (isLiveMicMuted) {
+      btn.style.color = '#ef4444';
+      text.textContent = 'Unmute Mic';
+      status.textContent = 'Microphone Muted';
+      status.style.color = '#ef4444';
+    } else {
+      btn.style.color = 'var(--text-primary)';
+      text.textContent = 'Mute Mic';
+      status.textContent = 'Listening continuously via Gemini Live';
+      status.style.color = 'var(--emerald)';
+    }
+  }
+
+  function interruptLiveSpeech() {
+    const agentSubtitle = document.getElementById('live-transcript-agent');
+    agentSubtitle.textContent = "[Speech interrupted by user]";
+    document.getElementById('live-avatar-figure').classList.remove('avatar-speaking');
+    setTimeout(() => {
+      document.getElementById('live-avatar-figure').classList.add('avatar-speaking');
+      agentSubtitle.textContent = "Listening to your new instruction...";
+    }, 1200);
+  }
+
+  // Sidebar Tab Switching
+  function switchNavTab(tabName) {
+    document.querySelectorAll('.nav-pill').forEach(el => el.classList.remove('active'));
+    const clickedPill = document.getElementById('tab-' + tabName);
+    if (clickedPill) clickedPill.classList.add('active');
+  }
+
+  function toggleSteps(id) {
+    const card = document.getElementById(id);
+    if (card) card.classList.toggle('collapsed');
+  }
+
+  function openModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('open');
+  }
+
+  function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('open');
+  }
+
+  let isLight = false;
+  function toggleTheme() {
+    isLight = !isLight;
+    document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
+  }
+
+  function handleSendMessage() {
+    const input = document.getElementById('user-input-field');
+    const text = input.value.trim();
+    if (!text) return;
+
+    const chatStream = document.getElementById('chat-stream');
+
+    const userRow = document.createElement('div');
+    userRow.className = 'message-row-user';
+    userRow.innerHTML = `<div class="user-bubble">${escapeHtml(text)}</div>`;
+    chatStream.appendChild(userRow);
+
+    input.value = '';
+    chatStream.scrollTop = chatStream.scrollHeight;
+
+    setTimeout(() => {
+      const assistantRow = document.createElement('div');
+      assistantRow.className = 'message-row-assistant';
+      assistantRow.innerHTML = `
+        <div class="assistant-avatar-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4zm-6 9a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v2a6 6 0 0 1-12 0v-2zm-2 5a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v1a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-1z"/></svg>
+        </div>
+        <div class="assistant-body">
+          I received: <em>"${escapeHtml(text)}"</em>. Executing through the autonomous pipeline.
+        </div>
+      `;
+      chatStream.appendChild(assistantRow);
+      chatStream.scrollTop = chatStream.scrollHeight;
+    }, 600);
+  }
+
+  function simulateFileUpload() {
+    alert('File dropped: attached to prompt context!');
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+</script>
+
+</body>
+</html>

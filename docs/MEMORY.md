@@ -99,6 +99,9 @@ To prevent recency bias from starving critical relationship facts in favor of da
    - `memory_conflicts`: Contradiction resolution ledger comparing new user inputs against stored facts.
    - `session_condensations`: Summarized session rollups preserving high-level context.
 
+### Search Engine Note (Lexical vs. Semantic):
+`sqlite_memory.py` uses SQLite FTS5 BM25 with recency decay scoring (`memory_manager._score()` also employs lexical keyword overlap). These are high-speed, local **lexical** search mechanisms with zero external dependencies and zero GPU overhead, not embedding-based semantic vector search.
+
 ### Tool Operations (`recall_history`):
 - `op="search"`: Executes BM25 relevance search blended with recency decay (`recency_weight=0.35`, `recency_half_life_days=14.0`).
 - `op="expand"`: Retrieves a contiguous chronological turn sequence across a `[low_id, high_id]` boundary to recover full conversational context.
@@ -118,6 +121,7 @@ Every note is stored as a standard `.md` file containing YAML frontmatter and bi
 ```markdown
 ---
 id: note_project_zezo
+title: ZEZO Autonomous Operating System
 category: project
 tags: [architecture, os, ai]
 updated: "2026-10-24 17:00:00"
@@ -126,17 +130,45 @@ updated: "2026-10-24 17:00:00"
 
 Lead Architect: [[Hamza Bukhari]]
 Related Modules: [[SQLite Memory Engine]], [[Autonomous Office Deck]]
+
+---
+*Note: Horizontal rules in the body are preserved safely without corrupting frontmatter.*
 ```
+
+### High-Performance Incremental Caching (`vault_index.json`):
+To scale effortlessly to hundreds of notes without synchronous disk I/O bottlenecks:
+- VaultEngine maintains an atomic cache file: `memory/vault/vault_index.json`.
+- `get_all_notes()` compares filesystem modification time (`st_mtime`) for each `.md` file against the cached entry.
+- Unchanged files are served from memory in `< 3ms` instead of re-reading and re-parsing markdown files from disk.
+- Cache writes use PID- and thread-isolated `.tmp` staging files with Windows `os.replace` retry loops.
+
+### Permanent Deletion Mechanics (Anti-Resurrection Guarantee):
+- When a note is deleted (`delete_note()`):
+  1. **Frontmatter-First Session ID Extraction:** The note's YAML frontmatter is inspected for `session_id` or `id` before falling back to filename patterns. This guarantees that even if a note file was renamed, its session identity is reliably resolved.
+  2. **SQLite Turn Purging:** Associated conversational turns in `zezo_brain.db` (`DELETE FROM turns WHERE session_id = ?`) are permanently deleted.
+  3. **Unlinking & Cache Eviction:** The markdown file is deleted from disk and evicted from `vault_index.json`.
+  4. This eliminates the resurrection bug where `sync_real_conversations_from_db()` would previously regenerate deleted conversation notes upon graph refresh.
+
+### Strict Starting-Fence YAML Parsing:
+- Note parsers in both Python (`vault_engine._parse_frontmatter`) and TypeScript (`splitFrontmatterAndBody`) strictly require `^---\r?\n` at file index 0.
+- Markdown horizontal rules (`---`) placed anywhere in the note body are preserved verbatim and will never be mistaken for frontmatter delimiters.
 
 ### Knowledge Graph Synthesis:
 1. **Bi-Directional Wikilink Parsing:** `VaultEngine` scans all vault notes for `[[Target Note]]` patterns and compiles directed link edges.
-2. **Conversation Ingestion:** Session summaries are automatically distilled into conversation nodes with intelligent turn sampling:
+2. **Conversation Ingestion & Metadata Delivery:** Session summaries are distilled into conversation nodes with first-class `turn_count` metadata:
    - First 8 turns (`_VAULT_HEAD_TURNS = 8`): Establishes the initial task context and objectives.
    - Last 12 turns (`_VAULT_TAIL_TURNS = 12`): Captures the resolution, deliverables, and final outcomes.
-3. **Interactive 3D Visualizer:** Rendered via `3d-force-graph` in the frontend HUD:
-   - Color-coded categories: Profile (Purple `#a855f7`), Project (Cyan `#38bdf8`), Preference (Orange `#fb923c`), Relationship (Yellow `#facc15`), Knowledge (Emerald `#34d399`), General (Slate `#94a3b8`).
-   - Interactive Node Inspector: Clicking a node slides open `MemoryInspectorDrawer.tsx` displaying note markdown, backlinks, and temporal tags.
-   - Dynamic Audio Reactivity: Viseme and audio levels dynamically modulate particle flows and graph rotation.
+   - Frontmatter stores clean user-facing tags (`tags: [conversation]`) and explicit turn count (`turn_count: 14`), eliminating internal `#3_TURNS` tag clutter.
+3. **"Knowledge Galaxy" 3D Visual Experience (`MemoryGraphCanvas.tsx`):**
+   - **Procedural 3D Starfield:** 1,200 particle celestial depth field (`THREE.Points`) surrounding the force graph for true cosmic exploration.
+   - **Synaptic Neural Links:** Directional particle flow (`#818cf8`) traveling across celestial violet links (`rgba(120, 120, 255, 0.35)`).
+   - **Cinematic Camera Glide:** Smooth camera flight (`Graph.cameraPosition`) focusing on clicked nodes with distance calculation.
+   - **Reactive 3D Search Dimming:** Reactive traversal dims non-matching node spheres and `SpriteText` labels to `0.08` opacity without reloading WebGL canvas.
+4. **Unified Spatial Right Drawer (`MemoryInspectorDrawer.tsx`):**
+   - Viewing, editing, and creating notes are unified into the right drawer (`mode="inspect" | "create"`), replacing center popups.
+   - Dynamic React key `key={drawerMode === 'create' ? 'create-mode' : (selectedNode?.id || 'empty')}` guarantees zero ghost data retention when switching modes.
+   - Replaced database jargon with user-centric copy (*"Note Content"*, *"Write your thoughts here. Use [[Note Name]] to link..."*).
+   - Native `window.confirm()` replaced with ReUI `ConfirmDialog` for delete workflows.
 
 ---
 

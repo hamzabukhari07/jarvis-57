@@ -17,6 +17,12 @@ import {
   Square,
   Check,
   Copy,
+  Paperclip,
+  Mic,
+  MicOff,
+  X,
+  FileCode,
+  FolderOpen,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
@@ -146,22 +152,92 @@ export const AssistantMessage: FC = () => {
 };
 
 /* ── 3. Single-Row Pill Composer [ Ask or enter directive... (↑) ] ── */
-export const ZezoPillComposer: FC<{ placeholder?: string }> = ({
+export const ZezoPillComposer: FC<{
+  placeholder?: string;
+  onAttachFile?: () => void;
+  uploadedFiles?: { name: string; size: string; type: string }[];
+  onRemoveFile?: (index: number) => void;
+  isDictating?: boolean;
+  onToggleDictate?: () => void;
+}> = ({
   placeholder,
+  onAttachFile,
+  uploadedFiles,
+  onRemoveFile,
+  isDictating,
+  onToggleDictate,
 }) => {
   const isRunning = useAuiState((s) => s.thread.isRunning);
 
   return (
     <div className="p-3 pb-3 shrink-0 bg-transparent relative z-10">
       <div className="max-w-3xl mx-auto w-full">
+        {/* Uploaded Files Chips Strip */}
+        {uploadedFiles && uploadedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2 max-h-24 overflow-y-auto px-1">
+            {uploadedFiles.map((file, idx) => (
+              <div
+                key={idx}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--card)] border border-[var(--border)] text-[11px] text-[var(--foreground)] shadow-2xs"
+              >
+                {file.type === 'FOLDER' ? (
+                  <FolderOpen className="w-3.5 h-3.5 text-[var(--primary)] shrink-0" />
+                ) : (
+                  <FileCode className="w-3.5 h-3.5 text-[var(--muted-foreground)] shrink-0" />
+                )}
+                <span className="truncate max-w-[140px] font-medium">{file.name}</span>
+                <span className="text-[10px] text-[var(--muted-foreground)] font-mono">({file.size})</span>
+                {onRemoveFile && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveFile(idx)}
+                    className="text-[var(--muted-foreground)] hover:text-red-400 transition-colors ml-0.5 cursor-pointer p-0.5 rounded"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         <ComposerPrimitive.Root
           data-slot="aui-composer-root"
-          className="group relative flex items-center w-full rounded-full border border-[var(--border)] bg-[var(--card)]/90 backdrop-blur-xl hover:border-[var(--border)]/80 focus-within:border-[var(--accent)]/80 focus-within:ring-2 focus-within:ring-[var(--accent)]/20 pl-3.5 pr-1.5 py-1 transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          className="group relative flex items-center w-full rounded-full border border-[var(--border)] bg-[var(--card)]/90 backdrop-blur-xl hover:border-[var(--border)]/80 focus-within:border-[var(--accent)]/80 focus-within:ring-2 focus-within:ring-[var(--accent)]/20 pl-2.5 pr-1.5 py-1 transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
         >
+          {/* File Attachment Action Button */}
+          {onAttachFile && (
+            <button
+              type="button"
+              onClick={onAttachFile}
+              className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)] transition-colors rounded-full cursor-pointer shrink-0"
+              title="Attach files or folder"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Voice Dictation Button */}
+          {onToggleDictate && (
+            <button
+              type="button"
+              onClick={onToggleDictate}
+              className={cn(
+                "p-1.5 transition-colors rounded-full cursor-pointer shrink-0 mr-1",
+                isDictating
+                  ? "text-red-400 bg-red-500/20 animate-pulse ring-1 ring-red-400/40"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
+              )}
+              title={isDictating ? "Stop voice dictation" : "Dictate with voice"}
+            >
+              {isDictating ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
+          )}
+
           <ComposerPrimitive.Input
             data-slot="aui-composer-input"
-            placeholder={placeholder || "Ask or enter directive..."}
-            className="flex-1 bg-transparent border-0 px-1 py-1 text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none resize-none leading-normal min-h-[28px] max-h-[80px]"
+            placeholder={placeholder || (isDictating ? "Listening... speak now" : "Ask or enter directive (or tap mic to dictate)...")}
+            className="flex-1 bg-transparent border-0 px-2 py-1 text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none resize-none leading-normal min-h-[28px] max-h-[80px]"
             rows={1}
             autoFocus={false}
           />
@@ -200,9 +276,19 @@ export const ZezoChatThread: FC<{
   placeholder?: string;
   className?: string;
   systemState?: string;
+  onAttachFile?: () => void;
+  uploadedFiles?: { name: string; size: string; type: string }[];
+  onRemoveFile?: (index: number) => void;
+  isDictating?: boolean;
+  onToggleDictate?: () => void;
 }> = ({
   placeholder,
   className,
+  onAttachFile,
+  uploadedFiles,
+  onRemoveFile,
+  isDictating,
+  onToggleDictate,
 }) => {
   return (
     <ThreadPrimitive.Root className={cn("flex flex-col h-full w-full bg-transparent overflow-hidden", className)}>
@@ -218,7 +304,14 @@ export const ZezoChatThread: FC<{
         />
       </ThreadPrimitive.Viewport>
 
-      <ZezoPillComposer placeholder={placeholder} />
+      <ZezoPillComposer
+        placeholder={placeholder}
+        onAttachFile={onAttachFile}
+        uploadedFiles={uploadedFiles}
+        onRemoveFile={onRemoveFile}
+        isDictating={isDictating}
+        onToggleDictate={onToggleDictate}
+      />
     </ThreadPrimitive.Root>
   );
 };

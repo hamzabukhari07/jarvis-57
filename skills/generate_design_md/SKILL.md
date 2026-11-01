@@ -1,6 +1,6 @@
 ---
 name: generate_design_md
-description: "Master studio protocol for reverse-engineering design systems and generating canonical DESIGN.md and preview.html specifications via autonomous coding engines."
+description: "Master studio protocol for auditing, extracting, and documenting design systems into canonical DESIGN.md and preview.html specifications via autonomous coding engines."
 domain: design
 author: "Hamza Bukhari"
 version: "2.2.0"
@@ -22,7 +22,7 @@ auto_activate: true
 > **Lead Architect & Creator:** Hamza Bukhari  
 > **Core Subsystem:** Autonomous Coding Engine Pipeline (Google Antigravity CLI `agy`, OpenCode, Kilo Code)  
 > **Target Audience:** Autonomous Coding Engines, Office Fleet Agents, and ZEZO Core Orchestrators.  
-> **Core Axiom:** **Authenticity over invention.** Every token, color, font, radius, spacing step, and shadow documented must be traceable to real source code or extracted stylesheet data. You reverse-engineer the authentic design DNA — you do not redesign, invent unbacked tokens, or impose aesthetic bias.
+> **Core Axiom:** **Authenticity over invention.** Every token, color, font, radius, spacing step, and shadow documented must be traceable to real source code or extracted stylesheet data. You audit and extract the authentic design DNA — you do not redesign, invent unbacked tokens, or impose aesthetic bias.
 
 ---
 
@@ -82,11 +82,11 @@ Must follow this exact structure without omitting sections:
 
 ## 🤖 Agent Directive
 
-When reverse-engineering a design system, execute the corresponding directive based on the target mode:
+When auditing and extracting a design system, execute the corresponding directive based on the target mode:
 
 ### Scenario A: Extract Design System from Live URL (Pre-Flight Ingested Assets)
 ````markdown
-You are an expert Frontend Systems Architect, UI Auditor, and Design Tokens Specialist. Your task is to reverse-engineer the authentic design system from the pre-flight extracted files of a live website in the workspace into canonical design system specifications.
+You are an expert Frontend Systems Architect, UI Auditor, and Design Tokens Specialist. Your task is to audit and extract the authentic design system from the pre-flight extracted files of a live website in the workspace into canonical design system specifications.
 
 The target directory contains three pre-flight extraction files:
 1. 'site_dom.html' — Cleaned, hydrated DOM snapshot of the live webpage.
@@ -96,7 +96,7 @@ The target directory contains three pre-flight extraction files:
 CRITICAL CONSTRAINTS:
 - Treat these three files as your primary immutable source of truth.
 - Do not run external web searches or attempt to re-crawl the live URL.
-- Reverse-engineer what is actually present. Do not redesign, invent unbacked tokens, or impose aesthetic bias.
+- Audit and document what is actually present. Do not redesign, invent unbacked tokens, or impose aesthetic bias.
 - Execute directly with surgical precision without leaving placeholder TODOs.
 
 EXECUTION STEPS:
@@ -118,7 +118,7 @@ Deliver production-quality, auditable files directly in the target directory now
 
 ### Scenario B: Extract Design System from Local Codebase / Workspace Files
 ````markdown
-You are an expert Frontend Systems Architect, UI Auditor, and Design Tokens Specialist. Your task is to reverse-engineer the authentic design system from the local codebase and files in the workspace into canonical design system specifications.
+You are an expert Frontend Systems Architect, UI Auditor, and Design Tokens Specialist. Your task is to audit and extract the authentic design system from the local codebase and files in the workspace into canonical design system specifications.
 
 ANALYSIS PRIORITIES:
 1. System sources first:

@@ -209,7 +209,8 @@ class ZezoUIServer:
         self.on_sleep_toggle: Callable[[bool], None] | None = None
         self.on_remote_clicked: Callable[[], tuple[str, str] | None] | None = None
         self.on_file_uploaded: Callable[[dict[str, Any]], None] | None = None
-        self.on_assistant_settings_changed: Callable[[str, str, str], None] | None = None
+        self.on_assistant_settings_changed: Callable[..., None] | None = None
+        self.on_accent_change: Callable[[str], None] | None = None
         self.on_pipeline_settings_changed: Callable[[], None] | None = None
         self.on_audio_devices_changed: Callable[[str, str], None] | None = None
         self.get_initial_state: Callable[[], dict[str, Any]] | None = None
@@ -752,14 +753,22 @@ class ZezoUIServer:
             voice = str(data.get("voice_name", "Charon")).strip() or "Charon"
             lang = str(data.get("response_language", "auto")).strip() or "auto"
             fallback_voice = data.get("fallback_voice")
+            voice_accent = data.get("voice_accent")
 
             from memory.config_manager import (
                 save_assistant_config, save_voice, save_response_language, get_assistant_name,
                 save_api_keys_transactional, is_configured, get_masked_gemini_key, get_masked_groq_key,
                 get_masked_elevenlabs_key, get_masked_tavily_key, save_fallback_voice, get_fallback_voice,
                 save_voice_fallback_mode, get_voice_fallback_mode, get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
+                save_voice_accent, get_voice_accent, AVAILABLE_VOICE_ACCENTS,
             )
             name = str(data.get("assistant_name") or "").strip() or get_assistant_name()
+
+            if voice_accent is not None:
+                v_acc = str(voice_accent).strip().lower()
+                if v_acc not in AVAILABLE_VOICE_ACCENTS:
+                    return web.json_response({"status": "error", "message": f"Invalid voice accent: {voice_accent}"}, status=400)
+                save_voice_accent(v_acc)
 
             gemini_key = data.get("gemini_api_key")
             groq_key = data.get("groq_api_key")
@@ -789,16 +798,30 @@ class ZezoUIServer:
                 else:
                     save_voice_fallback_mode(str(voice_fallback))
 
+            current_accent = get_voice_accent()
             if self.on_assistant_settings_changed:
                 try:
-                    self.on_assistant_settings_changed(name, voice, lang)
+                    self.on_assistant_settings_changed(name, voice, lang, current_accent)
+                except TypeError:
+                    try:
+                        self.on_assistant_settings_changed(name, voice, lang)
+                    except Exception as e:
+                        logger.warning("on_assistant_settings_changed error: %s", e)
                 except Exception as e:
                     logger.warning("on_assistant_settings_changed error: %s", e)
+
+            if getattr(self, "on_accent_change", None) and voice_accent is not None:
+                try:
+                    self.on_accent_change(current_accent)
+                except Exception as e:
+                    logger.warning("on_accent_change error: %s", e)
 
             res_payload = {
                 "assistant_name": name,
                 "voice_name": voice,
                 "response_language": lang,
+                "voice_accent": current_accent,
+                "available_accents": list(AVAILABLE_VOICE_ACCENTS),
                 "fallback_voice": get_fallback_voice(),
                 "voice_fallback": get_voice_fallback_mode(),
                 "voice_fallback_enabled": get_voice_fallback_mode() == "auto",
@@ -934,6 +957,7 @@ class ZezoUIServer:
         try:
             from memory.config_manager import (
                 get_assistant_name, get_voice, get_response_language,
+                get_voice_accent, AVAILABLE_VOICE_ACCENTS,
                 get_autostart_enabled, get_brief_enabled,
                 get_wake_word_enabled, get_push_to_talk_enabled,
                 get_masked_gemini_key, get_masked_groq_key, get_masked_elevenlabs_key, get_masked_tavily_key,
@@ -961,6 +985,8 @@ class ZezoUIServer:
                 "wake_phrase": f"Hey {get_assistant_name()}",
                 "voice_name": get_voice(),
                 "response_language": get_response_language(),
+                "voice_accent": get_voice_accent(),
+                "available_accents": list(AVAILABLE_VOICE_ACCENTS),
                 "theme": get_theme(),
                 "accent": get_accent(),
                 **get_avatar_settings(),
@@ -1007,6 +1033,7 @@ class ZezoUIServer:
             from memory.config_manager import (
                 save_assistant_config, save_voice, save_response_language,
                 get_assistant_name,
+                save_voice_accent, get_voice_accent, AVAILABLE_VOICE_ACCENTS,
                 save_autostart_enabled, save_brief_enabled,
                 save_wake_word_enabled, get_wake_word_enabled,
                 save_push_to_talk_enabled,
@@ -1066,6 +1093,12 @@ class ZezoUIServer:
             resp_lang = data.get("response_language")
             if resp_lang is not None:
                 save_response_language(str(resp_lang).strip())
+            voice_accent = data.get("voice_accent")
+            if voice_accent is not None:
+                v_acc = str(voice_accent).strip().lower()
+                if v_acc not in AVAILABLE_VOICE_ACCENTS:
+                    return web.json_response({"status": "error", "message": f"Invalid voice accent: {voice_accent}"}, status=400)
+                save_voice_accent(v_acc)
 
             # 3. Keys
             keys_to_save = {}
@@ -1116,10 +1149,21 @@ class ZezoUIServer:
                 save_antigravity_model(str(data["antigravity_model"]))
 
             # Notify UI callbacks if relevant
-            if voice_name or resp_lang or _posted_name:
+            if voice_name or resp_lang or _posted_name or voice_accent is not None:
+                current_acc = str(voice_accent).strip().lower() if voice_accent is not None else get_voice_accent()
                 if self.on_assistant_settings_changed:
                     try:
-                        self.on_assistant_settings_changed(get_assistant_name(), voice_name or "Charon", resp_lang or "auto")
+                        self.on_assistant_settings_changed(get_assistant_name(), voice_name or "Charon", resp_lang or "auto", current_acc)
+                    except TypeError:
+                        try:
+                            self.on_assistant_settings_changed(get_assistant_name(), voice_name or "Charon", resp_lang or "auto")
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+                if getattr(self, "on_accent_change", None) and voice_accent is not None:
+                    try:
+                        self.on_accent_change(current_acc)
                     except Exception:
                         pass
 
@@ -2404,10 +2448,12 @@ class ZezoUIServer:
             voice = str(payload.get("voice_name", "Charon")).strip() or "Charon"
             lang = str(payload.get("response_language", "auto")).strip() or "auto"
             fallback_voice = payload.get("fallback_voice")
+            voice_accent = payload.get("voice_accent")
             try:
                 from memory.config_manager import (
                     save_assistant_config, save_voice, save_response_language,
                     get_user_name, save_fallback_voice, get_fallback_voice, get_assistant_name,
+                    save_voice_accent, get_voice_accent, AVAILABLE_VOICE_ACCENTS,
                 )
                 name = name or get_assistant_name()
                 user = get_user_name()
@@ -2416,14 +2462,32 @@ class ZezoUIServer:
                 save_response_language(lang)
                 if fallback_voice is not None:
                     save_fallback_voice(str(fallback_voice))
+                if voice_accent is not None:
+                    v_acc = str(voice_accent).strip().lower()
+                    if v_acc in AVAILABLE_VOICE_ACCENTS:
+                        save_voice_accent(v_acc)
 
+                current_accent = get_voice_accent()
                 if self.on_assistant_settings_changed:
-                    self.on_assistant_settings_changed(name, voice, lang)
+                    try:
+                        self.on_assistant_settings_changed(name, voice, lang, current_accent)
+                    except TypeError:
+                        try:
+                            self.on_assistant_settings_changed(name, voice, lang)
+                        except Exception:
+                            pass
+                if getattr(self, "on_accent_change", None) and voice_accent is not None:
+                    try:
+                        self.on_accent_change(current_accent)
+                    except Exception:
+                        pass
 
                 self.broadcast("assistant_settings_updated", {
                     "assistant_name": name,
                     "voice_name": voice,
                     "response_language": lang,
+                    "voice_accent": current_accent,
+                    "available_accents": list(AVAILABLE_VOICE_ACCENTS),
                     "fallback_voice": get_fallback_voice(),
                 })
             except Exception as e:

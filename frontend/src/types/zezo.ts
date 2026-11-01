@@ -47,6 +47,7 @@ export interface PipelineSettings {
   groq_api_key_masked: string
   has_elevenlabs_key: boolean
   elevenlabs_api_key_masked: string
+  voice_accent?: string
 }
 
 export interface ChatMessage {
@@ -61,5 +62,20 @@ export interface ChatMessage {
     status: 'running' | 'completed' | 'failed'
     output?: string
   }
+}
+
+export interface MemoryGraphNodeData {
+  id: string
+  label: string
+  category: string
+  file: string
+  snippet: string
+  color: string
+  size: number
+  tags: string[]
+  turn_count?: number
+  updated?: string | number
+  date?: string
+  timestamp?: number
 }
 

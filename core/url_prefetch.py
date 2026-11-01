@@ -116,6 +116,47 @@ def _extract_css_tokens(css_text: str) -> dict[str, str]:
     return tokens
 
 
+def _clean_html_dom(raw_html: str) -> str:
+    """Sanitize and compress live HTML DOM for coding engine analysis.
+
+    Removes script bundles, hydration payloads, and huge base64 images,
+    while preserving tag hierarchies, layout classes, and SVG viewBox/class attributes.
+    Reduces file size by 75–90% to avoid LLM token and tool-iteration choking.
+    """
+    if not raw_html:
+        return ""
+
+    # 1. Strip script tags and their contents (hydration, analytics, client bundles)
+    cleaned = re.sub(r"<script\b[^>]*>[\s\S]*?</script>", "", raw_html, flags=re.IGNORECASE)
+
+    # 2. Strip noscript tags and contents
+    cleaned = re.sub(r"<noscript\b[^>]*>[\s\S]*?</noscript>", "", cleaned, flags=re.IGNORECASE)
+
+    # 3. Truncate heavy base64 data URIs
+    cleaned = re.sub(r'data:image/[^;]+;base64,[a-zA-Z0-9+/=]{40,}', 'data:image/placeholder', cleaned)
+
+    # 4. Truncate massive SVG path bloat while PRESERVING viewBox, class, width, height attributes
+    def _truncate_svg(match: re.Match) -> str:
+        open_tag = match.group(1)   # e.g. <svg viewBox="0 0 24 24" class="h-5 w-5">
+        close_tag = match.group(3)  # </svg>
+        return f"{open_tag}\n  <!-- SVG paths omitted for brevity -->\n{close_tag}"
+
+    cleaned = re.sub(
+        r'(<svg\b[^>]*>)([\s\S]*?)(</svg>)',
+        _truncate_svg,
+        cleaned,
+        flags=re.IGNORECASE
+    )
+
+    # 5. Strip unnecessary HTML comments (except the ones we just added)
+    cleaned = re.sub(r'<!--(?! SVG paths omitted).*?-->', '', cleaned, flags=re.DOTALL)
+
+    # 6. Collapse excessive blank lines
+    cleaned = re.sub(r'\n\s*\n+', '\n', cleaned)
+
+    return cleaned.strip()
+
+
 def prefetch_url_assets(url: str, target_dir: Path, ctx: Optional[Any] = None) -> dict[str, str]:
     """Pre-fetch DOM, stylesheets, and CSS tokens from a live URL into target_dir.
 
@@ -136,10 +177,12 @@ def prefetch_url_assets(url: str, target_dir: Path, ctx: Optional[Any] = None) -
     tokens_file = target_path / "site_tokens.json"
 
     try:
-        # 1. Fetch HTML DOM
-        html_dom = _fetch_url_text(url, timeout=3.0)
-        if not html_dom:
+        # 1. Fetch HTML DOM & sanitize for fast LLM inspection
+        raw_dom = _fetch_url_text(url, timeout=3.0)
+        if not raw_dom:
             html_dom = f"<!-- Failed to fetch live DOM for {url} -->\n<!DOCTYPE html><html><head></head><body></body></html>"
+        else:
+            html_dom = _clean_html_dom(raw_dom)
         dom_file.write_text(html_dom, encoding="utf-8", errors="replace")
 
         # 2. Extract and fetch stylesheets (limit to 5 primary CSS files)

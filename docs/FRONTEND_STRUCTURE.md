@@ -23,29 +23,51 @@ The ZEZO frontend is a high-performance, dark cyberpunk single-page application 
 
 ## 📐 2. Application Layout Structure (`frontend/src/App.tsx`)
 
-The root `App.tsx` controls global telemetry, active modals, WebSocket streaming, and master view switching.
-
-### Master View Switching:
-The navigation header provides tabs to transition across operational interfaces:
-1. **Tactical View (`activeTab === 'tactical'`):** 3-panel command dashboard featuring hardware telemetry, holographic avatar visualizer, live execution canvas, and real-time Assistant-UI chat stream.
-2. **Office View (`activeTab === 'office'`):** Autonomous 2D pixel Scranton Office screen displaying specialist agent desks, monitor screens, sprite states, and 1-on-1 direct chat channels.
-3. **Workflow View (`activeTab === 'workflow'`):** Interactive node-based agent pipeline execution builder.
+The root `App.tsx` controls global telemetry, active modals, WebSocket streaming, and master view switching using ZEZO's signature dashboard layout:
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            HEADER (Header.tsx)                              │
-│  [⚙ SETTINGS] [⧉ LOGS] [⊞ TASKS] [📱 REMOTE]   [TACTICAL | OFFICE | WORKFLOW]│
-├───────────────────┬─────────────────────────────────────┬───────────────────┤
-│                   │      CENTER COLUMN                  │                   │
-│   LEFT TELEMETRY  │  ┌───────────────────────────────┐  │   RIGHT ACTIVITY  │
-│   System metrics, │  │   HOLOGRAPHIC AVATAR          │  │   STREAM          │
-│   CPU/RAM/GPU/Net │  │   (QiviAvatarVisualizer.tsx)  │  │   (ZezoChatThread)│
-│   Gauges, Ingestion│ ├───────────────────────────────┤  │   Spoken turns,   │
-│                   │  │   LIVE DISPLAY CANVAS         │  │   Tool executions,│
-│                   │  │   (CanvasView.tsx)            │  │   Reasoning steps │
-│                   │  └───────────────────────────────┘  │                   │
-└───────────────────┴─────────────────────────────────────┴───────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ── LEFT POWER SIDEBAR (w-56) ── │ ── TOP HEADER (h-12) ─────────────────────────────────── │
+│                                 │  ● Ready     Home / "Active Session" ▾   [ 💬 Chat | 🎙️ Live ] [+ New]│
+│  ZEZO OS                        ├───────────────────────────────────────────────────────────┤
+│  Hamza Bukhari                  │ ── ADAPTIVE MAIN CANVAS ───────────────────────────────── │
+│                                 │                                                           │
+│  [🏠 HOME]      (activeTab)     │  [ Chat Mode ]                                            │
+│  [👥 AGENTS]                    │  • Full-width Assistant-UI conversational workspace        │
+│  [⚡ WORKFLOW]                  │  • Single-row bottom pill composer dock                  │
+│                                 │  • File attachment [📎] & Web Speech dictation [🎙️]       │
+│  ── WORKSPACE ──                │  • Stop / Send controls                                   │
+│  [📋 Tasks]       [Running]     │                                                           │
+│  [📜 Logs]           [Live]     │  — OR —                                                   │
+│  [📱 Remote]           [QR]     │                                                           │
+│                                 │  [ Live Voice Mode ]                                      │
+│  ── FOOTER ──                   │  • Centered 3D particle companion avatar (Qivi WebGL)     │
+│  [⚙️ Settings]   [🌓 Theme]     │  • State badge: [ ● LISTENING ] + Equalizer waveform      │
+│  ● Connected · v0.61            │  • Real-time Live Subtitle Stream (You / ZEZO turns)      │
+│                                 │  • 4 Control buttons: [ 🎙️ MUTE | 🔊 SPK | ⏹ STOP | ⏻ OFF ]│
+└─────────────────────────────────┴───────────────────────────────────────────────────────────┘
 ```
+
+### 1. Left Power Sidebar (`w-56`)
+- **Primary Navigation**: Seamlessly toggles the root operational view:
+  - `HOME` (`activeTab === 'tactical'`): Enters the primary conversational / voice workspace.
+  - `AGENTS` (`activeTab === 'office'`): Scranton Office 2D pixel desk simulation.
+  - `WORKFLOW` (`activeTab === 'workflow'`): Node-based agent pipeline execution builder.
+- **Workspace Utilities**: Direct access buttons for system inspection dialogs without cluttering the canvas:
+  - `[Tasks]`: Opens `TaskManagerModal` with a live running tasks counter badge.
+  - `[Logs]`: Opens `BackendLogModal` with a live stream badge.
+  - `[Remote]`: Opens `MobileRemoteModal` with QR tunnel pairing.
+- **Footer**: `SettingsModal` trigger, theme mode switcher (`light` / `dark`), and connection health status indicator.
+
+### 2. Top Header (`h-12`)
+- **System Readiness**: Ambient pulsing status beacon (`● Ready`).
+- **Interactive Session Dropdown**: Breadcrumb navigation (`Home / "Active Session" ▾`) providing quick switching between active chats and history search.
+- **Segmented Operational Mode Pill**: Smoothly toggles between `[ 💬 Chat | 🎙️ Live ]` modes.
+- **Action Button**: `+ New chat` to reset thread state and initiate a clean conversation.
+
+### 3. Dual-Mode Adaptive Canvas
+- **Chat Mode (`operationalMode === 'chat'`)**: Distraction-free conversational view powered by `@assistant-ui/react`. Features auto-scrolling message bubbles, markdown code rendering, file attachment chips, and Web Speech API voice dictation directly into the pill composer without triggering speech synthesis.
+- **Live Voice Mode (`operationalMode === 'live'`)**: Immersive companion interface centered on the 3D WebGL point-cloud avatar (`QiviAvatarVisualizer`), an audio-reactive equalizer soundwave, real-time live transcription stream for user and assistant speech turns, and the 4-button hardware control cluster (`MUTE`, `SPEAKER`, `STOP`, `OFF`).
 
 ---
 

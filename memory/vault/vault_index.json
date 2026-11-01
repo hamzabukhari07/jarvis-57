@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "notes": {
+    "conv_20261029_021431.md": {
+      "id": "conv_20261029_021431",
+      "file": "conv_20261029_021431.md",
+      "title": "A Ver",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 45,
+      "updated": "2026-10-29",
+      "snippet": "Live interaction recorded on **2026-10-29 02:16:39** (45 total turns).",
+      "size": 985,
+      "_mtime": 1793566257.8849547
+    },
+    "conv_20261029_202119.md": {
+      "id": "conv_20261029_202119",
+      "file": "conv_20261029_202119.md",
+      "title": "As Is Always",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 11,
+      "updated": "2026-10-29",
+      "snippet": "Live interaction recorded on **2026-10-29 20:23:06** (11 total turns).",
+      "size": 1161,
+      "_mtime": 1793566257.8834012
+    },
+    "conv_20261030_124144.md": {
+      "id": "conv_20261030_124144",
+      "file": "conv_20261030_124144.md",
+      "title": "Session 20261030",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 2,
+      "updated": "2026-10-30",
+      "snippet": "Live interaction recorded on **2026-10-30 12:57:23** (2 total turns).",
+      "size": 608,
+      "_mtime": 1793566257.8818107
+    },
+    "conv_20261030_165128.md": {
+      "id": "conv_20261030_165128",
+      "file": "conv_20261030_165128.md",
+      "title": "Lesigenza",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 25,
+      "updated": "2026-10-30",
+      "snippet": "Live interaction recorded on **2026-10-30 16:51:56** (25 total turns).",
+      "size": 1371,
+      "_mtime": 1793566257.8808072
+    },
+    "conv_20261030_175809.md": {
+      "id": "conv_20261030_175809",
+      "file": "conv_20261030_175809.md",
+      "title": "Ake This Link And Give Me",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 27,
+      "updated": "2026-10-30",
+      "snippet": "Live interaction recorded on **2026-10-30 17:58:41** (27 total turns).",
+      "size": 1218,
+      "_mtime": 1793566257.8792853
+    },
+    "conv_20261030_182217.md": {
+      "id": "conv_20261030_182217",
+      "file": "conv_20261030_182217.md",
+      "title": "Take This Link And Give Me",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 16,
+      "updated": "2026-10-30",
+      "snippet": "Live interaction recorded on **2026-10-30 18:22:40** (16 total turns).",
+      "size": 1355,
+      "_mtime": 1793566257.8772845
+    },
+    "conv_20261102_014341.md": {
+      "id": "conv_20261102_014341",
+      "file": "conv_20261102_014341.md",
+      "title": "How Are You Jesus",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 7,
+      "updated": "2026-11-02",
+      "snippet": "Live interaction recorded on **2026-11-02 01:48:44** (7 total turns).",
+      "size": 942,
+      "_mtime": 1793566257.876315
+    }
+  }
+}

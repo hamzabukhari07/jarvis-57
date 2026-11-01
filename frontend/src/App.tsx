@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useZezoSocket } from './hooks/useZezoSocket'
-import type { ZezoTelemetry } from './types/zezo'
 import { api } from './lib/api'
 import { SettingsModal } from './components/settings/SettingsModal'
 import { BackendLogModal } from './components/telemetry/BackendLogModal'
@@ -10,13 +9,10 @@ import { QiviAvatarVisualizer } from './components/canvas/QiviAvatarVisualizer'
 import { AutonomousOfficeScreen } from './components/office/AutonomousOfficeScreen'
 import { ClipPeekOverlay } from './components/clipboard/ClipPeekOverlay'
 
-import { Frame, FramePanel, FrameHeader, FrameTitle } from './components/reui/frame'
+import { Frame, FramePanel } from './components/reui/frame'
 import { Badge } from './components/reui/badge'
 import { ConfirmDialog } from './components/reui/confirm-dialog'
 import { Button } from './components/ui/button'
-import { Tabs, TabsList, TabsTrigger } from './components/ui/tabs'
-import { Progress } from './components/ui/progress'
-import { ScrollArea } from './components/ui/scroll-area'
 import { Separator } from './components/ui/separator'
 
 // Official Assistant-UI Components & Runtime
@@ -27,7 +23,6 @@ import { cn } from './lib/utils'
 import {
   Settings,
   Home,
-  Grid,
   Users,
   Mic,
   MicOff,
@@ -36,27 +31,17 @@ import {
   Sun,
   Copy,
   Check,
-  Trash2,
-  FolderOpen,
-  FileUp,
-  FileCode,
-  X,
-  Cpu,
-  HardDrive,
-  Activity,
-  Wifi,
-  Sparkles,
   Layers,
   Terminal,
   QrCode,
   Volume2,
   VolumeX,
   Power,
-  Loader2,
-  CheckCircle2,
-  Clock,
   GitBranch,
-  AlertCircle,
+  MessageSquare,
+  Radio,
+  ChevronDown,
+  Plus,
 } from 'lucide-react'
 
 export default function App() {
@@ -71,8 +56,6 @@ export default function App() {
     remoteGateway,
     isConnected,
     transcriptStream,
-    canvasContent: liveCanvas,
-    telemetry: liveTelemetry,
     tasks: liveTasks,
     activeAttachments,
     currentView,
@@ -85,7 +68,6 @@ export default function App() {
     sendWakeToggle,
     sendPttToggle,
     sendPayloadRemove,
-    sendPayloadClear,
     sendConfirmationResolve,
     clearLogs,
     cancelTask,
@@ -93,11 +75,6 @@ export default function App() {
     requestRemoteKey,
   } = useZezoSocket()
 
-  const [telemetry, setTelemetry] = useState<ZezoTelemetry>({
-    cpu_percent: 0,
-    ram_percent: 0,
-    gpu_percent: 0,
-  })
   const [tasks, setTasks] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'tactical' | 'office' | 'workflow'>('tactical')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -105,17 +82,32 @@ export default function App() {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [isMobileRemoteOpen, setIsMobileRemoteOpen] = useState(false)
-  const [canvasContent, setCanvasContent] = useState<string>('')
   const [isMicMuted, setIsMicMuted] = useState(false)
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false)
   const [isSleeping, setIsSleeping] = useState(false)
-  const [canvasHeight, setCanvasHeight] = useState<number>(170)
-  const [isDraggingCanvas, setIsDraggingCanvas] = useState(false)
-  const dragStartRef = useRef<{ startY: number; startHeight: number } | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; size: string; type: string; path?: string }>>([])
-  const [isDraggingOver, setIsDraggingOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
+
+  // Signature Home Layout States (Chat vs Live Mode + Interactive Session Breadcrumbs)
+  const [operationalMode, setOperationalMode] = useState<'chat' | 'live'>('chat')
+  const [sessionTitle, setSessionTitle] = useState<string>(() => {
+    return localStorage.getItem('zezo_active_session_title') || 'Main Directive'
+  })
+  const [isSessionDropdownOpen, setIsSessionDropdownOpen] = useState(false)
+  const sessionDropdownRef = useRef<HTMLDivElement>(null)
+  const [savedSessions, setSavedSessions] = useState<{ id: string; title: string; date: string }[]>(() => {
+    try {
+      const stored = localStorage.getItem('zezo_saved_sessions')
+      return stored ? JSON.parse(stored) : [
+        { id: 'sess-1', title: 'Main Directive', date: 'Today' },
+      ]
+    } catch {
+      return [{ id: 'sess-1', title: 'Main Directive', date: 'Today' }]
+    }
+  })
+  const [isDictating, setIsDictating] = useState(false)
+  const recognitionRef = useRef<any>(null)
 
   const effectiveSystemState = systemState
   const effectiveAudioLevel = audioLevel || micLevel
@@ -135,24 +127,6 @@ export default function App() {
       setActiveTab(currentView === 'office' ? 'office' : 'tactical')
     }
   }, [currentView])
-
-  // Sync real-time canvas output from autonomous agent executions
-  useEffect(() => {
-    if (liveCanvas?.text) {
-      setCanvasContent(liveCanvas.text)
-    }
-  }, [liveCanvas])
-
-  // Sync real-time machine telemetry from live WebSocket broadcast
-  useEffect(() => {
-    if (isConnected) {
-      setTelemetry({
-        cpu_percent: liveTelemetry.cpu || 0,
-        ram_percent: liveTelemetry.mem || 0,
-        gpu_percent: liveTelemetry.gpu || 0,
-      })
-    }
-  }, [liveTelemetry, isConnected])
 
   // Sync background tasks from live WebSocket broadcast
   useEffect(() => {
@@ -279,34 +253,6 @@ export default function App() {
     }
   }, [activeAttachments])
 
-  // Native folder picker that avoids byte upload & freeze
-  const handleChooseFolderClick = async () => {
-    try {
-      const res = await api.pickWorkspaceFolder()
-      if (res && res.status === 'success' && res.folder) {
-        const item = res.folder
-        const newEntry = {
-          name: item.name,
-          size: typeof item.size === 'number' ? `${(item.size / 1024).toFixed(1)} KB` : (item.size || '0 KB'),
-          type: 'FOLDER' as const,
-          path: item.path,
-        }
-        setUploadedFiles((prev) => {
-          const existingKeys = new Set(prev.map((f) => (f.path || f.name).toLowerCase()))
-          if (existingKeys.has((newEntry.path || newEntry.name).toLowerCase())) return prev
-          return [newEntry, ...prev]
-        })
-        return
-      }
-      if (res && (res.status === 'canceled' || res.cancelled)) {
-        return
-      }
-    } catch (err) {
-      console.warn('Native folder picker fallback to web input:', err)
-    }
-    folderInputRef.current?.click()
-  }
-
   // Real file upload pipeline to ZEZO backend (/api/upload)
   const handleFileUpload = async (files: FileList | File[]) => {
     if (!files || files.length === 0) return
@@ -357,11 +303,6 @@ export default function App() {
     setUploadedFiles((prev) => prev.filter((_, idx) => idx !== index))
   }
 
-  const handleClearAllFiles = () => {
-    sendPayloadClear()
-    setUploadedFiles([])
-  }
-
   // Assistant-UI Runtime Configuration for Live Realtime Voice & Directive Transcription
   const convertMessage = useCallback((m: ChatTurn) => ({
     id: m.id,
@@ -390,41 +331,6 @@ export default function App() {
     convertMessage,
     onNew: handleNewAssistantMessage,
   })
-
-  // Drag-to-resize canvas height (Buttery-smooth 60-120fps with absolute coordinate deltas)
-  useEffect(() => {
-    if (!isDraggingCanvas) return
-
-    // Prevent text selection and lock cursor during rapid drag sweeps
-    const originalUserSelect = document.body.style.userSelect
-    const originalCursor = document.body.style.cursor
-    document.body.style.userSelect = 'none'
-    document.body.style.cursor = 'row-resize'
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!dragStartRef.current) return
-      // As mouse moves up (smaller clientY), canvas height increases
-      const deltaY = dragStartRef.current.startY - e.clientY
-      const targetHeight = dragStartRef.current.startHeight + deltaY
-      setCanvasHeight(Math.min(600, Math.max(120, targetHeight)))
-    }
-
-    const handleMouseUp = () => {
-      setIsDraggingCanvas(false)
-      dragStartRef.current = null
-    }
-
-    window.addEventListener('mousemove', handleMouseMove, { passive: true })
-    window.addEventListener('mouseup', handleMouseUp)
-    return () => {
-      document.body.style.userSelect = originalUserSelect
-      document.body.style.cursor = originalCursor
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isDraggingCanvas])
-
-  // Real-time Clock removed per user request
 
   const [currentTheme, setCurrentTheme] = useState(() => localStorage.getItem('zezo_theme') || 'copper')
   const isLightMode = currentTheme.endsWith('-light') || currentTheme === 'light'
@@ -490,13 +396,9 @@ export default function App() {
     }
   }, [])
 
-  // Poll Telemetry & Tasks (preserves design preview if backend is not running)
+  // Poll Tasks for Sidebar Matrix badge
   useEffect(() => {
     const poll = async () => {
-      try {
-        const status = await api.getSystemStatus()
-        if (status && (status.cpu_percent || status.ram_percent)) setTelemetry(status)
-      } catch { }
       try {
         const res = await fetch('/api/tasks')
         if (res.ok) {
@@ -512,7 +414,6 @@ export default function App() {
 
   const handleEmergencyStop = () => {
     sendInterrupt()
-    setCanvasContent((prev) => prev + '\n\n// [HALTED] Execution interrupted by user directive.')
   }
 
   const handleToggleMic = () => {
@@ -561,687 +462,579 @@ export default function App() {
     setTimeout(() => setIsChatCopied(false), 2000)
   }
 
+  // Session handling
+  const handleNewChat = () => {
+    const newId = `sess-${Date.now()}`
+    const newTitle = 'New Directive'
+    setSessionTitle(newTitle)
+    localStorage.setItem('zezo_active_session_title', newTitle)
+    setChatMessages([
+      {
+        id: `init-${Date.now()}`,
+        role: 'assistant',
+        text: 'ZEZO online. How can I assist you?',
+        createdAt: new Date(),
+      },
+    ])
+    setSavedSessions((prev) => {
+      const next = [{ id: newId, title: newTitle, date: 'Just now' }, ...prev.slice(0, 8)]
+      localStorage.setItem('zezo_saved_sessions', JSON.stringify(next))
+      return next
+    })
+    setIsSessionDropdownOpen(false)
+  }
+
+  const handleSelectSession = (s: { id: string; title: string }) => {
+    setSessionTitle(s.title)
+    localStorage.setItem('zezo_active_session_title', s.title)
+    setIsSessionDropdownOpen(false)
+  }
+
+  // Outside click listener for session dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (sessionDropdownRef.current && !sessionDropdownRef.current.contains(e.target as Node)) {
+        setIsSessionDropdownOpen(false)
+      }
+    }
+    if (isSessionDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isSessionDropdownOpen])
+
+  // Voice Dictation in Chat Mode (Speech-to-Text directly into Composer)
+  const handleToggleDictate = () => {
+    if (isDictating) {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop() } catch {}
+      }
+      setIsDictating(false)
+      return
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      console.warn('Web Speech API not supported in this browser')
+      return
+    }
+
+    try {
+      const recognition = new SpeechRecognition()
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = 'en-US'
+
+      recognition.onstart = () => setIsDictating(true)
+      recognition.onerror = () => setIsDictating(false)
+      recognition.onend = () => setIsDictating(false)
+
+      recognition.onresult = (event: any) => {
+        let transcript = ''
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          transcript += event.results[i][0].transcript
+        }
+        if (transcript) {
+          const inputEl = document.querySelector('[data-slot="aui-composer-input"]') as HTMLTextAreaElement | null
+          if (inputEl) {
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set
+            if (nativeInputValueSetter) {
+              nativeInputValueSetter.call(inputEl, transcript)
+            } else {
+              inputEl.value = transcript
+            }
+            inputEl.dispatchEvent(new Event('input', { bubbles: true }))
+          }
+        }
+      }
+
+      recognitionRef.current = recognition
+      recognition.start()
+    } catch (err) {
+      console.warn('Speech recognition start failed:', err)
+      setIsDictating(false)
+    }
+  }
+
+  // Parent task metrics for sidebar
+  const parentTasks = tasks.filter((t) => !t.parent_id)
+  const runningTasksCount = parentTasks.filter((t) => {
+    const s = (t.status || '').toUpperCase()
+    return s === 'RUNNING' || s === 'IN_PROGRESS' || s === 'PROCESSING'
+  }).length
+
+  // Subtitles for Live Voice Mode
+  const latestUserMessage = [...chatMessages].reverse().find((m) => m.role === 'user')
+  const latestAssistantMessage = [...chatMessages].reverse().find((m) => m.role === 'assistant')
+
 
 
   return (
-    <div className="flex flex-col w-screen h-screen bg-[var(--background)] text-[var(--foreground)] overflow-hidden font-sans select-none antialiased">
-      {/* ── 1. ReUI Top Application Shell Bar ── */}
-      <header className="h-12 border-b border-[var(--border)] bg-[var(--card)]/90 backdrop-blur-md px-2 sm:px-4 flex items-center justify-between z-40 shrink-0 select-none gap-1 sm:gap-2">
-        {/* Left: Section Actions */}
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsSettingsOpen(true)}
-            title="System & Pipeline Settings"
-            className="h-8 w-8 p-0 shrink-0"
-          >
-            <Settings className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsLogModalOpen(true)}
-            title="Backend Log Console (Ctrl+L)"
-            className="h-8 w-8 p-0 shrink-0 hidden sm:inline-flex"
-          >
-            <Terminal className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setSelectedTaskId(null)
-              setIsTaskModalOpen(true)
-            }}
-            title="Task Matrix & Registry"
-            className="h-8 w-8 p-0 shrink-0 hidden sm:inline-flex"
-          >
-            <Layers className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsMobileRemoteOpen(true)}
-            title="Mobile Remote Control & QR Pairing"
-            className="h-8 w-8 p-0 shrink-0 hidden sm:inline-flex"
-          >
-            <QrCode className="w-4 h-4" />
-          </Button>
+    <div className="flex w-screen h-screen bg-[var(--background)] text-[var(--foreground)] overflow-hidden font-sans select-none antialiased">
+      {/* Hidden Native File & Directory Inputs */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files) handleFileUpload(e.target.files)
+        }}
+      />
+      <input
+        ref={folderInputRef}
+        type="file"
+        // @ts-ignore
+        webkitdirectory=""
+        directory=""
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files) handleFileUpload(e.target.files)
+        }}
+      />
 
-          <Separator orientation="vertical" className="h-4 mx-0.5 sm:mx-1 bg-[var(--border)] hidden sm:block" />
-
-          {/* 100% Official ReUI Tabs Component */}
-          <Tabs
-            value={activeTab}
-            onValueChange={(val) => setActiveTab(val as 'tactical' | 'office' | 'workflow')}
-          >
-            <TabsList className="h-8 p-0.5 bg-[var(--input)]/80 border border-[var(--border)] shadow-2xs">
-              <TabsTrigger
-                value="tactical"
-                className="h-7 px-2.5 sm:px-3 text-xs font-semibold tracking-wider gap-1 sm:gap-1.5 data-[state=active]:bg-[var(--primary)] data-[state=active]:text-[var(--primary-foreground)]"
-                title="Tactical Dashboard & Realtime Telemetry"
-              >
-                <Home className="w-3.5 h-3.5" />
-                <span className="text-[11px] sm:text-xs">HOME</span>
-              </TabsTrigger>
-
-              <TabsTrigger
-                value="office"
-                className="h-7 px-2.5 sm:px-3 text-xs font-semibold tracking-wider gap-1 sm:gap-1.5 data-[state=active]:bg-[var(--primary)] data-[state=active]:text-[var(--primary-foreground)]"
-                title="Autonomous Agents & Office Fleet"
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span className="text-[11px] sm:text-xs">AGENTS</span>
-              </TabsTrigger>
-
-              <TabsTrigger
-                value="workflow"
-                className="h-7 px-2.5 sm:px-3 text-xs font-semibold tracking-wider gap-1 sm:gap-1.5 data-[state=active]:bg-[var(--primary)] data-[state=active]:text-[var(--primary-foreground)]"
-                title="Workflow Automation & Pipelines"
-              >
-                <GitBranch className="w-3.5 h-3.5" />
-                <span className="text-[11px] sm:text-xs">WORKFLOW</span>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-
-
-        {/* Right: Quick Light/Dark Toggle & Real-time Telemetry & Clock */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-          <div className="flex items-center bg-[var(--input)] border border-[var(--border)] rounded-xl p-0.5">
-            <button
-              type="button"
-              onClick={handleToggleThemeMode}
-              className={cn(
-                "flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer",
-                isLightMode
-                  ? "bg-[var(--card)] text-[var(--foreground)] font-semibold"
-                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-              )}
-              title="Light Mode"
-            >
-              <Sun className="w-3.5 h-3.5 text-[var(--foreground)]" />
-              <span className="hidden sm:inline">Light</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleToggleThemeMode}
-              className={cn(
-                "flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer",
-                !isLightMode
-                  ? "bg-[var(--card)] text-[var(--foreground)] font-semibold"
-                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-              )}
-              title="Dark Mode"
-            >
-              <Moon className="w-3.5 h-3.5 text-[var(--foreground)]" />
-              <span className="hidden sm:inline">Dark</span>
-            </button>
+      {/* ── 1. LEFT POWER SIDEBAR (Option B Signature Navigation) ── */}
+      <aside className="w-56 h-full border-r border-[var(--border)] bg-[var(--card)]/90 backdrop-blur-md flex flex-col justify-between p-3 select-none shrink-0 z-30">
+        <div className="flex flex-col gap-4">
+          {/* Brand & Lead Title */}
+          <div className="flex items-center gap-2.5 px-2 py-1">
+            <img
+              src="/logo.png"
+              alt="ZEZO Logo"
+              className="w-8 h-8 rounded-lg object-contain shrink-0 border border-[var(--border)] shadow-xs bg-black"
+            />
+            <span className="font-bold text-base tracking-wider text-[var(--foreground)] truncate">ZEZO</span>
           </div>
-        </div>
-      </header>
 
-      {/* ── 2. TACTICAL DASHBOARD VIEW (Desktop 3-Column Layout Preserved Uniformly) ── */}
-      {activeTab === 'tactical' && (
-        <main className="flex-1 min-h-0 h-[calc(100vh-48px)] max-h-[calc(100vh-48px)] grid grid-cols-[clamp(260px,22vw,285px)_1fr_clamp(300px,26vw,345px)] gap-2 p-2 overflow-hidden bg-[var(--background)]">
-
-          {/* ── LEFT PANEL: Telemetry & Task Queue ── */}
-          <aside className="flex flex-col gap-2 min-w-0 h-full min-h-0 overflow-hidden order-1">
-            {/* System Frame */}
-            <Frame spacing="xs" className="shrink-0">
-              <FramePanel className="p-3">
-                <FrameHeader className="p-0 pb-2.5">
-                  <div className="flex items-center justify-between">
-                    <FrameTitle className="text-[11px] font-semibold text-[var(--foreground)]">System</FrameTitle>
-                    <Badge variant={isConnected ? "success" : "secondary"} size="xs">
-                      {isConnected ? "LIVE" : "DISCONNECTED"}
-                    </Badge>
-                  </div>
-                </FrameHeader>
-
-                <div className="grid grid-cols-2 gap-2 mt-1">
-                  {/* CPU */}
-                  <div className="p-2.5 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] bg-[var(--input)]/60 border border-[var(--border)] shadow-2xs flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-[10px] text-[var(--muted-foreground)] font-mono">
-                      <span>CPU LOAD</span>
-                      <Cpu className="w-3 h-3 text-[var(--muted-foreground)]" />
-                    </div>
-                    <div className="text-base font-semibold text-[var(--foreground)] my-1 font-mono truncate">
-                      {Math.round(telemetry.cpu_percent)}%
-                    </div>
-                    <Progress value={telemetry.cpu_percent} />
-                  </div>
-
-                  {/* RAM */}
-                  <div className="p-2.5 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] bg-[var(--input)]/60 border border-[var(--border)] shadow-2xs flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-[10px] text-[var(--muted-foreground)] font-mono">
-                      <span>RAM USAGE</span>
-                      <HardDrive className="w-3 h-3 text-[var(--muted-foreground)]" />
-                    </div>
-                    <div className="text-base font-semibold text-[var(--foreground)] my-1 font-mono truncate">
-                      {Math.round(telemetry.ram_percent)}%
-                    </div>
-                    <Progress value={telemetry.ram_percent} />
-                  </div>
-
-                  {/* GPU */}
-                  <div className="p-2.5 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] bg-[var(--input)]/60 border border-[var(--border)] shadow-2xs flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-[10px] text-[var(--muted-foreground)] font-mono">
-                      <span>GPU LOAD</span>
-                      <Activity className="w-3 h-3 text-[var(--muted-foreground)]" />
-                    </div>
-                    <div className="text-base font-semibold text-[var(--foreground)] my-1 font-mono truncate">
-                      {telemetry.gpu_percent !== undefined ? `${Math.round(telemetry.gpu_percent)}%` : '0%'}
-                    </div>
-                    <Progress value={telemetry.gpu_percent || 0} />
-                  </div>
-
-                  {/* Network */}
-                  <div className="p-2.5 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] bg-[var(--input)]/60 border border-[var(--border)] shadow-2xs flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-[10px] text-[var(--muted-foreground)] font-mono">
-                      <span>NETWORK</span>
-                      <Wifi className="w-3 h-3 text-[var(--muted-foreground)]" />
-                    </div>
-                    <div className="text-base font-semibold text-[var(--foreground)] my-1 font-mono truncate">
-                      {!isConnected
-                        ? 'OFFLINE'
-                        : liveTelemetry.net >= 1.0
-                          ? `${liveTelemetry.net.toFixed(1)} MB/s`
-                          : liveTelemetry.net > 0.001
-                            ? `${Math.round(liveTelemetry.net * 1024)} KB/s`
-                            : 'ONLINE'}
-                    </div>
-                    <Progress
-                      value={
-                        !isConnected
-                          ? 0
-                          : liveTelemetry.net > 0
-                            ? Math.min(100, Math.max(12, Math.round(liveTelemetry.net * 20)))
-                            : 100
-                      }
-                    />
-                  </div>
-                </div>
-              </FramePanel>
-            </Frame>
-
-            {/* Tasks Frame */}
-            <Frame spacing="xs" className="flex-1 min-h-0 flex flex-col overflow-hidden">
-              <FramePanel className="p-3 flex flex-col h-full min-h-0 overflow-hidden">
-                <FrameHeader className="p-0 pb-2 shrink-0">
-                  <div className="flex items-center justify-between">
-                    <FrameTitle className="text-[11px] font-semibold text-[var(--foreground)]">Tasks</FrameTitle>
-                    {(() => {
-                      // Filter out child tasks (subtasks) for display in main list
-                      const parentTasks = tasks.filter((t) => !t.parent_id)
-                      const activeCount = parentTasks.filter((t) => {
-                        const s = (t.status || '').toUpperCase()
-                        return s === 'RUNNING' || s === 'IN_PROGRESS'
-                      }).length
-                      return (
-                        <Badge
-                          variant={activeCount > 0 ? "running" : parentTasks.length > 0 ? "success" : "secondary"}
-                          size="xs"
-                        >
-                          {activeCount > 0 ? `${activeCount} ACTIVE` : parentTasks.length > 0 ? 'ALL DONE' : '0 ACTIVE'}
-                        </Badge>
-                      )
-                    })()}
-                  </div>
-                </FrameHeader>
-
-                <ScrollArea className="flex-1 [&>[data-radix-scroll-area-viewport]]:p-0.5">
-                  {tasks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-center text-[var(--muted-foreground)] py-12">
-                      <Grid className="w-8 h-8 text-[var(--muted-foreground)] opacity-30 mb-2" />
-                      <div className="text-xs font-semibold text-[var(--foreground)]">No Active Tasks</div>
-                      <div className="text-[10px] font-mono text-[var(--muted-foreground)] mt-1 max-w-[210px] leading-relaxed">
-                        Tasks dispatched via voice or prompt will appear here.
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 pr-1.5 mr-0.5 min-w-0">
-                      {/* Filter out child tasks (subtasks) - they appear nested in TaskManagerModal */}
-                      {tasks.filter((t) => !t.parent_id).map((t, idx) => {
-                        const status = (t.status || 'QUEUED').toUpperCase()
-                        const isRunning = status === 'IN_PROGRESS' || status === 'RUNNING'
-                        const isDone = status === 'COMPLETED' || status === 'SUCCESS' || status === 'DONE'
-                        const isCancelled = status === 'CANCELLED'
-                        const isFailed = status === 'FAILED'
-
-                        const badgeVariant = isRunning
-                          ? 'running'
-                          : isDone
-                            ? 'success'
-                            : isCancelled || isFailed
-                              ? 'destructive'
-                              : 'queued'
-
-                        const displayTitle = t.prompt || t.group_title || t.params?.taskTitle || t.params?.task || t.params?.target || t.message || t.id
-
-                        return (
-                          <div
-                            key={idx}
-                            onClick={() => {
-                              setSelectedTaskId(t.id)
-                              setIsTaskModalOpen(true)
-                            }}
-                            className="p-2.5 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] bg-[var(--input)]/60 border border-[var(--border)] hover:border-[var(--primary)] hover:bg-[var(--card)]/90 transition-all cursor-pointer select-none flex flex-col gap-1.5 shadow-2xs min-w-0 w-full overflow-hidden"
-                          >
-                            {/* Task Description */}
-                            <div className="font-medium text-[var(--foreground)] text-xs leading-snug line-clamp-2 break-words min-w-0 select-text" title={displayTitle}>
-                              {displayTitle}
-                            </div>
-                            {t.message && t.message !== displayTitle && (
-                              <div className="text-[11px] text-[var(--muted-foreground)] font-mono leading-tight truncate min-w-0">
-                                {t.message}
-                              </div>
-                            )}
-
-                            {/* Status Tag Badge + Progress Details */}
-                            <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-[var(--border)]/40 min-w-0">
-                              <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-hidden">
-                                <Badge
-                                  variant={badgeVariant}
-                                  size="xs"
-                                  radius="default"
-                                  className={`gap-1 font-semibold shrink-0 ${
-                                    isDone
-                                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                                      : isCancelled || isFailed
-                                        ? 'bg-red-500/20 text-red-400 border-red-500/40'
-                                        : ''
-                                  }`}
-                                >
-                                  {isRunning && <Loader2 className="w-2.5 h-2.5 animate-spin text-[var(--primary)]" />}
-                                  {isDone && <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />}
-                                  {(isCancelled || isFailed) && <AlertCircle className="w-2.5 h-2.5 text-red-400" />}
-                                  {!isRunning && !isDone && !isCancelled && !isFailed && <Clock className="w-2.5 h-2.5 text-[var(--muted-foreground)]" />}
-                                  <span>{isRunning ? 'RUNNING' : status}</span>
-                                </Badge>
-                                <span className="text-[9px] font-mono text-[var(--muted-foreground)] uppercase truncate" title={t.id}>
-                                  {t.id}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className="text-[10px] font-mono font-semibold text-[var(--foreground)] tabular-nums">
-                                  {Math.round(t.progress || 0)}%
-                                </span>
-                                <div className="w-10 h-1.5 bg-[var(--card)] rounded-full overflow-hidden border border-[var(--border)]/30 shrink-0">
-                                  <div
-                                    className={`h-full transition-all duration-300 ${
-                                      isRunning
-                                        ? 'bg-[var(--primary)] animate-pulse'
-                                        : isDone
-                                          ? 'bg-emerald-500'
-                                          : isCancelled || isFailed
-                                            ? 'bg-red-500/60'
-                                            : 'bg-[var(--muted)]'
-                                    }`}
-                                    style={{ width: `${Math.min(100, Math.max(0, Math.round(t.progress || 0)))}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </ScrollArea>
-              </FramePanel>
-            </Frame>
-          </aside>
-
-          {/* ── CENTER PANEL: Hologram Neural Orb + Display Canvas ── */}
-          <section className="flex flex-col min-w-0 h-full min-h-0 overflow-hidden order-2">
-            {/* Hologram & Fluid Vortex Avatar Frame */}
-            <Frame spacing="xs" className="flex-1 min-h-0 mb-0 flex flex-col overflow-hidden">
-              <FramePanel className="p-3 flex flex-col justify-end items-center text-center relative overflow-hidden h-full">
-
-                {/* 3D Qivi Particle Companion Avatar */}
-                <div
-                  className={`absolute inset-0 flex items-center justify-center z-10 ${
-                    isAnyModalOpen ? 'invisible opacity-0 pointer-events-none' : 'visible opacity-100'
-                  }`}
-                  id="vortex-gif"
-                >
-                  {!isAnyModalOpen && (
-                    <QiviAvatarVisualizer
-                      systemState={effectiveSystemState}
-                      audioLevel={effectiveAudioLevel}
-                      isSleeping={isSleeping}
-                      isMicMuted={isMicMuted}
-                    />
-                  )}
-                </div>
-
-                {/* Bottom Center Control & Status Cluster (Directly below avatar companion) */}
-                <div className="relative z-20 flex flex-col items-center gap-2.5 w-full max-w-md px-2 mb-2">
-                  {/* Minimalist Audio & State Equalizer Banner */}
-                  <div className="flex items-center gap-3 px-3.5 py-1 rounded-full bg-[var(--card)] border border-[var(--border)] shadow-xs">
-                    {/* State Indicator Dot & Name */}
-                    <div className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full transition-colors duration-150 ${
-                        effectiveSystemState === 'listening' ? 'bg-emerald-500 animate-pulse ring-2 ring-emerald-500/40' :
-                        effectiveSystemState === 'thinking' ? 'bg-amber-500 animate-pulse ring-2 ring-amber-500/40' :
-                        effectiveSystemState === 'speaking' ? 'bg-[var(--accent)] animate-pulse ring-2 ring-[var(--accent)]/40' :
-                        'bg-[var(--muted-foreground)]'
-                      }`} />
-                      <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--foreground)] font-semibold">
-                        {effectiveSystemState}
-                      </span>
-                    </div>
-
-                    {/* Equalizer Waveform Soundwave Bars (Only shown when speaking, not during listening) */}
-                    {effectiveSystemState === 'speaking' && (
-                      <div className="flex items-center gap-1 h-3.5 px-1.5 py-0.5 rounded-full bg-[var(--input)] border border-[var(--border)]/60">
-                        <div className="w-0.5 bg-emerald-400 rounded-full animate-soundwave-1" />
-                        <div className="w-0.5 bg-emerald-500 rounded-full animate-soundwave-2" />
-                        <div className="w-0.5 bg-cyan-400 rounded-full animate-soundwave-3" />
-                        <div className="w-0.5 bg-[var(--accent)] rounded-full animate-soundwave-4" />
-                        <div className="w-0.5 bg-amber-400 rounded-full animate-soundwave-5" />
-                        <div className="w-0.5 bg-emerald-400 rounded-full animate-soundwave-6" />
-                      </div>
-                    )}
-                  </div>
-
-
-
-                  {/* Avatar Command Buttons (MIC, SPEAKER, STOP, POWER/SLEEP) */}
-                  <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 max-w-full">
-                    {/* Mic Mute Toggle */}
-                    <Button
-                      variant={isMicMuted ? "destructive" : "outline"}
-                      size="sm"
-                      onClick={handleToggleMic}
-                      title={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
-                      className="h-7 px-2 sm:px-2.5 gap-1 text-xs font-medium shrink-0"
-                    >
-                      {isMicMuted ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3 text-primary" />}
-                      <span className="text-[10px] sm:text-[11px]">{isMicMuted ? 'UNMUTE' : 'MUTE'}</span>
-                    </Button>
-
-                    {/* Speaker Voice Output Mute (Deafen) Toggle */}
-                    <Button
-                      variant={isSpeakerMuted ? "destructive" : "outline"}
-                      size="sm"
-                      onClick={handleToggleSpeaker}
-                      title={isSpeakerMuted ? "Unmute Assistant Voice Output" : "Mute Assistant Voice Output (Deafen)"}
-                      className="h-7 px-2 sm:px-2.5 gap-1 text-xs font-medium shrink-0"
-                    >
-                      {isSpeakerMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3 text-primary" />}
-                      <span className="text-[10px] sm:text-[11px]">{isSpeakerMuted ? 'MUTED' : 'SPEAKER'}</span>
-                    </Button>
-
-                    {/* Emergency Stop */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleEmergencyStop}
-                      title="Emergency Stop (Interrupt Agent Execution)"
-                      className="h-7 px-2 sm:px-2.5 gap-1 text-xs font-medium hover:bg-destructive/15 hover:border-destructive/50 hover:text-destructive shrink-0"
-                    >
-                      <Square className="w-3 h-3 text-destructive" />
-                      <span className="text-[10px] sm:text-[11px]">STOP</span>
-                    </Button>
-
-                    {/* Power / Sleep Mode Toggle */}
-                    <Button
-                      variant={isSleeping ? "secondary" : "outline"}
-                      size="sm"
-                      onClick={handleToggleSleep}
-                      title={isSleeping ? "Wake Assistant (Resume Active Mode)" : "Put Assistant to Sleep (Standby Mode)"}
-                      className="h-7 px-2 sm:px-2.5 gap-1 text-xs font-medium shrink-0"
-                    >
-                      <Power className={`w-3.5 h-3.5 ${isSleeping ? 'text-amber-400' : 'text-emerald-500'}`} />
-                      <span className="text-[10px] sm:text-[11px]">{isSleeping ? 'ON' : 'OFF'}</span>
-                    </Button>
-                  </div>
-                </div>
-              </FramePanel>
-            </Frame>
-
-            {/* Sleek Low-Profile Splitter Bar (Desktop Only) */}
-            <div
-              onMouseDown={(e) => {
-                e.preventDefault()
-                dragStartRef.current = {
-                  startY: e.clientY,
-                  startHeight: canvasHeight,
-                }
-                setIsDraggingCanvas(true)
-              }}
-              title="Drag to resize Inspector panel / Double click to reset"
-              onDoubleClick={() => setCanvasHeight(240)}
-              className={`hidden lg:flex h-2 my-0.5 items-center justify-center cursor-row-resize select-none relative z-20 group transition-colors ${isDraggingCanvas ? 'bg-[var(--accent)]/20' : 'hover:bg-[var(--accent)]/10'
-                }`}
-            >
-              <div
-                className={`h-1 rounded-full transition-all duration-200 ${isDraggingCanvas
-                    ? 'w-16 bg-[var(--accent)] shadow-sm'
-                    : 'w-10 bg-[var(--border)] group-hover:w-14 group-hover:bg-[var(--accent)]'
-                  }`}
-              />
+          {/* Primary Navigation Tabs */}
+          <div className="flex flex-col gap-1">
+            <div className="text-[10px] font-mono font-medium text-[var(--muted-foreground)] uppercase tracking-wider px-2 py-1">
+              Navigation
             </div>
 
-            {/* LIVE DISPLAY CANVAS Frame (Dynamic Resizable Height on Desktop, Responsive on Tablet/Mobile) */}
-            <Frame
-              spacing="xs"
-              style={{ height: `${canvasHeight}px` }}
+            <button
+              type="button"
+              onClick={() => setActiveTab('tactical')}
               className={cn(
-                "shrink-0 overflow-hidden flex flex-col mt-0.5",
-                !isDraggingCanvas && "transition-[height] duration-150 ease-out"
+                "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer text-left",
+                activeTab === 'tactical'
+                  ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-2xs"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
               )}
             >
-              <FramePanel className="p-2.5 flex flex-col h-full min-h-0 overflow-hidden">
-                <FrameHeader className="p-0 pb-1.5 shrink-0">
-                  <div className="flex items-center justify-between">
-                    <FrameTitle className="text-[11px] font-semibold text-[var(--foreground)]">Live Output</FrameTitle>
-                    <div className="flex items-center gap-1.5">
-                      <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(canvasContent)} className="h-7 text-[11px] gap-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
-                        <Copy className="w-3 h-3" />
-                        <span>COPY</span>
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setCanvasContent('')} className="h-7 text-[11px] gap-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
-                        <Trash2 className="w-3 h-3" />
-                        <span>CLEAR</span>
-                      </Button>
-                    </div>
-                  </div>
-                </FrameHeader>
+              <Home className="w-4 h-4 shrink-0" />
+              <span>HOME</span>
+            </button>
 
-                <ScrollArea className="flex-1">
-                  {canvasContent ? (
-                    <div className="font-mono text-xs text-[var(--foreground)] whitespace-pre-wrap leading-relaxed pr-2">
-                      {canvasContent}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-center text-[var(--muted-foreground)] py-8">
-                      <Sparkles className="w-8 h-8 text-[var(--accent)] opacity-50 mb-2" />
-                      <div className="text-xs font-semibold text-[var(--foreground)]">Ready</div>
-                      <div className="text-[10px] font-mono text-[var(--muted-foreground)] mt-1 max-w-sm leading-relaxed">
-                        Live execution output streams here.
-                      </div>
-                    </div>
-                  )}
-                </ScrollArea>
-              </FramePanel>
-            </Frame>
-          </section>
+            <button
+              type="button"
+              onClick={() => setActiveTab('office')}
+              className={cn(
+                "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer text-left",
+                activeTab === 'office'
+                  ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-2xs"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
+              )}
+            >
+              <Users className="w-4 h-4 shrink-0" />
+              <span>AGENTS</span>
+            </button>
 
-          {/* ── RIGHT PANEL: Payload Ingestion & Activity Log ── */}
-          <aside className="flex flex-col gap-2 min-w-0 h-full min-h-0 overflow-hidden order-3">
-            {/* Uploads Frame */}
-            <Frame spacing="xs" className="shrink-0">
-              <FramePanel className="p-2.5">
-                <FrameHeader className="p-0 pb-1.5">
-                  <div className="flex items-center justify-between">
-                    <FrameTitle className="text-[11px] font-semibold text-[var(--foreground)]">Uploads</FrameTitle>
-                    {uploadedFiles.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleClearAllFiles}
-                        className="text-[10px] text-[var(--muted-foreground)] hover:text-red-400 transition-colors"
-                      >
-                        Clear ({uploadedFiles.length})
-                      </button>
-                    )}
-                  </div>
-                </FrameHeader>
+            <button
+              type="button"
+              onClick={() => setActiveTab('workflow')}
+              className={cn(
+                "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer text-left",
+                activeTab === 'workflow'
+                  ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-2xs"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
+              )}
+            >
+              <GitBranch className="w-4 h-4 shrink-0" />
+              <span>WORKFLOW</span>
+            </button>
+          </div>
 
-                {/* Hidden Native File & Directory Inputs */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files) handleFileUpload(e.target.files)
-                  }}
-                />
-                <input
-                  ref={folderInputRef}
-                  type="file"
-                  // @ts-ignore
-                  webkitdirectory=""
-                  directory=""
-                  multiple
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files) handleFileUpload(e.target.files)
-                  }}
-                />
+          {/* Workspace Tools Cluster */}
+          <div className="flex flex-col gap-1 mt-1">
+            <div className="text-[10px] font-mono font-medium text-[var(--muted-foreground)] uppercase tracking-wider px-2 py-1">
+              Workspace
+            </div>
 
-                {/* Interactive Drag & Drop Zone */}
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault()
-                    setIsDraggingOver(true)
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault()
-                    setIsDraggingOver(false)
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    setIsDraggingOver(false)
-                    if (e.dataTransfer.files) handleFileUpload(e.dataTransfer.files)
-                  }}
-                  className={`border-2 border-dashed rounded-[var(--radius,0.5rem)] p-3 text-center transition-all ${isDraggingOver
-                      ? 'border-[var(--accent)] bg-[var(--accent)]/10 shadow-sm'
-                      : 'border-[var(--border)] bg-[var(--input)] hover:border-[var(--accent)]/50'
-                    }`}
-                >
-                  <div className="flex items-center justify-center gap-2 mb-1.5">
-                    <FileUp className={`w-5 h-5 transition-colors ${isDraggingOver ? 'text-[var(--primary)]' : 'text-[var(--primary)]'}`} />
-                    <FolderOpen className={`w-5 h-5 transition-colors ${isDraggingOver ? 'text-[var(--primary)]' : 'text-[var(--primary)]'}`} />
-                  </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedTaskId(null)
+                setIsTaskModalOpen(true)
+              }}
+              className="w-full justify-between h-8 px-2.5 text-xs font-normal border-[var(--border)] hover:bg-[var(--secondary)] cursor-pointer"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Layers className="w-3.5 h-3.5 text-[var(--muted-foreground)] shrink-0" />
+                <span className="truncate">Tasks</span>
+              </div>
+              <Badge
+                variant="outline"
+                size="xs"
+                className={cn(
+                  "font-mono text-[9px] px-1.5 py-0 h-4 border",
+                  runningTasksCount > 0
+                    ? "bg-[var(--primary)]/15 text-[var(--primary)] border-[var(--primary)]/30 animate-pulse"
+                    : "text-[var(--muted-foreground)] border-[var(--border)]"
+                )}
+              >
+                {runningTasksCount > 0 ? `${runningTasksCount} Running` : 'Ready'}
+              </Badge>
+            </Button>
 
-                  <div className="text-xs font-medium text-[var(--foreground)]">
-                    {isDraggingOver ? 'Drop files or folders here' : 'Drag & drop any files or folders'}
-                  </div>
-                  <div className="text-[10px] text-[var(--muted-foreground)] font-mono mt-0.5 mb-2.5">
-                    Images, PDFs, code, docs, audio, or zip
-                  </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsLogModalOpen(true)}
+              className="w-full justify-between h-8 px-2.5 text-xs font-normal border-[var(--border)] hover:bg-[var(--secondary)] cursor-pointer"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Terminal className="w-3.5 h-3.5 text-[var(--muted-foreground)] shrink-0" />
+                <span className="truncate">Logs</span>
+              </div>
+              <Badge variant="outline" size="xs" className="font-mono text-[9px] px-1.5 py-0 h-4 text-emerald-400 border-emerald-500/30">
+                Live
+              </Badge>
+            </Button>
 
-                  <div className="grid grid-cols-2 gap-1.5 w-full">
-                    <Button
-                      variant="outline"
-                      size="sm"
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsMobileRemoteOpen(true)}
+              className="w-full justify-between h-8 px-2.5 text-xs font-normal border-[var(--border)] hover:bg-[var(--secondary)] cursor-pointer"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <QrCode className="w-3.5 h-3.5 text-[var(--muted-foreground)] shrink-0" />
+                <span className="truncate">Remote</span>
+              </div>
+              <Badge variant="outline" size="xs" className="font-mono text-[9px] px-1.5 py-0 h-4 text-[var(--muted-foreground)] border-[var(--border)]">
+                QR
+              </Badge>
+            </Button>
+          </div>
+        </div>
+
+        {/* Sidebar Footer: Settings, Theme & Live Connection Indicator */}
+        <div className="flex flex-col gap-2 pt-2 border-t border-[var(--border)]">
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSettingsOpen(true)}
+              title="System & Pipeline Settings"
+              className="flex-1 justify-start gap-2 h-8 px-2.5 text-xs font-medium border-[var(--border)] hover:bg-[var(--secondary)] cursor-pointer"
+            >
+              <Settings className="w-3.5 h-3.5 shrink-0" />
+              <span>Settings</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleToggleThemeMode}
+              title={isLightMode ? "Switch to Dark Mode" : "Switch to Light Mode"}
+              className="h-8 w-8 p-0 shrink-0 border-[var(--border)] hover:bg-[var(--secondary)] cursor-pointer"
+            >
+              {isLightMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-between px-2 py-1 text-[10px] font-mono text-[var(--muted-foreground)] bg-[var(--input)]/60 rounded border border-[var(--border)]/60">
+            <div className="flex items-center gap-1.5">
+              <span className={cn(
+                "w-1.5 h-1.5 rounded-full shrink-0",
+                isConnected ? "bg-emerald-400" : "bg-zinc-500"
+              )} />
+              <span>{isConnected ? "Connected" : "Offline"}</span>
+            </div>
+            <span>v0.61</span>
+          </div>
+        </div>
+      </aside>
+
+      {/* ── 2. MAIN APPLICATION CANVAS CONTAINER ── */}
+      <div className="flex-1 h-full min-w-0 flex flex-col overflow-hidden bg-[var(--background)]">
+        {/* ── TOP HEADER BAR ── */}
+        <header className="h-12 border-b border-[var(--border)] bg-[var(--card)]/80 backdrop-blur-md px-4 flex items-center justify-between shrink-0 select-none z-20 gap-3">
+          {/* Left: Session Breadcrumb Dropdown */}
+          <div className="relative" ref={sessionDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsSessionDropdownOpen((prev) => !prev)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--secondary)] border border-transparent hover:border-[var(--border)] transition-all cursor-pointer"
+            >
+              <span className="text-[var(--muted-foreground)] font-mono text-[11px]">Home /</span>
+              <span className="font-semibold max-w-[200px] truncate">&quot;{sessionTitle}&quot;</span>
+              <ChevronDown className={cn("w-3 h-3 text-[var(--muted-foreground)] transition-transform duration-200", isSessionDropdownOpen && "rotate-180")} />
+            </button>
+
+            {/* Session Switcher Popover Dropdown */}
+            {isSessionDropdownOpen && (
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-64 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-xl p-1.5 z-50 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-2 py-1 text-[10px] font-mono font-semibold uppercase text-[var(--muted-foreground)] flex items-center justify-between">
+                  <span>Chat Sessions</span>
+                  <button
+                    type="button"
+                    onClick={handleNewChat}
+                    className="text-[var(--primary)] hover:underline flex items-center gap-1 cursor-pointer font-sans normal-case text-xs"
+                  >
+                    <Plus className="w-3 h-3" /> New
+                  </button>
+                </div>
+                <Separator className="bg-[var(--border)] my-0.5" />
+                <div className="max-h-48 overflow-y-auto space-y-0.5">
+                  {savedSessions.map((s) => (
+                    <button
+                      key={s.id}
                       type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="h-7 px-2 text-[11px] font-medium gap-1 whitespace-nowrap bg-[var(--input)] border-[var(--border)] hover:bg-[var(--primary)]/15 text-[var(--foreground)] w-full justify-center"
+                      onClick={() => handleSelectSession(s)}
+                      className={cn(
+                        "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-left transition-colors cursor-pointer",
+                        sessionTitle === s.title
+                          ? "bg-[var(--primary)]/15 text-[var(--primary)] font-semibold"
+                          : "text-[var(--foreground)] hover:bg-[var(--secondary)]"
+                      )}
                     >
-                      <FileUp className="w-3.5 h-3.5 text-[var(--primary)] shrink-0" />
-                      <span className="truncate">Choose Files</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      type="button"
-                      onClick={handleChooseFolderClick}
-                      className="h-7 px-2 text-[11px] font-medium gap-1 whitespace-nowrap border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--primary)]/15 bg-[var(--input)] w-full justify-center"
-                    >
-                      <FolderOpen className="w-3.5 h-3.5 text-[var(--primary)] shrink-0" />
-                      <span className="truncate">Choose Folder</span>
-                    </Button>
-                  </div>
+                      <span className="truncate max-w-[160px]">{s.title}</span>
+                      <span className="text-[10px] font-mono text-[var(--muted-foreground)]">{s.date}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Segmented Mode Toggle [ 💬 Chat | 🎙️ Live ] & + New Chat */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Segmented Mode Pill Toggle */}
+            <div className="flex items-center bg-[var(--input)] border border-[var(--border)] rounded-xl p-0.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setOperationalMode('chat')}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                  operationalMode === 'chat'
+                    ? "bg-[var(--card)] text-[var(--foreground)] shadow-xs"
+                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                )}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Chat</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOperationalMode('live')}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                  operationalMode === 'live'
+                    ? "bg-[var(--card)] text-[var(--foreground)] shadow-xs"
+                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                )}
+              >
+                <Radio className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Live</span>
+              </button>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNewChat}
+              title="Start a new conversation"
+              className="h-8 px-2.5 text-xs font-medium gap-1 border-[var(--border)] hover:bg-[var(--secondary)] cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 text-[var(--primary)]" />
+              <span className="hidden sm:inline">New chat</span>
+            </Button>
+          </div>
+        </header>
+
+      {/* ── 2. MAIN ADAPTIVE WORKSPACE CANVAS ── */}
+      {activeTab === 'tactical' && (
+        operationalMode === 'chat' ? (
+          /* ── CHAT MODE: Full-width Assistant-UI Workspace + Pill Input Dock ── */
+          <main className="flex-1 min-h-0 h-[calc(100vh-48px)] flex flex-col overflow-hidden bg-[var(--background)] relative">
+            {/* Copy Full Chat Button in Top-Right Corner */}
+            <div className="absolute top-2.5 right-4 z-20">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCopyChat}
+                className="h-6 px-2 text-[10px] gap-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] bg-[var(--card)]/60 backdrop-blur-sm border border-[var(--border)]/50 cursor-pointer rounded-md shadow-2xs"
+                title="Copy full chat transcript"
+              >
+                {isChatCopied ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-400" />
+                    <span className="text-emerald-400 font-mono">Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Official Assistant-UI Runtime & Thread */}
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <AssistantRuntimeProvider runtime={assistantRuntime}>
+                <ZezoChatThread
+                  className="h-full min-h-0"
+                  systemState={effectiveSystemState}
+                  onAttachFile={() => fileInputRef.current?.click()}
+                  uploadedFiles={uploadedFiles}
+                  onRemoveFile={handleRemoveFile}
+                  isDictating={isDictating}
+                  onToggleDictate={handleToggleDictate}
+                />
+              </AssistantRuntimeProvider>
+            </div>
+          </main>
+        ) : (
+          /* ── LIVE VOICE MODE: Exact Image 5 3D Companion Avatar + Live Subtitles + Control Buttons ── */
+          <main className="flex-1 min-h-0 h-[calc(100vh-48px)] flex flex-col items-center justify-center p-4 overflow-y-auto bg-[var(--background)] relative">
+            <div className="w-full max-w-xl flex flex-col items-center justify-center gap-3 my-auto py-2">
+              {/* Center 3D Qivi Particle Companion Avatar (Exact Image 5 Visualizer) */}
+              <div
+                className={`w-full max-w-md h-[280px] sm:h-[320px] flex items-center justify-center relative ${
+                  isAnyModalOpen ? 'invisible opacity-0 pointer-events-none' : 'visible opacity-100'
+                }`}
+                id="vortex-gif"
+              >
+                {!isAnyModalOpen && (
+                  <QiviAvatarVisualizer
+                    systemState={effectiveSystemState}
+                    audioLevel={effectiveAudioLevel}
+                    isSleeping={isSleeping}
+                    isMicMuted={isMicMuted}
+                  />
+                )}
+              </div>
+
+              {/* State Badge with Pulse & Equalizer Soundwave (Directly under 3D avatar) */}
+              <div className="flex items-center gap-3 px-4 py-1.5 rounded-full bg-[var(--card)] border border-[var(--border)] shadow-xs">
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "w-2 h-2 rounded-full transition-colors duration-150",
+                    effectiveSystemState === 'listening' ? "bg-emerald-500 animate-pulse ring-2 ring-emerald-500/40" :
+                    effectiveSystemState === 'thinking' ? "bg-amber-500 animate-pulse ring-2 ring-amber-500/40" :
+                    effectiveSystemState === 'speaking' ? "bg-[var(--accent)] animate-pulse ring-2 ring-[var(--accent)]/40" :
+                    "bg-[var(--muted-foreground)]"
+                  )} />
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--foreground)] font-semibold">
+                    {effectiveSystemState}
+                  </span>
                 </div>
 
-                {/* Uploaded Files Chips List */}
-                {uploadedFiles.length > 0 && (
-                  <div className="mt-2.5 max-h-28 overflow-y-auto space-y-1 pr-1">
-                    {uploadedFiles.map((f, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between px-2 py-1 rounded-md bg-[var(--input)] border border-[var(--border)] text-[11px]"
-                      >
-                        <div className="flex items-center gap-1.5 min-w-0 mr-1">
-                          {f.type === 'FOLDER' ? (
-                            <FolderOpen className="w-3 h-3 text-[var(--accent)] shrink-0" />
-                          ) : (
-                            <FileCode className="w-3 h-3 text-[var(--muted-foreground)] shrink-0" />
-                          )}
-                          <span className="text-[var(--foreground)] truncate">{f.name}</span>
-                          <span className="text-[var(--muted-foreground)] font-mono text-[9px] shrink-0">({f.size})</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveFile(i)}
-                          className="text-[var(--muted-foreground)] hover:text-red-400 p-0.5 rounded transition-colors"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
+                {/* Soundwave Equalizer when speaking */}
+                {effectiveSystemState === 'speaking' && (
+                  <div className="flex items-center gap-1 h-3.5 px-1.5 py-0.5 rounded-full bg-[var(--input)] border border-[var(--border)]/60">
+                    <div className="w-0.5 bg-emerald-400 rounded-full animate-soundwave-1" />
+                    <div className="w-0.5 bg-emerald-500 rounded-full animate-soundwave-2" />
+                    <div className="w-0.5 bg-cyan-400 rounded-full animate-soundwave-3" />
+                    <div className="w-0.5 bg-[var(--accent)] rounded-full animate-soundwave-4" />
+                    <div className="w-0.5 bg-amber-400 rounded-full animate-soundwave-5" />
+                    <div className="w-0.5 bg-emerald-400 rounded-full animate-soundwave-6" />
                   </div>
                 )}
-              </FramePanel>
-            </Frame>
+              </div>
 
-            {/* Chat Frame with 100% Official Assistant-UI Library Components */}
-            <Frame spacing="xs" className="flex-1 min-h-0 flex flex-col overflow-hidden">
-              <FramePanel className="p-2.5 flex flex-col h-full min-h-0 overflow-hidden">
-                <FrameHeader className="p-0 pb-1.5 shrink-0">
-                  <div className="flex items-center justify-between w-full">
-                    <FrameTitle className="text-[11px] font-semibold text-[var(--foreground)]">Chat</FrameTitle>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleCopyChat}
-                      className="h-6 px-1.5 text-[10px] gap-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
-                      title="Copy full chat transcript"
-                    >
-                      {isChatCopied ? (
-                        <>
-                          <Check className="w-3 h-3 text-emerald-400" />
-                          <span className="text-emerald-400 font-mono text-[10px]">Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          <span className="text-[10px]">Copy</span>
-                        </>
-                      )}
-                    </Button>
+              {/* Live Voice Subtitle Stream (User's addition to Image 5) */}
+              <div className="w-full max-w-lg px-2">
+                <div className="p-3 rounded-xl bg-[var(--card)]/90 backdrop-blur-md border border-[var(--border)] shadow-sm space-y-2">
+                  <div className="flex items-center justify-between text-[10px] font-mono text-[var(--muted-foreground)] uppercase">
+                    <span className="flex items-center gap-1.5">
+                      <Radio className="w-3 h-3 text-[var(--primary)] animate-pulse" />
+                      Live Voice Stream
+                    </span>
+                    <span>Subtitles</span>
                   </div>
-                </FrameHeader>
 
-                {/* 100% Official Assistant-UI Runtime & Thread Primitives */}
-                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                  <AssistantRuntimeProvider runtime={assistantRuntime}>
-                    <ZezoChatThread className="h-full min-h-0" systemState={effectiveSystemState} />
-                  </AssistantRuntimeProvider>
+                  {latestUserMessage && (
+                    <div className="text-xs text-[var(--foreground)] flex items-start gap-2">
+                      <span className="font-semibold text-[var(--primary)] shrink-0 font-mono text-[11px]">You:</span>
+                      <span className="line-clamp-2 leading-relaxed">{latestUserMessage.text}</span>
+                    </div>
+                  )}
+
+                  {latestAssistantMessage && (
+                    <div className="text-xs text-[var(--muted-foreground)] flex items-start gap-2 border-t border-[var(--border)]/40 pt-1.5">
+                      <span className="font-semibold text-emerald-400 shrink-0 font-mono text-[11px]">ZEZO:</span>
+                      <span className="line-clamp-2 leading-relaxed text-[var(--foreground)]/90">{latestAssistantMessage.text}</span>
+                    </div>
+                  )}
+
+                  {!latestUserMessage && !latestAssistantMessage && (
+                    <div className="text-xs text-[var(--muted-foreground)] italic text-center py-1">
+                      Listening for speech... Say &quot;Hey Zezo&quot; or start speaking.
+                    </div>
+                  )}
                 </div>
-              </FramePanel>
-            </Frame>
-          </aside>
+              </div>
 
+              {/* Exact 4 Control Buttons Cluster from Image 5 (MUTE, SPEAKER, STOP, OFF) */}
+              <div className="flex flex-wrap items-center justify-center gap-2">
+              {/* Mic Mute Toggle */}
+              <Button
+                variant={isMicMuted ? "destructive" : "outline"}
+                size="sm"
+                onClick={handleToggleMic}
+                title={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
+                className="h-8 px-3.5 gap-1.5 text-xs font-medium shrink-0 cursor-pointer"
+              >
+                {isMicMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-primary" />}
+                <span className="text-[11px] font-mono font-semibold">{isMicMuted ? 'UNMUTE' : 'MUTE'}</span>
+              </Button>
+
+              {/* Speaker Voice Output Toggle */}
+              <Button
+                variant={isSpeakerMuted ? "destructive" : "outline"}
+                size="sm"
+                onClick={handleToggleSpeaker}
+                title={isSpeakerMuted ? "Unmute Assistant Voice Output" : "Mute Assistant Voice Output"}
+                className="h-8 px-3.5 gap-1.5 text-xs font-medium shrink-0 cursor-pointer"
+              >
+                {isSpeakerMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-primary" />}
+                <span className="text-[11px] font-mono font-semibold">{isSpeakerMuted ? 'MUTED' : 'SPEAKER'}</span>
+              </Button>
+
+              {/* Emergency Stop */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEmergencyStop}
+                title="Emergency Stop (Interrupt Agent Execution)"
+                className="h-8 px-3.5 gap-1.5 text-xs font-medium hover:bg-destructive/15 hover:border-destructive/50 hover:text-destructive shrink-0 cursor-pointer"
+              >
+                <Square className="w-3.5 h-3.5 text-destructive" />
+                <span className="text-[11px] font-mono font-semibold">STOP</span>
+              </Button>
+
+              {/* Power / Sleep Mode Toggle */}
+              <Button
+                variant={isSleeping ? "secondary" : "outline"}
+                size="sm"
+                onClick={handleToggleSleep}
+                title={isSleeping ? "Wake Assistant (Resume Active Mode)" : "Put Assistant to Sleep (Standby Mode)"}
+                className="h-8 px-3.5 gap-1.5 text-xs font-medium shrink-0 cursor-pointer"
+              >
+                <Power className={`w-3.5 h-3.5 ${isSleeping ? 'text-amber-400' : 'text-emerald-500'}`} />
+                <span className="text-[11px] font-mono font-semibold">{isSleeping ? 'ON' : 'OFF'}</span>
+              </Button>
+            </div>
+          </div>
         </main>
+        )
       )}
 
       {/* ── SCRANTON OFFICE SCREEN ── */}
@@ -1275,6 +1068,7 @@ export default function App() {
           </Frame>
         </main>
       )}
+      </div>
 
       {/* 100% Official ReUI Settings Modal with All OS Options */}
       <SettingsModal

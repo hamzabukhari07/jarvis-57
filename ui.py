@@ -199,6 +199,7 @@ class MainWindow(QMainWindow):
         self.on_interrupt: Callable[[], None] | None = None
         self.on_voice_change: Callable[[], None] | None = None
         self.on_language_change: Callable[[str], None] | None = None
+        self.on_accent_change: Callable[[str], None] | None = None
         self.on_audio_device_change: Callable[[], None] | None = None
         self.on_push_to_talk: Callable[[bool], str] | None = None
         self.on_sleep_toggle: Callable[[bool], None] | None = None
@@ -317,6 +318,7 @@ class MainWindow(QMainWindow):
 
         from memory.config_manager import (
             get_assistant_name, get_voice, get_response_language,
+            get_voice_accent, AVAILABLE_VOICE_ACCENTS,
             get_autostart_enabled, get_brief_enabled,
             get_wake_word_enabled, get_push_to_talk_enabled,
             get_masked_gemini_key, get_masked_groq_key, get_masked_elevenlabs_key, get_masked_tavily_key,
@@ -333,6 +335,8 @@ class MainWindow(QMainWindow):
             "wake_phrase": f"Hey {self._assistant_name or get_assistant_name()}",
             "voice_name": get_voice(),
             "response_language": get_response_language(),
+            "voice_accent": get_voice_accent(),
+            "available_accents": list(AVAILABLE_VOICE_ACCENTS),
             "autostart_enabled": get_autostart_enabled(),
             "morning_brief_enabled": get_brief_enabled(),
             "wake_word_enabled": get_wake_word_enabled(),
@@ -359,7 +363,7 @@ class MainWindow(QMainWindow):
             "timestamp": time.time(),
         }
 
-    def _handle_assistant_settings_changed(self, name: str, voice: str, lang: str):
+    def _handle_assistant_settings_changed(self, name: str, voice: str, lang: str, accent: str = None):
         if name:
             self._assistant_name = name
             if getattr(self, "on_assistant_name_change", None):
@@ -377,6 +381,11 @@ class MainWindow(QMainWindow):
                 self.on_language_change(lang)
             except Exception as e:
                 logger.warning("Error in on_language_change callback: %s", e)
+        if accent and getattr(self, "on_accent_change", None):
+            try:
+                self.on_accent_change(accent)
+            except Exception as e:
+                logger.warning("Error in on_accent_change callback: %s", e)
 
     def _handle_pipeline_settings_changed(self):
         if getattr(self, "on_pipeline_change", None):
@@ -469,6 +478,7 @@ class MainWindow(QMainWindow):
     def _get_initial_state(self) -> dict:
         from memory.config_manager import (
             get_assistant_name, get_voice, get_response_language,
+            get_voice_accent, AVAILABLE_VOICE_ACCENTS,
             get_autostart_enabled, get_brief_enabled,
             get_wake_word_enabled, get_push_to_talk_enabled,
             get_masked_gemini_key, get_masked_groq_key, get_masked_elevenlabs_key, get_masked_tavily_key,
@@ -506,6 +516,8 @@ class MainWindow(QMainWindow):
             "wake_phrase": f"Hey {get_assistant_name()}",
             "voice_name": get_voice(),
             "response_language": get_response_language(),
+            "voice_accent": get_voice_accent(),
+            "available_accents": list(AVAILABLE_VOICE_ACCENTS),
             "autostart_enabled": get_autostart_enabled(),
             "morning_brief_enabled": get_brief_enabled(),
             "wake_word_enabled": get_wake_word_enabled(),
@@ -764,6 +776,14 @@ class ZezoUI:
         self._win.on_language_change = cb
 
     @property
+    def on_accent_change(self) -> Callable[[str], None] | None:
+        return self._win.on_accent_change
+
+    @on_accent_change.setter
+    def on_accent_change(self, cb: Callable[[str], None] | None):
+        self._win.on_accent_change = cb
+
+    @property
     def on_pipeline_change(self) -> Callable[[], None] | None:
         return self._win.on_pipeline_change
 
@@ -830,6 +850,9 @@ class ZezoUI:
 
     def set_on_voice_change(self, cb: Callable[[], None]):
         self.on_voice_change = cb
+
+    def set_on_accent_change(self, cb: Callable[[str], None]):
+        self.on_accent_change = cb
 
     def set_on_pipeline_change(self, cb: Callable[[], None]):
         self.on_pipeline_change = cb

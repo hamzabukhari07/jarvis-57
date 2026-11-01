@@ -274,9 +274,17 @@ def clear() -> None:
 IGNORED_DIRS = {
     ".git", "node_modules", ".venv", "venv", "__pycache__",
     ".next", "dist", "build", ".pytest_cache", ".idea", ".vscode",
-    "target", "vendor", ".antigravity"
+    "target", "vendor", ".antigravity",
+    "assets", "public", "images", "fonts"
 }
 MAX_FILE_SIZE = 2_000_000  # 2MB per file snapshot
+
+# Only snapshot text/code deliverables to eliminate heavy binary media choke
+SNAPSHOT_EXTENSIONS = {
+    ".html", ".css", ".js", ".jsx", ".ts", ".tsx", ".py", ".json",
+    ".md", ".toml", ".yaml", ".yml", ".txt", ".sh", ".sql", ".env",
+    ".env.example", ".svg", ".xml"
+}
 
 
 def _prune_empty_dirs(root: Path) -> bool:
@@ -319,6 +327,8 @@ def capture_repo_snapshot(repo_path: str | Path) -> dict[str, bytes]:
             try:
                 rel_parts = p.relative_to(root).parts
                 if any(part in IGNORED_DIRS or part.startswith(".git") for part in rel_parts):
+                    continue
+                if p.suffix.lower() not in SNAPSHOT_EXTENSIONS:
                     continue
                 if p.is_file() and p.stat().st_size <= MAX_FILE_SIZE:
                     content = p.read_bytes()

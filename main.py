@@ -88,6 +88,7 @@ from actions.web_search        import _news as _fetch_news_sync
 from memory.config_manager     import (
     get_brief_enabled, get_media_resolution, get_proactive_audio_enabled,
     get_push_to_talk_enabled, get_thinking_enabled, get_turn_tuning, get_voice,
+    get_voice_accent,
     get_wake_word_enabled, save_wake_word_enabled,    get_input_device, get_output_device,
     save_input_device, save_output_device, get_fallback_voice, get_assistant_name,
 )
@@ -590,6 +591,39 @@ def _keep_context_of(exc: BaseException) -> bool:
     return True
 
 
+def _build_accent_directive(accent: str) -> str:
+    acc = (accent or "auto").strip().lower()
+    if acc == "american":
+        return (
+            "[VOICE PROTOCOL: US ACCENT]\n"
+            "- SPEAK: Consistent General American (GA) accent, standard rhoticity, natural pacing.\n"
+            "- LOCK: Maintain American enunciation regardless of user's accent or code-switching.\n"
+            "- NEVER: Slip into British or South Asian phonemes."
+        )
+    elif acc == "british":
+        return (
+            "[VOICE PROTOCOL: UK ACCENT]\n"
+            "- SPEAK: Crisp British Received Pronunciation (RP), non-rhotic vowel endings, measured cadence.\n"
+            "- LOCK: Maintain British pronunciation consistently across all turns."
+        )
+    elif acc == "pakistani":
+        return (
+            "[VOICE PROTOCOL: PAKISTANI / SOUTH ASIAN ACCENT]\n"
+            "- SPEAK: Articulate Pakistani / South Asian English cadence with natural dental plosives (/t/, /d/).\n"
+            "- CODE-SWITCHING: Keep vocal timbre seamless between Urdu and English. Do not abruptly shift to Western phonemes for English loanwords."
+        )
+    elif acc == "australian":
+        return (
+            "[VOICE PROTOCOL: AUSTRALIAN ACCENT]\n"
+            "- SPEAK: Relaxed General Australian English cadence with natural vowel broadness."
+        )
+    else:
+        return (
+            "[VOICE PROTOCOL: ADAPTIVE]\n"
+            "- BEHAVIOR: Maintain neutral, stable conversational accent. Adapt naturally without dramatic acoustic wavering or mid-utterance flips."
+        )
+
+
 class ZezoLive:
 
     def __init__(self, ui: ZezoUI):
@@ -645,8 +679,10 @@ class ZezoLive:
         self.ui.on_sleep_toggle   = self._on_ui_sleep_toggle
         self.ui.on_voice_change   = self._on_voice_change     # voice picker → rebuild session
         self.ui.on_language_change = self._on_language_change # language picker → rebuild session
+        self.ui.on_accent_change  = self._on_accent_change   # voice accent picker → rebuild session
         self.ui.on_pipeline_change = self._on_pipeline_change # pipeline switcher
         self.ui.on_audio_device_change = self._on_audio_device_change
+        self._active_voice_accent = get_voice_accent()
         self._reconnect_event: asyncio.Event | None = None
         self._reconnect_keep = True   # False → next rebuild drops the resumption handle
         self._silence_watchdog_task: Optional[asyncio.Task] = None
@@ -966,6 +1002,14 @@ class ZezoLive:
             return
         self._active_language = current_lang
         self.request_reconnect(reason=f"response language set to {current_lang}")
+
+    def _on_accent_change(self, new_accent: str = ""):
+        from memory.config_manager import get_voice_accent
+        curr = (new_accent or get_voice_accent() or "").strip().lower()
+        if getattr(self, "_active_voice_accent", None) == curr:
+            return
+        self._active_voice_accent = curr
+        self.request_reconnect(keep_context=False, reason=f"voice accent set to {curr}")
 
     def _on_pipeline_change(self):
         """Pipeline mode or custom engine configuration changed in UI."""
@@ -1401,6 +1445,7 @@ class ZezoLive:
 
     def _build_config(self, agent_id: Optional[str] = None, mode: Optional[str] = None) -> types.LiveConnectConfig:
         from datetime import datetime
+        from memory.config_manager import get_voice_accent
 
         # System identity is user-selectable (see the Persona tab)
         self._asst_name = get_assistant_name()
@@ -1623,6 +1668,9 @@ class ZezoLive:
         if skills_str:
             parts.append(skills_str)
         parts.append(sys_prompt)
+        accent_dir = _build_accent_directive(get_voice_accent())
+        if accent_dir:
+            parts.append(accent_dir)
 
         # Map response language to robust ASR language hints / codes to prevent language mixing / hallucination
         lang_map = {
@@ -3098,9 +3146,50 @@ class ZezoLive:
                 current_model = task.params.get("model", "") if task.params else ""
 
                 res = task.result if isinstance(task.result, dict) else {}
-                summary = res.get("output") or res.get("full_content") or res.get("summary") or res.get("result") or res.get("message") or task.message or ""
+                summary = (
+                    res.get("hud_summary")
+                    or res.get("summary")
+                    or res.get("full_content")
+                    or res.get("result")
+                    or res.get("message")
+                    or res.get("output")
+                    or task.message
+                    or ""
+                )
                 summary_str = str(summary or "Done")
-                prompt_summary = summary_str if len(summary_str) <= 3500 else summary_str[:3500] + "\n...(full content displayed on screen canvas and stored in task result)..."
+
+                # Canvas content sanitizer: prevent raw JSON dictionaries or arrays from appearing on HUD canvas
+                canvas_str = summary_str.strip()
+                if canvas_str.startswith("{") or canvas_str.startswith("["):
+                    try:
+                        parsed = json.loads(canvas_str)
+                        if isinstance(parsed, dict):
+                            clean_val = parsed.get("hud_summary") or parsed.get("summary") or parsed.get("full_content")
+                            if clean_val:
+                                canvas_str = str(clean_val)
+                            else:
+                                deliverables = parsed.get("files") or parsed.get("files_created") or []
+                                status_txt = parsed.get("status", "completed").capitalize()
+                                repo_txt = parsed.get("project_name") or parsed.get("repo", "")
+                                d_lines = [f"### Task {status_txt}"]
+                                if repo_txt:
+                                    d_lines.append(f"- **Workspace:** `{repo_txt}`")
+                                if deliverables:
+                                    d_lines.append(f"- **Deliverables:** {', '.join(str(f) for f in deliverables[:5])}")
+                                canvas_str = "\n".join(d_lines)
+                        elif isinstance(parsed, list):
+                            items_text = []
+                            for item in parsed:
+                                if isinstance(item, dict) and "content" in item:
+                                    items_text.append(str(item["content"]))
+                                elif isinstance(item, str):
+                                    items_text.append(item)
+                            if items_text:
+                                canvas_str = "\n\n".join(items_text)
+                    except Exception:
+                        pass
+
+                prompt_summary = canvas_str if len(canvas_str) <= 3500 else canvas_str[:3500] + "\n...(full content displayed on screen canvas and stored in task result)..."
                 files_mod = res.get("files_modified") or res.get("files_created") or []
                 files_str = f"Modified files: {', '.join(files_mod[:3])}" if files_mod else ""
 
@@ -3132,8 +3221,8 @@ class ZezoLive:
                         f"All detailed content has been posted to the HUD display.]"
                     )
                     log_text = f"SYS: Task #{task.id} finished successfully."
-                    if self.ui and hasattr(self.ui, "show_content") and summary_str and summary_str.strip() not in ("Done.", "Done", ""):
-                        self.ui.show_content(f"{tool_label.upper()}", summary_str)
+                    if self.ui and hasattr(self.ui, "show_content") and canvas_str and canvas_str.strip() not in ("Done.", "Done", ""):
+                        self.ui.show_content(f"{tool_label.upper()}", canvas_str)
 
                 try:
                     if self.session and self._awake:
@@ -3530,6 +3619,7 @@ class ZezoLive:
 
                     # Record active session parameters to prevent duplicate voluntary reconnects
                     self._active_voice      = get_voice()
+                    self._active_voice_accent = get_voice_accent()
                     from memory.config_manager import get_pipeline_mode, get_response_language
                     self._active_pipeline   = get_pipeline_mode()
                     self._active_language   = get_response_language()

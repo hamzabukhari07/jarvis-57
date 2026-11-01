@@ -17,7 +17,7 @@ from core.antigravity_runner import (
     _resolve_model,
     run_antigravity_worker,
 )
-from core.repo_context import get_unique_project_dir, remember_repo, resolve
+from core.repo_context import get_unique_project_dir, guard_domain_workspace, remember_repo, resolve
 from core.task_manager import get_task_manager
 
 # Re-export background worker for backwards compatibility
@@ -47,7 +47,14 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
 
     run_in_place = bool(parameters.get("run_in_place", False))
 
-    if explicit_path:
+    # Smart Guard: Detect domain mismatch / context hallucination for new URLs
+    domain_guarded_dir = guard_domain_workspace(prompt, explicit_path) if not run_in_place else None
+
+    if domain_guarded_dir:
+        repo = domain_guarded_dir
+        source = "domain_guard"
+        remember_repo(str(repo))
+    elif explicit_path:
         repo, source = resolve(explicit=explicit_path)
     elif run_in_place:
         resolved_p, _ = resolve()
@@ -160,7 +167,12 @@ TOOL = {
             },
             "project_path": {
                 "type": "STRING",
-                "description": "Optional directory path (e.g. 'Desktop/website'). If omitted, resolves active project.",
+                "description": (
+                    "Target project directory. CRITICAL: For greenfield tasks, new website builds, "
+                    "or when analyzing a NEW external URL, LEAVE THIS EMPTY. The system will auto-generate "
+                    "a clean workspace. Only provide an explicit path if the user specifically asked to "
+                    "'continue working in [folder_name]' or modify an existing local project."
+                ),
             },
             "model": {
                 "type": "STRING",
