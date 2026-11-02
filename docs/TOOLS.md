@@ -112,6 +112,7 @@ ZEZO features **40 tools** (31 active action tools + 9 inline tools).
 | `weather_report` | `actions/weather_report.py` | `read_only` | `BLOCKING` | Retrieves current meteorological conditions and weather forecasts for any city. | `city` (req) |
 | `game_updater` | `actions/game_updater.py` | `read_only` | `BLOCKING` | Checks Steam and Epic Games patch notes and schedules background updates. | `action`, `platform`, `game_name`, `app_id`, `hour`, `minute`, `shutdown_when_done` |
 | `send_message` | `actions/send_message.py` | `external_mutation` | `BLOCKING` | Dispatches WhatsApp and Telegram messages with strict search and confirmation governance. | `receiver` (req), `message_text`, `platform` (req: 'WhatsApp'\|'Telegram'), `action` ('search'\|'send') |
+| `memory` | `actions/memory_tool.py` | `local_mutation` | `BLOCKING` | Canonical unified memory action tool adhering to AGENTS.md Core Rule 4. Unifies fact recall, asynchronous zero-latency fact learning, relearn-safe forgetting, and verbatim turn history exploration under a single action contract. Enforces a sliding turn read budget (default: 3 reads per 8-second window). When active (`ZEZO_UNIFIED_MEMORY_TOOL=true`), `actions/recall_history.py` is dynamically deactivated and inline memory declarations are superseded. | `action` (req: 'recall'\|'learn'\|'forget'\|'history'), `category`, `key`, `value`, `query`, `turn_range`, `period` |
 
 ### 4. Inline Session Tools (`main.py`)
 

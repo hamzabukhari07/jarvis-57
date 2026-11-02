@@ -114,3 +114,36 @@ Per **AGENTS.md Rule 6**, the active live voice pipeline runs strictly via Googl
 | `silence_ms` | integer | `450` | Milliseconds of silence before server commits turn |
 | `prefix_ms` | integer | `100` | Padding audio frames attached to start of speech |
 | `end_sensitivity` | string | `"high"` | Sensitivity for detecting completion of user speech |
+
+---
+
+## 🧠 Fast-Path Hybrid Memory Engine Environment Flags
+
+The Fast-Path Hybrid Memory Engine (Option 1) provides zero-latency fact ingestion, an atomic write-ahead journal, in-memory Read-Your-Writes consistency, and turn read budgets governed by the following environment variables:
+
+| Environment Variable | Default | Type | Role & Description |
+|---|---|---|---|
+| `ZEZO_UNIFIED_MEMORY_TOOL` | `true` | boolean | When `true`, exposes the canonical `actions/memory_tool.py` (`memory` tool) and dynamically disables `actions/recall_history.py`. If `false`, re-enables legacy recall actions. |
+| `ZEZO_MEMORY_ASYNC_OUTBOX` | `true` | boolean | When `true`, routes fact writes through the asynchronous outbox queue and write-ahead journal (`outbox_journal.jsonl`). If `false`, executes synchronous fallback writes. |
+| `ZEZO_PRETURN_RECALL` | `true` | boolean | When `true`, executes bounded (<=180ms) lexical prefetch for typed chat prompts in `main.py` (`_on_text_command`). Live audio pipelines remain untouched. |
+| `ZEZO_MEMORY_READ_BUDGET` | `3` | integer | Maximum memory read queries allowed per conversational turn. Enforced at tool dispatch in `main.py`. |
+| `ZEZO_MEMORY_BUDGET_WINDOW_SEC` | `8.0` | float | Inactivity window in seconds before the turn memory read budget resets automatically. |
+
+---
+
+## 🔀 Dual Operational Modes: Chat Mode vs. Live Voice Mode
+
+ZEZO features strict dual operational mode decoupling synchronized across the React frontend and Python daemon via WebSockets (`{ "type": "operational_mode", "mode": "chat" | "live" }`):
+
+| Operational Mode | Primary UI View | Microphone Input | Audio Speaker Output | Purpose & Experience |
+|---|---|---|---|---|
+| **`chat`** | Text Chat Thread (`ZezoChatThread.tsx`) | Completely Gated (Dropped in `_listen_audio()`) | Completely Suppressed (Dropped in `_drop_assistant_audio()`) | Distraction-free, silent ChatGPT-style text workspace. Zero unsolicited voice audio from speakers; zero room audio sent to LLM. |
+| **`live`** | 3D Voice Avatar (`VortexAvatar.tsx`) | Open Bidirectional Audio (PCM stream to Gemini Live) | Full Duplex Vocal Playback (`_play_audio()`) | High-speed bidirectional vocal conversation with emotional prosody and real-time barge-in support. |
+
+### Operational Mode Switch Safety & Race Condition Guard
+When switching from `live` to `chat`:
+1. `ZezoLive._on_operational_mode_change("chat")` executes immediate `interrupt()`.
+2. Both `audio_in_queue` and `out_queue` are flushed synchronously to prevent delayed or buffered speech playback.
+3. UI state broadcasts mode changes across all connected clients via `core/ui_server.py`.
+
+

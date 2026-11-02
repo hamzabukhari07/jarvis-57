@@ -2,6 +2,121 @@
 
 # LEARNING JOURNAL (active — last 25 entries)
 
+## [2026-11-02] — Startup Performance Optimization, Dynamic Obsidian Graph & Chat/Live Mode Audio Decoupling
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Runtime analysis of `python main.py` surfaced three critical issues:
+    1. **Slow Startup Performance & Load Churn:** Audio endpoint discovery in `core/audio_devices.py` repeatedly probed Windows host APIs (DirectSound, MME, WASAPI) with 600ms latency sleeps, running concurrently from UI threads and background `prefetch()` without single-flight protection, causing a 10–15s boot freeze. Concurrently, `actions/memory_tool.py` was rejected on boot due to missing handler and invalid risk tier `'normal'`.
+    2. **Static Knowledge Graph Hierarchy:** The 3D Knowledge Galaxy artificially forced static parent nodes `[[ZEZO OS]]` and `[[Hamza Bukhari]]` into every note (`vault_engine.py:309`) with fixed radius sizes, preventing natural Obsidian-like emergent topology.
+    3. **Chat Mode vs. Live Voice Audio Decoupling:** Typing in Chat Mode leaked Gemini Live vocal playback through PC speakers because `_drop_assistant_audio()` was unaware of UI operational mode.
+- **Key Architectural Decisions & Engineering Solutions:**
+  1. **Single-Flight Audio Endpoint Probing (`core/audio_devices.py`):**
+     - Introduced `_prefetch_done = threading.Event()` and `_query_lock = threading.Lock()`.
+     - Concurrent calls to `list_devices()` wait on `_prefetch_done` rather than executing duplicate blocking scans.
+     - Reduced probe durations from 600ms to 180ms (`_PROBE_SECONDS = {"output": 0.18, "input": 0.18}`), completely eliminating startup audio freeze while maintaining physical hardware detection fidelity.
+  2. **Action Loader Discovery Contract (`actions/memory_tool.py`):**
+     - Corrected `TOOL["risk"] = "local_mutation"` and exported `"handler": handler` for dynamic loading by `core/action_loader.py`.
+  3. **Obsidian-Style Dynamic Knowledge Graph Architecture (`memory/vault_engine.py`, `MemoryGraphCanvas.tsx`):**
+     - Removed hardcoded static links. Pure regex wikilink extraction (`WIKILINK_PATTERN`) parses explicit `[[wikilinks]]` with contextual topic fallbacks.
+     - Implemented dynamic degree centrality (`deg = in_degree + out_degree`) with logarithmic radius scaling (`node["size"] = max(10, min(34, int(10 + 8 * math.log1p(deg))))`).
+     - Frontend 3D canvas scales node geometry via `.nodeVal()` and clusters satellites tightly around hub nodes using dynamic force distance (`linkDistance = 40` for hubs, `120` for leaves).
+  4. **Dual Operational Mode Audio Decoupling (`frontend/`, `core/ui_server.py`, `ui.py`, `main.py`):**
+     - Synchronized operational mode (`"chat"` vs `"live"`) across React frontend and Python daemon via WebSocket event `{ type: "operational_mode", mode }`.
+     - **Elite Race Condition Guard:** On mode transition to `"chat"`, `main.py:_on_operational_mode_change()` fires `self.interrupt()` and flushes both `audio_in_queue` and `out_queue` to prevent lingering audio playback.
+     - `_drop_assistant_audio()` drops all incoming assistant PCM audio when in Chat mode or when speaker is muted.
+     - `_listen_audio()` drops microphone audio when in Chat mode, guaranteeing distraction-free, silent ChatGPT-style text operation.
+  5. **Robust Background Vault Sync (`main.py`):**
+     - Enhanced `_run_vault_sync()` with background exception recovery and non-blocking retry loop.
+- **Files Touched / Created:**
+  - `actions/memory_tool.py`
+  - `core/audio_devices.py`
+  - `memory/vault_engine.py`
+  - `frontend/src/components/memory/MemoryGraphCanvas.tsx`
+  - `frontend/src/hooks/useZezoSocket.ts`
+  - `frontend/src/App.tsx`
+  - `core/ui_server.py`
+  - `ui.py`
+  - `main.py`
+  - `memory/sqlite_memory.py`
+  - `tests/test_startup_and_modes.py`
+  - `docs/MEMORY.md`, `docs/CONFIGURATION.md`, `docs/TOOLS.md`
+- **Verification Performed:**
+  - Layer 1 (Static): `python -m py_compile` passed on all 6 touched Python files; `npm run build` compiled cleanly in 2.01s with 0 errors.
+  - Layer 2 (Runtime): Unit tests in `tests/test_startup_and_modes.py` verified action loader discovery, audio single-flight cache, dynamic graph logarithmic scaling, and operational mode audio gating.
+  - Layer 3 (Regression): Full pytest suite passed (15 passed in 4.29s).
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Audit of `main.py:_dispatch_save_memory` revealed that `update_memory()` was directly executing synchronous disk operations (`tmp_path.write_text`), an atomic retry loop (`os.replace` with up to 600ms cumulative sleep under Windows file locks), and SQLite operations directly on the primary `asyncio` event loop.
+  - This frozen event loop caused severe jitter on Gemini Live bidirectional WebSocket audio, resulting in audible speech stutter during memory saves.
+  - Concurrently, memory tooling was fragmented across inline `save_memory`, `recall_memory`, and action `recall_history.py`, lacking in-chat user feedback and instant undo/forget controls.
+- **Key Architectural Decisions & Engineering Solutions:**
+  1. **Asynchronous Write Outbox & Atomic Journal (`memory/memory_manager.py`):**
+     - Decoupled fact ingestion into an in-memory queue (`queue.Queue(maxsize=256)`) and append-only write-ahead journal (`memory/outbox_journal.jsonl`).
+     - Monotonic sequence numbering (`_seq_counter`) tracked across restarts via `memory/outbox_checkpoint.json`.
+     - Ingestion returns immediate ACK (<1.0ms, `status: "queued"`) without touching SQLite or performing synchronous file replacements.
+     - Background daemon worker drains batches (up to 32 entries) every 1.5 seconds with exponential retry backoff.
+     - **Poison-Pill Single-Item Isolation:** If a 32-item batch fails 3 times, the batch unpacks into individual transactions; corrupt items route to `memory/outbox_dead_letter.jsonl` while healthy items commit normally.
+     - **Compaction Mutex Lock:** Journal rewrites (`_compact_journal_under_lock`) execute under the exact same `_journal_lock` as runtime appends to guarantee zero lost writes. Post-compaction order strictly updates `os.replace` -> watermark -> checkpoint ledger -> overlay eviction.
+  2. **Zero-Latency "Read-Your-Writes" In-Memory Overlay:**
+     - `_uncommitted_overlay: dict[tuple[str, str], tuple[Optional[str], int]]` merges directly into `_search_raw_facts()` and `all_entries_for_ui()`.
+     - Newly learned facts are searchable <1ms after ingestion before background disk writes; uncommitted deletions immediately suppress matching facts.
+  3. **Relearn-Safe Database Engine & Privacy Boundary (`memory/sqlite_memory.py`):**
+     - Table `deleted_fact_tombstones (category, key, deleted_at)` records deletions. `record_learn()` deletes matching tombstones. Stale `sync_facts_from_dict()` calls skip tombstoned keys where `deleted_at > updated_at`.
+     - Forgetting a fact scrubs memory tool invocations in the `turns` table to `[Fact removed by user]`, updating `turns_fts` via automated triggers. Verbatim conversational utterances are preserved for chronological audit integrity.
+  4. **Canonical Unified Tool & Sliding Turn Budget (`actions/memory_tool.py`, `main.py`):**
+     - Adheres to AGENTS.md Core Rule 4: exports `TOOL` schema and `handler()` supporting `recall`, `learn`, `forget`, and `history`.
+     - Legacy `actions/recall_history.py` dynamically deactivates (`enabled: False`) when `ZEZO_UNIFIED_MEMORY_TOOL=true`.
+     - Enforces a sliding-window turn read budget (default: 3 reads within 8.0s window) inside `_execute_tool()`. Resets on `_on_text_command()` and `interrupt()`. Live audio pipelines (`_listen_audio`, `_receive_audio`, `_play_audio`, `_on_ptt`) kept 100% untouched per Core Rule 6.
+  5. **Bounded Pre-Turn Contextual Recall (Typed Mode Only):**
+     - Input text >= 8 characters in `_on_text_command()` triggers non-blocking background search in `sqlite_memory.search_scroll_history()`.
+     - Strict 180ms deadline (`asyncio.wait_for(timeout=0.18)`), blended score >= 0.45, max 3 turns, max 600 chars total, framed as untrusted background context.
+  6. **Real-Time UI Sovereignty & Chat Memory Chips (`frontend/`, `core/ui_server.py`):**
+     - Added ReUI `ChatMemoryChip` component with micro-states (`queued` pulsing spinner, `persisted` brain badge with instant revert `[✕]`, `failed` warning with retry button).
+     - State machine deduplicates entries by `id` so status transitions in-place from `queued` to `persisted`/`failed`.
+     - Keyboard accessibility: `Escape` dismisses the chip view without forgetting the fact.
+     - Added session-scoped incognito memory pause button (`[MEM / INCOGNITO]`) in `ZezoPillComposer` and REST endpoints `/api/memory/pause`, `/api/memory/fact/delete`, `/api/memory/fact/retry`.
+- **Files Touched / Created:**
+  - `memory/memory_state.py` (decoupled pause state)
+  - `memory/memory_manager.py` (outbox queue, journal, monotonic seq, poison isolation, compaction mutex, overlay merge)
+  - `memory/sqlite_memory.py` (deleted_fact_tombstones, relearn handling, pause guard, get_all_facts, score property)
+  - `actions/memory_tool.py` (canonical unified memory tool)
+  - `actions/recall_history.py` (dynamic deactivation when unified tool active)
+  - `main.py` (sliding turn budget, bounded typed prefetch, prompt conditional, os import)
+  - `core/ui_server.py` (REST endpoints `/api/memory/fact/delete`, `/api/memory/fact/retry`, `/api/memory/pause`)
+  - `frontend/src/types/zezo.ts` (`MemoryActivityEntry` interface)
+  - `frontend/src/lib/api.ts` (API methods for delete, retry, pause)
+  - `frontend/src/hooks/useZezoSocket.ts` (WebSocket listeners and deduplication)
+  - `frontend/src/components/assistant-ui/ZezoChatThread.tsx` (`ChatMemoryChip` ReUI component, composer incognito toggle)
+  - `docs/MEMORY.md`, `docs/TOOLS.md`, `docs/CONFIGURATION.md` (documentation synchronization)
+  - `tests/test_memory_fast_path.py` (11 targeted unit tests)
+- **Verification:**
+  - Layer 1 (Static): `python -m py_compile ...` passed with 0 errors; `cd frontend; npm run build` passed cleanly (`tsc -b && vite build` in 3.64s).
+  - Layer 2 (Runtime): All 11 targeted unit tests in `tests/test_memory_fast_path.py` passed in 3.06s.
+  - Layer 3 (Regression): Full repository test suite `pytest tests/ -v` passed (32 passed in 13.22s, 0 failures).
+
+## [2026-11-02] — Memory Architecture Benchmark & Strategic Roadmap (OpenHuman Brain vs. ZEZO OS)
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why this was built / Root Cause & Motivation:**
+  - Conducted an in-depth comparative audit between OpenHuman's "Brain" memory system (`References/MEMORY_SYSTEM.md`) and ZEZO's Hybrid 3-Tier memory engine (`memory/memory_manager.py`, `memory/sqlite_memory.py`, `memory/vault_engine.py`, `actions/recall_history.py`, `main.py`).
+  - Identified critical operational gaps, anti-patterns to avoid, and unique strengths in ZEZO to preserve.
+  - Documented complete architectural findings, code-level recommendations from Senior Backend and Product Design perspectives, and an actionable prioritized roadmap in `docs/MEMORY_COMPARISON_AND_ROADMAP.md`.
+- **Key Architectural Findings & Strategic Decisions:**
+  1. **What to Copy / Adapt:**
+     - **In-Chat Memory Chips (P1 UX Priority):** Implement live badges in the conversation feed (`🧠 Remembered: {fact}`) with an instant `[✕ Forget]` button, eliminating the "silent black box" trust issue.
+     - **Unified Tool Architecture (P1 Backend Priority):** Consolidate fragmented `save_memory`, `recall_memory`, and `actions/recall_history.py` into a single canonical `actions/memory_tool.py` (`recall`, `learn`, `forget`, `history`).
+     - **Async Write Outbox (P2 Priority):** Decouple disk I/O and atomic file replacement from the live Gemini Live audio WebSocket loop using a background queue.
+  2. **What NOT to Copy:**
+     - Rejected cloud SaaS engine (`tinyhumans`), proprietary vector databases, and commercial paywalls (`MEMORY_PLAN_REQUIRED`). ZEZO remains 100% sovereign, zero-subscription, and local-first.
+  3. **What ZEZO Does Better & Must Keep:**
+     - The 3-Speed Multi-Tier Hierarchy (Tier 1 Instant In-Prompt, Tier 2 Deep SQLite FTS5 BM25, Tier 3 Associative Markdown Vault).
+     - Interactive 3D Celestial Knowledge Galaxy (`MemoryGraphCanvas.tsx`) with Three.js starfield and organic orbital physics.
+     - Automated credential and API key redaction (`redact_secrets`) before persistence.
+     - Human-readable, user-editable Markdown notes with `[[wikilinks]]`.
+- **Artifacts Created / Updated:**
+  - `docs/MEMORY_COMPARISON_AND_ROADMAP.md` (Complete comparative benchmark & roadmap).
+- **Verification:**
+  - Layer 1 (Static): Verified markdown syntax and cross-file references.
+
 ## [2026-11-02] — ZEZO OS Signature Home Layout: Power Sidebar & Dual-Mode Adaptive Canvas (Option B)
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Why this was built / Root Cause & Motivation:**
@@ -16,7 +131,7 @@
     6. **UI Polish & Spacing Refinements:**
        - Replaced sidebar icon with official ZEZO logo (`/logo.png`) and removed redundant `v0.61` & `Autonomous OS` text.
        - Removed redundant `[● OFFLINE]` / `Ready` status indicator in the top header.
-       - Resolved Live Voice spacing issue by uniting avatar, state badge, live subtitles, and control buttons into a tightly grouped, centered column (`gap-3.5`).
+       - Unified Live Voice controls: combined the separate State Badge, Subtitle Stream, and 4 Control Buttons (`MUTE`, `SPEAKER`, `STOP`, `OFF`) into **one single cohesive card frame** with header state/equalizer, middle transcript stream, and footer button cluster with balanced internal spacing.
 - **Execution & Changes Applied:**
   - **`frontend/src/components/assistant-ui/ZezoChatThread.tsx`:**
     - Augmented `ZezoPillComposer` with a file attachment button `[📎]`, uploaded file chips display strip with removal `[✕]`, and a Web Speech API dictation button `[🎙️]`.

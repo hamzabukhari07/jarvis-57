@@ -177,3 +177,72 @@ To scale effortlessly to hundreds of notes without synchronous disk I/O bottlene
 - **100% Local-First:** All 3 memory tiers reside strictly on the local filesystem (`memory/`). No memory data is synced to external vector clouds.
 - **Git-Ignored:** `memory/long_term.json`, `memory/zezo_brain.db`, and `memory/vault/` are listed in `.gitignore` to prevent leaking private credentials or conversation transcripts.
 - **User Editing:** The user can inspect, modify, or delete any Markdown note or memory entry at any time via file explorer or the in-app Memory Explorer settings tab.
+
+---
+
+## 🚀 6. Fast-Path Hybrid Memory Engine (Option 1 Architecture)
+
+### 1. Root Cause & Problem Statement
+In previous iterations, fact ingestion (`update_memory()`) performed synchronous atomic file replacements (`os.replace`) with exponential retry sleep loops directly inside the `asyncio` event loop. Under Windows filesystem locking (e.g., Windows Search Indexer, antivirus scans), this caused up to 600ms latency spikes, stalling the live WebSocket audio stream and producing audible speech stutter.
+
+### 2. Architecture & Durability Flow
+Option 1 completely decouples memory ingestion from synchronous disk commits:
+
+```
+[Tool: memory(learn/forget)]
+          │
+          ├── (1) Checks session incognito pause (memory_state.is_memory_paused())
+          ├── (2) Increments monotonic _seq_counter under _seq_lock
+          ├── (3) Updates _uncommitted_overlay[(category, key)] = (value, seq)
+          ├── (4) Appends JSONL entry to memory/outbox_journal.jsonl under _journal_lock
+          ├── (5) Pushes to queue.Queue(maxsize=256)
+          └── (6) Returns immediate in-memory ACK (<1.0ms, status: "queued")
+                    │
+                    ▼
+          [Background Outbox Worker (1.5s drain interval)]
+                    │
+                    ├── (1) Drains batch up to 32 entries
+                    ├── (2) Commits to long_term.json and SQLite facts table (3 retries with exponential backoff)
+                    │       └── [Poison-Pill Single-Item Isolation]: If batch fails, commits healthy items and
+                    │           routes bad item to memory/outbox_dead_letter.jsonl
+                    ├── (3) Compaction under _journal_lock: Rewrites outbox_journal.jsonl via os.replace
+                    ├── (4) Advances in-memory _committed_watermark = target_watermark
+                    ├── (5) Persists checkpoint ledger to memory/outbox_checkpoint.json
+                    ├── (6) Evicts committed keys (seq <= _committed_watermark) from _uncommitted_overlay
+                    └── (7) Broadcasts WebSocket event: memory_activity (status: "persisted" | "failed")
+```
+
+### 3. Read-Your-Writes Zero Latency Retrieval
+To ensure that facts learned in the current turn are immediately searchable before background disk commits:
+- `_search_raw_facts()` and `all_entries_for_ui()` merge `_uncommitted_overlay` directly over the baseline `long_term.json`.
+- Newly learned facts receive an extra recency weight in scoring.
+- Pending deletions (`value=None`) immediately suppress matching stored facts from search results.
+
+### 4. Relearn-Safe Tombstones & Privacy Boundary
+- **SQLite Tombstones:** `deleted_fact_tombstones (category, key, deleted_at)` records deletions. `record_learn()` deletes matching tombstones. Stale `sync_facts_from_dict()` calls skip tombstoned keys where `deleted_at > updated_at`.
+- **Source-Turn Scrubbing:** Forgetting a fact scrubs memory tool invocations in the `turns` table to `[Fact removed by user]`, updating `turns_fts` via automated triggers. Verbatim conversational utterances are preserved for chronological audit integrity.
+
+### 5. In-Chat Memory Chips & User Sovereignty
+- **Micro-States:**
+  - `queued`: `⏳ Saving: {key} ({value})` (pulsing indicator).
+  - `persisted`: `🧠 Remembered: {key} ({value}) [✕]` (ReUI button).
+  - `failed`: `⚠️ Save failed: {key} ({value}) [Retry]` (tooltip with failure reason).
+- **Instant Revert / Forget:** Clicking `[✕]` optimistically fades out the chip and issues `POST /api/memory/fact/delete` (reverting to `previous_value` if present, or deleting).
+- **Session-Scoped Incognito Mode:** Discrete `[MEM / INCOGNITO]` badge toggle in the chat composer allows users to pause all fact learning and turn logging for sensitive discussions.
+
+### 6. Bounded Pre-Turn Contextual Recall (Typed Mode Only)
+- In typed chat mode (`_on_text_command`), input text >= 8 characters triggers a non-blocking background search in `sqlite_memory.search_scroll_history()`.
+- **Strict SLA:** Capped at 180ms (`asyncio.wait_for(timeout=0.18)`).
+- **Threshold & Budget:** Blended BM25/recency score >= 0.45, max 3 turns, max 600 characters total. Context is framed as untrusted historical data.
+- **Audio Hands-Off:** Streaming live voice pipelines remain 100% untouched per AGENTS.md Core Rule 6.
+
+### 7. Obsidian-Style Dynamic Knowledge Graph Architecture
+The 3D Knowledge Galaxy (`memory/vault_engine.py` & `frontend/src/components/memory/MemoryGraphCanvas.tsx`) implements an organic, emergent graph structure modeled after Obsidian:
+- **Zero Hardcoded Parent Anchors:** Notes do not contain forced static links (e.g. `[[ZEZO OS]]` or `[[Hamza Bukhari]]`). All topology emerges naturally from note content, explicit conversational `[[wikilinks]]`, and contextual topic clusters.
+- **Dynamic Degree Centrality:** Each node's link degree (`deg = in_degree + out_degree`) is calculated dynamically on graph compilation.
+- **Logarithmic Node Radius Scaling:** Node sizes follow a smooth logarithmic curve:
+  $$\text{size} = \text{clamp}(10, 34, \lfloor 10 + 8 \times \ln(1 + \text{deg}) \rfloor)$$
+  This guarantees that highly connected hub notes expand naturally without blowing up or crowding out leaf nodes.
+- **Dynamic D3 Force Clustering:** WebGL force simulation clusters hub nodes tightly (`linkDistance = 40`) while spacing out leaves (`linkDistance = 120`), creating natural galaxy clusters.
+- **Non-Blocking Background Vault Sync:** `_run_vault_sync()` in `main.py` synchronizes new SQLite turns into Markdown vault notes in the background with automatic retry error recovery.
+

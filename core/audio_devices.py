@@ -110,10 +110,12 @@ _PREFERRED_APIS = {
 # detail: DirectSound input passes a callback stream and fails a blocking read,
 # so an earlier version of this probe rejected a microphone that works perfectly
 # in the app. Probe the mode you ship, not the mode that is easier to write.
-_PROBE_SECONDS = {"output": 0.6, "input": 0.35}
+_PROBE_SECONDS = {"output": 0.18, "input": 0.18}
 
 # Cache: {(api_name_or_None, kind): bool}
 _probe_results: dict = {}
+_prefetch_done: threading.Event = threading.Event()
+_query_lock: threading.Lock = threading.Lock()
 
 
 def _transport_works(idx: int, kind: str, api_key) -> bool:
@@ -337,24 +339,43 @@ def prefetch() -> None:
     settings drawer never pays for enumeration on the Qt thread."""
     def _work():
         global _cache
-        result = _query()
-        with _cache_lock:
-            _cache = result
+        with _query_lock:
+            with _cache_lock:
+                if _cache is not None:
+                    _prefetch_done.set()
+                    return
+            result = _query()
+            with _cache_lock:
+                _cache = result
+            _prefetch_done.set()
         print(f"[Audio] {len(result['input'])} input / "
               f"{len(result['output'])} output devices found")
+
+    _prefetch_done.clear()
     threading.Thread(target=_work, daemon=True, name="audio-devices").start()
 
 
 def list_devices(kind: str, refresh: bool = False) -> list[str]:
-    """Device names for 'input' or 'output'. Falls back to a synchronous query
-    if the prefetch has not landed yet — correctness over the cache."""
+    """Device names for 'input' or 'output'. Awaits in-flight prefetch before
+    falling back to a synchronous query — prevents redundant concurrent probes."""
     global _cache
     with _cache_lock:
         cached = None if refresh else _cache
     if cached is None:
-        cached = _query()
-        with _cache_lock:
-            _cache = cached
+        # If prefetch is in flight, wait up to 2.5s for it to finish instead of double-probing
+        if not refresh and not _prefetch_done.is_set():
+            _prefetch_done.wait(timeout=2.5)
+            with _cache_lock:
+                cached = _cache
+        if cached is None:
+            with _query_lock:
+                with _cache_lock:
+                    cached = _cache
+                if cached is None:
+                    cached = _query()
+                    with _cache_lock:
+                        _cache = cached
+                    _prefetch_done.set()
     return list(cached.get(kind, []))
 
 

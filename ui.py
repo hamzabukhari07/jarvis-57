@@ -224,6 +224,8 @@ class MainWindow(QMainWindow):
         self._server.on_pipeline_settings_changed = self._handle_pipeline_settings_changed
         self._server.on_audio_devices_changed = self._handle_audio_devices_changed
         self._server.on_create_shortcut = self._create_desktop_shortcut
+        self.on_operational_mode_change = None
+        self._server.on_operational_mode_changed = self._handle_operational_mode_changed
         self._server.on_wake_toggle = lambda en: getattr(self, "on_wake_toggle", lambda x: "ok")(en) if hasattr(self, "on_wake_toggle") else "ok"
         self._server.on_ptt_toggle = lambda en: getattr(self, "on_push_to_talk", lambda x: "ok")(en) if hasattr(self, "on_push_to_talk") else "ok"
         self._server.get_initial_state = self._get_initial_state
@@ -416,6 +418,13 @@ class MainWindow(QMainWindow):
     def _handle_interrupt(self):
         if self.on_interrupt:
             self.on_interrupt()
+
+    def _handle_operational_mode_changed(self, mode: str):
+        if self.on_operational_mode_change:
+            try:
+                self.on_operational_mode_change(mode)
+            except Exception as e:
+                logger.warning("Error in on_operational_mode_change callback: %s", e)
 
     def _handle_mute_toggle(self, muted: bool):
         self._muted = muted
@@ -814,6 +823,14 @@ class ZezoUI:
     @on_push_to_talk.setter
     def on_push_to_talk(self, cb: Callable[[bool], str] | None):
         self._win.on_push_to_talk = cb
+
+    @property
+    def on_operational_mode_change(self) -> Callable[[str], None] | None:
+        return getattr(self._win, "on_operational_mode_change", None)
+
+    @on_operational_mode_change.setter
+    def on_operational_mode_change(self, cb: Callable[[str], None] | None):
+        self._win.on_operational_mode_change = cb
 
     @property
     def current_file(self) -> str:

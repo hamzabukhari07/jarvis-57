@@ -213,6 +213,8 @@ class ZezoUIServer:
         self.on_accent_change: Callable[[str], None] | None = None
         self.on_pipeline_settings_changed: Callable[[], None] | None = None
         self.on_audio_devices_changed: Callable[[str, str], None] | None = None
+        self.on_operational_mode_changed: Callable[[str], None] | None = None
+        self._operational_mode: str = "chat"
         self.get_initial_state: Callable[[], dict[str, Any]] | None = None
 
     def start(self) -> None:
@@ -285,6 +287,10 @@ class ZezoUIServer:
         app.router.add_post("/api/memory/clear", self._memory_clear_handler)
         app.router.add_post("/api/memory/wipe_all", self._memory_wipe_all_handler)
         app.router.add_post("/api/memory/optimize", self._memory_optimize_handler)
+        app.router.add_post("/api/memory/fact/delete", self._memory_fact_delete_handler)
+        app.router.add_post("/api/memory/fact/retry", self._memory_fact_retry_handler)
+        app.router.add_get("/api/memory/pause", self._memory_pause_get_handler)
+        app.router.add_post("/api/memory/pause", self._memory_pause_set_handler)
         app.router.add_post("/api/workspace/set", self._workspace_set_handler)
         app.router.add_post("/api/workspace/pick", self._workspace_pick_handler)
         app.router.add_get("/api/remote", self._remote_gateway_handler)
@@ -327,6 +333,18 @@ class ZezoUIServer:
                 )
                 self.clipboard_watcher.start()
                 self._log_bus_task = asyncio.create_task(self._poll_log_bus_loop())
+
+                # Subscribe to memory outbox activity updates for WebSocket broadcast
+                try:
+                    from memory.memory_manager import register_memory_activity_callback
+
+                    def _on_mem_activity(payload: dict) -> None:
+                        if self._loop and self._loop.is_running() and not self._stopped.is_set():
+                            self._loop.call_soon_threadsafe(self.broadcast, "memory_activity", payload)
+
+                    register_memory_activity_callback(_on_mem_activity)
+                except Exception as ex:
+                    logger.warning("[UI Server] Failed to register memory activity callback: %s", ex)
                 break
             except OSError:
                 if attempt == 4:
@@ -1868,6 +1886,8 @@ class ZezoUIServer:
 
     async def _memory_clear_handler(self, request: web.Request) -> web.Response:
         try:
+            from memory.memory_manager import clear_pending_outbox
+            clear_pending_outbox()
             from memory.sqlite_memory import get_db_path
             db_path = get_db_path()
             if db_path.exists():
@@ -1889,7 +1909,9 @@ class ZezoUIServer:
         try:
             from memory.sqlite_memory import wipe_all_sqlite_memory
             from memory.vault_engine import vault_engine
-            from memory.memory_manager import wipe_all_long_term_json
+            from memory.memory_manager import wipe_all_long_term_json, clear_pending_outbox
+
+            clear_pending_outbox()
 
             preserve_profile = False
             try:
@@ -1927,6 +1949,87 @@ class ZezoUIServer:
             return web.json_response({"status": "success", "message": "Memory database optimized and vacuumed"})
         except Exception as e:
             logger.exception("Error in /api/memory/optimize: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_fact_delete_handler(self, request: web.Request) -> web.Response:
+        """Endpoint to forget or revert a specific memory fact."""
+        try:
+            data = await request.json()
+            category = str(data.get("category") or "notes").strip().lower()
+            key = str(data.get("key") or "").strip()
+            restore_value = data.get("restore_value")
+
+            if not key:
+                return web.json_response({"status": "error", "message": "Key is required"}, status=400)
+
+            from memory.memory_manager import queue_memory_forget, queue_memory_write
+            loop = asyncio.get_running_loop()
+
+            if restore_value is not None:
+                # Revert to previous value
+                res = await loop.run_in_executor(None, queue_memory_write, category, key, str(restore_value))
+            else:
+                # Forget fact
+                res = await loop.run_in_executor(None, queue_memory_forget, category, key)
+
+            return web.json_response({"status": "success", "result": res})
+        except Exception as e:
+            logger.exception("Error in /api/memory/fact/delete: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_fact_retry_handler(self, request: web.Request) -> web.Response:
+        """Endpoint to retry saving a failed memory fact."""
+        try:
+            from memory.memory_state import is_memory_paused
+            if is_memory_paused():
+                return web.json_response(
+                    {"status": "error", "message": "Cannot retry save while memory is paused."},
+                    status=400,
+                )
+
+            data = await request.json()
+            category = str(data.get("category") or "notes").strip().lower()
+            key = str(data.get("key") or "").strip()
+            value = str(data.get("value") or "").strip()
+
+            canonical_categories = {"identity", "preferences", "projects", "relationships", "wishes", "notes"}
+            if category not in canonical_categories:
+                return web.json_response(
+                    {"status": "error", "message": f"Invalid category '{category}'. Must be one of {sorted(canonical_categories)}"},
+                    status=400,
+                )
+
+            if not key or not value:
+                return web.json_response({"status": "error", "message": "Key and value are required"}, status=400)
+
+            from memory.memory_manager import queue_memory_write
+            loop = asyncio.get_running_loop()
+            res = await loop.run_in_executor(None, queue_memory_write, category, key, value)
+            return web.json_response({"status": "success", "result": res})
+        except Exception as e:
+            logger.exception("Error in /api/memory/fact/retry: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_pause_get_handler(self, request: web.Request) -> web.Response:
+        """Get current incognito memory pause state."""
+        try:
+            from memory.memory_state import is_memory_paused
+            return web.json_response({"paused": is_memory_paused()})
+        except Exception as e:
+            logger.exception("Error in GET /api/memory/pause: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_pause_set_handler(self, request: web.Request) -> web.Response:
+        """Toggle or set incognito memory pause state."""
+        try:
+            data = await request.json()
+            paused = bool(data.get("paused", False))
+            from memory.memory_state import set_memory_paused
+            set_memory_paused(paused)
+            self.broadcast("memory_pause_changed", {"paused": paused})
+            return web.json_response({"status": "success", "paused": paused})
+        except Exception as e:
+            logger.exception("Error in POST /api/memory/pause: %s", e)
             return web.json_response({"status": "error", "message": str(e)}, status=500)
 
     async def _workspace_set_handler(self, request: web.Request) -> web.Response:
@@ -2434,6 +2537,17 @@ class ZezoUIServer:
             except Exception as e:
                 logger.warning("Failed to toggle autostart: %s", e)
 
+        elif msg_type == "operational_mode":
+            mode = str(payload.get("mode", "chat")).strip().lower()
+            if mode in ("chat", "live"):
+                self._operational_mode = mode
+                if self.on_operational_mode_changed:
+                    try:
+                        self.on_operational_mode_changed(mode)
+                    except Exception as e:
+                        logger.warning("on_operational_mode_changed error: %s", e)
+                self.broadcast("operational_mode_status", {"mode": mode})
+
         elif msg_type == "brief_toggle":
             enable = bool(payload.get("enable", False))
             try:
@@ -2716,6 +2830,7 @@ class ZezoUIServer:
             "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
             "has_tavily_key": bool(get_tavily_api_key()),
             "tasks": tasks,
+            "operational_mode": getattr(self, "_operational_mode", "chat"),
             "timestamp": time.time(),
             **self._collect_audio_state(),
         }

@@ -13,6 +13,7 @@ Capabilities:
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Dict, Optional
 
 from memory.sqlite_memory import (
@@ -194,7 +195,7 @@ TOOL = {
         "Use op='expand' with lo and hi turn IDs to retrieve full untruncated past exchanges."
     ),
     "risk": "read_only",
-    "enabled": True,
+    "enabled": os.environ.get("ZEZO_UNIFIED_MEMORY_TOOL", "true").lower() == "false",
     "behavior": "BLOCKING",
     "parameters": {
         "type": "OBJECT",

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import type { MemoryActivityEntry } from '../types/zezo'
+import { api } from '../lib/api'
 
 export interface SocketMessage {
   type: string
@@ -76,10 +78,15 @@ export function useZezoSocket() {
     detail: '',
     variant: 'default',
   })
+  const [memoryActivities, setMemoryActivities] = useState<MemoryActivityEntry[]>([])
+  const [memoryPaused, setMemoryPaused] = useState<boolean>(false)
 
   const wsRef = useRef<WebSocket | null>(null)
   const lastAudioLevelRef = useRef<number>(0)
   const lastMicLevelRef = useRef<number>(0)
+  const operationalModeRef = useRef<'chat' | 'live'>(
+    (typeof window !== 'undefined' && (localStorage.getItem('zezo_operational_mode') as 'chat' | 'live')) || 'chat'
+  )
 
   const send = useCallback((msg: any) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -103,6 +110,16 @@ export function useZezoSocket() {
         ws.send(JSON.stringify({ type: 'get_backend_logs' }))
         ws.send(JSON.stringify({ type: 'get_audio_devices' }))
         ws.send(JSON.stringify({ type: 'get_remote_key' }))
+        ws.send(JSON.stringify({ type: 'operational_mode', mode: operationalModeRef.current }))
+
+        // Synchronize incognito memory pause state
+        api.getMemoryPause().then((res) => {
+          if (res && typeof res.paused === 'boolean') {
+            setMemoryPaused(res.paused)
+          }
+        }).catch((err) => {
+          console.debug('[ZezoWS] Failed to fetch memory pause state:', err)
+        })
       }
 
       ws.onclose = () => {
@@ -369,6 +386,35 @@ export function useZezoSocket() {
               }
               break
 
+            case 'memory_activity': {
+              const actPayload: MemoryActivityEntry = (d.data && typeof d.data === 'object') ? d.data : d
+              if (actPayload && actPayload.id) {
+                setMemoryActivities((prev) => {
+                  const existingIndex = prev.findIndex((c) => c.id === actPayload.id)
+                  if (existingIndex >= 0) {
+                    const updated = [...prev]
+                    updated[existingIndex] = {
+                      ...updated[existingIndex],
+                      status: actPayload.status,
+                      value: actPayload.value ?? updated[existingIndex].value,
+                      reason: actPayload.reason ?? updated[existingIndex].reason,
+                    }
+                    return updated
+                  }
+                  return [...prev, actPayload]
+                })
+                window.dispatchEvent(new CustomEvent('zezo_memory_activity', { detail: actPayload }))
+              }
+              break
+            }
+
+            case 'memory_pause_changed': {
+              const p = Boolean(d.paused ?? d.data?.paused ?? false)
+              setMemoryPaused(p)
+              window.dispatchEvent(new CustomEvent('zezo_memory_pause_changed', { detail: { paused: p } }))
+              break
+            }
+
             case 'fleet_updated':
             case 'agent_task_started':
             case 'agent_task_completed':
@@ -458,6 +504,14 @@ export function useZezoSocket() {
     setConfirmationState((prev) => ({ ...prev, active: false }))
   }, [send])
 
+  const sendOperationalMode = useCallback((mode: 'chat' | 'live') => {
+    operationalModeRef.current = mode
+    try {
+      localStorage.setItem('zezo_operational_mode', mode)
+    } catch {}
+    send({ type: 'operational_mode', mode })
+  }, [send])
+
   return {
     isConnected,
     systemState,
@@ -477,6 +531,10 @@ export function useZezoSocket() {
     setActiveAttachments,
     currentView,
     confirmationState,
+    memoryActivities,
+    setMemoryActivities,
+    memoryPaused,
+    setMemoryPaused,
     send,
     sendUserMessage,
     sendInterrupt,
@@ -487,6 +545,7 @@ export function useZezoSocket() {
     sendPayloadRemove,
     sendPayloadClear,
     sendConfirmationResolve,
+    sendOperationalMode,
     clearLogs,
     cancelTask,
     saveAudioDevices,

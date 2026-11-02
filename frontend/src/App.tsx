@@ -69,6 +69,7 @@ export default function App() {
     sendPttToggle,
     sendPayloadRemove,
     sendConfirmationResolve,
+    sendOperationalMode,
     clearLogs,
     cancelTask,
     saveAudioDevices,
@@ -90,7 +91,19 @@ export default function App() {
   const folderInputRef = useRef<HTMLInputElement>(null)
 
   // Signature Home Layout States (Chat vs Live Mode + Interactive Session Breadcrumbs)
-  const [operationalMode, setOperationalMode] = useState<'chat' | 'live'>('chat')
+  const [operationalMode, setOperationalMode] = useState<'chat' | 'live'>(() => {
+    try {
+      const saved = localStorage.getItem('zezo_operational_mode')
+      return saved === 'live' ? 'live' : 'chat'
+    } catch {
+      return 'chat'
+    }
+  })
+
+  const handleModeSwitch = useCallback((mode: 'chat' | 'live') => {
+    setOperationalMode(mode)
+    sendOperationalMode(mode)
+  }, [sendOperationalMode])
   const [sessionTitle, setSessionTitle] = useState<string>(() => {
     return localStorage.getItem('zezo_active_session_title') || 'Main Directive'
   })
@@ -777,7 +790,7 @@ export default function App() {
 
             {/* Session Switcher Popover Dropdown */}
             {isSessionDropdownOpen && (
-              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-64 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-xl p-1.5 z-50 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute top-full left-0 mt-1.5 w-72 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-xl p-1.5 z-50 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
                 <div className="px-2 py-1 text-[10px] font-mono font-semibold uppercase text-[var(--muted-foreground)] flex items-center justify-between">
                   <span>Chat Sessions</span>
                   <button
@@ -789,7 +802,7 @@ export default function App() {
                   </button>
                 </div>
                 <Separator className="bg-[var(--border)] my-0.5" />
-                <div className="max-h-48 overflow-y-auto space-y-0.5">
+                <div className="max-h-60 overflow-y-auto space-y-0.5">
                   {savedSessions.map((s) => (
                     <button
                       key={s.id}
@@ -802,7 +815,7 @@ export default function App() {
                           : "text-[var(--foreground)] hover:bg-[var(--secondary)]"
                       )}
                     >
-                      <span className="truncate max-w-[160px]">{s.title}</span>
+                      <span className="truncate max-w-[170px]">{s.title}</span>
                       <span className="text-[10px] font-mono text-[var(--muted-foreground)]">{s.date}</span>
                     </button>
                   ))}
@@ -817,7 +830,7 @@ export default function App() {
             <div className="flex items-center bg-[var(--input)] border border-[var(--border)] rounded-xl p-0.5 shadow-2xs">
               <button
                 type="button"
-                onClick={() => setOperationalMode('chat')}
+                onClick={() => handleModeSwitch('chat')}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer",
                   operationalMode === 'chat'
@@ -831,7 +844,7 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setOperationalMode('live')}
+                onClick={() => handleModeSwitch('live')}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer",
                   operationalMode === 'live'
@@ -921,117 +934,117 @@ export default function App() {
                 )}
               </div>
 
-              {/* State Badge with Pulse & Equalizer Soundwave (Directly under 3D avatar) */}
-              <div className="flex items-center gap-3 px-4 py-1.5 rounded-full bg-[var(--card)] border border-[var(--border)] shadow-xs">
-                <div className="flex items-center gap-2">
-                  <span className={cn(
-                    "w-2 h-2 rounded-full transition-colors duration-150",
-                    effectiveSystemState === 'listening' ? "bg-emerald-500 animate-pulse ring-2 ring-emerald-500/40" :
-                    effectiveSystemState === 'thinking' ? "bg-amber-500 animate-pulse ring-2 ring-amber-500/40" :
-                    effectiveSystemState === 'speaking' ? "bg-[var(--accent)] animate-pulse ring-2 ring-[var(--accent)]/40" :
-                    "bg-[var(--muted-foreground)]"
-                  )} />
-                  <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--foreground)] font-semibold">
-                    {effectiveSystemState}
-                  </span>
+              {/* ── UNIFIED LIVE VOICE CONTROL & SUBTITLES FRAME ── */}
+              <div className="w-full max-w-lg rounded-2xl bg-[var(--card)]/90 backdrop-blur-md border border-[var(--border)] shadow-md p-3.5 flex flex-col gap-3">
+                {/* Frame Header: State Badge with Equalizer & Stream Status */}
+                <div className="flex items-center justify-between gap-2 pb-2 border-b border-[var(--border)]/60">
+                  {/* State Badge with Pulse */}
+                  <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-[var(--input)]/80 border border-[var(--border)]/60">
+                    <span className={cn(
+                      "w-2 h-2 rounded-full transition-colors duration-150 shrink-0",
+                      effectiveSystemState === 'listening' ? "bg-emerald-500 animate-pulse ring-2 ring-emerald-500/40" :
+                      effectiveSystemState === 'thinking' ? "bg-amber-500 animate-pulse ring-2 ring-amber-500/40" :
+                      effectiveSystemState === 'speaking' ? "bg-[var(--accent)] animate-pulse ring-2 ring-[var(--accent)]/40" :
+                      "bg-[var(--muted-foreground)]"
+                    )} />
+                    <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--foreground)] font-semibold">
+                      {effectiveSystemState}
+                    </span>
+
+                    {/* Soundwave Equalizer when speaking */}
+                    {effectiveSystemState === 'speaking' && (
+                      <div className="flex items-center gap-0.5 h-3 px-1 ml-1 rounded-full bg-[var(--background)] border border-[var(--border)]/60">
+                        <div className="w-0.5 bg-emerald-400 rounded-full animate-soundwave-1" />
+                        <div className="w-0.5 bg-emerald-500 rounded-full animate-soundwave-2" />
+                        <div className="w-0.5 bg-cyan-400 rounded-full animate-soundwave-3" />
+                        <div className="w-0.5 bg-[var(--accent)] rounded-full animate-soundwave-4" />
+                        <div className="w-0.5 bg-amber-400 rounded-full animate-soundwave-5" />
+                        <div className="w-0.5 bg-emerald-400 rounded-full animate-soundwave-6" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Live Stream Label */}
+                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-[var(--muted-foreground)] uppercase">
+                    <Radio className="w-3 h-3 text-[var(--primary)] animate-pulse" />
+                    <span>Live Voice Subtitles</span>
+                  </div>
                 </div>
 
-                {/* Soundwave Equalizer when speaking */}
-                {effectiveSystemState === 'speaking' && (
-                  <div className="flex items-center gap-1 h-3.5 px-1.5 py-0.5 rounded-full bg-[var(--input)] border border-[var(--border)]/60">
-                    <div className="w-0.5 bg-emerald-400 rounded-full animate-soundwave-1" />
-                    <div className="w-0.5 bg-emerald-500 rounded-full animate-soundwave-2" />
-                    <div className="w-0.5 bg-cyan-400 rounded-full animate-soundwave-3" />
-                    <div className="w-0.5 bg-[var(--accent)] rounded-full animate-soundwave-4" />
-                    <div className="w-0.5 bg-amber-400 rounded-full animate-soundwave-5" />
-                    <div className="w-0.5 bg-emerald-400 rounded-full animate-soundwave-6" />
-                  </div>
-                )}
-              </div>
-
-              {/* Live Voice Subtitle Stream (User's addition to Image 5) */}
-              <div className="w-full max-w-lg px-2">
-                <div className="p-3 rounded-xl bg-[var(--card)]/90 backdrop-blur-md border border-[var(--border)] shadow-sm space-y-2">
-                  <div className="flex items-center justify-between text-[10px] font-mono text-[var(--muted-foreground)] uppercase">
-                    <span className="flex items-center gap-1.5">
-                      <Radio className="w-3 h-3 text-[var(--primary)] animate-pulse" />
-                      Live Voice Stream
-                    </span>
-                    <span>Subtitles</span>
-                  </div>
-
+                {/* Frame Body: Live Speech Transcript Stream */}
+                <div className="min-h-[44px] max-h-[88px] overflow-y-auto px-1 space-y-1.5 text-xs">
                   {latestUserMessage && (
-                    <div className="text-xs text-[var(--foreground)] flex items-start gap-2">
+                    <div className="flex items-start gap-2">
                       <span className="font-semibold text-[var(--primary)] shrink-0 font-mono text-[11px]">You:</span>
-                      <span className="line-clamp-2 leading-relaxed">{latestUserMessage.text}</span>
+                      <span className="line-clamp-2 leading-relaxed text-[var(--foreground)]">{latestUserMessage.text}</span>
                     </div>
                   )}
 
                   {latestAssistantMessage && (
-                    <div className="text-xs text-[var(--muted-foreground)] flex items-start gap-2 border-t border-[var(--border)]/40 pt-1.5">
+                    <div className={cn("flex items-start gap-2", latestUserMessage && "border-t border-[var(--border)]/40 pt-1.5")}>
                       <span className="font-semibold text-emerald-400 shrink-0 font-mono text-[11px]">ZEZO:</span>
                       <span className="line-clamp-2 leading-relaxed text-[var(--foreground)]/90">{latestAssistantMessage.text}</span>
                     </div>
                   )}
 
                   {!latestUserMessage && !latestAssistantMessage && (
-                    <div className="text-xs text-[var(--muted-foreground)] italic text-center py-1">
+                    <div className="text-[11px] text-[var(--muted-foreground)] italic text-center py-2 font-mono">
                       Listening for speech... Say &quot;Hey Zezo&quot; or start speaking.
                     </div>
                   )}
                 </div>
+
+                {/* Frame Footer: 4 Control Buttons Cluster (MUTE, SPEAKER, STOP, OFF) */}
+                <div className="pt-2.5 border-t border-[var(--border)]/60 flex items-center justify-between gap-2">
+                  {/* Mic Mute Toggle */}
+                  <Button
+                    variant={isMicMuted ? "destructive" : "outline"}
+                    size="sm"
+                    onClick={handleToggleMic}
+                    title={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
+                    className="flex-1 h-8 px-2 gap-1.5 text-xs font-medium cursor-pointer"
+                  >
+                    {isMicMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-primary" />}
+                    <span className="text-[11px] font-mono font-semibold">{isMicMuted ? 'UNMUTE' : 'MUTE'}</span>
+                  </Button>
+
+                  {/* Speaker Voice Output Toggle */}
+                  <Button
+                    variant={isSpeakerMuted ? "destructive" : "outline"}
+                    size="sm"
+                    onClick={handleToggleSpeaker}
+                    title={isSpeakerMuted ? "Unmute Assistant Voice Output" : "Mute Assistant Voice Output"}
+                    className="flex-1 h-8 px-2 gap-1.5 text-xs font-medium cursor-pointer"
+                  >
+                    {isSpeakerMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-primary" />}
+                    <span className="text-[11px] font-mono font-semibold">{isSpeakerMuted ? 'MUTED' : 'SPEAKER'}</span>
+                  </Button>
+
+                  {/* Emergency Stop */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleEmergencyStop}
+                    title="Emergency Stop (Interrupt Agent Execution)"
+                    className="flex-1 h-8 px-2 gap-1.5 text-xs font-medium hover:bg-destructive/15 hover:border-destructive/50 hover:text-destructive cursor-pointer"
+                  >
+                    <Square className="w-3.5 h-3.5 text-destructive" />
+                    <span className="text-[11px] font-mono font-semibold">STOP</span>
+                  </Button>
+
+                  {/* Power / Sleep Mode Toggle */}
+                  <Button
+                    variant={isSleeping ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={handleToggleSleep}
+                    title={isSleeping ? "Wake Assistant (Resume Active Mode)" : "Put Assistant to Sleep (Standby Mode)"}
+                    className="flex-1 h-8 px-2 gap-1.5 text-xs font-medium cursor-pointer"
+                  >
+                    <Power className={`w-3.5 h-3.5 ${isSleeping ? 'text-amber-400' : 'text-emerald-500'}`} />
+                    <span className="text-[11px] font-mono font-semibold">{isSleeping ? 'ON' : 'OFF'}</span>
+                  </Button>
+                </div>
               </div>
-
-              {/* Exact 4 Control Buttons Cluster from Image 5 (MUTE, SPEAKER, STOP, OFF) */}
-              <div className="flex flex-wrap items-center justify-center gap-2">
-              {/* Mic Mute Toggle */}
-              <Button
-                variant={isMicMuted ? "destructive" : "outline"}
-                size="sm"
-                onClick={handleToggleMic}
-                title={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
-                className="h-8 px-3.5 gap-1.5 text-xs font-medium shrink-0 cursor-pointer"
-              >
-                {isMicMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-primary" />}
-                <span className="text-[11px] font-mono font-semibold">{isMicMuted ? 'UNMUTE' : 'MUTE'}</span>
-              </Button>
-
-              {/* Speaker Voice Output Toggle */}
-              <Button
-                variant={isSpeakerMuted ? "destructive" : "outline"}
-                size="sm"
-                onClick={handleToggleSpeaker}
-                title={isSpeakerMuted ? "Unmute Assistant Voice Output" : "Mute Assistant Voice Output"}
-                className="h-8 px-3.5 gap-1.5 text-xs font-medium shrink-0 cursor-pointer"
-              >
-                {isSpeakerMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-primary" />}
-                <span className="text-[11px] font-mono font-semibold">{isSpeakerMuted ? 'MUTED' : 'SPEAKER'}</span>
-              </Button>
-
-              {/* Emergency Stop */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleEmergencyStop}
-                title="Emergency Stop (Interrupt Agent Execution)"
-                className="h-8 px-3.5 gap-1.5 text-xs font-medium hover:bg-destructive/15 hover:border-destructive/50 hover:text-destructive shrink-0 cursor-pointer"
-              >
-                <Square className="w-3.5 h-3.5 text-destructive" />
-                <span className="text-[11px] font-mono font-semibold">STOP</span>
-              </Button>
-
-              {/* Power / Sleep Mode Toggle */}
-              <Button
-                variant={isSleeping ? "secondary" : "outline"}
-                size="sm"
-                onClick={handleToggleSleep}
-                title={isSleeping ? "Wake Assistant (Resume Active Mode)" : "Put Assistant to Sleep (Standby Mode)"}
-                className="h-8 px-3.5 gap-1.5 text-xs font-medium shrink-0 cursor-pointer"
-              >
-                <Power className={`w-3.5 h-3.5 ${isSleeping ? 'text-amber-400' : 'text-emerald-500'}`} />
-                <span className="text-[11px] font-mono font-semibold">{isSleeping ? 'ON' : 'OFF'}</span>
-              </Button>
-            </div>
           </div>
         </main>
         )
@@ -1132,3 +1145,4 @@ export default function App() {
     </div>
   )
 }
+

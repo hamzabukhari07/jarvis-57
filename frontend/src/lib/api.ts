@@ -261,6 +261,45 @@ export const api = {
     return res.json()
   },
 
+  async deleteFact(category: string, key: string, restoreValue?: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/api/memory/fact/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, key, restore_value: restoreValue }),
+    })
+    if (!res.ok) throw new Error(`Failed to delete/revert fact: ${res.statusText}`)
+    return res.json()
+  },
+
+  async retryFact(category: string, key: string, value: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/api/memory/fact/retry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, key, value }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }))
+      throw new Error(err.message || `Failed to retry fact: ${res.statusText}`)
+    }
+    return res.json()
+  },
+
+  async getMemoryPause(): Promise<{ paused: boolean }> {
+    const res = await fetch(`${API_BASE}/api/memory/pause`)
+    if (!res.ok) throw new Error(`Failed to fetch memory pause state: ${res.statusText}`)
+    return res.json()
+  },
+
+  async setMemoryPause(paused: boolean): Promise<{ status: string; paused: boolean }> {
+    const res = await fetch(`${API_BASE}/api/memory/pause`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paused }),
+    })
+    if (!res.ok) throw new Error(`Failed to set memory pause: ${res.statusText}`)
+    return res.json()
+  },
+
   async setWorkspace(path: string): Promise<{ status: string; active_workspace: string }> {
     const res = await fetch(`${API_BASE}/api/workspace/set`, {
       method: 'POST',

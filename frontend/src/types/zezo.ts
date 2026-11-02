@@ -79,3 +79,16 @@ export interface MemoryGraphNodeData {
   timestamp?: number
 }
 
+export interface MemoryActivityEntry {
+  id: string
+  action: 'learned' | 'forgotten'
+  category: string
+  key: string
+  value?: string
+  previous_value?: string
+  status: 'queued' | 'persisted' | 'failed'
+  reason?: string
+  timestamp: number
+  turn_id?: string
+}
+

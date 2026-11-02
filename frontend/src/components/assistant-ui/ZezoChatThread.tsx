@@ -1,4 +1,4 @@
-import { type FC } from "react";
+import { type FC, useState, useEffect } from "react";
 import {
   ThreadPrimitive,
   ComposerPrimitive,
@@ -23,10 +23,18 @@ import {
   X,
   FileCode,
   FolderOpen,
+  Brain,
+  RotateCcw,
+  EyeOff,
+  Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "../ui/button";
+import { Badge } from "../reui/badge";
 import { cn } from "@/lib/utils";
 import { ChatAvatarIcon } from "../avatar/ChatAvatarIcon";
+import type { MemoryActivityEntry } from "@/types/zezo";
+import { api } from "@/lib/api";
 
 function formatMessageTime(date?: Date | string | number): string {
   if (!date) return "";
@@ -34,6 +42,136 @@ function formatMessageTime(date?: Date | string | number): string {
   if (!(d instanceof Date) || isNaN(d.getTime())) return "";
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
 }
+
+/* ── Memory Activity Chip (Fast-Path Read-Your-Writes Micro-State Chip) ── */
+export const ChatMemoryChip: FC<{
+  entry: MemoryActivityEntry;
+  onUndo?: (entry: MemoryActivityEntry) => void;
+  onRetry?: (entry: MemoryActivityEntry) => void;
+}> = ({ entry, onUndo, onRetry }) => {
+  const [isDismissed, setIsDismissed] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  // Keyboard accessibility: Escape key dismisses chip without deleting/forgetting fact
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsDismissed(true);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  if (isDismissed) return null;
+
+  const handleUndo = async () => {
+    if (isUndoing || !onUndo) return;
+    setIsUndoing(true);
+    try {
+      await onUndo(entry);
+      setIsDismissed(true);
+    } catch (err) {
+      console.error("[ChatMemoryChip] Undo failed:", err);
+      setIsUndoing(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    if (isRetrying || !onRetry) return;
+    setIsRetrying(true);
+    try {
+      await onRetry(entry);
+    } catch (err) {
+      console.error("[ChatMemoryChip] Retry failed:", err);
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  if (entry.status === "queued") {
+    return (
+      <Badge
+        variant="queued"
+        size="sm"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-sans font-medium text-[var(--muted-foreground)] bg-[var(--card)]/90 border border-[var(--border)] shadow-2xs rounded-full transition-opacity duration-300 animate-pulse select-none"
+      >
+        <Loader2 className="w-3 h-3 animate-spin text-[var(--primary)] shrink-0" />
+        <span>Saving:</span>
+        <span className="font-semibold text-[var(--foreground)]">{entry.key}</span>
+        {entry.value && (
+          <span className="text-[var(--muted-foreground)] font-mono text-[10px] truncate max-w-[120px]">
+            ({entry.value})
+          </span>
+        )}
+      </Badge>
+    );
+  }
+
+  if (entry.status === "failed") {
+    return (
+      <Badge
+        variant="destructive"
+        size="sm"
+        title={entry.reason || "Failed to persist memory fact"}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-sans font-medium bg-red-500/10 text-red-400 border border-red-500/30 rounded-full transition-opacity duration-300 shadow-2xs select-none"
+      >
+        <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
+        <span>Save failed:</span>
+        <span className="font-semibold text-red-300">{entry.key}</span>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={handleRetry}
+            disabled={isRetrying}
+            className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-red-300 hover:text-white bg-red-500/20 hover:bg-red-500/40 px-1.5 py-0.5 rounded cursor-pointer transition-colors ml-1"
+            title="Retry memory save"
+          >
+            <RotateCcw className={cn("w-2.5 h-2.5", isRetrying && "animate-spin")} />
+            <span>Retry</span>
+          </button>
+        )}
+      </Badge>
+    );
+  }
+
+  // entry.status === "persisted"
+  const isForgotten = entry.action === "forgotten";
+  return (
+    <Badge
+      variant="completed"
+      size="sm"
+      className={cn(
+        "inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-sans font-medium rounded-full shadow-2xs transition-opacity duration-300 select-none",
+        isForgotten
+          ? "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+          : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+      )}
+    >
+      <Brain className="w-3 h-3 shrink-0" />
+      <span>{isForgotten ? "Fact removed from memory:" : "Remembered:"}</span>
+      <span className="font-semibold text-[var(--foreground)]">{entry.key}</span>
+      {!isForgotten && entry.value && (
+        <span className="text-[var(--muted-foreground)] font-mono text-[10px] truncate max-w-[140px]">
+          ({entry.value})
+        </span>
+      )}
+      {onUndo && (
+        <button
+          type="button"
+          onClick={handleUndo}
+          disabled={isUndoing}
+          aria-label={`Forget memory ${entry.key}`}
+          className="ml-1 p-0.5 text-[var(--muted-foreground)] hover:text-red-400 hover:bg-[var(--secondary)] rounded-full transition-colors cursor-pointer"
+          title={isForgotten ? "Undo removal" : "Forget this fact"}
+        >
+          {isUndoing ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+        </button>
+      )}
+    </Badge>
+  );
+};
 
 /* ── 1. User Message (Spoken / Typed Directive) ── */
 export const UserMessage: FC = () => {
@@ -81,6 +219,54 @@ export const AssistantMessage: FC = () => {
   const createdAt = useAuiState((s) => s.message.createdAt);
   const timeStr = formatMessageTime(createdAt);
 
+  // Read-Your-Writes In-Chat Memory Activities
+  const [activities, setActivities] = useState<MemoryActivityEntry[]>([]);
+
+  useEffect(() => {
+    const handleActivity = (e: Event) => {
+      const customEvt = e as CustomEvent<MemoryActivityEntry>;
+      if (!customEvt.detail || !customEvt.detail.id) return;
+      const entry = customEvt.detail;
+
+      setActivities((prev) => {
+        const existingIdx = prev.findIndex((a) => a.id === entry.id);
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            status: entry.status,
+            value: entry.value ?? updated[existingIdx].value,
+            reason: entry.reason ?? updated[existingIdx].reason,
+          };
+          return updated;
+        }
+        // Keep up to 5 recent activity chips
+        return [...prev.slice(-4), entry];
+      });
+    };
+
+    window.addEventListener("zezo_memory_activity", handleActivity);
+    return () => window.removeEventListener("zezo_memory_activity", handleActivity);
+  }, []);
+
+  const handleUndo = async (entry: MemoryActivityEntry) => {
+    if (entry.action === "forgotten") {
+      // Revert forget by restoring previous value if known
+      if (entry.value) {
+        await api.retryFact(entry.category, entry.key, entry.value);
+      }
+    } else {
+      // Forget fact (or revert to previous value)
+      await api.deleteFact(entry.category, entry.key, entry.previous_value);
+    }
+  };
+
+  const handleRetry = async (entry: MemoryActivityEntry) => {
+    if (entry.value) {
+      await api.retryFact(entry.category, entry.key, entry.value);
+    }
+  };
+
   return (
     <MessagePrimitive.Root
       data-slot="aui-assistant-message"
@@ -98,12 +284,26 @@ export const AssistantMessage: FC = () => {
 
         {/* Live Speech Dialogue & Real-time Transcription Stream */}
         <PKMessageContent markdown className="flex-1 min-w-0 bg-transparent p-0 text-xs text-[var(--foreground)] leading-relaxed">
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <MessagePrimitive.Parts
               components={{
                 Text: TextPart,
               }}
             />
+
+            {/* In-Chat Fast-Path Memory Chips */}
+            {activities.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {activities.map((act) => (
+                  <ChatMemoryChip
+                    key={act.id}
+                    entry={act}
+                    onUndo={handleUndo}
+                    onRetry={handleRetry}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* Realtime Speaking Waveform Pulse during active speech generation */}
             {isRunning && (
@@ -217,6 +417,7 @@ export const ZezoPillComposer: FC<{
             </button>
           )}
 
+
           {/* Voice Dictation Button */}
           {onToggleDictate && (
             <button
@@ -290,8 +491,55 @@ export const ZezoChatThread: FC<{
   isDictating,
   onToggleDictate,
 }) => {
+  const [memoryPaused, setMemoryPaused] = useState<boolean>(false);
+
+  useEffect(() => {
+    api.getMemoryPause().then((res) => {
+      if (res && typeof res.paused === "boolean") {
+        setMemoryPaused(res.paused);
+      }
+    }).catch(() => {});
+
+    const handlePauseChanged = (e: Event) => {
+      const customEvt = e as CustomEvent<{ paused: boolean }>;
+      if (customEvt.detail && typeof customEvt.detail.paused === "boolean") {
+        setMemoryPaused(customEvt.detail.paused);
+      }
+    };
+    window.addEventListener("zezo_memory_pause_changed", handlePauseChanged);
+    return () => window.removeEventListener("zezo_memory_pause_changed", handlePauseChanged);
+  }, []);
+
+  const handleToggleMemoryPause = async () => {
+    const nextState = !memoryPaused;
+    setMemoryPaused(nextState);
+    try {
+      await api.setMemoryPause(nextState);
+    } catch (err) {
+      console.error("[ZezoChatThread] Failed to toggle memory pause:", err);
+      setMemoryPaused(!nextState);
+    }
+  };
+
   return (
-    <ThreadPrimitive.Root className={cn("flex flex-col h-full w-full bg-transparent overflow-hidden", className)}>
+    <ThreadPrimitive.Root className={cn("flex flex-col h-full w-full bg-transparent overflow-hidden relative", className)}>
+      {/* Top Left Corner: Incognito Pause Memory Badge Button */}
+      <div className="absolute top-2.5 left-4 z-20">
+        <button
+          type="button"
+          onClick={handleToggleMemoryPause}
+          className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider transition-all cursor-pointer shadow-2xs backdrop-blur-sm border",
+            memoryPaused
+              ? "bg-amber-500/20 text-amber-400 border-amber-500/40 hover:bg-amber-500/30"
+              : "bg-[var(--card)]/80 text-[var(--muted-foreground)] border-[var(--border)]/70 hover:bg-[var(--secondary)] hover:text-[var(--foreground)]"
+          )}
+          title={memoryPaused ? "Memory paused (Incognito Active) - Click to resume learning" : "Memory active - Click to pause learning (Incognito)"}
+        >
+          <EyeOff className={cn("w-3 h-3", memoryPaused && "text-amber-400")} />
+          <span>{memoryPaused ? "INCOGNITO" : "MEM"}</span>
+        </button>
+      </div>
       <ThreadPrimitive.Viewport
         data-slot="aui-thread-viewport"
         className="flex-1 overflow-y-auto px-4 py-3 space-y-4 focus:outline-none scroll-smooth"

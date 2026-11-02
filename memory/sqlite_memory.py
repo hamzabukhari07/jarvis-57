@@ -21,6 +21,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
+from memory.memory_state import is_memory_paused
+
 
 def get_base_dir() -> Path:
     if getattr(sys, "frozen", False):
@@ -224,6 +226,18 @@ def init_db() -> None:
                     );
                 """)
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_cond_sess ON session_condensations(session_id);")
+
+                # 8. Deleted Fact Tombstones table (Anti-Resurrection & Relearn Safety)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS deleted_fact_tombstones (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        category TEXT NOT NULL,
+                        key TEXT NOT NULL,
+                        deleted_at TEXT NOT NULL,
+                        UNIQUE(category, key)
+                    );
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_fact_tombstones ON deleted_fact_tombstones(category, key);")
         finally:
             conn.close()
 
@@ -237,6 +251,9 @@ def log_turn(
     session_id: Optional[str] = None,
 ) -> None:
     """Asynchronously / thread-safely persist a conversation turn or tool invocation."""
+    if is_memory_paused():
+        return
+
     sess_id = session_id or _current_session_id
     clean_content = redact_secrets(content or "")
     clean_tool_name = (tool_name or "").strip() or None
@@ -271,7 +288,7 @@ def log_turn(
 
 
 def sync_facts_from_dict(memory_dict: dict) -> None:
-    """Sync existing JSON dictionary memory structure into SQLite facts table."""
+    """Sync existing JSON dictionary memory structure into SQLite facts table (respecting tombstones)."""
     if not isinstance(memory_dict, dict):
         return
     now_str = datetime.now().strftime("%Y-%m-%d")
@@ -279,6 +296,10 @@ def sync_facts_from_dict(memory_dict: dict) -> None:
         try:
             conn = _get_connection()
             with conn:
+                # Load active tombstones to prevent resurrecting explicitly deleted facts
+                tombstone_rows = conn.execute("SELECT category, key, deleted_at FROM deleted_fact_tombstones").fetchall()
+                tombstones = {(r["category"], r["key"]): r["deleted_at"] for r in tombstone_rows}
+
                 valid_pairs = set()
                 for cat, items in memory_dict.items():
                     if not isinstance(items, dict):
@@ -287,7 +308,17 @@ def sync_facts_from_dict(memory_dict: dict) -> None:
                         val = entry.get("value", "") if isinstance(entry, dict) else str(entry or "")
                         updated = (entry.get("updated", "") if isinstance(entry, dict) else "") or now_str
                         if val:
-                            valid_pairs.add((cat, key))
+                            pair = (cat, key)
+                            # Tombstone guard: do not resurrect deleted facts from stale dictionary
+                            if pair in tombstones:
+                                tomb_dt = tombstones[pair]
+                                if str(updated) < str(tomb_dt):
+                                    continue
+                                else:
+                                    conn.execute("DELETE FROM deleted_fact_tombstones WHERE category = ? AND key = ?", (cat, key))
+                                    tombstones.pop(pair, None)
+
+                            valid_pairs.add(pair)
                             conn.execute(
                                 """
                                 INSERT INTO facts (category, key, value, updated_at)
@@ -309,6 +340,82 @@ def sync_facts_from_dict(memory_dict: dict) -> None:
             conn.close()
         except Exception as e:
             print(f"[SQLite Memory] ⚠️ sync_facts error: {e}")
+
+
+def get_all_facts() -> dict[tuple[str, str], dict]:
+    """Retrieve all facts currently stored in the SQLite facts table."""
+    facts = {}
+    with _db_lock:
+        try:
+            conn = _get_connection()
+            cursor = conn.execute("SELECT category, key, value, updated_at FROM facts")
+            for row in cursor.fetchall():
+                facts[(row["category"], row["key"])] = {
+                    "value": row["value"],
+                    "updated_at": row["updated_at"],
+                }
+            conn.close()
+        except Exception as e:
+            print(f"[SQLite Memory] ⚠️ get_all_facts error: {e}")
+    return facts
+
+
+def delete_fact(category: str, key: str) -> bool:
+    """Delete fact from SQLite, create tombstone, and scrub memory tool execution records."""
+    deleted_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with _db_lock:
+        try:
+            conn = _get_connection()
+            with conn:
+                conn.execute("DELETE FROM facts WHERE category = ? AND key = ?", (category, key))
+                conn.execute(
+                    """
+                    INSERT INTO deleted_fact_tombstones (category, key, deleted_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(category, key) DO UPDATE SET deleted_at = excluded.deleted_at
+                    """,
+                    (category, key, deleted_at),
+                )
+                # Scrub memory tool call rows that referenced this key to prevent leaking deleted facts
+                conn.execute(
+                    """
+                    UPDATE turns SET content = '[Fact removed by user]'
+                    WHERE (tool_name = 'memory' OR tool_name = 'save_memory')
+                      AND tool_args LIKE '%"key": "' || ? || '"%'
+                    """,
+                    (key,),
+                )
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"[SQLite Memory] ⚠️ delete_fact error: {e}")
+            return False
+
+
+def record_learn(category: str, key: str, value: str, updated_at: Optional[str] = None) -> bool:
+    """Upsert fact into SQLite facts table and clear any existing tombstone (relearn-safe)."""
+    now_str = updated_at or datetime.now().strftime("%Y-%m-%d")
+    with _db_lock:
+        try:
+            conn = _get_connection()
+            with conn:
+                # Clear tombstone on explicit relearn
+                conn.execute("DELETE FROM deleted_fact_tombstones WHERE category = ? AND key = ?", (category, key))
+                conn.execute(
+                    """
+                    INSERT INTO facts (category, key, value, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(category, key) DO UPDATE SET
+                        value = excluded.value,
+                        updated_at = excluded.updated_at
+                    """,
+                    (category, key, str(value), str(now_str)),
+                )
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"[SQLite Memory] ⚠️ record_learn error: {e}")
+            return False
 
 
 def _rerank_by_recency(results: list[dict], weight: float, half_life_days: float) -> list[dict]:
@@ -467,6 +574,13 @@ def search_scroll_history(query: str, limit: int = 5, session_id: Optional[str] 
 
     if recency_weight > 0 and results:
         results = _rerank_by_recency(results, recency_weight, recency_half_life_days)
+    else:
+        for r in results:
+            if "score" not in r:
+                raw_rank = abs(float(r.get("rank") or 1.0))
+                r["score"] = round(raw_rank, 6) if raw_rank < 0.001 else round(raw_rank, 4)
+                if r["score"] == 0.0 and raw_rank > 0:
+                    r["score"] = 0.000001
 
     return results[:limit]
 

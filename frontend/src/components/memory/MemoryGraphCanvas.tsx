@@ -340,8 +340,9 @@ export const MemoryGraphCanvas: React.FC<MemoryGraphCanvasProps> = ({
         .linkDirectionalParticleWidth(1.2)
         .linkDirectionalParticleColor(() => '#818cf8')
         .nodeVal((node: any) => {
+          if (node.size && node.size > 0) return node.size / 4
           const degree = nodeDegrees.get(node.id) || 0
-          return Math.max(2.5, Math.min(8.5, 2.5 + Math.sqrt(degree) * 0.9))
+          return Math.max(2, Math.min(12, 2 + 3 * Math.log1p(degree)))
         })
         .nodeColor((node: any) => {
           const query = searchQueryRef.current
@@ -425,6 +426,21 @@ export const MemoryGraphCanvas: React.FC<MemoryGraphCanvasProps> = ({
         })
 
       Graph.graphData({ nodes: effectiveNodes, links: effectiveLinks })
+
+      // Dynamic link distance for Obsidian-like hub clustering
+      const linkForce = Graph.d3Force?.('link')
+      if (linkForce && typeof linkForce.distance === 'function') {
+        linkForce.distance((link: any) => {
+          const sId = typeof link.source === 'object' ? link.source.id : link.source
+          const tId = typeof link.target === 'object' ? link.target.id : link.target
+          const sDeg = nodeDegrees.get(sId) || 0
+          const tDeg = nodeDegrees.get(tId) || 0
+          const maxDeg = Math.max(sDeg, tDeg)
+          if (maxDeg > 5) return 40
+          if (maxDeg > 2) return 70
+          return 120
+        })
+      }
 
       // --- ADD 1,200 STAR CELESTIAL PARTICLE FIELD (KNOWLEDGE GALAXY DEPTH) ---
       const scene = Graph.scene?.()

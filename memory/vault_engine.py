@@ -10,7 +10,9 @@ Provides:
 
 from __future__ import annotations
 
+import collections
 import json
+import math
 import os
 import re
 import sys
@@ -305,16 +307,28 @@ class VaultEngine:
                     if not primary_topic:
                         primary_topic = f"Session {sess_id.replace('sess_', '')[:8]}"
 
-                    # Auto-detect wikilinks to connect this conversation to other nodes
-                    detected_links = ["[[ZEZO OS]]", "[[Hamza Bukhari]]"]
-                    combined_text = " ".join([t[1] for t in turns if t[1]]).lower()
+                    # Auto-detect wikilinks to connect this conversation dynamically
+                    detected_links = []
+                    raw_combined_text = " ".join([t[1] for t in turns if t[1]])
 
+                    # 1. Extract explicit [[wikilinks]] typed by user or AI in conversation
+                    explicit_wikilinks = WIKILINK_PATTERN.findall(raw_combined_text)
+                    for match in explicit_wikilinks:
+                        link_target = match[0].strip() if isinstance(match, tuple) else match.strip()
+                        if link_target:
+                            detected_links.append(f"[[{link_target}]]")
+
+                    # 2. Contextual topic linking without forced global parents
+                    combined_text = raw_combined_text.lower()
                     if any(w in combined_text for w in ("react", "ui", "frontend", "css", "settings", "theme", "modal", "dialog")):
                         detected_links.append("[[System Preferences]]")
                     if any(w in combined_text for w in ("fleet", "agent", "specialist", "verve", "flux", "michael", "nexus", "dwight")):
                         detected_links.append("[[Autonomous Specialist Fleet]]")
                     if any(w in combined_text for w in ("graph", "obsidian", "canvas", "d3", "memory")):
                         detected_links.append("[[Obsidian Knowledge Graph]]")
+
+                    # Deduplicate while preserving order
+                    detected_links = list(dict.fromkeys(detected_links))
 
                     date_str = str(start_time)[:10] if start_time else datetime.now().strftime("%Y-%m-%d")
 
@@ -855,6 +869,20 @@ class VaultEngine:
                         "target": target_id,
                         "value": 1,
                     })
+
+        # 3. Dynamic Obsidian-style degree calculation and logarithmic node scaling
+        in_degree: Dict[str, int] = collections.defaultdict(int)
+        out_degree: Dict[str, int] = collections.defaultdict(int)
+        for link in links:
+            out_degree[str(link["source"])] += 1
+            in_degree[str(link["target"])] += 1
+
+        for node in nodes:
+            nid = str(node["id"])
+            deg = in_degree[nid] + out_degree[nid]
+            node["degree"] = deg
+            # Logarithmic scaling: smooth growth that plateaus (Degree 0 -> 10, Degree 5 -> ~24, Degree 20 -> ~34)
+            node["size"] = max(10, min(34, int(10 + 8 * math.log1p(deg))))
 
         return {
             "status": "success",
