@@ -25,7 +25,7 @@ import {
  ExternalLink,
  X,
  ChevronRight,
-} from 'lucide-react'
+} from '@/lib/zezo-icons'
 import { api } from '../../lib/api'
 
 export function formatRelativeTime(epochSec?: number | string): string {

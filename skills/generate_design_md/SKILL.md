@@ -21,7 +21,7 @@ auto_activate: true
 
 > **Lead Architect & Creator:** Hamza Bukhari  
 > **Core Subsystem:** Autonomous Coding Engine Pipeline (Google Antigravity CLI `agy`, OpenCode, Kilo Code)  
-> **Target Audience:** Autonomous Coding Engines, Office Fleet Agents, and ZEZO Core Orchestrators.  
+> **Target Audience:** Autonomous Coding Engines, Office Specialist Agents, and ZEZO Core Orchestrators.  
 > **Core Axiom:** **Authenticity over invention.** Every token, color, font, radius, spacing step, and shadow documented must be traceable to real source code or extracted stylesheet data. You audit and extract the authentic design DNA — you do not redesign, invent unbacked tokens, or impose aesthetic bias.
 
 ---

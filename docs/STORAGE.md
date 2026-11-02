@@ -9,7 +9,7 @@
 ## 📖 1. Overview & Data Flow
 
 All operational state, memory databases, configurations, and generated code artifacts reside exclusively on the host filesystem. Data is segregated into:
-1. **Core Runtime Configuration (`config/`):** API credentials, fleet agent definitions, and MCP configurations.
+1. **Core Runtime Configuration (`config/`):** API credentials, agent definitions, and MCP configurations.
 2. **Hybrid 3-Tier Memory Engine (`memory/`):** Fast JSON profile priming, SQLite WAL + FTS5 database, and local Markdown knowledge vault.
 3. **External Desktop Workspaces (`~/Desktop/...`):** Isolated directories for heavy web captures, reverse-engineering teardowns, and application rebuilds.
 4. **Declarative Skills Directory (`skills/`):** Modular capability packages.
@@ -23,7 +23,7 @@ All operational state, memory databases, configurations, and generated code arti
 | Storage Item | Location | Format | Purpose | Security & Git Status |
 | :--- | :--- | :--- | :--- | :--- |
 | **API Keys & Toggles** | `config/api_keys.json` | JSON | Google Gemini, Groq, and ElevenLabs API keys; assistant name, voice persona, autostart, and brief mode flags. | **Git-Ignored.** Treated as sensitive credentials. |
-| **Fleet Roster & Worktrees**| `config/fleet_agents.json` | JSON | Fleet agent registry, Scranton office desk coordinates, LLM engine assignments, and risk tiers. | Tracked in Git (defaults). Local overrides preserved. |
+| **Agent Registry & Worktrees** | `config/agents.json` | JSON | Agent profiles, configured desk assignments, LLM engine assignments, and risk tiers. | Tracked in Git (defaults). Local overrides preserved. |
 | **MCP Server Config** | `config/mcp_servers.json` | JSON | Model Context Protocol server registrations and execution paths. | **Git-Ignored.** |
 | **Skills State** | `config/skills_state.json`| JSON | Enabled/disabled states and scan hashes for discovered skill packages. | **Git-Ignored.** |
 

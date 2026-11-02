@@ -62,7 +62,7 @@ _TOOL_CATEGORIES: dict[str, str] = {
     "quick_snippet": "coding",
     "code_engines_status": "coding",
     "ast_tool": "coding",
-    "fleet_control": "coding",
+    "agents_control": "coding",
     "task_status": "coding",
 
     # Web Intelligence & Automation
@@ -221,13 +221,13 @@ class ActionRegistry:
     def get_tool_declarations(self, agent_id: Optional[str] = None, mode: Optional[str] = None) -> list[dict]:
         """
         Returns Gemini function-declarations, optionally filtered by agent allowed_tools or execution mode.
-        If agent_id is provided, checks agent's allowed_tools from FleetManager.
+        If agent_id is provided, checks agent's allowed_tools from AgentManager.
         """
         allowed_set: Optional[set[str]] = None
         if agent_id:
             try:
-                from core.fleet_manager import fleet_manager
-                agent = fleet_manager.get_agent(agent_id)
+                from core.agents_manager import agent_manager
+                agent = agent_manager.get_agent(agent_id)
                 if agent and agent.allowed_tools:
                     allowed_set = set(agent.allowed_tools)
             except Exception as e:
@@ -265,8 +265,8 @@ class ActionRegistry:
         agent_name = None
         if agent_id:
             try:
-                from core.fleet_manager import fleet_manager
-                agent = fleet_manager.get_agent(agent_id)
+                from core.agents_manager import agent_manager
+                agent = agent_manager.get_agent(agent_id)
                 if agent:
                     agent_name = agent.name
                     if agent.allowed_tools:

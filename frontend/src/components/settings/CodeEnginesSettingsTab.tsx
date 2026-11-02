@@ -21,7 +21,7 @@ import {
   Loader2,
   Copy,
   Check,
-} from 'lucide-react'
+} from '@/lib/zezo-icons'
 import { api, type CodeEngineStatus } from '../../lib/api'
 import { cn } from '../../lib/utils'
 
@@ -180,7 +180,7 @@ export function CodeEnginesSettingsTab() {
     try {
       // Extract directory path if it's a file
       const dirPath = path.replace(/[/\\][^/\\]+$/, '')
-      await fetch('/api/fleet/open_folder', {
+      await fetch('/api/agents/open_folder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: dirPath }),

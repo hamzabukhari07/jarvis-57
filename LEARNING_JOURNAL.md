@@ -2,6 +2,13 @@
 
 # LEARNING JOURNAL (active — last 25 entries)
 
+## [2026-11-03] — Migrate Frontend Icons to Free Hugeicons
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root cause:** The frontend used Lucide icons; the requested icon refresh standardizes the app on free Hugeicons Stroke Rounded.
+- **Change:** Added `@hugeicons/react` and `@hugeicons/core-free-icons`, created `frontend/src/lib/zezo-icons.tsx` to map app semantic names to actual free icon exports, and migrated all frontend Lucide imports to that adapter. Removed `lucide-react`; visual sizing and existing classes stay at call sites.
+- **Documentation:** Updated `docs/FRONTEND_STRUCTURE.md` and the ReUI example in `EXAMPLES.md`.
+- **Verification:** `npx tsc -b` passed and `npm run build` completed (7,446 modules transformed). The build emitted existing Vite config-loader and large-chunk warnings; no Lucide imports remain.
+
 ## [2026-11-03] — Searchable, Scrollable Chat Session Picker
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Root cause:** The session dropdown displayed saved conversations in a small unfiltered list, which becomes difficult to navigate as chat history grows.
@@ -644,7 +651,7 @@
   - `core/fleet/dispatcher.py`
   - `core/skill_prompt_engineer.py`
   - `actions/run_skill.py`
-  - `docs/FLEET_MANAGEMENT.md`
+  - `docs/AGENTS_MANAGEMENT.md`
   - `docs/CODE_ENGINES.md`
   - `LEARNING_JOURNAL.md`
 - **Creator & Lead Architect:** Hamza Bukhari
@@ -715,11 +722,11 @@
     - Checked prompt for HTTP/HTTPS URLs via `re.search(r'https?://[^\s\'"<>]+', req_prompt)`.
     - If URL found: triggers `prefetch_url_assets` into `Path(w_target_dir)` with `task_ctx`, setting `context_dict["mode"] = "url"`, `"url"`, and `"prefetched_assets"`.
     - If no URL found: sets `context_dict["mode"] = "local"` and `"target_dir" = w_target_dir`.
-  - **`docs/FLEET_MANAGEMENT.md`:** Documented the pre-flight asset extraction and dual-mode dispatch mechanism for design audit workflows.
+  - **`docs/AGENTS_MANAGEMENT.md`:** Documented the pre-flight asset extraction and dual-mode dispatch mechanism for design audit workflows.
 - **Key Files Touched:**
   - `core/url_prefetch.py`
   - `core/fleet/dispatcher.py`
-  - `docs/FLEET_MANAGEMENT.md`
+  - `docs/AGENTS_MANAGEMENT.md`
   - `LEARNING_JOURNAL.md`
 - **Verification:**
   - Layer 1 (Static): `python -m py_compile core/url_prefetch.py core/fleet/dispatcher.py` passed with zero errors.
@@ -1312,7 +1319,7 @@ ami landing page.html).
   - **Continuous Telemetry Line Draining & Heartbeat Engine (`core/antigravity_runner.py`, `core/fleet/dispatcher.py`):**
     - Dedicated daemon reader thread (`bufsize=1`) drains CLI stdout line-by-line in real time, avoiding OS pipe buffer deadlocks.
     - Dynamic progress curve: smoothly advances across distinct milestones (30% -> 45% -> 60% -> 80% -> 95%) coupled with a 2.5-second fallback heartbeat cycle (`Synthesizing components...`, `Writing deliverable files...`) so the UI never stays silent for more than 2.5 seconds.
-  - **The 4-Way Scranton Fleet Swarm Pipeline (`core/fleet/orchestrator.py`, `docs/FLEET_MANAGEMENT.md`):**
+  - **The 4-Way Scranton Fleet Swarm Pipeline (`core/fleet/orchestrator.py`, `docs/AGENTS_MANAGEMENT.md`):**
     - Upgraded multi-agent workflow decomposition in `FleetOrchestrator.decompose_and_dispatch`:
       * **Verve (Antigravity):** Core layout, responsive grids, hero framing, Tailwind styling, design token fidelity.
       * **Flux (Antigravity):** Dynamic interactive components, modals, filters, overflow balance.
@@ -1330,7 +1337,7 @@ ami landing page.html).
   - `core/fleet/dispatcher.py`
   - `frontend/src/App.tsx`
   - `frontend/src/components/tasks/TaskManagerModal.tsx`
-  - `docs/FLEET_MANAGEMENT.md`
+  - `docs/AGENTS_MANAGEMENT.md`
   - `LEARNING_JOURNAL.md`
 - **Verification:**
   - Layer 1 (Static): `python -m py_compile` validated all modified Python modules (`core/fleet/orchestrator.py`, `core/antigravity_runner.py`, `core/design_resolver.py`, `actions/antigravity_agent.py`, `core/fleet/dispatcher.py`).
@@ -1793,7 +1800,7 @@ ami landing page.html).
   - `tests/test_extractor_suite.py`
   - `tests/test_phase4_agent_capability_registry_suite.py`
   - `core/prompt.txt`
-  - `docs/TOOLS.md`, `docs/FLEET_MANAGEMENT.md`, `docs/SKILLS_SYSTEM.md`
+  - `docs/TOOLS.md`, `docs/AGENTS_MANAGEMENT.md`, `docs/SKILLS_SYSTEM.md`
 - **Verification:**
   - Layer 1 (Static): `python -m py_compile` passed across all modified Python modules with code 0.
   - Layer 2 (Runtime): Tested 2-step intake gate, read-back confirmation prompt, catalog query resolution, direct chat dispatch with real task ID, empty snapshot greenfield undo, and smart preview routing.
@@ -1850,7 +1857,7 @@ ami landing page.html).
   2. **Authoring 7 Missing Subsystem Docs:**
      - `docs/REVERSE_ENGINEERING.md`: REA CLI (`rea-agents@6.7.0`), 0-LLM CDP evidence envelopes (`evidence.json`, `blueprint.md`, `ledger.json`), isolated desktop rebuilds, and automated Vite server.
      - `docs/CODE_ENGINES.md`: Unified registry for Antigravity CLI (`agy`), OpenCode (`opencode`), Kilo Code (`kilo`), binary resolution, authentication probing, and 5-min TTL caching.
-     - `docs/FLEET_MANAGEMENT.md`: Scranton Office 2D desk layout (`OFFICE_DESK_COORDINATES`), specialized agent roster, role inference, and Git worktree sandboxes.
+     - `docs/AGENTS_MANAGEMENT.md`: Scranton Office 2D desk layout (`OFFICE_DESK_COORDINATES`), specialized agent roster, role inference, and Git worktree sandboxes.
      - `docs/TASK_SYSTEM.md`: 7-state task lifecycle, hierarchical parent/child trees, unnotified child suppression, and UI broadcasting.
      - `docs/REMOTE_TUNNELING.md`: Cloudflare Quick Tunnels, public DNS verification (`dns.google`), and QR code/OTP pairing.
      - `docs/CLIPBOARD_WATCHER.md`: Background clipboard daemon, real-time content classification, and ClipPeek floating HUD.
@@ -3141,7 +3148,7 @@ pm --prefix frontend run build passed with 0 errors (Vite production bundle gene
   - **Embedded Master Prompt**: Embedded the comprehensive **Senior Frontend Design-Systems Auditor and UI Documentation Agent** master prompt enforcing "authenticity over invention", system source inspection priorities (`tailwind.config.*`, CSS variables in `:root`, shared UI primitives), strict conflict resolution rules, and an auditable `## Sources` section.
   - **Engine Skill Routing in `actions/run_skill.py`**: Added dedicated delegation logic for `generate_design_md` to immediately dispatch to the active coding engine bridge or specialized fleet agent (Pam Beesly) with the complete master prompt.
   - **Subsystem & Fleet Alignment**: Updated `config/fleet_agents.json`, `AutonomousOfficeScreen.tsx`, `core/fleet/registry.py`, `core/fleet/dispatcher.py`, and `core/action_loader.py` to cleanly remove `extract_design_system` and map Pam Beesly directly to `antigravity_run` and `generate_design_md`.
-  - **Documentation Sync**: Synchronized `docs/TOOLS.md`, `docs/DESIGN_SYSTEM_ARCHITECTURE.md`, `docs/FLEET_MANAGEMENT.md`, and `docs/ARCHITECTURE.md`.
+  - **Documentation Sync**: Synchronized `docs/TOOLS.md`, `docs/DESIGN_SYSTEM_ARCHITECTURE.md`, `docs/AGENTS_MANAGEMENT.md`, and `docs/ARCHITECTURE.md`.
 - **Key Files**:
   - `skills/generate_design_md/SKILL.md`
   - `actions/run_skill.py`
@@ -3263,3 +3270,80 @@ pm --prefix frontend run build passed with 0 errors (Vite production bundle gene
 - **Change:** Removed the waveform from the Live Voice stage at the user's request and reverted its frontend documentation; retained the existing avatar gradient and voice-level signals.
 - **Files:** `frontend/src/App.tsx`, `docs/FRONTEND_STRUCTURE.md`.
 - **Verification:** `npm run build` passed `tsc -b`; Vite bundling failed because the Tailwind Windows native binding could not load and Vite reported `spawn EPERM`.
+
+## [2026-11-03] — Consolidate Agent Management into a Table and Workspace
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** The Agents landing screen exposed the roster, office floor, detail panel, and logs together, while Edit and Files opened separate dialogs.
+- **Change:** Made a searchable, status-filtered compact table the default Agents view. Row expansion reveals Edit, Chat, Delete, Logs, and Files; the eye button opens a short profile. Edit, Chat, and Files now share a dedicated tabbed agent workspace; Logs has a dedicated screen. Chat exposes Engine, Model, and Workspace controls, uses the existing native folder picker, persists the selected folder, and sends that path with each chat task. Floor and Tasks are no longer available.
+- **Files:** `frontend/src/components/office/AutonomousOfficeScreen.tsx`, `AgentRosterTable.tsx`, `AgentWorkspaceView.tsx`, `AgentFilesPanel.tsx`, `AgentLogsView.tsx`, `AgentConfigModal.tsx`, `AgentDirectChatView.tsx`, `frontend/src/lib/api.ts`, `docs/AGENTS_MANAGEMENT.md`.
+- **Verification:** `npm run build` passed TypeScript (`tsc -b`). Vite bundling remains blocked by the Tailwind Windows native binding load failure and `spawn EPERM`. Runtime UI interaction was not verified because Vite could not start.
+
+## [2026-11-03] — Replace Legacy Floor and Task Shell with Full-Screen Cabins
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** Floor and Tasks navigation still fell through to the legacy three-column layout, keeping the roster and agent detail/log sidebars visible; the office floor remained a flat map.
+- **Change:** Added a full-screen perspective operations hall with agent cabins and a central corridor. Floor and Tasks now share that view; Tasks displays each agent's current work on the cabin monitor. Navigation back to the Agents roster and all dedicated workspace routes are preserved.
+- **Files:** `frontend/src/components/office/AgentFloorScene.tsx`, `frontend/src/components/office/AutonomousOfficeScreen.tsx`, `docs/AGENTS_MANAGEMENT.md`.
+- **Verification:** `npm run build` passed TypeScript (`tsc -b`). Vite bundling remains blocked because the Tailwind Windows native binding cannot load and Vite reports `spawn EPERM`; runtime rendering was not verified.
+
+## [2026-11-03] — Remove Floor and Task Views
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** The Floor and Tasks visualizations were no longer wanted and left a large legacy office floor, Kanban board, cabin scene, and navigation controls in the Agents UI.
+- **Change:** Removed Floor and Tasks entry points and render paths, deleted the dedicated cabin scene module, and retained the Agents roster, Edit/Chat/Files workspace, Logs view, and shared ReUI status filter. Moved the existing action toast outside the removed floor so agent actions still provide feedback.
+- **Files:** `frontend/src/components/office/AgentRosterTable.tsx`, `AutonomousOfficeScreen.tsx`, `AgentDirectChatView.tsx`, deleted `AgentFloorScene.tsx`, `docs/AGENTS_MANAGEMENT.md`.
+- **Verification:** `npx tsc -b` passed. `npm run build` passed TypeScript, but Vite bundling failed because the Tailwind Windows native binding could not load and Vite reported `spawn EPERM`; runtime rendering was not verified. `git diff --check` passed.
+
+## [2026-11-03] — Standardize Agent Subsystem Names
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** Agent management was identified by inconsistent subsystem names across modules, tool registration, API routes, events, configuration, and documentation.
+- **Change:** Renamed the manager, subsystem package, action tool, config file, frontend roster component directory, and management guide to Agent terminology. Updated their imports, API routes, WebSocket event/payload, prompt instructions, settings, tests, and docs together. Agent state now consistently uses the `agents` key; the old visual Floor/Tasks routes remain removed.
+- **Files:** `core/agents_manager.py`, `core/agents/`, `actions/agents_control.py`, `config/agents.json`, `frontend/src/components/agents/`, `frontend/src/lib/api.ts`, `core/ui_server.py`, `main.py`, `docs/AGENTS_MANAGEMENT.md`, related caller/docs files.
+- **Verification:** `python -m py_compile` passed for changed Python files; runtime import/state check loaded 11 agents and confirmed the `agents_control` tool; `pytest tests/test_skill_runner.py -q` passed (7 tests). Frontend TypeScript build passed, but Vite bundling could not complete because Tailwind's Windows native binding failed to load and process spawn returned `EPERM`. Final `git diff --check` reported whitespace warnings only on CRLF-converted additions; verify after normalizing the touched line endings.
+
+## [2026-11-03] — Add Agents Navigation and Chat Space
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** Agents management and direct chat were reached through row actions and shared tabs, while the agreed navigation calls for separate Manage Agents and Chat Space destinations.
+- **Change:** Added an expandable Agents navigation submenu and a three-pane Chat Space with per-agent selection, recent conversations, workspace/files, and read-only engine/provider/model details. Persisted conversation messages per agent/thread in local storage; workspace path selection continues to save to the agent profile and accompany chat requests. Edit and Files remain available from Manage Agents.
+- **Files:** `frontend/src/App.tsx`, `frontend/src/components/office/AutonomousOfficeScreen.tsx`, `AgentDirectChatView.tsx`, `AgentWorkspaceView.tsx`, `docs/AGENTS_MANAGEMENT.md`.
+- **Verification:** `npx tsc -b --pretty false` passed. `npm run build` passed TypeScript compilation, then Vite failed because Tailwind's Windows native binding could not load and process spawn returned `EPERM`; interactive browser rendering could not be verified in this environment.
+
+## [2026-11-03] — Clarify Chat Space Agent and Model Controls
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Added an agent avatar and stronger dropdown affordance, removed the Provider label from the chat header, and made Model selectable. Model changes persist through the selected agent profile update; engine remains visible and is configured in Edit.
+- **Files:** `frontend/src/components/office/AgentDirectChatView.tsx`, `docs/AGENTS_MANAGEMENT.md`.
+- **Verification:** `npx tsc -b --pretty false` passed. Full Vite bundling was not rerun; the environment's known Tailwind Windows native binding and `spawn EPERM` failure remains documented in the preceding Chat Space entry.
+
+## [2026-11-03] — Refine Chat Space Agent Selector
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Removed duplicate avatar rendering from the selected option and reduced the agent selector width to give engine/model details more room in the header.
+- **Files:** `frontend/src/components/office/AgentDirectChatView.tsx`.
+- **Verification:** `npx tsc -b --pretty false` passed.
+
+## [2026-11-03] — Fit Chat Space Header Controls
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Made the agent selector size to its content with a sensible min/max width; allowed engine and model controls to wrap within the available header width so labels are not clipped.
+- **Files:** `frontend/src/components/office/AgentDirectChatView.tsx`.
+- **Verification:** `npx tsc -b --pretty false` passed.
+
+## [2026-11-03] — Make Chat Space Engine Selectable
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Added an engine selector in Chat Space. Changing engines selects that engine's first available model and persists both settings to the current agent profile.
+- **Files:** `frontend/src/components/office/AgentDirectChatView.tsx`, `docs/AGENTS_MANAGEMENT.md`.
+- **Verification:** `npx tsc -b --pretty false` passed.
+
+## [2026-11-03] — Refine Sidebar and Live Mode Controls
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Stacked sidebar footer actions when the rail is collapsed, aligned Chat/Live active colors with primary theme tokens, and removed the fill/border from the expanded voice-control frame.
+- **Files:** `frontend/src/App.tsx`, `docs/FRONTEND_STRUCTURE.md`.
+- **Verification:** `npx tsc -b --pretty false` passed.
+
+## [2026-11-03] — Make Agents Navigation Expand Only
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Changed the Agents navigation parent to only expand or collapse its submenu; Manage Agents and Chat Space remain the only submenu destinations that navigate. Clicking Agents in the collapsed rail expands the rail and submenu without changing screens.
+- **Files:** `frontend/src/App.tsx`, `docs/FRONTEND_STRUCTURE.md`.
+- **Verification:** `npx tsc -b --pretty false` passed.
+
+## [2026-11-03] — Share ZEZO Chat Composer with Agent Chat
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Replaced the separate Assistant-UI composer in Agents Chat Space with the same `ZezoChatThread`/`ZezoPillComposer` used in main chat, including upload chips and file attachment action. Standardized the live control icon colors on the muted foreground token.
+- **Files:** `frontend/src/components/office/AgentDirectChatView.tsx`, `frontend/src/App.tsx`, `docs/AGENTS_MANAGEMENT.md`, `docs/FRONTEND_STRUCTURE.md`.
+- **Verification:** `npx tsc -b --pretty false` passed.

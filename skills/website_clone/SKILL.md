@@ -16,7 +16,7 @@ auto_activate: true
 
 > **Lead Architect & Creator:** Hamza Bukhari  
 > **Core Subsystem:** Uncage Ingestion & Autonomous Reverse-Engineering Rebuild Pipeline  
-> **Target Audience:** Google Antigravity Agent, OpenCode, Kilo Code, Autonomous Office Fleet, and ZEZO Core Orchestrators.  
+> **Target Audience:** Google Antigravity Agent, OpenCode, Kilo Code, Autonomous Office Agents, and ZEZO Core Orchestrators.  
 > **Core Axiom:** Two-Phase Execution (Ingestion ➔ Rebuild). Uncage captures authentic offline assets into the project folder. Downstream autonomous coding engines inspect real files on disk and rebuild a pixel-perfect, clean implementation.
 
 ---

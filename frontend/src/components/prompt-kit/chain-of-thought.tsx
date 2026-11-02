@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Circle } from "lucide-react";
+import { ChevronDown, Circle } from "@/lib/zezo-icons";
 
 export type ChainOfThoughtItemProps = React.ComponentProps<"div">;
 

@@ -1,5 +1,5 @@
 {
-  "fleet": {
+  "agents": {
     "MICHAEL": {
       "name": "MICHAEL",
       "role": "Lead Software Architect & Tech Lead",
@@ -26,7 +26,7 @@
       ],
       "capabilities": [
         "task_decomposition",
-        "fleet_orchestration",
+        "agent_orchestration",
         "multi_agent_delegation"
       ],
       "is_core": true,
@@ -50,7 +50,7 @@
       "allowed_tools": [
         "antigravity_run",
         "browser_control",
-        "fleet_control",
+        "agents_control",
         "task_status"
       ],
       "allowed_skills": [
@@ -85,7 +85,7 @@
         "file_processor",
         "file_controller",
         "browser_control",
-        "fleet_control",
+        "agents_control",
         "task_status"
       ],
       "allowed_skills": [
@@ -122,7 +122,7 @@
         "quick_snippet",
         "file_processor",
         "file_controller",
-        "fleet_control",
+        "agents_control",
         "task_status"
       ],
       "allowed_skills": [
@@ -160,7 +160,7 @@
         "quick_snippet",
         "file_processor",
         "file_controller",
-        "fleet_control",
+        "agents_control",
         "task_status"
       ],
       "allowed_skills": [
@@ -196,7 +196,7 @@
         "antigravity_run",
         "file_processor",
         "file_controller",
-        "fleet_control",
+        "agents_control",
         "task_status"
       ],
       "allowed_skills": [
@@ -231,7 +231,7 @@
         "web_search",
         "web_read_page",
         "youtube_video",
-        "fleet_control",
+        "agents_control",
         "task_status"
       ],
       "allowed_skills": [
@@ -257,7 +257,7 @@
       "avatar_pixel": "quantum_pixel.png",
       "default_tool": "kilo_run",
       "risk_tier": "L1_MUTATION",
-      "prompt_prefix": "You are Quantum, an autonomous fleet specialist focusing on deep web research and analysis.",
+      "prompt_prefix": "You are Quantum, an autonomous agents specialist focusing on deep web research and analysis.",
       "model_id": "",
       "desk_x": 600,
       "desk_y": 280,
@@ -281,7 +281,7 @@
       ],
       "is_core": false,
       "engine": "",
-      "soul_markdown": "You are Quantum, an autonomous fleet specialist focusing on deep web research and analysis."
+      "soul_markdown": "You are Quantum, an autonomous agents specialist focusing on deep web research and analysis."
     },
     "DEVDYNAMO": {
       "name": "DevDynamo",
@@ -291,7 +291,7 @@
       "avatar_pixel": "devdynamo_pixel.png",
       "default_tool": "opencode_run",
       "risk_tier": "L1_MUTATION",
-      "prompt_prefix": "You are DevDynamo, an autonomous fleet specialist focusing on Full-stack development, modern web engineering, and autonomous task execution.",
+      "prompt_prefix": "You are DevDynamo, an autonomous agents specialist focusing on Full-stack development, modern web engineering, and autonomous task execution.",
       "model_id": "",
       "desk_x": 180,
       "desk_y": 280,
@@ -316,7 +316,7 @@
       ],
       "is_core": false,
       "engine": "opencode",
-      "soul_markdown": "You are DevDynamo, an autonomous fleet specialist focusing on Full-stack development, modern web engineering, and autonomous task execution."
+      "soul_markdown": "You are DevDynamo, an autonomous agents specialist focusing on Full-stack development, modern web engineering, and autonomous task execution."
     },
     "DATAEINSTEIN": {
       "name": "InsightAI",
@@ -326,7 +326,7 @@
       "avatar_pixel": "dataeinstein_pixel.png",
       "default_tool": "antigravity_run",
       "risk_tier": "L1_MUTATION",
-      "prompt_prefix": "You are Dataeinstein, an autonomous fleet specialist focusing on Machine Learning, Data Analysis, Predictive Modeling.",
+      "prompt_prefix": "You are Dataeinstein, an autonomous agents specialist focusing on Machine Learning, Data Analysis, Predictive Modeling.",
       "model_id": "gemini-3.8-flash-low",
       "desk_x": 180,
       "desk_y": 400,
@@ -351,7 +351,7 @@
       ],
       "is_core": false,
       "engine": "",
-      "soul_markdown": "You are Dataeinstein, an autonomous fleet specialist focusing on Machine Learning, Data Analysis, Predictive Modeling."
+      "soul_markdown": "You are Dataeinstein, an autonomous agents specialist focusing on Machine Learning, Data Analysis, Predictive Modeling."
     },
     "RECON": {
       "name": "Recon",
@@ -371,7 +371,7 @@
         "agent_reach",
         "web_search",
         "web_read_page",
-        "fleet_control",
+        "agents_control",
         "task_status"
       ],
       "allowed_skills": [

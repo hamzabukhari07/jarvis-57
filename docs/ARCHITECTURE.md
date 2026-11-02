@@ -30,7 +30,7 @@ flowchart TD
 
     subgraph Frontend["🎨 Desktop Frontend (React 18 + Vite)"]
         APP["App.tsx / Tactical Dashboard"]
-        OFFICE["Autonomous Office Screen (Pixel Desks)"]
+        OFFICE["Agents Screen (Roster and Workspaces)"]
         CHAT["ZezoChatThread (Assistant-UI)"]
         GRAPH["MemoryGraphCanvas (3D Force Graph)"]
         CLIP["ClipPeekOverlay (Clipboard HUD)"]
@@ -58,8 +58,8 @@ flowchart TD
         GROQ["Groq LPU Fast Coprocessor"]
     end
 
-    subgraph Fleet["🤖 Autonomous Agent Fleet & Engines"]
-        FM["Fleet Manager (core/fleet_manager.py)"]
+    subgraph agents["🤖 Autonomous Agents & Engines"]
+        FM["agents Manager (core/agents_manager.py)"]
         TM["Task Manager (core/task_manager.py)"]
         AGY["Antigravity CLI (agy)"]
         OCODE["OpenCode Agent"]
@@ -118,15 +118,15 @@ ZEZO implements dynamic fallback ladders to guarantee resilience against provide
 ### 3. Frontend & UI Server Layer
 - **UI Server (`core/ui_server.py`):** Runs an `aiohttp.web` server in a dedicated background thread. Serves Vite production bundles (`frontend/dist/`) and establishes a WebSocket bridge on `ws://127.0.0.1:8765/ws`.
 - **Desktop Frontend (`frontend/src/`):** React 18 single-page application built on Vite and Tailwind CSS. Employs the ReUI component system for design fidelity:
-  - `AutonomousOfficeScreen.tsx`: 2D pixel desk grid, worker sprite animations, monitor telemetry, and agent soul editing.
-  - `AgentDirectChatView.tsx`: 1-on-1 isolated context chat with autonomous fleet agents.
+  - `AutonomousOfficeScreen.tsx`: Agents roster, workspace tabs, and logs routing.
+  - `AgentDirectChatView.tsx`: 1-on-1 isolated context chat with autonomous agents.
   - `MemoryGraphCanvas.tsx`: 3D Force-Directed Knowledge Graph (`3d-force-graph`) with real-time viseme reactivity and node inspector drawer.
   - `TaskManagerModal.tsx`: Background task tree viewer, subtask log streaming, and process termination.
   - `ClipPeekOverlay.tsx`: Floating clipboard monitor.
   - `ZezoChatThread.tsx`: Assistant-UI conversational thread with collapsible reasoning traces.
 
-### 4. Autonomous Multi-Agent Fleet System
-- **Fleet Manager (`core/fleet_manager.py`):** Orchestrates named specialist workers:
+### 4. Autonomous Agent System
+- **agents Manager (`core/agents_manager.py`):** Orchestrates named specialist workers:
   - **Verve:** Senior Frontend & Studio UI Specialist (Antigravity CLI / React / Tailwind).
   - **Flux:** Frontend Specialist & Overflow Developer.
   - **Ahmad:** Full-Stack & Backend Specialist (FastAPI / PostgreSQL / SQLite / APIs).
@@ -174,4 +174,4 @@ ZEZO perceives and acts on the Windows desktop through a 3-tier escalated percep
 
 ## 🏁 Summary
 
-ZEZO merges the responsiveness of **real-time 16kHz Gemini Live audio** with the execution depth of an **autonomous multi-agent coding fleet**, served cleanly over a **FastAPI/aiohttp WebSocket server** to a **React 18 / ReUI desktop frontend**.
+ZEZO merges the responsiveness of **real-time 16kHz Gemini Live audio** with the execution depth of an **autonomous multi-agent coding agents**, served cleanly over a **FastAPI/aiohttp WebSocket server** to a **React 18 / ReUI desktop frontend**.

@@ -257,7 +257,7 @@
       background: var(--border-subtle);
     }
 
-    /* ── Scranton Pixel Office Container & Viewport ── */
+    /* ── Agent Operations Container & Viewport ── */
     .canvas-wrapper {
       flex: 1;
       position: relative;
@@ -1675,7 +1675,7 @@
   <!-- Main Canvas & Inspector Layout -->
   <main class="deck-container">
 
-    <!-- Center Scranton Pixel Office View -->
+    <!-- Center Agent Operations View -->
     <div class="frame">
       <div class="corner corner-tl"></div>
       <div class="corner-v corner-v-tl"></div>
@@ -1846,7 +1846,7 @@
             <!-- Spec Grid with Openable OS Sandbox Folder Links -->
             <div class="spec-grid">
               <div class="spec-label">BRANCH</div>
-              <div class="spec-val" id="specWorktree">agent/fleet-orchestrator</div>
+              <div class="spec-val" id="specWorktree">agent/agents-orchestrator</div>
 
               <div class="spec-label">PATH</div>
               <div class="spec-val">
@@ -1880,7 +1880,7 @@
           <div id="inspector-tab-soul" class="inspector-tab-content" style="display: none; flex-direction: column; gap: 6px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <span class="type-label" style="font-size: 9px; color: var(--accent);">SYSTEM PROMPT / SOUL.MD</span>
-              <span class="type-code text-muted" style="font-size: 8.5px;">Live in config/fleet_agents.json</span>
+              <span class="type-code text-muted" style="font-size: 8.5px;">Live in config/agents.json</span>
             </div>
             <textarea id="agentSoulEditor" class="soul-editor" placeholder="Enter agent persona and system instructions..."></textarea>
             <div style="display: flex; justify-content: flex-end; gap: 6px;">
@@ -1951,7 +1951,7 @@
             </div>
             <div class="log-line">
               <span class="log-ts">[01:57:49]</span>
-              <span class="log-msg highlight">Autonomous fleet active: working, walking, breaks & banter</span>
+              <span class="log-msg highlight">Autonomous agents active: working, walking, breaks & banter</span>
             </div>
           </div>
 
@@ -2036,13 +2036,13 @@
           <button class="modal-btn primary" onclick="closeModal('sandboxModal')">Done</button>
   </div>
 
-  <!-- Modal: Create / Hire New Fleet Agent -->
+  <!-- Modal: Create / Hire New Specialist Agent -->
   <div class="modal-overlay" id="createAgentModal">
     <div class="modal-panel" style="max-width: 480px;">
       <div class="modal-head">
         <div style="display: flex; align-items: center; gap: 6px;">
           <iconify-icon icon="solar:user-plus-bold" style="font-size: 16px; color: var(--green);"></iconify-icon>
-          <span style="font-weight: 700;">HIRE & SPAWN FLEET AGENT</span>
+          <span style="font-weight: 700;">HIRE & SPAWN AGENTS AGENT</span>
         </div>
         <button class="hud-tool-btn" onclick="closeModal('createAgentModal')">✕</button>
       </div>
@@ -2101,7 +2101,7 @@
 
     // 12 Full Scranton Agents with Dedicated Desks, Worktrees, Activity Logs & Files
     const agents = [
-      { name: 'MICHAEL', role: "Regional Manager & Orchestrator", worktree: 'agent/fleet-orchestrator', sandbox: '.agent_worktrees/task-100/', files: ['main.py', 'core/prompt.txt', 'AGENTS.md'], logs: ['[SYSTEM] Fleet Orchestrator attached to workspace.', '[MICHAEL] Sprint priorities aligned across 12 subagents.', '[MICHAEL] That is what she said!'], x: 6.5, y: 17, shirt: '#243b63', hair: '#33251e', skin: '#e9bd91', tie: '#b63e3b', state: 'working', deskX: 4, deskY: 23, isBusy: false },
+      { name: 'MICHAEL', role: "Regional Manager & Orchestrator", worktree: 'agent/agents-orchestrator', sandbox: '.agent_worktrees/task-100/', files: ['main.py', 'core/prompt.txt', 'AGENTS.md'], logs: ['[SYSTEM] Agents Orchestrator attached to workspace.', '[MICHAEL] Sprint priorities aligned across 12 subagents.', '[MICHAEL] That is what she said!'], x: 6.5, y: 17, shirt: '#243b63', hair: '#33251e', skin: '#e9bd91', tie: '#b63e3b', state: 'working', deskX: 4, deskY: 23, isBusy: false },
       { name: 'JIM', role: 'Lead Code Review & Staging', worktree: 'agent/pr-review-staging', sandbox: '.agent_worktrees/task-101/', files: ['actions/opencode_agent.py', 'core/task_manager.py'], logs: ['[JIM] Reviewing staged diff in opencode_agent.py.', '[JIM] Dwight, your stapler is in Jell-O again.', '[JIM] Staging PR assertions verified (12/12 passing).'], x: 37.5, y: 30, shirt: '#526f9a', hair: '#4b3023', skin: '#e8bd96', tie: '#d5d0c6', state: 'working', deskX: 56, deskY: 27.5, isBusy: false },
       { name: 'DWIGHT', role: 'OpenCode Refactoring & Security', worktree: 'agent/task-api-refactor', sandbox: '.agent_worktrees/task-102/', files: ['actions/kilo_agent.py', 'core/governance.py', 'core/action_loader.py'], logs: ['[DWIGHT] Scanning AST nodes with Tree-Sitter.', '[DWIGHT] MICHAEL!! Jim put my stapler in Jell-O!', '[DWIGHT] Security policy applied: 0 unsafe shell commands permitted.'], x: 40, y: 30, shirt: '#c49b31', hair: '#32251c', skin: '#e6b98e', tie: '#604b25', state: 'working', deskX: 65, deskY: 27.5, isBusy: false },
       { name: 'PAM', role: 'UI Token Extractor & Aesthetics', worktree: 'agent/design-tokens-v2', sandbox: '.agent_worktrees/task-103/', files: ['frontend/index.html', 'frontend/css/style.css', 'skills/hamza_taste/SKILL.md'], logs: ['[PAM] Extracted 42 new CSS color tokens from reference.', '[PAM] Fixed contrast ratios to AAA standard.', '[PAM] Rendered new procedural pixel avatars.'], x: 47, y: 68, shirt: '#ce789c', hair: '#80502f', skin: '#edc49f', tie: '#a84e76', state: 'working', deskX: 50, deskY: 55, isBusy: false },
@@ -2481,7 +2481,7 @@
           document.getElementById('activeAgentTask').innerText = data.task || 'Coding task in progress';
         }
       } else {
-        appendLog('FLEET', `Task started on agent [${targetId}]: ${data.task || ''}`, 'highlight');
+        appendLog('AGENTS', `Task started on agent [${targetId}]: ${data.task || ''}`, 'highlight');
       }
     }
 
@@ -2506,19 +2506,19 @@
           setState(agent, 'idle');
         });
       } else {
-        appendLog('FLEET', `Task completed: ${data.summary || ''}`, 'success');
+        appendLog('AGENTS', `Task completed: ${data.summary || ''}`, 'success');
       }
     }
 
-    async function syncBackendFleetState() {
+    async function syncBackendAgentsState() {
       try {
-        const res = await fetch('/api/fleet/state');
+        const res = await fetch('/api/agents/state');
         if (!res.ok) return;
         const json = await res.json();
-        const fleetMap = (json && json.fleet) || {};
+        const agentsMap = (json && json.agents) || {};
 
-        Object.keys(fleetMap).forEach(k => {
-          const remote = fleetMap[k];
+        Object.keys(agentsMap).forEach(k => {
+          const remote = agentsMap[k];
           let local = agents.find(a => a.name.toUpperCase() === k.toUpperCase());
           if (!local) {
             local = {
@@ -2554,7 +2554,7 @@
         });
         renderRoster();
       } catch (err) {
-        console.debug('[Fleet] State sync error:', err);
+        console.debug('[Agents] State sync error:', err);
       }
     }
 
@@ -2676,7 +2676,7 @@
 
       // 5. Fetch Real Backend Agent Data (Soul + Memory + Active Worktree)
       try {
-        const res = await fetch(`/api/fleet/agent?id=${encodeURIComponent(ag.name)}`);
+        const res = await fetch(`/api/agents/agent?id=${encodeURIComponent(ag.name)}`);
         if (res.ok) {
           const profile = await res.json();
           // Populate Soul Editor
@@ -2720,7 +2720,7 @@
       const btn = document.getElementById('btnSaveSoul');
       btn.innerText = 'SAVING...';
       try {
-        const res = await fetch('/api/fleet/save_soul', {
+        const res = await fetch('/api/agents/save_soul', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ agent_id: selectedAgent.name, soul_md: soulText })
@@ -2754,7 +2754,7 @@
       goToDesk(selectedAgent);
 
       try {
-        const res = await fetch('/api/fleet/dispatch_task', {
+        const res = await fetch('/api/agents/dispatch_task', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2802,7 +2802,7 @@
 
       playFoley('click');
       try {
-        const res = await fetch('/api/fleet/save_agent', {
+        const res = await fetch('/api/agents/save_agent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2839,7 +2839,7 @@
               worktree: `agent/${id.toLowerCase()}`,
               sandbox: `.agent_worktrees/${id.toLowerCase()}/`,
               files: ['main.py', 'core/prompt.txt'],
-              logs: [`[${id}] Joined the Scranton Office Fleet.`],
+              logs: [`[${id}] Joined the Scranton Office Agents.`],
               x: slot.x + 3,
               y: slot.y + 4,
               shirt: color,
@@ -2858,7 +2858,7 @@
             goToDesk(local);
           }
           selectAgent(id);
-          appendLog('FLEET', `New agent [${name}] successfully spawned on the office floor.`, 'success');
+          appendLog('AGENTS', `New agent [${name}] successfully spawned on the office floor.`, 'success');
         }
       } catch (err) {
         showSoundToast('Error creating agent');
@@ -2972,8 +2972,8 @@
       setState(a, 'idle');
     });
 
-    // ── Real-Time Fleet WebSocket Integration ──
-    function connectFleetWebSocket() {
+    // ── Real-Time Agents WebSocket Integration ──
+    function connectAgentsWebSocket() {
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = location.host || '127.0.0.1:8765';
       const wsUrl = `${protocol}//${host}/ws`;
@@ -2982,15 +2982,15 @@
       try {
         ws = new WebSocket(wsUrl);
       } catch (e) {
-        console.debug('[Fleet-WS] Connect error, retrying in 3s:', e);
-        setTimeout(connectFleetWebSocket, 3000);
+        console.debug('[Agents-WS] Connect error, retrying in 3s:', e);
+        setTimeout(connectAgentsWebSocket, 3000);
         return;
       }
 
       ws.onopen = () => {
-        console.log('[Fleet-WS] Connected to ZEZO backend:', wsUrl);
+        console.log('[Agents-WS] Connected to ZEZO backend:', wsUrl);
         appendLog('SYSTEM', 'Connected to ZEZO Agent OS real-time stream.', 'success');
-        syncBackendFleetState();
+        syncBackendAgentsState();
       };
 
       ws.onmessage = (event) => {
@@ -3005,36 +3005,36 @@
             handleTaskProgress(data);
           } else if (type === 'task_done' || type === 'task_completed') {
             handleTaskDone(data);
-          } else if (type === 'fleet_updated') {
-            syncBackendFleetState();
+          } else if (type === 'agents_updated') {
+            syncBackendAgentsState();
           } else if (type === 'task_queued') {
             appendLog('SYSTEM', `Task [${data.task_id}] queued (position #${data.position})`, 'warn');
           } else if (type === 'backend_logs' && data.lines) {
             data.lines.forEach(l => {
-              if (l.includes('[MICHAEL]') || l.includes('[DWIGHT]') || l.includes('[FLEET]') || l.includes('[kilo_agent]') || l.includes('[opencode_agent]')) {
+              if (l.includes('[MICHAEL]') || l.includes('[DWIGHT]') || l.includes('[AGENTS]') || l.includes('[kilo_agent]') || l.includes('[opencode_agent]')) {
                 appendLog('ENGINE', l, 'info');
               }
             });
           }
         } catch (err) {
-          console.debug('[Fleet-WS] Parse error:', err);
+          console.debug('[Agents-WS] Parse error:', err);
         }
       };
 
       ws.onclose = () => {
-        console.debug('[Fleet-WS] Disconnected, retrying in 3s...');
-        setTimeout(connectFleetWebSocket, 3000);
+        console.debug('[Agents-WS] Disconnected, retrying in 3s...');
+        setTimeout(connectAgentsWebSocket, 3000);
       };
     }
 
     // Initialize state & WebSocket connection on page load
     window.addEventListener('DOMContentLoaded', () => {
-      syncBackendFleetState();
-      connectFleetWebSocket();
+      syncBackendAgentsState();
+      connectAgentsWebSocket();
     });
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
-      syncBackendFleetState();
-      connectFleetWebSocket();
+      syncBackendAgentsState();
+      connectAgentsWebSocket();
     }
 
     // ── Audio Web Synthesizer (Retro Micro-Foley) ──
@@ -3173,7 +3173,7 @@
       });
 
       setTimeout(() => {
-        appendLog('FLEET', `All-hands meeting concluded. Agents returning to workstations.`, 'success');
+        appendLog('AGENTS', `All-hands meeting concluded. Agents returning to workstations.`, 'success');
         agents.forEach(ag => goToDesk(ag));
       }, 7000);
     }
@@ -3255,14 +3255,14 @@
       }, 400);
     }
 
-    // ── Live Backend Fleet Synchronization ──
-    async function syncBackendFleetState() {
+    // ── Live Backend Agents Synchronization ──
+    async function syncBackendAgentsState() {
       try {
-        const res = await fetch('/api/fleet/state');
+        const res = await fetch('/api/agents/state');
         if (res.ok) {
           const data = await res.json();
-          if (data.fleet && Array.isArray(data.fleet)) {
-            data.fleet.forEach(f => {
+          if (data.agents && Array.isArray(data.agents)) {
+            data.agents.forEach(f => {
               const nameKey = (f.name || f.id || '').toUpperCase();
               let local = agents.find(x => x.name.toUpperCase() === nameKey);
               if (!local && f.id) {
@@ -3276,11 +3276,11 @@
                 const slot = deskSlots[agents.length % deskSlots.length];
                 local = {
                   name: f.id,
-                  role: f.role || 'Fleet Specialist',
+                  role: f.role || 'Agents Specialist',
                   worktree: f.worktree || `agent/${f.id.toLowerCase()}`,
                   sandbox: f.sandbox_path || `.agent_worktrees/${f.id.toLowerCase()}/`,
                   files: f.recent_files || ['main.py'],
-                  logs: [`[${f.id}] Synced from backend fleet.`],
+                  logs: [`[${f.id}] Synced from backend agents.`],
                   x: slot.x + 3,
                   y: slot.y + 4,
                   shirt: f.color || '#06b6d4',
@@ -3311,8 +3311,8 @@
         // Fallback for standalone / static preview
       }
     }
-    setInterval(syncBackendFleetState, 3500);
-    setTimeout(syncBackendFleetState, 800);
+    setInterval(syncBackendAgentsState, 3500);
+    setTimeout(syncBackendAgentsState, 800);
 
   </script>
 </body>

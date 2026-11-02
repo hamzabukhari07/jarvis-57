@@ -38,7 +38,7 @@ import {
   CheckCircle2,
   XCircle,
   Code2,
-} from "lucide-react";
+} from "@/lib/zezo-icons";
 import { Blobatar } from "blobatar/react";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
@@ -101,8 +101,8 @@ export const ActionApprovalToolUI = makeAssistantToolUI({
   },
 });
 
-export const FleetTaskToolUI = makeAssistantToolUI({
-  toolName: "fleet_task",
+export const AgentTaskToolUI = makeAssistantToolUI({
+  toolName: "agents_task",
   render: ({ args, result, status }) => {
     const isRunning = status.type === "running";
     const isFailed =
@@ -126,7 +126,7 @@ export const FleetTaskToolUI = makeAssistantToolUI({
               leftIcon={<BrainCircuit className="size-4 text-[var(--accent)] animate-pulse" />}
             >
               <span className="font-semibold text-xs">
-                Fleet Agent Dispatch: <strong>{agent}</strong>
+                Agent Dispatch: <strong>{agent}</strong>
               </span>
               <span className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--secondary)] text-[var(--muted-foreground)]">
                 {isRunning ? (

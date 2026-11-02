@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   X,
   Save,
@@ -11,7 +11,7 @@ import {
   MapPin,
   Check,
   Cpu,
-} from 'lucide-react'
+} from '@/lib/zezo-icons'
 import { Frame, FramePanel, FrameHeader, FrameTitle } from '../reui/frame'
 import { Badge } from '../reui/badge'
 import { Button } from '../ui/button'
@@ -37,6 +37,7 @@ import type { AgentProfile } from '../../types/zezo'
 
 export interface AgentConfigModalProps {
   isOpen: boolean
+  embedded?: boolean
   onClose: () => void
   agent: AgentOfficeMember | null
   onSave?: (updatedAgent: AgentOfficeMember) => void
@@ -101,11 +102,12 @@ const COLOR_PRESETS = [
 
 export const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
   isOpen,
+  embedded = false,
   onClose,
   agent,
   onSave,
 }) => {
-  if (!isOpen || !agent) return null
+  if ((!isOpen && !embedded) || !agent) return null
 
   // Local Form States
   const [name, setName] = useState(agent.name || '')
@@ -142,7 +144,6 @@ export const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
   })
 
   const [isSaving, setIsSaving] = useState(false)
-  const folderInputRef = useRef<HTMLInputElement>(null)
 
   // Synchronize initial state when agent prop changes
   useEffect(() => {
@@ -229,7 +230,16 @@ export const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
     }
   }
 
-  // Save handler: updates agent and persists via POST /api/fleet/agents
+  const handleBrowseWorkspace = async () => {
+    try {
+      const result = await api.pickAgentFolder(workspace)
+      if (result.success && result.path) setWorkspace(result.path)
+    } catch (err) {
+      console.error('Failed to select agent workspace folder:', err)
+    }
+  }
+
+  // Save handler: updates agent and persists via POST /api/agents
   const handleSave = async () => {
     setIsSaving(true)
     const updatedName = name.trim() || agent.name
@@ -274,7 +284,7 @@ export const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
     }
 
     try {
-      // Persist to backend POST /api/fleet/agents
+      // Persist to backend POST /api/agents
       await api.saveAgent(payload)
       if (onSave) {
         onSave(updatedAgent)
@@ -293,11 +303,11 @@ export const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-150">
-      <Frame className="w-full max-w-xl border-[var(--border)] max-h-[90vh] flex flex-col">
-        <FramePanel className="bg-[var(--card)] border-[var(--border)] p-0 overflow-hidden flex flex-col max-h-[90vh]">
+    <div className={embedded ? 'flex h-full min-h-0 w-full' : 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-150'}>
+      <Frame className={`w-full border-[var(--border)] flex flex-col ${embedded ? 'max-w-none h-full min-h-0' : 'max-w-xl max-h-[90vh]'}`}>
+        <FramePanel className={`bg-[var(--card)] border-[var(--border)] p-0 overflow-hidden flex flex-col ${embedded ? 'h-full min-h-0' : 'max-h-[90vh]'}`}>
           {/* Header */}
-          <FrameHeader className="p-3 border-b border-[var(--border)] flex flex-row items-center justify-between shrink-0">
+          {!embedded && <FrameHeader className="p-3 border-b border-[var(--border)] flex flex-row items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
               <Cpu className="w-4 h-4 text-[var(--primary)]" />
               <FrameTitle className="text-sm font-semibold text-[var(--foreground)]">
@@ -312,7 +322,7 @@ export const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
             >
               <X className="w-4 h-4" />
             </Button>
-          </FrameHeader>
+          </FrameHeader>}
 
           {/* Scrollable Form Content */}
           <ScrollArea className="flex-1 p-4 overflow-y-auto">
@@ -483,21 +493,6 @@ export const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    ref={folderInputRef}
-                    className="hidden"
-                    // @ts-expect-error webkitdirectory is standard in modern Chromium/desktop browsers
-                    webkitdirectory=""
-                    directory=""
-                    onChange={(e) => {
-                      const files = e.target.files
-                      if (files && files.length > 0) {
-                        const folderPath = files[0].webkitRelativePath?.split('/')[0] || files[0].name || 'Selected Folder'
-                        setWorkspace(folderPath)
-                      }
-                    }}
-                  />
                   <div className="relative flex-1 min-w-0">
                     <input
                       type="text"
@@ -513,7 +508,7 @@ export const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => folderInputRef.current?.click()}
+                    onClick={handleBrowseWorkspace}
                     className="h-8 text-xs font-mono px-3 gap-1.5 shrink-0 bg-[var(--input)]/40 hover:bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]"
                   >
                     <FolderOpen className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />

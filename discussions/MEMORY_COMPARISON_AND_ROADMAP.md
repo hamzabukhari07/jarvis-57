@@ -243,7 +243,7 @@ flowchart TD
   - ✅ **Zero Audio Jitter:** Audio loop never waits on Windows file locks or SQLite writes.
   - ✅ **Sub-Second Voice Recall:** Direct contextual injection answers past questions without tool round-trips.
 - **Cons:**
-  - ❌ Leaves multi-agent fleet memory namespacing simple.
+  - ❌ Leaves multi-agent memory namespacing simple.
   - ❌ Does not automate deep topic consolidation or contradiction resolution in the background.
 - **Best For:** Immediate production implementation (P0/P1 roadmap execution).
 
@@ -251,16 +251,16 @@ flowchart TD
 
 ### Option 2: The Autonomous Dual-Track Brain (System 1 Core + System 2 Cognitive Bus)
 
-> **Philosophy:** *Bi-cameral cognitive architecture.* Decouples real-time reactive conversation (System 1) from an asynchronous, background cognitive worker (System 2) that handles consolidation, contradiction resolution, and multi-agent fleet memory.
+> **Philosophy:** *Bi-cameral cognitive architecture.* Decouples real-time reactive conversation (System 1) from an asynchronous, background cognitive worker (System 2) that handles consolidation, contradiction resolution, and multi-agent memory.
 
 ```mermaid
 flowchart TD
-    User["User Interaction (Voice / Text / Fleet Task)"] --> IngressRouter["Core Ingress & Identity Router"]
+    User["User Interaction (Voice / Text / Agents Task)"] --> IngressRouter["Core Ingress & Identity Router"]
 
     subgraph Track1["Track 1: System 1 (Real-Time Reactive Core)"]
         IngressRouter --> CallerID{"Caller Identity"}
         CallerID -->|"User Voice / Chat"| UserScope["Scope: user:primary"]
-        CallerID -->|"Fleet Subagent (opencode/kilo)"| FleetScope["Scope: agent:subagent_id"]
+        CallerID -->|"Agents Subagent (opencode/kilo)"| AgentsScope["Scope: agent:subagent_id"]
         
         UserScope --> FastCache["In-Memory RAM Profile Cache (Zero I/O)"]
         FastCache --> LiveAudio["Gemini Live WebSocket Loop"]
@@ -302,11 +302,11 @@ flowchart TD
   3. The Cognitive Daemon independently analyzes facts, flags contradictions in `memory_conflicts`, prunes expired subagent scratchpads, auto-promotes topic notes to Major Hubs (`tier-1`), and optimizes SQLite WAL.
 - **Pros:**
   - ✅ **Maximum Cognitive Intelligence:** Background de-duplication, automatic contradiction resolution, and self-organizing knowledge.
-  - ✅ **Clean Multi-Agent Isolation:** Fleet subagents (`opencode`, `kilo`) get their own isolated scratchpad partitions and cannot pollute user facts.
+  - ✅ **Clean Multi-Agent Isolation:** Agents subagents (`opencode`, `kilo`) get their own isolated scratchpad partitions and cannot pollute user facts.
   - ✅ **Zero Live Loop Interference:** Heavy analytical tasks never compete with microphone/speaker audio threads.
 - **Cons:**
   - ⚠️ Higher implementation complexity; requires managing a multi-threaded daemon and inter-thread event queues.
-- **Best For:** Mid-term evolution as ZEZO expands its multi-agent fleet capabilities.
+- **Best For:** Mid-term evolution as ZEZO expands its multi-agent capabilities.
 
 ---
 
@@ -377,7 +377,7 @@ flowchart TD
 | **Voice Latency (Turn Ingress)** | **Ultra-Low (<180ms prefetch)** | Very Low (<250ms) | Low (<300ms) |
 | **Live Loop Jitter Risk** | **Zero (Async Outbox)** | **Zero (In-Memory Cache)** | Low (Atomic file staging) |
 | **User Transparency** | High (In-Chat Chips + Forget) | High (Chips + Conflict Badges) | **Exceptional (3D Galaxy + Drawer)** |
-| **Multi-Agent Fleet Isolation** | Basic | **Complete (Partitioned Scopes)** | Medium (Folder namespaces) |
+| **Agent Isolation** | Basic | **Complete (Partitioned Scopes)** | Medium (Folder namespaces) |
 | **Associative Reasoning Depth** | Moderate (Lexical FTS5) | High (Consolidated Facts) | **Highest (Wikilink Graph Traversals)** |
 | **Implementation Complexity** | **Low (Surgical: 3–4 files)** | High (Daemon + PubSub Event Bus) | Medium (Graph engine + D3 physics) |
 | **Blast Radius / Risk** | **Minimal** | Moderate | Low (Preserves existing vault) |
@@ -403,7 +403,7 @@ Adopt a **Two-Phase Evolutionary Roadmap**:
 | **Tool Architecture** | **Unified:** Single `memory` tool with operations: `recall`, `fetch`, `learn`, `forget`. | **Fragmented:** `save_memory` (`main.py:441`), `recall_memory` (`main.py:471`), and `recall_history` (`actions/recall_history.py`). | **Model Confusion:** Multiple overlapping tools waste function-declaration tokens and cause tool selection ambiguity. |
 | **Write Reliability & Decoupling** | **Durable Outbox:** Writes queued in `HostWriteSink`; returns immediately; worker delivers in background. | **Synchronous File Replacement:** Direct `json.dumps()` + `os.replace()` with sleep retries (`memory_manager.py:158`). | **Event Loop Jitter:** File-locking delays on Windows risk blocking Gemini Live's real-time audio WebSocket loop. |
 | **Pause Memory / Incognito Mode** | **Explicit:** Dedicated `MemoryOffState.tsx` screen and `Binding::Off` state machine. | **Always On:** No global pause toggle exists in the HUD or chat UI. | **Privacy Risk:** User cannot temporarily discuss sensitive credentials or ephemeral workflows without persisting them to history. |
-| **Multi-Agent Memory Scopes** | **Strict Identity Isolation:** Subagents have `Identity::child` scratchpads; cannot pollute user profile facts. | **Partially Shared:** Fleet agents (`opencode`, `kilo`) share global `long_term.json` and vault notes. | **Cross-Agent Pollution:** Temporary code refactoring facts or subagent notes risk cluttering core user profile memory. |
+| **Multi-Agent Memory Scopes** | **Strict Identity Isolation:** Subagents have `Identity::child` scratchpads; cannot pollute user profile facts. | **Partially Shared:** Agents agents (`opencode`, `kilo`) share global `long_term.json` and vault notes. | **Cross-Agent Pollution:** Temporary code refactoring facts or subagent notes risk cluttering core user profile memory. |
 | **Prompt Cache Invalidation** | **Ephemeral Injection:** Memory injected via middleware as an ephemeral block; transcript prefixes remain static. | **Dynamic String Formatting:** Timestamps, recent sessions, and recency-ordered facts re-rendered into system prompt string. | *(Needs verification: depends on how Gemini Live handles caching in this setup; measure before treating as a real cost)*. |
 
 ### Table 2: Where ZEZO Already Leads (Protected Strengths)
@@ -637,7 +637,7 @@ Adopt a **Two-Phase Evolutionary Roadmap**:
 
 ### 6. DO NOT Copy Full Multi-Tenant `user:<id>` Scoping
 - **Why OpenHuman did it:** Required for multi-user cloud SaaS organizations.
-- **Why it is WRONG for ZEZO:** ZEZO is a dedicated personal desktop OS. Only agent-level partitioning (`agent_origin`) is required to separate autonomous fleet coding logs from the user's primary profile.
+- **Why it is WRONG for ZEZO:** ZEZO is a dedicated personal desktop OS. Only agent-level partitioning (`agent_origin`) is required to separate autonomous agents coding logs from the user's primary profile.
 
 ---
 
@@ -713,7 +713,7 @@ Adopt a **Two-Phase Evolutionary Roadmap**:
 | **4** | **Memory Tool Execution Budgets:** Limit per-turn memory tool calls to max 3 to prevent query loops. | **Backend** | **Medium** | **Low** | **P1 (Immediate)** | `main.py`, `core/loop_gates.py` |
 | **5** | **Async Write Outbox with Shutdown Flush:** Buffer memory writes into a background queue; live audio loop acknowledges immediately; flush on exit. | **Backend** | **High** | **Medium** | **P2 (Near-Term)** | `memory/memory_manager.py`, `memory/vault_engine.py` |
 | **6** | **Pause Memory / Incognito Mode Toggle:** Global toggle to pause memory logging and vault generation; clear UI badge. | **Both** | **Medium** | **Low** | **P2 (Near-Term)** | `memory/config_manager.py`, `main.py`, `frontend/src/App.tsx` |
-| **7** | **Specialist Fleet Memory Namespacing:** Namespace memory facts by agent identity (`ZEZO` vs `opencode` vs `kilo`) to prevent coding scratchpad pollution. | **Backend** | **Medium** | **Medium** | **P2 (Near-Term)** | `memory/sqlite_memory.py`, `actions/fleet_control.py` |
+| **7** | **Specialist Agents Memory Namespacing:** Namespace memory facts by agent identity (`ZEZO` vs `opencode` vs `kilo`) to prevent coding scratchpad pollution. | **Backend** | **Medium** | **Medium** | **P2 (Near-Term)** | `memory/sqlite_memory.py`, `actions/agents_control.py` |
 | **8** | **FTS5 Query String Sanitization:** Strip reserved FTS5 operators (`*`, `^`, `NEAR`, `NOT`) from search strings to prevent syntax exceptions. | **Backend** | **Medium** | **Low** | **P2 (Near-Term)** | `memory/sqlite_memory.py` |
 | **9** | **Proactive Conflict Indicator Pill:** Surface rows from existing `memory_conflicts` table as amber warning pills on graph nodes. | **Frontend** | **Medium** | **Low** | **P3 (Enhancement)** | `frontend/src/components/memory/MemoryGraphCanvas.tsx`, `core/ui_server.py` |
 | **10** | **Vault Organic Hub Auto-Linking Polish:** Ensure regex topic linking is active during `sync_real_conversations_from_db()` to link sessions to parent hubs. | **Backend** | **Medium** | **Low** | **P3 (Enhancement)** | `memory/vault_engine.py` |

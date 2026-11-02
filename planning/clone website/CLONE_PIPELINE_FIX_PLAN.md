@@ -192,7 +192,7 @@ ctx.set_pid(proc.pid)
 | Is the prompt given to it? | **Yes** — `-p full_prompt`. |
 | Which prompt, for the clone's rebuild? | **The caller's own reverse-engineering prompt, byte-identical.** `prompt_mode="verbatim"` → `is_verbatim` → `full_prompt = task` ([:559-563](../actions/antigravity_agent.py#L559-L563)). No ZEZO directives appended, no 6000-char truncation. (Measured earlier: 3266 chars, zero leakage.) |
 | Does it run *in* the capture folder? | **Yes, after FIX-01/FIX-02** — `cwd=str(repo)` and `--add-dir str(repo)`, where `repo` comes from the resolver. Today that resolver hands it the wrong folder; that is the bug FIX-02 fixes. |
-| Does the plan replace `agy` with a stub, a fleet agent, or the REST fallback? | **No.** The fleet route reaches this same `_run_worker` → same `agy.exe` call. The REST path is only the fallback *after* a CLI failure. |
+| Does the plan replace `agy` with a stub, a specialist agent, or the REST fallback? | **No.** The agents route reaches this same `_run_worker` → same `agy.exe` call. The REST path is only the fallback *after* a CLI failure. |
 | What *does* change about that run? | Only what happens **around** it: FIX-03 detects what it actually wrote instead of assuming, FIX-04 stops it completing the caller's card, FIX-14 stops an unknown `--model` being silently ignored. |
 
 **But — the prerequisite that makes it work (FIX-00e):** `agy` is **not logged in** on this machine, and
@@ -472,15 +472,15 @@ if explicit:
 | Caller | Passes an explicit path? | Notes |
 |---|---|---|
 | `actions/antigravity_agent.py:924` | yes (`explicit_path`) | Task text can name a folder; the regex at `:909` only matches `folder/dir` phrasing. Audit that it can't produce an in-repo string. |
-| `actions/fleet_control.py` (`_handle_dispatch`) | yes (`path`/`project_path`) | FIX-08 makes the model actually pass it. |
+| `actions/agents_control.py` (`_handle_dispatch`) | yes (`path`/`project_path`) | FIX-08 makes the model actually pass it. |
 | `actions/website_cloner.py` | after FIX-01, no longer calls `resolve()` at all | Route it through `expand_user_dir` only. |
-| `tests/test_project_isolation_and_fleet_orchestrator_suite.py:62` | no | Must still pass unchanged. |
+| `tests/test_project_isolation_and_agents_orchestrator_suite.py:62` | no | Must still pass unchanged. |
 
 **Verification**
 - Layer 2 (the exact repro from the diagnosis): with `memory/repo_context.json` seeded to a temp dir,
   `resolve(explicit="<a path under the ZEZO root>")` must now **raise**, not return the temp dir.
 - Layer 2: `resolve(explicit="<a normal temp dir>")` still returns it with `source == "explicit"`.
-- Layer 3: `pytest tests/test_project_isolation_and_fleet_orchestrator_suite.py tests/test_workspace_picker.py`
+- Layer 3: `pytest tests/test_project_isolation_and_agents_orchestrator_suite.py tests/test_workspace_picker.py`
 
 > **Executed 2026-10-24 — Layers 1 and 2 only; Layer 3 runs at the end of the batch.**
 > `python -m py_compile core/repo_context.py actions/website_cloner.py` → both compile.
@@ -581,7 +581,7 @@ that the failure path still raises.
 - Layer 2: run the clone worker with a stubbed engine; assert the task status is **not** `DONE` at
   the moment the engine returns, and only becomes `DONE` after the artifact is verified.
 - Regression: a plain `antigravity_run` (no `task_ctx`) still marks its own task complete.
-- Regression: `pytest tests/test_fleet_control_suite.py` — fleet dispatch relies on this seam.
+- Regression: `pytest tests/test_agents_control_suite.py` — agents dispatch relies on this seam.
 
 ---
 
@@ -646,7 +646,7 @@ Order of operations to fix properly:
 **File:** [`core/prompt.txt:405-414`](../core/prompt.txt#L405-L414)
 
 The prompt matches `"React rebuild FAILED -"`, but the code raises
-`"Rebuild FAILED - capture intact at {clone_dir} (preview open at …). Reason: … A fleet agent can be
+`"Rebuild FAILED - capture intact at {clone_dir} (preview open at …). Reason: … A specialist agent can be
 pointed at that folder to finish it."` ([`website_cloner.py:2981-2985`](../actions/website_cloner.py#L2981-L2985)).
 The branch never fires, so the model improvised "the React rebuild failed" and never got the
 instruction to pass `path`.
@@ -663,7 +663,7 @@ instruction to pass `path`.
        whatever they asked for.
     2. Offer the handoff: "Is folder ko kisi agent ko de dun?"
     3. If the user agrees, call
-       `fleet_control(action='dispatch', agent_id='VERVE', path='<the exact folder from the error>',
+       `agents_control(action='dispatch', agent_id='VERVE', path='<the exact folder from the error>',
         task='Finish the rebuild in this folder: <what was asked>')`.
        ALWAYS pass `path` - without it the agent gets a different folder and the captured work is lost.
     4. NEVER claim the rebuilt app is ready when this failure arrives.
@@ -694,7 +694,7 @@ if is_ui_task(task) and not is_verbatim and not payload.get("skip_design"):
 ```
 
 The clone's own rebuild is protected (`skip_design=True` + `prompt_mode="verbatim"`). The follow-up
-**fleet/agent** path is not, so a rebuild request came back as *"the full Aura Frame design
+**agents/agent** path is not, so a rebuild request came back as *"the full Aura Frame design
 reference"* — the new page that appeared in the temp folder, titled *"Image Gen Dashboard Canvas"*.
 
 Fix by making the intent detectable, not just declarable:
@@ -715,7 +715,7 @@ if is_ui_task(task) and not is_verbatim and not _is_rebuild_task(task) \
         and not payload.get("skip_design"):
 ```
 
-Also let the caller be explicit: accept `skip_design` through `fleet_control`'s `dispatch` so an
+Also let the caller be explicit: accept `skip_design` through `agents_control`'s `dispatch` so an
 agent hand-off can request verbatim reproduction.
 
 **Verification**
@@ -730,14 +730,14 @@ agent hand-off can request verbatim reproduction.
 Mostly fixed by FIX-06 (the prompt regains the `ALWAYS pass path` rule). Close the remaining hole so
 it cannot silently regress:
 
-- Confirm `path` is in the `fleet_control` TOOL schema for `dispatch` — the handler accepts it
-  ([`actions/fleet_control.py:40`](../actions/fleet_control.py#L40)) but a parameter the model cannot
+- Confirm `path` is in the `agents_control` TOOL schema for `dispatch` — the handler accepts it
+  ([`actions/agents_control.py:40`](../actions/agents_control.py#L40)) but a parameter the model cannot
   see is a parameter it will not send.
 - In `_handle_dispatch`, when `path` is omitted, log a **warning** naming the folder it fell back to.
   Do not invent a default (Rule 3) — just stop the fallback being invisible.
 
 **Verification**
-- Layer 2: `fleet_control({"action":"dispatch","agent_id":"VERVE","task":"…"})` with no `path`
+- Layer 2: `agents_control({"action":"dispatch","agent_id":"VERVE","task":"…"})` with no `path`
   emits the warning; with `path` reaches `dispatch_task` carrying it.
 
 ---
@@ -881,7 +881,7 @@ revert if the timestamps are not wanted, or leave and stop treating them as a re
 ## 4. Verification plan (AGENTS.md Rule 7)
 
 **Files that will be touched:** `core/repo_context.py`, `actions/website_cloner.py`,
-`actions/antigravity_agent.py`, `actions/fleet_control.py`, `core/prompt.txt`,
+`actions/antigravity_agent.py`, `actions/agents_control.py`, `core/prompt.txt`,
 `core/models.py`, `frontend/src/components/tasks/TaskManagerModal.tsx`, `.gitignore`, tests.
 
 **Layer 1 — static:** `python -m py_compile` on every touched `.py`; `tsc`/vite build for the frontend.
@@ -904,7 +904,7 @@ revert if the timestamps are not wanted, or leave and stop treating them as a re
 **Layer 3 — regression:**
 ```
 pytest tests/test_website_cloner_suite.py tests/test_reverse_engineer_suite.py \
-       tests/test_fleet_control_suite.py tests/test_project_isolation_and_fleet_orchestrator_suite.py \
+       tests/test_agents_control_suite.py tests/test_project_isolation_and_agents_orchestrator_suite.py \
        tests/test_workspace_picker.py
 ```
 > Deliberately **not** the whole repo: the assigned feature plus its direct seams only. (The

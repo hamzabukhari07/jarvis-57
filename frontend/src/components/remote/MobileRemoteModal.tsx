@@ -20,7 +20,7 @@ import {
  X,
  ExternalLink,
  QrCode,
-} from 'lucide-react'
+} from '@/lib/zezo-icons'
 
 interface MobileRemoteModalProps {
  isOpen: boolean

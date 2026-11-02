@@ -1,6 +1,6 @@
 # 🧪 ZEZO REA (Reverse Engineer Anything) — Test Cases & Validation Guide
 
-> **Feature:** Official REA CLI Integration (`rea-agents@6.7.0`), Task Matrix UX & Configurable Fleet Scaffolding  
+> **Feature:** Official REA CLI Integration (`rea-agents@6.7.0`), Task Matrix UX & Configurable Agent Scaffolding  
 > **Lead Architect & Creator:** Hamza Bukhari  
 > **Target OS:** Windows (Primary)  
 > **Output Directory:** `C:\Users\<User>\Desktop\<domain>_rebuild\`  
@@ -16,7 +16,7 @@ Use this interactive checklist to track which tests pass or fail during testing:
 | **TC-01** | **Rebuild vs Clone Intent** | Dispatches `reverse_engineer` (NOT `clone_website`) | [ ] Pass / [ ] Fail |
 | **TC-02** | **Official REA CLI Execution** | Runs `rea capture-browser-scenario` (0 LLM cost) | [ ] Pass / [ ] Fail |
 | **TC-03** | **Task Matrix Card UX** | Live steps inside Task Card (No popups / No eye button) | [ ] Pass / [ ] Fail |
-| **TC-04** | **Configurable Fleet Engine** | Obey UI dropdown (Antigravity / OpenCode / Kilo / Groq) | [ ] Pass / [ ] Fail |
+| **TC-04** | **Configurable Agent Engine** | Obey UI dropdown (Antigravity / OpenCode / Kilo / Groq) | [ ] Pass / [ ] Fail |
 | **TC-05** | **Desktop Output & Quality** | Scaffolded on Desktop with 3D WebGL `index.html` + React | [ ] Pass / [ ] Fail |
 | **TC-06** | **"Launch Kr" Preview** | Opens default browser via `os.startfile` | [ ] Pass / [ ] Fail |
 | **TC-07** | **Conversational Clean Domain** | No prompt pollution in folder name (`stripe.com_rebuild`) | [ ] Pass / [ ] Fail |
@@ -78,10 +78,10 @@ Use this interactive checklist to track which tests pass or fail during testing:
 
 ---
 
-### 🎯 Test Case 4: Configurable Fleet Scaffolding Engine (UI Dropdown Driven)
+### 🎯 Test Case 4: Configurable Agent Scaffolding Engine (UI Dropdown Driven)
 - **Goal:** Verify scaffolding dispatches strictly to the engine and model configured in the UI (no hardcoded fallback chains).
 - **Test Setup:**
-  - In Autonomous Office Deck / Fleet settings, set the developer agent's engine to **OpenCode** (or **KiloCode** / **Antigravity** / **Groq**) and select a model.
+  - In Agents settings, set the developer agent's engine to **OpenCode** (or **KiloCode** / **Antigravity** / **Groq**) and select a model.
 - **Test Prompt:**
   ```text
   Rebuild this frontend https://resend.com

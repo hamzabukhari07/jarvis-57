@@ -299,8 +299,8 @@
         <p>Reconciles localStorage against API skills, purges orphaned IDs, and adds mtime check in `_skills_list_handler` for zero-restart registry reloads.</p>
       </div>
       <div class="card">
-        <h3>Fleet Architecture & Chat Dispatch <span class="badge badge-success">Included</span></h3>
-        <p>Corrects agent engine mappings, parameter bindings, worktree alignment, and enables direct actionable verb detection in fleet chat handler.</p>
+        <h3>Agents Architecture & Chat Dispatch <span class="badge badge-success">Included</span></h3>
+        <p>Corrects agent engine mappings, parameter bindings, worktree alignment, and enables direct actionable verb detection in agents chat handler.</p>
       </div>
     </div>
   </section>
@@ -313,7 +313,7 @@
       <div class="step-num">01</div>
       <div class="step-content">
         <h3>Phase 1: Intake Gate & 5-Pillar State Machine</h3>
-        <p><strong>Target Files:</strong> <code>actions/antigravity_agent.py</code>, <code>actions/fleet_control.py</code>, <code>core/prompt.txt</code></p>
+        <p><strong>Target Files:</strong> <code>actions/antigravity_agent.py</code>, <code>actions/agents_control.py</code>, <code>core/prompt.txt</code></p>
         <ul>
           <li>Implement unified 5-pillar extraction (`scope_type`, `entity_content`, `tech_stack`, `color_theme`, `key_sections`).</li>
           <li>Enforce 2-step confirmation gate: prompt for missing pillars in Step 1, read back plan and require `confirmed=true` in Step 2.</li>
@@ -389,12 +389,12 @@ finally:
     <div class="roadmap-step">
       <div class="step-num">06</div>
       <div class="step-content">
-        <h3>Phase 6: Fleet Architecture & Chat Dispatch Fixes</h3>
-        <p><strong>Target Files:</strong> <code>config/fleet_agents.json</code>, <code>core/fleet_manager.py</code>, <code>core/ui_server.py</code></p>
+        <h3>Phase 6: Agents Architecture & Chat Dispatch Fixes</h3>
+        <p><strong>Target Files:</strong> <code>config/agents.json</code>, <code>core/agents_manager.py</code>, <code>core/ui_server.py</code></p>
         <ul>
-          <li><strong>config/fleet_agents.json:</strong> Replace `default_tool` with `engine` (antigravity/opencode/kilo), purge CLI runners from `allowed_tools`, replace string `"None"` with `null`, move PAM desk to `(460, 280)`, remove ghost `"groq"` from Michael.</li>
-          <li><strong>core/fleet_manager.py:</strong> Inject `allowed_skills` from `SkillRegistry` into `enriched_prompt`; align worktree `task_id` with `submitted_id`; set `merge_changes=True` on success; fix Pam's `extract_design_system` param mapping.</li>
-          <li><strong>core/ui_server.py (`_fleet_chat_handler`):</strong> Detect actionable verbs (build/create/fix/write/redesign/make) and dispatch via `fleet_manager.dispatch_task` instead of returning hallucinated text.</li>
+          <li><strong>config/agents.json:</strong> Replace `default_tool` with `engine` (antigravity/opencode/kilo), purge CLI runners from `allowed_tools`, replace string `"None"` with `null`, move PAM desk to `(460, 280)`, remove ghost `"groq"` from Michael.</li>
+          <li><strong>core/agents_manager.py:</strong> Inject `allowed_skills` from `SkillRegistry` into `enriched_prompt`; align worktree `task_id` with `submitted_id`; set `merge_changes=True` on success; fix Pam's `extract_design_system` param mapping.</li>
+          <li><strong>core/ui_server.py (`_agents_chat_handler`):</strong> Detect actionable verbs (build/create/fix/write/redesign/make) and dispatch via `agents_manager.dispatch_task` instead of returning hallucinated text.</li>
         </ul>
       </div>
     </div>

@@ -6,7 +6,7 @@ Creator & Lead Architect: Hamza Bukhari
 Orchestrates declarative procedural skills (skills/<skill_name>/SKILL.md) through
 either:
   1. Dual-AI Sequential Execution (Groq LPU with stateful Gemini-3.8-Flash fallback).
-  2. Autonomous Fleet Delegation (FleetDispatcher) when configured for specialized agents.
+  2. Autonomous Agent Delegation (AgentDispatcher) when configured for specialized agents.
 
 Returns immediately (<50ms) with conversational acknowledgment while coordinating
 work in background worker threads via TaskManager.
@@ -28,7 +28,7 @@ TOOL = {
     "description": (
         "Execute a procedural skill workflow using the Dual-AI Skill Runner. "
         "Coordinates atomic tool sequences via Groq LPU with stateful Gemini-3.8-Flash fallback, "
-        "or routes to an autonomous fleet agent if fleet delegation is configured."
+        "or routes to an autonomous agent if agent delegation is configured."
     ),
     "parameters": {
         "type": "OBJECT",
@@ -45,17 +45,17 @@ TOOL = {
                 "type": "STRING",
                 "description": "Optional textual description of the specific task to perform under this skill.",
             },
-            "fleet_agent": {
+            "agent_id": {
                 "type": "STRING",
-                "description": "Optional fleet agent ID to delegate to (e.g., 'pam', 'verve', 'flux', 'nexus'). Omit or pass 'zezo' for direct execution by Zezo.",
+                "description": "Optional agent ID to delegate to (e.g., 'pam', 'verve', 'flux', 'nexus'). Omit or pass 'zezo' for direct execution by Zezo.",
             },
             "executor": {
                 "type": "STRING",
-                "description": "Optional execution mode: 'zezo' to execute directly without sub-agents, or 'fleet' to delegate.",
+                "description": "Optional execution mode: 'zezo' to execute directly without sub-agents, or 'agents' to delegate.",
             },
             "direct": {
                 "type": "BOOLEAN",
-                "description": "Set to true to force Zezo to execute the skill directly without fleet delegation.",
+                "description": "Set to true to force Zezo to execute the skill directly without agent delegation.",
             },
         },
         "required": ["skill_name"],
@@ -79,7 +79,7 @@ def _execute_skill_worker(params: dict, task_ctx: Any) -> dict:
 
 
 def handler(parameters: dict, **kwargs: Any) -> str:
-    """Dispatches the skill to either FleetDispatcher or SkillRunner."""
+    """Dispatches the skill to either AgentDispatcher or SkillRunner."""
     params = parameters or {}
     skill_name = (params.get("skill_name") or params.get("skill") or "").strip()
     if not skill_name:
@@ -120,16 +120,16 @@ def handler(parameters: dict, **kwargs: Any) -> str:
     if params.get("task"):
         raw_user_params["task"] = params.get("task")
 
-    fleet_target: Optional[str] = (params.get("fleet_agent") or params.get("agent_id") or "").strip()
+    agent_target: Optional[str] = (params.get("agent_id") or "").strip()
     user_task = params.get("task") or f"Execute skill {resolved_name}"
     is_direct: bool = (
         bool(params.get("direct"))
         or str(params.get("executor", "")).lower() in ("zezo", "self", "direct", "local")
-        or str(fleet_target).lower() in ("zezo", "none", "self")
+        or str(agent_target).lower() in ("zezo", "none", "self")
         or any(k in user_task.lower() for k in ("khud", "zezo khud", "yourself", "direct"))
     )
 
-    # ── 2. Check for Engine-Only or Fleet Delegation ─────────────────────────
+    # ── 2. Check for Engine-Only or Agent Delegation ─────────────────────────
     # Engine skills (generate_design_md, website_build, website_clone) use the Universal Skill Prompt Engineer
     if resolved_name in ("generate_design_md", "website_build", "website_clone"):
         sop_content = skill_reg.read_skill(resolved_name)
@@ -193,7 +193,7 @@ def handler(parameters: dict, **kwargs: Any) -> str:
             logger.debug("[run_skill] Pending intent note: %s", _ep)
 
         if is_direct:
-            # Direct Zezo execution: reads SKILL.md, invokes coding engine directly without fleet/worktree quarantine
+            # Direct Zezo execution: reads SKILL.md, invokes coding engine directly without agents/worktree quarantine
             try:
                 from core.skill_prompt_engineer import craft_skill_engine_prompt
                 from actions.antigravity_agent import antigravity_action
@@ -217,13 +217,13 @@ def handler(parameters: dict, **kwargs: Any) -> str:
             except Exception as e_dir:
                 logger.warning("[run_skill] Direct engine execution failed, falling back: %s", e_dir)
         else:
-            # Fleet delegation to Scranton specialist
+            # Delegate to a specialist agent
             try:
-                from core.fleet_manager import get_fleet_manager
+                from core.agents_manager import get_agent_manager
                 from core.skill_prompt_engineer import craft_skill_engine_prompt
 
-                fm = get_fleet_manager()
-                target_agent = fm.get_agent(fleet_target) if fleet_target else fm.resolve_agent_for_skill(resolved_name)
+                fm = get_agent_manager()
+                target_agent = fm.get_agent(agent_target) if agent_target else fm.resolve_agent_for_skill(resolved_name)
                 fallback_agent = "VERVE" if resolved_name == "website_build" else "PAM"
                 agent_id = target_agent.id if target_agent else fallback_agent
                 engine_name = getattr(target_agent, "engine", "antigravity") if target_agent else "antigravity"
@@ -252,47 +252,47 @@ def handler(parameters: dict, **kwargs: Any) -> str:
             except Exception as e:
                 logger.warning("[run_skill] Engine delegation for %s failed: %s", resolved_name, e)
 
-    fleet_target: Optional[str] = (params.get("fleet_agent") or params.get("agent_id") or "").strip()
+    agent_target: Optional[str] = (params.get("agent_id") or "").strip()
 
-    if not fleet_target:
-        # Check if fleet agents have this skill configured in allowed_skills
+    if not agent_target:
+        # Check if agents have this skill configured in allowed_skills
         try:
-            from core.fleet_manager import get_fleet_manager
+            from core.agents_manager import get_agent_manager
 
-            fm = get_fleet_manager()
+            fm = get_agent_manager()
             for aid, agent in fm.agents.items():
                 allowed = getattr(agent, "allowed_skills", []) or []
                 if resolved_name in allowed:
                     tags = getattr(skill_record, "tags", []) or []
                     domain = getattr(skill_record, "domain", "")
-                    if "fleet" in tags or domain == "fleet" or params.get("delegate") is True:
-                        fleet_target = aid
+                    if "agents" in tags or domain == "agents" or params.get("delegate") is True:
+                        agent_target = aid
                         break
         except Exception as e:
-            logger.debug("[run_skill] Fleet delegation check note: %s", e)
+            logger.debug("[run_skill] agents delegation check note: %s", e)
 
-    if fleet_target:
+    if agent_target:
         try:
-            from core.fleet_manager import get_fleet_manager
+            from core.agents_manager import get_agent_manager
 
-            fm = get_fleet_manager()
+            fm = get_agent_manager()
             prompt = (
                 params.get("task")
                 or json.dumps(raw_user_params)
                 or f"Execute procedural skill: {resolved_name}"
             )
             dispatch_res = fm.dispatcher.dispatch_task(
-                agent_id=fleet_target,
+                agent_id=agent_target,
                 prompt=f"Execute skill '{resolved_name}': {prompt}",
                 session_memory=kwargs.get("session_memory"),
             )
             task_id = dispatch_res.get("task_id") or "active"
             return (
-                f"Delegated skill '{resolved_name}' to autonomous fleet agent '{fleet_target}' "
+                f"Delegated skill '{resolved_name}' to autonomous agent '{agent_target}' "
                 f"(task: {task_id})."
             )
         except Exception as e:
-            logger.warning("[run_skill] Fleet dispatch failed, falling back to local runner: %s", e)
+            logger.warning("[run_skill] agents dispatch failed, falling back to local runner: %s", e)
 
     # ── 3. Route to SkillRunner via Background TaskManager ───────────────────
     from core.task_manager import get_task_manager

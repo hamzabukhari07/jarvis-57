@@ -113,7 +113,7 @@ class VaultEngine:
             "",
             "## Related Links",
             "- Projects: [[ZEZO OS]]",
-            "- Specialists: [[Autonomous Specialist Fleet]]",
+            "- Specialists: [[Autonomous Agents]]",
             "- Preferences: [[System Preferences]]",
         ]
         user_profile_file.write_text("\n".join(user_content), encoding="utf-8")
@@ -141,7 +141,7 @@ class VaultEngine:
             "- Bidirectional Google Gemini Live audio streaming via WebSockets.",
             "- React 19 Full-Screen Workstation with ReUI design system.",
             "- Local-First Markdown Brain Vault with [[Obsidian Knowledge Graph]].",
-            "- Multi-agent autonomous specialist fleet.",
+            "- Multi-agent autonomous specialists.",
         ]
         (self.vault_dir / "projects.md").write_text("\n".join(project_content), encoding="utf-8")
 
@@ -171,20 +171,20 @@ class VaultEngine:
         (self.vault_dir / "preferences.md").write_text("\n".join(pref_content), encoding="utf-8")
 
         # 4. relationships.md
-        fleet_note = [
+        agents_note = [
             "---",
-            "id: specialist_fleet",
-            "title: Autonomous Specialist Fleet",
+            "id: autonomous_agents",
+            "title: Autonomous Agents",
             "category: relationship",
             f"updated: {datetime.now().strftime('%Y-%m-%d')}",
-            "tags: [fleet, agents, ai]",
+            "tags: [agents, ai]",
             "---",
             "",
-            "# Autonomous Specialist Fleet",
+            "# Autonomous Agents",
             "",
-            "Autonomous multi-agent fleet executing specialist tasks under [[ZEZO OS]] and [[Hamza Bukhari]].",
+            "Autonomous agents executing specialist tasks under [[ZEZO OS]] and [[Hamza Bukhari]].",
         ]
-        (self.vault_dir / "relationships.md").write_text("\n".join(fleet_note), encoding="utf-8")
+        (self.vault_dir / "relationships.md").write_text("\n".join(agents_note), encoding="utf-8")
 
         # 5. knowledge_facts.md
         knowledge_content = [
@@ -322,8 +322,8 @@ class VaultEngine:
                     combined_text = raw_combined_text.lower()
                     if any(w in combined_text for w in ("react", "ui", "frontend", "css", "settings", "theme", "modal", "dialog")):
                         detected_links.append("[[System Preferences]]")
-                    if any(w in combined_text for w in ("fleet", "agent", "specialist", "verve", "flux", "michael", "nexus", "dwight")):
-                        detected_links.append("[[Autonomous Specialist Fleet]]")
+                    if any(w in combined_text for w in ("agent", "specialist", "verve", "flux", "michael", "nexus", "dwight")):
+                        detected_links.append("[[Autonomous Agents]]")
                     if any(w in combined_text for w in ("graph", "obsidian", "canvas", "d3", "memory")):
                         detected_links.append("[[Obsidian Knowledge Graph]]")
 

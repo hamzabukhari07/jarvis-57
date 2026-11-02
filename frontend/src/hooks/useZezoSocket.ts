@@ -415,10 +415,10 @@ export function useZezoSocket() {
               break
             }
 
-            case 'fleet_updated':
+            case 'agents_updated':
             case 'agent_task_started':
             case 'agent_task_completed':
-              window.dispatchEvent(new CustomEvent('zezo_fleet_updated', { detail: d }))
+              window.dispatchEvent(new CustomEvent('zezo_agents_updated', { detail: d }))
               break
 
             case 'teardown_progress':

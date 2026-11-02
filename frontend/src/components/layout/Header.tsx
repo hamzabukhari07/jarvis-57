@@ -10,7 +10,7 @@ import {
  Layers, 
  Workflow, 
  Sparkles 
-} from 'lucide-react'
+} from '@/lib/zezo-icons'
 import type { ZezoTelemetry } from '../../types/zezo'
 
 interface HeaderProps {

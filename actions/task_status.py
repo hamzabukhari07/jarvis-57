@@ -66,10 +66,10 @@ def task_status(parameters: dict, player=None, speak=None) -> str:
             return f"Failed to cancel active task {tid}."
         return "No active background tasks are currently running to cancel."
 
-    # Conversational Team / Fleet status queries
-    if action in ("team", "team_status", "fleet", "blocked", "completed_today"):
-        from core.fleet_manager import fleet_manager
-        deck = fleet_manager.get_fleet_deck_state()
+    # Conversational Team / agents status queries
+    if action in ("team", "team_status", "agents", "blocked", "completed_today"):
+        from core.agents_manager import agent_manager
+        deck = agent_manager.get_agents_state()
         all_tasks = tm.all_tasks()
 
         if action == "blocked":

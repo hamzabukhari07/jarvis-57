@@ -364,7 +364,7 @@ The URL the user saw — `http://127.0.0.1:9400/antigravity_clone.html` — is t
 - WEBSITE CLONE REACT REBUILD FAILURE: if the failed background task was a website clone whose React
   rebuild failed, the error text starts with "React rebuild FAILED -" and names the folder ...
   2. ... but the React rebuild failed ...
-  3. ... fleet_control(action='dispatch', agent_id='VERVE', path='<the exact folder from the error>', ...)
+  3. ... agents_control(action='dispatch', agent_id='VERVE', path='<the exact folder from the error>', ...)
      ALWAYS pass `path` - without it the agent gets a brand-new empty folder and the captured work is lost.
 ```
 
@@ -397,7 +397,7 @@ There is **no failure branch for "capture ok / rebuild failed"**, so the model a
 Two separate defects that together produced "नया design बना दिया".
 
 **(a) No path on the hand-off.** `_handle_dispatch` does support it —
-[`actions/fleet_control.py:40`](../actions/fleet_control.py#L40):
+[`actions/agents_control.py:40`](../actions/agents_control.py#L40):
 ```python
 target_path = str(params.get("path") or params.get("project_path") or "").strip() or None
 ```

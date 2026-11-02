@@ -13,7 +13,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 17:29:44** (2 total turns).",
       "size": 337,
-      "_mtime": 1793639881.6261535
+      "_mtime": 1793652893.5374177
     },
     "conv_score.md": {
       "id": "conv_score",
@@ -27,7 +27,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 20:47:17** (4 total turns).",
       "size": 613,
-      "_mtime": 1793639881.6251507
+      "_mtime": 1793652893.535421
     },
     "conv_20261102_205443.md": {
       "id": "conv_20261102_205443",
@@ -41,7 +41,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 20:55:42** (3 total turns).",
       "size": 466,
-      "_mtime": 1793639881.6231568
+      "_mtime": 1793652893.533417
     },
     "conv_20261102_205838.md": {
       "id": "conv_20261102_205838",
@@ -55,7 +55,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 20:58:55** (4 total turns).",
       "size": 287,
-      "_mtime": 1793639881.622138
+      "_mtime": 1793652893.5324056
     },
     "conv_20261102_215500.md": {
       "id": "conv_20261102_215500",
@@ -69,7 +69,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 21:55:18** (7 total turns).",
       "size": 580,
-      "_mtime": 1793639881.620631
+      "_mtime": 1793652893.5298789
     },
     "conv_20261102_220753.md": {
       "id": "conv_20261102_220753",
@@ -83,7 +83,77 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 22:09:22** (16 total turns).",
       "size": 883,
-      "_mtime": 1793639881.6196284
+      "_mtime": 1793652893.5288804
+    },
+    "conv_20261102_221740.md": {
+      "id": "conv_20261102_221740",
+      "file": "conv_20261102_221740.md",
+      "title": "Whats Up",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 6,
+      "updated": "2026-11-02",
+      "snippet": "Live interaction recorded on **2026-11-02 22:18:42** (6 total turns).",
+      "size": 625,
+      "_mtime": 1793652893.5268788
+    },
+    "conv_20261102_223645.md": {
+      "id": "conv_20261102_223645",
+      "file": "conv_20261102_223645.md",
+      "title": "Here Is Content From My Clipboard",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 4,
+      "updated": "2026-11-02",
+      "snippet": "Live interaction recorded on **2026-11-02 22:37:24** (4 total turns).",
+      "size": 782,
+      "_mtime": 1793652893.525878
+    },
+    "conv_20261102_225110.md": {
+      "id": "conv_20261102_225110",
+      "file": "conv_20261102_225110.md",
+      "title": "Session 20261102",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 2,
+      "updated": "2026-11-02",
+      "snippet": "Live interaction recorded on **2026-11-02 22:51:34** (2 total turns).",
+      "size": 337,
+      "_mtime": 1793652893.5233479
+    },
+    "conv_20261102_232303.md": {
+      "id": "conv_20261102_232303",
+      "file": "conv_20261102_232303.md",
+      "title": "Hey Zizou",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 14,
+      "updated": "2026-11-02",
+      "snippet": "Live interaction recorded on **2026-11-02 23:23:21** (14 total turns).",
+      "size": 936,
+      "_mtime": 1793652893.5218227
+    },
+    "conv_20261102_234928.md": {
+      "id": "conv_20261102_234928",
+      "file": "conv_20261102_234928.md",
+      "title": "Yo Whats Up Zizo How Are",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 23,
+      "updated": "2026-11-02",
+      "snippet": "Live interaction recorded on **2026-11-02 23:50:03** (23 total turns).",
+      "size": 1275,
+      "_mtime": 1793652893.5202866
     }
   }
 }

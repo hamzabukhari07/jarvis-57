@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Paperclip, ArrowUp, Square } from "lucide-react";
+import { Paperclip, ArrowUp, Square } from "@/lib/zezo-icons";
 import { Button } from "@/components/ui/button";
 
 export interface AIChatInputProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {

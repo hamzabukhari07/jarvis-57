@@ -27,7 +27,7 @@ Telemetry & Analytics Data Specification:
 Surgically adapt each designated layout slot:
 {slots}
 Key architectural slots to fulfill:
-- [TOPBAR_HUD_SLOT]: Mission control header displaying active node/fleet status, real-time clock, environment pill, alert count badge, and user session profile.
+- [TOPBAR_HUD_SLOT]: Mission control header displaying active node/agents status, real-time clock, environment pill, alert count badge, and user session profile.
 - [SIDEBAR_NAV_SLOT]: Collapsible vertical navigation bar with subsystem routes, quick filters, view switcher, and system health status summary.
 - [METRIC_KPI_CARDS_SLOT]: High-impact KPI stat cards featuring key operational metrics, trend indicators (positive/negative percentage deltas), sparklines, and status badges.
 - [PRIMARY_VISUALIZATION_SLOT]: Main analytics chart container (time-series performance curve, resource distribution, or network traffic graph) rendered via interactive SVG/Canvas.

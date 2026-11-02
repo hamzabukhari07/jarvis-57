@@ -25,7 +25,7 @@ VALID_TOOLS: set[str] = {
     "opencode_run", "kilo_run", "quick_snippet", "code_helper",
     "antigravity_run", "groq", "agent_reach",
     "web_read_page", "web_reader", "web_search", "browser_control",
-    "file_processor", "file_controller", "fleet_control", "task_status",
+    "file_processor", "file_controller", "agents_control", "task_status",
 }
 
 
@@ -67,7 +67,7 @@ def _infer_agent_defaults(role: str, specialty: str) -> Dict[str, Any]:
 
 
 @dataclass
-class FleetAgent:
+class AgentProfile:
     id: str
     name: str
     role: str
@@ -102,34 +102,34 @@ class FleetAgent:
             self.prompt_prefix = self.soul_markdown
 
 
-class FleetRegistry:
-    """Manages fleet registry, agent configurations, personas, desk assignments, and persistence."""
+class AgentRegistry:
+    """Manages agents registry, agent configurations, personas, desk assignments, and persistence."""
 
     def __init__(self, config_path: Optional[Path] = None):
         self._lock = threading.RLock()
         if config_path:
             self.config_path = Path(config_path)
         else:
-            self.config_path = Path(__file__).resolve().parent.parent.parent / "config" / "fleet_agents.json"
-        self.agents: Dict[str, FleetAgent] = {}
+            self.config_path = Path(__file__).resolve().parent.parent.parent / "config" / "agents.json"
+        self.agents: Dict[str, AgentProfile] = {}
         self._last_mtime: float = 0.0
-        self._load_fleet()
+        self._load_agents()
 
     def refresh_if_modified(self) -> bool:
-        """Reload fleet config if fleet_agents.json was modified on disk."""
+        """Reload agents config if agents.json was modified on disk."""
         if not self.config_path.exists():
             return False
         try:
             mtime = self.config_path.stat().st_mtime
             if mtime != self._last_mtime:
-                self._load_fleet()
+                self._load_agents()
                 return True
         except OSError:
             pass
         return False
 
-    def _allocate_desk(self, existing: Optional[FleetAgent], req_x: int, req_y: int) -> Tuple[int, int]:
-        """Allocate next available workstation desk on the office floor."""
+    def _allocate_desk(self, existing: Optional[AgentProfile], req_x: int, req_y: int) -> Tuple[int, int]:
+        """Allocate the next available desk coordinate for the agent."""
         if req_x > 0 and req_y > 0:
             return req_x, req_y
         if existing and existing.desk_x > 0 and existing.desk_y > 0:
@@ -143,21 +143,21 @@ class FleetRegistry:
         idx = len(self.agents)
         return (180 + (idx % 4) * 140, 480 + (idx // 4) * 100)
 
-    def _load_fleet(self) -> None:
+    def _load_agents(self) -> None:
         if not self.config_path.exists():
             return
         try:
             self._last_mtime = self.config_path.stat().st_mtime
             with open(self.config_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            fleet_data = data.get("fleet", {})
+            agents_data = data.get("agents", {})
             with self._lock:
                 self.agents.clear()
-                for agent_id, info in fleet_data.items():
+                for agent_id, info in agents_data.items():
                     uid = agent_id.upper().strip()
                     prompt_prefix = info.get("prompt_prefix", "")
                     soul_markdown = info.get("soul_markdown") or prompt_prefix
-                    self.agents[uid] = FleetAgent(
+                    self.agents[uid] = AgentProfile(
                         id=uid,
                         name=info.get("name", agent_id),
                         role=info.get("role", ""),
@@ -180,16 +180,16 @@ class FleetRegistry:
                         soul_markdown=soul_markdown,
                     )
         except Exception as e:
-            logger.error("[FleetRegistry] Failed to load fleet config: %s", e)
+            logger.error("[AgentRegistry] Failed to load agents config: %s", e)
 
-    def _save_fleet(self) -> bool:
-        """Persist current fleet state back to fleet_agents.json."""
+    def _save_agents(self) -> bool:
+        """Persist current agents state back to agents.json."""
         try:
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
-            export: Dict[str, Any] = {"fleet": {}}
+            export: Dict[str, Any] = {"agents": {}}
             with self._lock:
                 for a in self.agents.values():
-                    export["fleet"][a.id] = {
+                    export["agents"][a.id] = {
                         "name": a.name,
                         "role": a.role,
                         "specialty": a.specialty,
@@ -218,10 +218,10 @@ class FleetRegistry:
                 pass
             return True
         except Exception as e:
-            logger.error("[FleetRegistry] Failed to save fleet config: %s", e)
+            logger.error("[AgentRegistry] Failed to save agents config: %s", e)
             return False
 
-    def resolve_agent_for_skill(self, skill_name: str) -> Optional[FleetAgent]:
+    def resolve_agent_for_skill(self, skill_name: str) -> Optional[AgentProfile]:
         """Dynamically resolve which live agent currently possesses the assigned skill."""
         candidates = []
         with self._lock:
@@ -233,13 +233,13 @@ class FleetRegistry:
             return None
         return min(candidates, key=lambda a: self.get_agent_active_task_count(a.id))
 
-    def get_all_agents(self) -> List[FleetAgent]:
+    def get_all_agents(self) -> List[AgentProfile]:
         """Return list of all currently active agents."""
         with self._lock:
             self.refresh_if_modified()
             return list(self.agents.values())
 
-    def get_agent(self, name_or_id: str) -> Optional[FleetAgent]:
+    def get_agent(self, name_or_id: str) -> Optional[AgentProfile]:
         key = name_or_id.upper().strip()
         with self._lock:
             self.refresh_if_modified()
@@ -251,7 +251,7 @@ class FleetRegistry:
                     return a
         return None
 
-    def resolve_agent_by_mention_or_capability(self, query: str) -> Optional[FleetAgent]:
+    def resolve_agent_by_mention_or_capability(self, query: str) -> Optional[AgentProfile]:
         """
         Dynamically resolves an agent by explicit name mention, active skill, or capability keyword fallback.
         Never resurrects or returns decommissioned ghost agents.
@@ -332,7 +332,7 @@ class FleetRegistry:
 
             # Orchestrator / Architecture
             if has_kw("decompose", "architect", "orchestrate", "lead", "plan project"):
-                orch_agent = match_candidates(lambda a: a.is_core or any(c in (a.capabilities or []) for c in ("task_decomposition", "fleet_orchestration")) or "architect" in (a.role or "").lower() or "orchestrator" in (a.role or "").lower())
+                orch_agent = match_candidates(lambda a: a.is_core or any(c in (a.capabilities or []) for c in ("task_decomposition", "agent_orchestration")) or "architect" in (a.role or "").lower() or "orchestrator" in (a.role or "").lower())
                 if orch_agent:
                     return orch_agent
 
@@ -361,7 +361,7 @@ class FleetRegistry:
                     count += 1
             return count
         except Exception as e:
-            logger.debug("[FleetRegistry] Error checking active tasks: %s", e)
+            logger.debug("[AgentRegistry] Error checking active tasks: %s", e)
             return 0
 
     def save_agent_profile(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -445,7 +445,7 @@ class FleetRegistry:
 
             prompt_prefix = str(
                 data.get("prompt_prefix")
-                or (existing.prompt_prefix if existing else f"You are {name_str}, an autonomous fleet specialist focusing on {specialty_str}.")
+                or (existing.prompt_prefix if existing else f"You are {name_str}, an autonomous agents specialist focusing on {specialty_str}.")
             ).strip()
 
             raw_allowed_tools = data.get("allowed_tools")
@@ -474,7 +474,7 @@ class FleetRegistry:
 
             soul_md = str(data.get("soul_markdown") or prompt_prefix).strip()
 
-            agent = FleetAgent(
+            agent = AgentProfile(
                 id=clean_id,
                 name=name_str,
                 role=role_str,
@@ -499,9 +499,9 @@ class FleetRegistry:
                 soul_markdown=soul_md,
             )
             self.agents[clean_id] = agent
-            ok = self._save_fleet()
+            ok = self._save_agents()
 
-        self._broadcast_event("fleet_updated", {"action": "hire", "agent": self._agent_to_dict(agent)})
+        self._broadcast_event("agents_updated", {"action": "hire", "agent": self._agent_to_dict(agent)})
 
         return {"success": ok, "agent": self._agent_to_dict(agent)}
 
@@ -514,9 +514,9 @@ class FleetRegistry:
         with self._lock:
             agent.prompt_prefix = soul_prompt.strip()
             agent.soul_markdown = soul_prompt.strip()
-            ok = self._save_fleet()
+            ok = self._save_agents()
 
-        self._broadcast_event("fleet_updated", {"action": "soul_update", "agent_id": agent.id})
+        self._broadcast_event("agents_updated", {"action": "soul_update", "agent_id": agent.id})
 
         return {"success": ok, "agent_id": agent.id, "soul": agent.prompt_prefix}
 
@@ -545,12 +545,12 @@ class FleetRegistry:
                 try:
                     git_sandbox.safe_teardown(agent.current_task_id or agent.id.lower())
                 except Exception as ex:
-                    logger.warning("[FleetRegistry] Worktree teardown during delete_agent error: %s", ex)
+                    logger.warning("[AgentRegistry] Worktree teardown during delete_agent error: %s", ex)
 
             del self.agents[key]
-            ok = self._save_fleet()
+            ok = self._save_agents()
 
-        self._broadcast_event("fleet_updated", {"action": "fire", "deleted_id": key})
+        self._broadcast_event("agents_updated", {"action": "fire", "deleted_id": key})
 
         return {"success": ok, "deleted_id": key}
 
@@ -566,7 +566,7 @@ class FleetRegistry:
             from memory.sqlite_memory import search_scroll_history
             memories = search_scroll_history(agent.name, limit=6)
         except Exception as e:
-            logger.debug("[FleetRegistry] Memory query error: %s", e)
+            logger.debug("[AgentRegistry] Memory query error: %s", e)
 
         # Query active task details from TaskManager if available
         task_info = None
@@ -585,7 +585,7 @@ class FleetRegistry:
                         "recent_logs": (st.get("logs") or [])[-6:],
                     }
             except Exception as e:
-                logger.debug("[FleetRegistry] Task query error: %s", e)
+                logger.debug("[AgentRegistry] Task query error: %s", e)
 
         return {
             "success": True,
@@ -595,13 +595,13 @@ class FleetRegistry:
             "memories": memories,
         }
 
-    def get_fleet_deck_state(self) -> List[Dict[str, Any]]:
-        """Export full live state for the Scranton Pixel Office UI."""
+    def get_agents_state(self) -> List[Dict[str, Any]]:
+        """Export the live agent state for the Agents UI."""
         try:
             from core.task_manager import get_task_manager
             tm = get_task_manager()
         except Exception as e:
-            logger.debug("[FleetRegistry] Failed to obtain task manager: %s", e)
+            logger.debug("[AgentRegistry] Failed to obtain task manager: %s", e)
             tm = None
 
         with self._lock:
@@ -621,7 +621,7 @@ class FleetRegistry:
                 logs = list(a.recent_logs)
                 if not logs:
                     logs = [
-                        f"[READY] Agent '{a.name}' registered into autonomous fleet",
+                        f"[READY] Agent '{a.name}' registered into autonomous agents",
                         f"[MODEL] Engine: {a.default_tool} | Model: {a.model_id or 'default'}",
                         f"[STATUS] Standby on office deck — ready for task assignment",
                     ]
@@ -654,11 +654,11 @@ class FleetRegistry:
                 })
             return state
 
-    def _agent_to_dict(self, a: FleetAgent) -> Dict[str, Any]:
+    def _agent_to_dict(self, a: AgentProfile) -> Dict[str, Any]:
         logs = list(a.recent_logs)
         if not logs:
             logs = [
-                f"[READY] Agent '{a.name}' registered into autonomous fleet",
+                f"[READY] Agent '{a.name}' registered into autonomous agents",
                 f"[MODEL] Engine: {a.default_tool} | Model: {a.model_id or 'default'}",
                 f"[STATUS] Standby on office deck — ready for task assignment",
             ]
@@ -690,17 +690,17 @@ class FleetRegistry:
         }
 
     def _broadcast_event(self, event_type: str, data: Dict[str, Any]) -> None:
-        """Thread-safe broadcast of fleet and task events to WebSocket UI and log bus."""
+        """Thread-safe broadcast of agents and task events to WebSocket UI and log bus."""
         try:
             from core.ui_server import get_ui_server
             get_ui_server().broadcast(event_type, data)
         except Exception as e:
-            logger.debug("[FleetRegistry] UI broadcast skipped: %s", e)
+            logger.debug("[AgentRegistry] UI broadcast skipped: %s", e)
         try:
             from core.log_bus import emit_tool_micro_event
-            emit_tool_micro_event(event_type, "fleet_manager", data)
+            emit_tool_micro_event(event_type, "agent_manager", data)
         except Exception:
             pass
 
 
-fleet_registry = FleetRegistry()
+agent_registry = AgentRegistry()

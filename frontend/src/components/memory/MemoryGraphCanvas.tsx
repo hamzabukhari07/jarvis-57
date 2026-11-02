@@ -14,7 +14,7 @@ import {
   Minimize2,
   SlidersHorizontal,
   Trash2,
-} from 'lucide-react'
+} from '@/lib/zezo-icons'
 import { Badge } from '../reui/badge'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'

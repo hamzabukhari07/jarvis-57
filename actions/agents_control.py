@@ -1,5 +1,5 @@
 """
-actions/fleet_control.py — Autonomous Multi-Agent Fleet Orchestration Tool.
+actions/agents_control.py — Autonomous Agent Orchestration Tool.
 
 Lead Architect: Hamza Bukhari
 Project: ZEZO (Autonomous Desktop AI Operating System v2)
@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Dict
 
-from core.fleet_manager import fleet_manager
+from core.agents_manager import agent_manager
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +23,9 @@ def _broadcast_ui(event: str, data: Dict[str, Any]) -> None:
         logger.debug("Failed broadcasting UI server event %s: %s", event, e)
     try:
         from core.log_bus import emit_tool_micro_event
-        emit_tool_micro_event(event, "fleet_control", data)
+        emit_tool_micro_event(event, "agents_control", data)
     except Exception as e:
-        logger.debug("Failed broadcasting fleet UI event %s: %s", event, e)
+        logger.debug("Failed broadcasting agents UI event %s: %s", event, e)
 
 
 import time
@@ -44,8 +44,8 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
     if not task:
         return "Error: task instruction is required to dispatch work to an agent."
 
-    # ── Stateless Greenfield Intake & Confirmation Gate for Fleet Builds ────
-    target_agent = fleet_manager.get_agent(agent_id)
+    # ── Stateless Greenfield Intake & Confirmation Gate for agents Builds ────
+    target_agent = agent_manager.get_agent(agent_id)
     canonical_agent_id = target_agent.id.upper() if target_agent else agent_id.upper()
     agent_skills = getattr(target_agent, "allowed_skills", []) or []
     is_web_agent = bool(set(agent_skills) & {"website_build", "web_design", "web_development"})
@@ -61,7 +61,7 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
         except Exception:
             remembered = None
         logger.warning(
-            "[FleetControl] dispatch to %s received no 'path' - falling back to an auto-selected folder "
+            "[AgentsControl] dispatch to %s received no 'path' - falling back to an auto-selected folder "
             "instead of the folder the user meant%s. Pass path=<existing folder> to work in place.",
             agent_id,
             f" (last remembered repo: {remembered})" if remembered else "",
@@ -92,15 +92,15 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
             t1, t2 = task.lower().strip(), last_task.lower().strip()
             if t1 == t2:
                 logger.info(
-                    "[FleetControl] Debounced duplicate dispatch to %s within %.1fs (existing task %s)",
+                    "[AgentsControl] Debounced duplicate dispatch to %s within %.1fs (existing task %s)",
                     agent_key,
                     now - last_time,
                     existing_task_id,
                 )
-                agent_name = (fleet_manager.get_agent(agent_id) or type("Agent", (), {"name": agent_id})).name
+                agent_name = (agent_manager.get_agent(agent_id) or type("Agent", (), {"name": agent_id})).name
                 return f"Task already dispatched to {agent_name} and in progress. Task ID: {existing_task_id}."
 
-    res = fleet_manager.dispatch_task(
+    res = agent_manager.dispatch_task(
         agent_id=agent_id,
         prompt=task,
         path=target_path,
@@ -113,7 +113,7 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
         confirmed=bool(params.get("confirmed", False)),
     )
     if not res.get("success"):
-        return f"Fleet dispatch failed: {res.get('error', 'Unknown error')}"
+        return f"agents dispatch failed: {res.get('error', 'Unknown error')}"
 
     # Handle multi-task decomposition result
     if res.get("orchestrator") or res.get("decomposed_count", 0) > 1:
@@ -121,7 +121,7 @@ def _handle_dispatch(params: Dict[str, Any]) -> str:
         orch_name = res.get("orchestrator", "Orchestrator")
         if str(orch_name).upper() == "MICHAEL":
             orch_name = "Michael Scott"
-        return f"{orch_name} decomposed and dispatched {count} specialist tasks to the fleet."
+        return f"{orch_name} decomposed and dispatched {count} specialist tasks to the agents."
 
     task_id = res.get("task_id")
     agent_name = res.get("agent_name", agent_id)
@@ -160,12 +160,12 @@ def _handle_hire(params: Dict[str, Any]) -> str:
         "model_id": model_id,
         "risk_tier": "L1_MUTATION" if tool in ("kilo_run", "opencode_run", "antigravity_run") else "L0_READ_ONLY",
     }
-    res = fleet_manager.save_agent_profile(profile_data)
+    res = agent_manager.save_agent_profile(profile_data)
     if not res.get("success"):
         return f"Failed to hire agent: {res.get('error', 'Unknown error')}"
 
-    _broadcast_ui("fleet_updated", {"action": "hire", "agent": res.get("agent")})
-    return f"Hired new fleet agent '{name.title()}' as {role} utilizing {tool}."
+    _broadcast_ui("agents_updated", {"action": "hire", "agent": res.get("agent")})
+    return f"Hired new agent '{name.title()}' as {role} utilizing {tool}."
 
 
 def _handle_fire(params: Dict[str, Any]) -> str:
@@ -173,12 +173,12 @@ def _handle_fire(params: Dict[str, Any]) -> str:
     if not agent_id:
         return "Error: agent_id is required to decommission an agent."
 
-    res = fleet_manager.delete_agent(agent_id)
+    res = agent_manager.delete_agent(agent_id)
     if not res.get("success"):
         return f"Failed to remove agent: {res.get('error', 'Agent not found')}"
 
-    _broadcast_ui("fleet_updated", {"action": "fire", "deleted_id": res.get("deleted_id")})
-    return f"Decommissioned agent '{agent_id.upper()}' from the active fleet."
+    _broadcast_ui("agents_updated", {"action": "fire", "deleted_id": res.get("deleted_id")})
+    return f"Removed agent '{agent_id.upper()}' from the active agent list."
 
 
 def _handle_update(params: Dict[str, Any]) -> str:
@@ -186,9 +186,9 @@ def _handle_update(params: Dict[str, Any]) -> str:
     if not agent_id:
         return "Error: agent_id is required to update an agent persona."
 
-    existing = fleet_manager.get_agent(agent_id)
+    existing = agent_manager.get_agent(agent_id)
     if not existing:
-        return f"Error: Agent '{agent_id}' not found in the active fleet roster."
+        return f"Error: Agent '{agent_id}' not found in the active agent list."
 
     profile_data: Dict[str, Any] = {
         "id": existing.id,
@@ -214,21 +214,21 @@ def _handle_update(params: Dict[str, Any]) -> str:
         raw_caps = params["capabilities"]
         profile_data["capabilities"] = [c.strip() for c in raw_caps if str(c).strip()] if isinstance(raw_caps, list) else [c.strip() for c in str(raw_caps).split(",") if c.strip()]
 
-    res = fleet_manager.save_agent_profile(profile_data)
+    res = agent_manager.save_agent_profile(profile_data)
     if not res.get("success"):
         return f"Failed to update agent '{existing.name}': {res.get('error', 'Unknown error')}"
 
     updated = res.get("agent", {})
-    _broadcast_ui("fleet_updated", {"action": "update", "agent": updated})
+    _broadcast_ui("agents_updated", {"action": "update", "agent": updated})
     return f"Successfully updated profile for agent '{existing.name}' (Role: {updated.get('role')}, Tool: {updated.get('default_tool')}, Tools: {', '.join(updated.get('allowed_tools', []))})."
 
 
 def _handle_list(params: Dict[str, Any]) -> str:
-    deck = fleet_manager.get_fleet_deck_state()
+    deck = agent_manager.get_agents_state()
     if not deck:
-        return "No agents currently registered in the active fleet."
+        return "No agents are currently registered."
 
-    lines = [f"Active Fleet Roster ({len(deck)} agents):"]
+    lines = [f"Active Agents ({len(deck)}):"]
     for a in deck:
         status_str = f"[{a['status'].upper()}]"
         if a.get("task_title"):
@@ -243,7 +243,7 @@ def _handle_status(params: Dict[str, Any]) -> str:
     if not agent_id:
         return _handle_list(params)
 
-    profile = fleet_manager.get_agent_full_profile(agent_id)
+    profile = agent_manager.get_agent_full_profile(agent_id)
     if not profile.get("success"):
         return f"Error: {profile.get('error', 'Agent not found')}"
 
@@ -271,7 +271,7 @@ def _handle_peer_chat(params: Dict[str, Any]) -> str:
     if not message:
         return "Error: message / task instruction is required for peer delegation."
 
-    res = fleet_manager.delegate_peer_task(
+    res = agent_manager.delegate_peer_task(
         from_agent_id=from_agent,
         to_agent_id=to_agent,
         task=message,
@@ -310,7 +310,7 @@ def _handle_decompose(params: Dict[str, Any]) -> str:
     if not prompt:
         return "Error: task prompt is required for workflow decomposition."
 
-    res = fleet_manager.decompose_and_dispatch(prompt, path=path)
+    res = agent_manager.decompose_and_dispatch(prompt, path=path)
     count = res.get("decomposed_count", 0)
     tasks = res.get("tasks", [])
     task_summaries = [f"• {t.get('agent_name', t.get('agent_id'))} ({t.get('tool')}) [ID: {t.get('task_id')}]" for t in tasks if t.get("success")]
@@ -350,25 +350,25 @@ _ACTION_DISPATCH: Dict[str, Callable[[Dict[str, Any]], str]] = {
 _HANDLERS = _ACTION_DISPATCH
 
 
-def fleet_control(parameters: Dict[str, Any], **kwargs: Any) -> str:
-    """Main entrypoint for autonomous fleet control, delegation, and P2P peer routing."""
+def agents_control(parameters: Dict[str, Any], **kwargs: Any) -> str:
+    """Coordinate agent management, task dispatch, and peer delegation."""
     action = str(parameters.get("action") or "list_agents").strip().lower()
     handler_fn = _ACTION_DISPATCH.get(action)
     if not handler_fn:
-        return f"Unknown fleet_control action '{action}'. Supported actions: {', '.join(sorted(_ACTION_DISPATCH.keys()))}"
+        return f"Unknown agent action '{action}'. Supported actions: {', '.join(sorted(_ACTION_DISPATCH.keys()))}"
     return handler_fn(parameters)
 
 
 TOOL = {
-    "name": "fleet_control",
+    "name": "agents_control",
     "description": (
-        "Orchestrate autonomous multi-agent fleet. Dispatch coding/research tasks to active specialist workers "
+        "Coordinate specialized agents. Dispatch coding and research tasks to active workers "
         "(e.g. Verve for frontend, Nexus/Ahmad for backend, Michael for architecture, Dwight for testing, Kelly for research), "
         "trigger P2P peer handoffs with upstream deliverables, decompose multi-stage workflows, hire/fire/update agents, or query agent status. "
         "Use action='update' whenever the user wants to change an agent's role, name, specialty, allowed tools, or model. "
         "Use this whenever the user addresses a specific agent ('Tell Verve to build a landing page', 'Kelly transcribe and summarize this video', "
         "'Ahmad build the auth API', 'Michael decompose this project'), asks to reassign a task, or when an agent is stuck or not working "
-        "('verve is not working, kisi or ko task assign kr de', 'switch agent', 'assign to someone else', 'Flux se karwao'), or for delegating work to the autonomous specialist fleet."
+        "('verve is not working, kisi or ko task assign kr de', 'switch agent', 'assign to someone else', 'Flux se karwao'), or for delegating work to the autonomous specialist agents."
     ),
     "risk": "local_mutation",
     "enabled": True,
@@ -379,11 +379,11 @@ TOOL = {
             "action": {
                 "type": "STRING",
                 "enum": ["dispatch", "reassign", "switch", "hire", "fire", "update", "edit", "list_agents", "get_status", "peer_chat", "decompose_workflow"],
-                "description": "The fleet management action to execute.",
+                "description": "Coordinate agents: dispatch work, manage agent profiles, or delegate tasks.",
             },
             "agent_id": {
                 "type": "STRING",
-                "description": "Target agent name or ID from the active fleet roster (e.g. 'VERVE', 'FLUX', 'MICHAEL', 'AHMAD', 'DWIGHT', 'KELLY').",
+                "description": "Target agent name or ID (e.g. 'VERVE', 'FLUX', 'MICHAEL', 'AHMAD', 'DWIGHT', 'KELLY').",
             },
             "from_agent": {
                 "type": "STRING",
@@ -480,7 +480,7 @@ TOOL = {
         },
         "required": ["action"],
     },
-    "handler": fleet_control,
+    "handler": agents_control,
 }
 
-handler = fleet_control
+handler = agents_control

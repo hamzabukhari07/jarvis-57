@@ -1,28 +1,28 @@
-# 👥 Autonomous Fleet Management & The Scranton Office
+# 👥 Agent Management
 
 > **Project:** ZEZO  
 > **Creator & Lead Architect:** Hamza Bukhari  
-> **Source Modules:** [`core/fleet_manager.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/fleet_manager.py) (Facade), [`core/fleet/`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/fleet/) (`registry.py`, `dispatcher.py`, `orchestrator.py`), [`actions/fleet_control.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/actions/fleet_control.py), [`frontend/src/components/office/AutonomousOfficeScreen.tsx`](file:///d:/anitgravity/zezo%20work/jarvis-57/frontend/src/components/office/AutonomousOfficeScreen.tsx), [`frontend/src/components/office/AgentDirectChatView.tsx`](file:///d:/anitgravity/zezo%20work/jarvis-57/frontend/src/components/office/AgentDirectChatView.tsx)  
-> **Configuration:** [`config/fleet_agents.json`](file:///d:/anitgravity/zezo%20work/jarvis-57/config/fleet_agents.json)  
+> **Source Modules:** [`core/agents_manager.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/agents_manager.py) (Facade), [`core/agents/`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/agents/) (`registry.py`, `dispatcher.py`, `orchestrator.py`), [`actions/agents_control.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/actions/agents_control.py), [`frontend/src/components/office/AutonomousOfficeScreen.tsx`](file:///d:/anitgravity/zezo%20work/jarvis-57/frontend/src/components/office/AutonomousOfficeScreen.tsx), [`frontend/src/components/office/AgentDirectChatView.tsx`](file:///d:/anitgravity/zezo%20work/jarvis-57/frontend/src/components/office/AgentDirectChatView.tsx)  
+> **Configuration:** [`config/agents.json`](file:///d:/anitgravity/zezo%20work/jarvis-57/config/agents.json)  
 > **Target OS:** Windows 10/11 (Primary), macOS, Linux  
 
 ---
 
 ## 📖 Overview
 
-The **Autonomous Fleet Management System** enables ZEZO to orchestrate a distributed team of specialized, autonomous sub-agents. Inspired by classic engineering room dynamics, ZEZO represents this multi-agent fleet visually as **The Scranton Office**—an interactive 2D pixel-art virtual floor where each specialist occupies a dedicated desk coordinate, maintains local state, executes coding and research workloads, and collaborates in real time.
+The **Autonomous Agent Management System** enables ZEZO to orchestrate a distributed team of specialized, autonomous sub-agents. The frontend presents the agents through a compact Agents roster and dedicated agent workspaces for Edit, Chat, and Files, with a separate Logs view. The former Floor and Tasks visualizations have been removed.
 
-Fleet execution features strict **Git worktree sandboxing**, **3-tier risk gates**, **keyword-driven role inference**, and **direct 1-on-1 chat channels** powered by Assistant-UI.
+Agent execution supports **Git worktree sandboxing**, **3-tier risk gates**, **keyword-driven role inference**, and direct 1-on-1 chat through Assistant-UI.
 
 ```mermaid
 flowchart TD
-    A["User Request:<br/>'Have Verve rebuild the navbar in Tailwind'"] --> B["Action Tool: fleet_control<br/>(actions/fleet_control.py)"]
-    B --> C["FleetManager (core/fleet_manager.py)"]
+    A["User Request:<br/>'Have Verve rebuild the navbar in Tailwind'"] --> B["Action Tool: agents_control<br/>(actions/agents_control.py)"]
+    B --> C["AgentManager (core/agents_manager.py)"]
     C --> D["Role & Specialty Inference<br/>(_infer_agent_defaults)"]
     D --> E["Security Risk Check<br/>(L0_READ_ONLY / L1_MUTATION / L2_DESTRUCTIVE)"]
     E --> F["Git Worktree Sandbox Creation<br/>(.agent_worktrees/<task_id>)"]
     F --> G["Execution Dispatch via Dedicated Engine<br/>(Antigravity / OpenCode / Kilo / Groq)"]
-    G --> H["Scranton Office HUD State Streaming<br/>(AutonomousOfficeScreen.tsx)"]
+    G --> H["Agents UI State Streaming<br/>(AutonomousOfficeScreen.tsx)"]
     H --> I["Safe 4-Gate Teardown & Merge Lock"]
 
     classDef core fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff;
@@ -31,16 +31,16 @@ flowchart TD
 
 ---
 
-## 🏗️ Modular Subsystem Architecture (`core/fleet/`)
+## 🏗️ Modular Subsystem Architecture (`core/agents/`)
 
-To eliminate God-object bloat and prevent lock contention between heavy Git sandbox operations and live agent telemetry, the fleet subsystem is partitioned into three decoupled modules unified under a backward-compatible Facade:
+To keep storage, dispatch, and live agent telemetry separate, the agent subsystem is partitioned into three modules unified by a shared manager facade:
 
 ```mermaid
 flowchart TD
-    FM["FleetManager (Facade)<br/>core/fleet_manager.py"]
-    FM --> FR["FleetRegistry<br/>core/fleet/registry.py"]
-    FM --> FD["FleetDispatcher<br/>core/fleet/dispatcher.py"]
-    FM --> FO["FleetOrchestrator<br/>core/fleet/orchestrator.py"]
+    FM["AgentManager (Facade)<br/>core/agents_manager.py"]
+    FM --> FR["AgentRegistry<br/>core/agents/registry.py"]
+    FM --> FD["AgentDispatcher<br/>core/agents/dispatcher.py"]
+    FM --> FO["AgentOrchestrator<br/>core/agents/orchestrator.py"]
 
     FR ---|"CRUD, JSON config, Desk Coordinates, Souls"| FR_DESC["State Lock (_lock)"]
     FD ---|"Risk gates, Skill injection, Background execution"| FD_DESC["Telemetry Streaming"]
@@ -50,26 +50,26 @@ flowchart TD
     class FM,FR,FD,FO comp;
 ```
 
-1. **`core/fleet/registry.py` (`FleetRegistry`):**
-   - Manages agent models (`FleetAgent`), desk allocations (`OFFICE_DESK_COORDINATES`), and configuration persistence (`config/fleet_agents.json`).
+1. **`core/agents/registry.py` (`AgentRegistry`):**
+   - Manages agent models (`AgentProfile`), desk allocations (`OFFICE_DESK_COORDINATES`), and configuration persistence (`config/agents.json`).
    - Guarded by its own dedicated re-entrant lock (`_lock`) ensuring thread-safe reads and writes.
-2. **`core/fleet/dispatcher.py` (`FleetDispatcher`):**
+2. **`core/agents/dispatcher.py` (`AgentDispatcher`):**
    - Validates risk tiers (`L0_READ_ONLY`, `L1_MUTATION`, `L2_DESTRUCTIVE`) and circuit breaker status.
    - Dynamically injects declarative skills (`agent.allowed_skills`) and spawns background tasks via `TaskManager`.
    - **Universal Skill Prompt Engineer Integration:** Automatically intercepts coding engine dispatches (`antigravity_run`, `opencode_run`, `kilo_run`), detects task mode (Mode 1: Live URL with Scrapling pre-flight ingestion vs Mode 2: Local Codebase direct inspection), and synthesizes dynamic execution directives via Groq LPU / Gemini Flash (`core/skill_prompt_engineer.py`) adhering directly to `SKILL.md` blueprints with zero forced schemas and strictly optional subagents.
-   - Wraps progress callbacks with rate-limited (`>= 1.0s` or completion) `fleet_updated` deck broadcasts for UI synchronization.
-3. **`core/fleet/orchestrator.py` (`FleetOrchestrator`):**
+   - Wraps progress callbacks with rate-limited (`>= 1.0s` or completion) `agents_updated` deck broadcasts for UI synchronization.
+3. **`core/agents/orchestrator.py` (`AgentOrchestrator`):**
    - Handles multi-agent workflow decomposition (`decompose_and_dispatch`) and peer-to-peer delegation (`delegate_peer_task`).
    - Manages Git worktree quarantine lifecycle and merges results safely upon task completion.
-4. **`core/fleet_manager.py` (Facade):**
+4. **`core/agents_manager.py` (Facade):**
    - Implements the Facade Pattern, composing `registry`, `dispatcher`, and `orchestrator` while exposing all historical methods, properties, and module-level helpers.
-   - Guarantees 100% backward compatibility for all existing callers (`main.py`, `fleet_control.py`, `ui_server.py`).
+   - Exposes the common agent operations used by `main.py`, `agents_control.py`, and `ui_server.py`.
 
 ---
 
-## 🏢 The Scranton Office & 2D Desk Grid
+## 🧭 Agent Assignment Coordinates
 
-In the UI ([`frontend/src/components/office/AutonomousOfficeScreen.tsx`](file:///d:/anitgravity/zezo%20work/jarvis-57/frontend/src/components/office/AutonomousOfficeScreen.tsx)), the office is mapped to a calibrated 2D grid defined in [`core/fleet_manager.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/fleet_manager.py):
+Agent profiles retain desk coordinates for assignment and configuration in [`core/agents_manager.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/agents_manager.py):
 
 ```python
 OFFICE_DESK_COORDINATES: list[tuple[int, int]] = [
@@ -79,17 +79,23 @@ OFFICE_DESK_COORDINATES: list[tuple[int, int]] = [
 ]
 ```
 
-Each desk position reflects the agent's live operational status:
-- **`idle`**: Agent sits quietly at desk; telemetry monitors are dim.
-- **`working`**: Agent typing animation active; monitor glows with live terminal telemetry.
-- **`reviewing`**: Paused for user verification or review gate.
-- **`error` / `blocked`**: Visual alert state indicating failure or circuit breaker intervention.
+## 🗂️ Agent Navigation and Chat Space
+
+The left navigation expands **Agents** into **Manage Agents** and **Chat Space**. Manage Agents remains the compact searchable, status-filtered table. Each row exposes Edit, Chat, Delete, Logs, and Files; Chat opens Chat Space with that agent selected. The eye button opens the short agent profile, and the lead agent remains protected from deletion.
+
+Edit and Files open the dedicated agent workspace, which retains only those two tabs:
+- **Edit:** Identity/avatar/color, role, instructions, workspace, engine/model/risk tier, skills, and tools configuration.
+- **Files:** `SOUL.md`, `AGENTS.md`, `PROFILE.md`, and `MEMORY.md` persona files, enable toggles, editor, save action, and workspace Explorer shortcut.
+
+**Chat Space** uses a clean three-pane layout: recent chats and New Chat on the left, the conversation in the center, and Workspace/Files on the right. Its composer reuses the same `ZezoChatThread` / `ZezoPillComposer` UI as ZEZO's main chat, including the shared attachment-chip presentation. The header lets the user switch agents and change the selected agent's engine and model. Changing the engine selects its first available model; both values are saved to the agent profile. Chat threads and message history are stored in browser local storage per agent. The workspace path can be changed with the native folder picker (`/api/agents/pick_folder`); the selected path is saved to the agent profile and sent as `path` with chat requests. The Files list reflects files currently registered as ZEZO attachments through `/api/attachments`.
+
+**Logs** opens a dedicated agent log screen. The Agents area has no separate Floor or Tasks views.
 
 ---
 
 ## 🧑‍💻 Specialist Agent Roster
 
-ZEZO includes an out-of-the-box roster of specialized agents defined in [`config/fleet_agents.json`](file:///d:/anitgravity/zezo%20work/jarvis-57/config/fleet_agents.json):
+ZEZO includes an out-of-the-box roster of specialized agents defined in [`config/agents.json`](file:///d:/anitgravity/zezo%20work/jarvis-57/config/agents.json):
 
 | Agent ID | Name | Role & Specialty | Execution Engine | Default Action Tool | Risk Tier | Desk Coordinates |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -146,17 +152,17 @@ When a mutation task is dispatched:
 1. ZEZO creates an isolated Git worktree under `.agent_worktrees/<task_id>/` on a dedicated branch (`agent/<clean_task_id>`). Paths containing `.agent_worktrees` are explicitly exempted from `core/repo_context.py:is_zezo_source_dir` isolation rules to allow safe execution without throwing false Zezo source tree collision errors.
 2. The agent executes all edits, builds, and tests inside this quarantined directory.
 3. Once the task succeeds (`prog == 100`), `complete_task(agent.id, task_id, merge_changes=True, worktree_id=...)` automatically runs a **4-gate safe teardown and merges changes to the main branch** under `_merge_lock`, preventing code loss.
-4. **Honest Error Contract:** In `core/fleet/dispatcher.py`, task results are strictly validated against error patterns (`tool '...' failed:`, `winerror`, `failed:`, `exception`). Action crashes immediately trigger `task_failed` telemetry, invoke `task_ctx.on_fail()`, and record circuit breaker failures, strictly preventing false positive `100 Completed successfully` broadcasts.
-5. **Direct Mode vs. Fleet Delegation:** If the user specifies direct execution (`"zezo khud karo"`, `direct=True`, `executor="zezo"`), `actions/run_skill.py` executes directly via native tools without routing through Scranton floor specialists or creating unneeded worktree quarantine directories.
+4. **Honest Error Contract:** In `core/agents/dispatcher.py`, task results are strictly validated against error patterns (`tool '...' failed:`, `winerror`, `failed:`, `exception`). Action crashes immediately trigger `task_failed` telemetry, invoke `task_ctx.on_fail()`, and record circuit breaker failures, strictly preventing false positive `100 Completed successfully` broadcasts.
+5. **Direct Mode vs. Agent Delegation:** If the user specifies direct execution (`"zezo khud karo"`, `direct=True`, `executor="zezo"`), `actions/run_skill.py` executes directly via native tools without dispatching to another agent or creating an unneeded worktree.
 
 ### 3. Declarative Skill Injection
-In `core/fleet_manager.py:dispatch_task`, when an agent defines skills in `agent.allowed_skills` (such as `website_build`), ZEZO automatically queries `core.skill_loader.get_skill_registry()` and injects the full declarative instructions under an `[ACTIVE SKILL: <name>]` block directly into the enriched execution prompt.
+In `core/agents_manager.py:dispatch_task`, when an agent defines skills in `agent.allowed_skills` (such as `website_build`), ZEZO automatically queries `core.skill_loader.get_skill_registry()` and injects the full declarative instructions under an `[ACTIVE SKILL: <name>]` block directly into the enriched execution prompt.
 
 ---
 
-## 🐝 The 4-Way Scranton Fleet Swarm Pipeline (`decompose_and_dispatch`)
+## 🐝 The 4-Way Agent Delegation Pipeline (`decompose_and_dispatch`)
 
-When a complex full-stack or multi-tiered engineering directive is received (e.g., *"Build an end-to-end AI landing page and SaaS backend with test coverage"*), ZEZO's Lead Architect **Michael** ([`core/fleet/orchestrator.py:decompose_and_dispatch`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/fleet/orchestrator.py)) orchestrates the **4-Way Scranton Fleet Swarm Pipeline**.
+When a complex engineering directive is received (e.g., *"Build an end-to-end AI landing page and SaaS backend with test coverage"*), ZEZO's Lead Architect **Michael** ([`core/agents/orchestrator.py:decompose_and_dispatch`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/agents/orchestrator.py)) coordinates specialist agents through the delegation pipeline.
 
 Rather than bottlenecking execution into a single agent or writing fragile intermediate Python synthesis scripts, Michael decomposes the objective into four domain-isolated, concurrent streams:
 
@@ -197,17 +203,17 @@ flowchart TD
 - **Subdirectory Domain Isolation:** Subtasks are explicitly dispatched into dedicated subdirectories (`base_path/frontend/`, `base_path/backend/`, `base_path/tests/`) under the project root. This prevents file collision races and Git worktree merge conflicts.
 - **Direct-Execution Guarantee:** Forbids intermediate Python builder scripts (`build_index.py`, `generate.py`). Code is emitted directly to final target files, preventing multi-minute latency penalties.
 - **Upstream Deliverable Piping:** When peer delegation occurs (`delegate_peer_task`), design tokens, extracted schemas, and candidate metadata are automatically serialized and prepended to downstream agent prompts.
-- **Dynamic Capability & Skill Resolution:** Tasks dispatched without hardcoded assignments resolve dynamically via `resolve_agent_for_skill(skill_name)` and capability inspection across currently registered live agents (`fleet_manager.get_all_agents()`), with load balancing across active tasks.
-- **Pre-Flight Asset Extraction for Design Audit:** When dispatching `generate_design_md`, `FleetDispatcher` checks for live URLs (`re.search(r'https?://[^\s\'"<>]+', prompt)`). If detected (Mode 1: URL), `core/url_prefetch.prefetch_url_assets` extracts the DOM, primary stylesheets (≤ 5 CSS files, < 3s), and `:root` tokens into `site_dom.html`, `site_styles.css`, and `site_tokens.json`, injecting them into the prompt synthesis context (`prefetched_assets`); if no URL is present (Mode 2: Local Codebase), it passes `mode: 'local'` and `target_dir`.
-- **Anti-Ghost Lifecycle:** Decommissioned agents are permanently deleted from `config/fleet_agents.json`, their worktrees torn down, and removed from `self.agents`. Memory fallback recreation of deleted agents is strictly prohibited.
+- **Dynamic Capability & Skill Resolution:** Tasks dispatched without hardcoded assignments resolve dynamically via `resolve_agent_for_skill(skill_name)` and capability inspection across currently registered live agents (`agent_manager.get_all_agents()`), with load balancing across active tasks.
+- **Pre-Flight Asset Extraction for Design Audit:** When dispatching `generate_design_md`, `AgentDispatcher` checks for live URLs (`re.search(r'https?://[^\s\'"<>]+', prompt)`). If detected (Mode 1: URL), `core/url_prefetch.prefetch_url_assets` extracts the DOM, primary stylesheets (≤ 5 CSS files, < 3s), and `:root` tokens into `site_dom.html`, `site_styles.css`, and `site_tokens.json`, injecting them into the prompt synthesis context (`prefetched_assets`); if no URL is present (Mode 2: Local Codebase), it passes `mode: 'local'` and `target_dir`.
+- **Anti-Ghost Lifecycle:** Decommissioned agents are permanently deleted from `config/agents.json`, their worktrees torn down, and removed from `self.agents`. Memory fallback recreation of deleted agents is strictly prohibited.
 
 ---
 
 ## 💬 Direct 1-on-1 Chat Channels (`AgentDirectChatView.tsx`)
 
-Users can click on any agent in the Scranton Office to open a dedicated, isolated conversational channel:
+Users can open a dedicated, isolated conversational channel for any agent:
 - **Independent Conversation Context:** Chats do not pollute the primary voice session memory.
-- **Actionable Task Dispatch Bridge:** Direct chat messages to agents in `/api/fleet/chat` are classified by `_is_actionable_task()`. When a user requests code creation or web building (e.g. "Build a landing page for my crypto app"), the chat engine bridges directly to `fleet_manager.dispatch_task()`, triggers real background execution, and replies with honest live Task ID telemetry, completely eliminating single-turn chat hallucinations.
+- **Actionable Task Dispatch Bridge:** Direct chat messages to agents in `/api/agents/chat` are classified by `_is_actionable_task()`. When a user requests code creation or web building (e.g. "Build a landing page for my crypto app"), the chat engine bridges directly to `agent_manager.dispatch_task()`, triggers real background execution, and replies with honest live Task ID telemetry, completely eliminating single-turn chat hallucinations.
 - **Assistant-UI Thread:** Full markdown rendering, code block copy buttons, and turn-by-turn reasoning pills for conceptual explanations.
 - **Dynamic Model Switching:** Allows overriding the agent's default LLM on the fly (e.g., switching between Gemini 3.7 Flash and Claude Sonnet 4.6).
 - **Live Soul Editing:** The side panel allows editing the agent's `prompt_prefix`, allowed tools, and capabilities directly from the UI.

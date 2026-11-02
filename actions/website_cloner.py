@@ -2505,7 +2505,7 @@ DEFAULT_OUTPUT_FORMAT = "raw_html"
 # The prefix of the text a failed rebuild raises. core/prompt.txt decides how ZEZO explains a
 # failed clone by matching this exact prefix, and the two drifted apart once already (the message
 # became "Rebuild FAILED -" while the prompt still matched "React rebuild FAILED -"), which
-# silently killed the branch that tells the model to pass `path` to fleet_control. It is a shared
+# silently killed the branch that tells the model to pass `path` to agents_control. It is a shared
 # constant now, and tests/test_website_cloner_suite.py asserts it appears in core/prompt.txt, so
 # the next rewrite of either side fails the suite instead of failing quietly in a live session.
 RE_REBUILD_FAILURE_PREFIX = "Rebuild FAILED - capture intact at"
@@ -2519,7 +2519,7 @@ def rebuild_failure_message(clone_dir: Path, preview_url: str, detail: str) -> s
     """
     return (
         f"{RE_REBUILD_FAILURE_PREFIX} {clone_dir} (preview open at {preview_url}). "
-        f"Reason: {detail}. A fleet agent can be pointed at that folder to finish it."
+        f"Reason: {detail}. A agent can be pointed at that folder to finish it."
     )
 
 # Explicit opt-out: deliver the capture and skip the engine stage entirely.
@@ -2743,7 +2743,7 @@ def _run_reverse_engineer(
 
     Returns (ok, detail, artifact_path). The call reuses the existing run_in_place seam in
     actions/antigravity_agent.py, so the build reports into THIS task's card instead of
-    spawning a second task - and it is the same agy.exe invocation a fleet agent would make.
+    spawning a second task - and it is the same agy.exe invocation a agent would make.
     """
     fmt = (output_format or DEFAULT_OUTPUT_FORMAT).strip()
     before_html = {str(p) for p in clone_dir.rglob("*.html")}
@@ -3025,7 +3025,7 @@ def _clone_worker(params: dict, ctx: TaskContext) -> dict:
         if not rebuild_ok:
             # The user asked for a rebuilt artifact and it did not arrive. Open the capture - it is
             # the deliverable now - and report the failure plainly instead of shipping a fake
-            # success. The folder is kept so a fleet agent can be pointed straight at it, and the
+            # success. The folder is kept so a agent can be pointed straight at it, and the
             # message comes from rebuild_failure_message so core/prompt.txt cannot drift from it.
             _safe_report(ctx, 100, f"[REBUILD ERROR] {rebuild_detail}")
             fallback_target = (

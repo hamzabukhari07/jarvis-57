@@ -1,5 +1,5 @@
 """
-core/fleet/dispatcher.py — Task Dispatcher & Worktree Execution Engine for ZEZO Fleet.
+core/agents/dispatcher.py — Task Dispatcher & Worktree Execution Engine for ZEZO agents.
 
 Creator & Lead Architect: Hamza Bukhari
 Project: ZEZO (Autonomous Desktop AI Operating System v2)
@@ -20,9 +20,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 if TYPE_CHECKING:
-    from core.fleet_manager import FleetAgent, FleetManager
+    from core.agents_manager import AgentProfile, AgentManager
 
-logger = logging.getLogger("zezo.fleet.dispatcher")
+logger = logging.getLogger("zezo.agents.dispatcher")
 
 VALID_RISK_TIERS: set[str] = {"L0_READ_ONLY", "L1_MUTATION", "L2_DESTRUCTIVE"}
 
@@ -36,7 +36,7 @@ def _setup_worktree(worktree_name: str) -> Any:
         elif hasattr(git_sandbox, "create_worktree"):
             return git_sandbox.create_worktree(worktree_name)
     except Exception as e:
-        logger.warning("[FleetDispatcher] Failed to setup worktree %s: %s", worktree_name, e)
+        logger.warning("[AgentDispatcher] Failed to setup worktree %s: %s", worktree_name, e)
     return None
 
 
@@ -49,13 +49,13 @@ def _teardown_worktree(worktree_name: str) -> Any:
         elif hasattr(git_sandbox, "safe_teardown"):
             return git_sandbox.safe_teardown(worktree_name)
     except Exception as e:
-        logger.warning("[FleetDispatcher] Failed to teardown worktree %s: %s", worktree_name, e)
+        logger.warning("[AgentDispatcher] Failed to teardown worktree %s: %s", worktree_name, e)
     return None
 
 
-class FleetDispatcher:
+class AgentDispatcher:
     """
-    Autonomous task dispatcher for the ZEZO agent fleet.
+    Autonomous task dispatcher for ZEZO agents.
     Coordinates risk tiers, circuit breaker checks, git worktree isolation,
     declarative skill injection, and execution via TaskManager.
     """
@@ -84,30 +84,30 @@ class FleetDispatcher:
         return 0
 
     def _broadcast_event(self, event_type: str, data: Dict[str, Any]) -> None:
-        """Thread-safe broadcast of fleet and task events to WebSocket UI and log bus."""
+        """Thread-safe broadcast of agents and task events to WebSocket UI and log bus."""
         if hasattr(self.registry, "_broadcast_event"):
             try:
                 self.registry._broadcast_event(event_type, data)
                 return
             except Exception as e:
-                logger.debug("[FleetDispatcher] Registry broadcast failed: %s", e)
+                logger.debug("[AgentDispatcher] Registry broadcast failed: %s", e)
 
         try:
             from core.ui_server import get_ui_server
             get_ui_server().broadcast(event_type, data)
         except Exception as e:
-            logger.debug("[FleetDispatcher] UI broadcast skipped: %s", e)
+            logger.debug("[AgentDispatcher] UI broadcast skipped: %s", e)
 
         try:
             from core.log_bus import emit_tool_micro_event
-            emit_tool_micro_event(event_type, "fleet_dispatcher", data)
+            emit_tool_micro_event(event_type, "agent_dispatcher", data)
         except Exception:
             pass
 
-    def _get_fleet_deck_state(self) -> List[Dict[str, Any]]:
-        """Retrieve current fleet deck state for broadcasts."""
-        if hasattr(self.registry, "get_fleet_deck_state"):
-            return self.registry.get_fleet_deck_state()
+    def _get_agents_state(self) -> List[Dict[str, Any]]:
+        """Retrieve current agents deck state for broadcasts."""
+        if hasattr(self.registry, "get_agents_state"):
+            return self.registry.get_agents_state()
         agents = getattr(self.registry, "agents", {})
         if isinstance(agents, dict):
             return [
@@ -194,7 +194,7 @@ class FleetDispatcher:
           - Git worktree sandboxing and isolation
           - Declarative skill injection (agent.allowed_skills)
           - Background worker thread execution via TaskManager
-          - Rate-limited WebSocket fleet_updated event broadcasting (>= 1.0s or prog >= 100)
+          - Rate-limited WebSocket agents_updated event broadcasting (>= 1.0s or prog >= 100)
           - Complete failure / cancellation / completion lifecycle hooks
         """
         effective_subtask = is_subtask or bool(parent_task_id)
@@ -203,7 +203,7 @@ class FleetDispatcher:
         target_pre = self._get_agent(agent_id)
         is_orchestrator = target_pre and (
             getattr(target_pre, "is_core", False)
-            or any(cap in (getattr(target_pre, "capabilities", []) or []) for cap in ("task_decomposition", "fleet_orchestration"))
+            or any(cap in (getattr(target_pre, "capabilities", []) or []) for cap in ("task_decomposition", "agent_orchestration"))
             or any(w in (getattr(target_pre, "role", "") or "").lower() for w in ("orchestrator", "architect", "manager"))
         )
         if not effective_subtask and is_orchestrator and any(
@@ -220,7 +220,7 @@ class FleetDispatcher:
                 registered_names = [f"{getattr(a, 'name', a)} ({getattr(a, 'id', a)})" for a in agents_dict.values()]
             return {
                 "success": False,
-                "error": f"Agent '{agent_id}' is not in the active fleet. Registered agents: {', '.join(registered_names)}",
+                "error": f"Agent '{agent_id}' is not in the active agents. Registered agents: {', '.join(registered_names)}",
             }
 
         # Dynamic Overflow Load Balancing: If agent is at capacity (>= 3 active tasks), auto-route to another active specialist
@@ -234,7 +234,7 @@ class FleetDispatcher:
                         if (agent_skills and set(alt_agent.allowed_skills or []) & agent_skills) or (
                             agent_caps and set(alt_agent.capabilities or []) & agent_caps
                         ) or (getattr(agent, "default_tool", None) and alt_agent.default_tool == agent.default_tool):
-                            logger.info("[FleetDispatcher] Agent %s at capacity (>=3 tasks). Auto-routing to %s.", agent.name, alt_agent.name)
+                            logger.info("[AgentDispatcher] Agent %s at capacity (>=3 tasks). Auto-routing to %s.", agent.name, alt_agent.name)
                             agent = alt_agent
                             break
 
@@ -277,7 +277,7 @@ class FleetDispatcher:
         try:
             Path(target_dir).mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            logger.warning("[FleetDispatcher] Could not ensure directory %s: %s", target_dir, e)
+            logger.warning("[AgentDispatcher] Could not ensure directory %s: %s", target_dir, e)
 
         # Resolve active procedural skills from agent.allowed_skills
         skills_context = ""
@@ -294,7 +294,7 @@ class FleetDispatcher:
                 if skill_obj and getattr(skill_obj, "instructions", None):
                     skills_context += f"\n\n[ACTIVE SKILL: {skill_obj.name}]\n{skill_obj.instructions}\n"
         except Exception as e:
-            logger.debug("[FleetDispatcher] Skill resolution error: %s", e)
+            logger.debug("[AgentDispatcher] Skill resolution error: %s", e)
 
         # Build context enrichment
         memory_context = ""
@@ -310,7 +310,7 @@ class FleetDispatcher:
         proj_context = f"\n\n[PROJECT TYPE: {project_type}]" if project_type else ""
 
         agent_prefix = getattr(agent, "prompt_prefix", "") or ""
-        agent_role = getattr(agent, "role", "Fleet Specialist")
+        agent_role = getattr(agent, "role", "agents Specialist")
         agent_name = getattr(agent, "name", agent.id)
 
         enriched_prompt = (
@@ -370,10 +370,10 @@ class FleetDispatcher:
             try:
                 # Wrap task_ctx.report to synchronize agent progress and activity logs
                 orig_report = getattr(task_ctx, "report", None)
-                last_fleet_broadcast = 0.0
+                last_agents_broadcast = 0.0
 
                 def _reporting_wrapper(prog: int, msg: str = "") -> None:
-                    nonlocal last_fleet_broadcast
+                    nonlocal last_agents_broadcast
                     if hasattr(task_ctx, "cancelled") and task_ctx.cancelled():
                         return
                     if orig_report:
@@ -401,9 +401,9 @@ class FleetDispatcher:
                     })
 
                     now = time.time()
-                    if now - last_fleet_broadcast >= 1.0 or prog >= 100:
-                        last_fleet_broadcast = now
-                        self._broadcast_event("fleet_updated", {"fleet": self._get_fleet_deck_state()})
+                    if now - last_agents_broadcast >= 1.0 or prog >= 100:
+                        last_agents_broadcast = now
+                        self._broadcast_event("agents_updated", {"agents": self._get_agents_state()})
 
                 task_ctx.report = _reporting_wrapper
 
@@ -513,7 +513,7 @@ class FleetDispatcher:
                                 call_params["prompt"] = crafted
                     except Exception as pe_err:
                         logger.warning(
-                            "[FleetDispatcher] craft_skill_engine_prompt failed for %s, falling back: %s",
+                            "[AgentDispatcher] craft_skill_engine_prompt failed for %s, falling back: %s",
                             getattr(w_agent, "name", w_agent_id),
                             pe_err,
                         )
@@ -540,7 +540,7 @@ class FleetDispatcher:
                         "agent_id": agent.id,
                         "agent": agent.name,
                     })
-                    self._broadcast_event("fleet_updated", {"fleet": self._get_fleet_deck_state()})
+                    self._broadcast_event("agents_updated", {"agents": self._get_agents_state()})
                     if wt_path:
                         _teardown_worktree(wt_name or worktree_name)
                     ret = {"status": "cancelled"}
@@ -561,7 +561,7 @@ class FleetDispatcher:
                             "agent_id": agent.id,
                             "agent": agent.name,
                         })
-                        self._broadcast_event("fleet_updated", {"fleet": self._get_fleet_deck_state()})
+                        self._broadcast_event("agents_updated", {"agents": self._get_agents_state()})
                         if wt_path:
                             _teardown_worktree(wt_name or worktree_name)
                         ret = {"status": "cancelled"}
@@ -604,7 +604,7 @@ class FleetDispatcher:
                         "agent": agent.name,
                         "error": err_msg,
                     })
-                    self._broadcast_event("fleet_updated", {"fleet": self._get_fleet_deck_state()})
+                    self._broadcast_event("agents_updated", {"agents": self._get_agents_state()})
                     if wt_path:
                         _teardown_worktree(wt_name or worktree_name)
                     ret = {"status": "error", "error": err_msg}
@@ -621,7 +621,7 @@ class FleetDispatcher:
                     "agent": agent.name,
                     "summary": f"Completed: {prompt[:60]}",
                 })
-                self._broadcast_event("fleet_updated", {"fleet": self._get_fleet_deck_state()})
+                self._broadcast_event("agents_updated", {"agents": self._get_agents_state()})
                 if wt_path:
                     _teardown_worktree(wt_name or worktree_name)
                 ret = {"status": "success", "result": str(res)}
@@ -639,7 +639,7 @@ class FleetDispatcher:
                     "agent": agent.name,
                     "error": str(ex),
                 })
-                self._broadcast_event("fleet_updated", {"fleet": self._get_fleet_deck_state()})
+                self._broadcast_event("agents_updated", {"agents": self._get_agents_state()})
                 if wt_path:
                     _teardown_worktree(wt_name or worktree_name)
                 sync_result_holder["err"] = str(ex)
@@ -718,7 +718,7 @@ class FleetDispatcher:
             "tool": effective_tool,
             "target_dir": target_dir,
         })
-        self._broadcast_event("fleet_updated", {"fleet": self._get_fleet_deck_state()})
+        self._broadcast_event("agents_updated", {"agents": self._get_agents_state()})
 
         # Synchronous execution wait if sync requested
         if sync:

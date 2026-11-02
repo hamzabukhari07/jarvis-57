@@ -2,9 +2,8 @@ import type { AgentProfile, PipelineSettings, ZezoTelemetry } from '../types/zez
 
 const API_BASE = '' // Vite proxy handles /api -> http://127.0.0.1:8000/api
 
-export interface FleetStateResponse {
-  fleet?: AgentProfile[]
-  agents?: Record<string, AgentProfile>
+export interface AgentsStateResponse {
+  agents?: AgentProfile[]
   telemetry?: ZezoTelemetry
 }
 
@@ -37,9 +36,9 @@ export interface CodeEngineStatus {
 }
 
 export const api = {
-  async getFleetState(): Promise<FleetStateResponse> {
-    const res = await fetch(`${API_BASE}/api/fleet/state`)
-    if (!res.ok) throw new Error(`Failed to fetch fleet state: ${res.statusText}`)
+  async getAgentsState(): Promise<AgentsStateResponse> {
+    const res = await fetch(`${API_BASE}/api/agents/state`)
+    if (!res.ok) throw new Error(`Failed to fetch agents state: ${res.statusText}`)
     return res.json()
   },
 
@@ -47,12 +46,13 @@ export const api = {
     agentId: string,
     message: string,
     engine?: string,
-    model?: string
+    model?: string,
+    workspace?: string
   ): Promise<{ response?: string; reply?: string; status?: string; task_id?: string; engine?: string; model?: string }> {
-    const res = await fetch(`${API_BASE}/api/fleet/chat`, {
+    const res = await fetch(`${API_BASE}/api/agents/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agent_id: agentId, message, engine, model }),
+      body: JSON.stringify({ agent_id: agentId, message, engine, model, path: workspace }),
     })
     if (!res.ok) throw new Error(`Agent chat failed: ${res.statusText}`)
     return res.json()
@@ -65,7 +65,7 @@ export const api = {
     tool?: string
     model?: string
   }): Promise<{ status: string; task_id?: string; message?: string }> {
-    const res = await fetch(`${API_BASE}/api/fleet/dispatch_task`, {
+    const res = await fetch(`${API_BASE}/api/agents/dispatch_task`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -75,7 +75,7 @@ export const api = {
   },
 
   async saveAgent(agent: AgentProfile): Promise<{ status: string }> {
-    const res = await fetch(`${API_BASE}/api/fleet/agents`, {
+    const res = await fetch(`${API_BASE}/api/agents`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(agent),
@@ -89,7 +89,7 @@ export const api = {
   },
 
   async deleteAgent(agentId: string): Promise<{ success: boolean }> {
-    const res = await fetch(`${API_BASE}/api/fleet/delete_agent`, {
+    const res = await fetch(`${API_BASE}/api/agents/delete_agent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ agent_id: agentId }),
@@ -339,6 +339,26 @@ export const api = {
   async pickWorkspaceFolder(): Promise<{ status: string; folder?: any; files?: any[]; cancelled?: boolean }> {
     const res = await fetch(`${API_BASE}/api/workspace/pick`, { method: 'POST' })
     if (!res.ok) throw new Error(`Pick workspace folder failed: ${res.statusText}`)
+    return res.json()
+  },
+
+  async pickAgentFolder(initialDir?: string): Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }> {
+    const res = await fetch(`${API_BASE}/api/agents/pick_folder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initial_dir: initialDir }),
+    })
+    if (!res.ok) throw new Error(`Pick agent workspace folder failed: ${res.statusText}`)
+    return res.json()
+  },
+
+  async openAgentFolder(path: string): Promise<{ success: boolean; path?: string; error?: string }> {
+    const res = await fetch(`${API_BASE}/api/agents/open_folder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    })
+    if (!res.ok) throw new Error(`Open agent workspace folder failed: ${res.statusText}`)
     return res.json()
   },
 

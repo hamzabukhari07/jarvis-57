@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, Globe, ChevronDown } from "lucide-react";
+import { Search, Globe, ChevronDown } from "@/lib/zezo-icons";
 import { cn } from "@/lib/utils";
 
 const SEARCH_SHIMMER_STYLE_ID = "an-web-search-shimmer-styles";

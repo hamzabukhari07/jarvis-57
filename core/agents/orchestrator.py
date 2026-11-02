@@ -24,10 +24,10 @@ DELIVERABLE_ARCHETYPES = (
     "saas",
 )
 
-__all__ = ["FleetOrchestrator", "DELIVERABLE_ARCHETYPES"]
+__all__ = ["AgentOrchestrator", "DELIVERABLE_ARCHETYPES"]
 
 
-class FleetOrchestrator:
+class AgentOrchestrator:
     """
     Coordinates multi-agent workflows, peer-to-peer task delegations,
     task decomposition (Michael orchestrator), and task completion lifecycle.
@@ -53,7 +53,7 @@ class FleetOrchestrator:
         return target
 
     def _broadcast_event(self, event_type: str, data: Dict[str, Any]) -> None:
-        """Thread-safe broadcast of fleet and task events to WebSocket UI and log bus."""
+        """Thread-safe broadcast of agents and task events to WebSocket UI and log bus."""
         if hasattr(self.dispatcher, "_broadcast_event"):
             try:
                 self.dispatcher._broadcast_event(event_type, data)
@@ -64,19 +64,19 @@ class FleetOrchestrator:
             from core.ui_server import get_ui_server
             get_ui_server().broadcast(event_type, data)
         except Exception as e:
-            logger.debug("[FleetOrchestrator] UI broadcast skipped: %s", e)
+            logger.debug("[AgentOrchestrator] UI broadcast skipped: %s", e)
         try:
             from core.log_bus import emit_tool_micro_event
-            emit_tool_micro_event(event_type, "fleet_orchestrator", data)
+            emit_tool_micro_event(event_type, "agent_orchestrator", data)
         except Exception:
             pass
 
-    def _get_fleet_deck_state(self) -> List[Dict[str, Any]]:
-        """Helper to obtain fleet deck state from registry or dispatcher."""
-        if hasattr(self.registry, "get_fleet_deck_state"):
-            return self.registry.get_fleet_deck_state()
-        if hasattr(self.dispatcher, "get_fleet_deck_state"):
-            return self.dispatcher.get_fleet_deck_state()
+    def _get_agents_state(self) -> List[Dict[str, Any]]:
+        """Helper to obtain agents deck state from registry or dispatcher."""
+        if hasattr(self.registry, "get_agents_state"):
+            return self.registry.get_agents_state()
+        if hasattr(self.dispatcher, "get_agents_state"):
+            return self.dispatcher.get_agents_state()
         return []
 
     def generate_peer_session_id(self, from_agent: str, to_agent: str) -> str:
@@ -138,7 +138,7 @@ class FleetOrchestrator:
 
         if dst in chain:
             cycle_str = " -> ".join(chain + [dst])
-            logger.warning("[FleetOrchestrator] Circular delegation loop blocked: %s", cycle_str)
+            logger.warning("[AgentOrchestrator] Circular delegation loop blocked: %s", cycle_str)
             return {
                 "success": False,
                 "error": f"Circular peer delegation loop detected ({cycle_str}). Delegation blocked.",
@@ -169,7 +169,7 @@ class FleetOrchestrator:
 
         full_task_prompt = f"{handoff_header}Directive: {task_text}"
 
-        logger.info("[FleetOrchestrator] P2P Delegation: %s -> %s (Chain: %s)", src, dst, " -> ".join(new_chain))
+        logger.info("[AgentOrchestrator] P2P Delegation: %s -> %s (Chain: %s)", src, dst, " -> ".join(new_chain))
 
         if hasattr(self.dispatcher, "dispatch_task"):
             res = self.dispatcher.dispatch_task(
@@ -188,7 +188,7 @@ class FleetOrchestrator:
         elif callable(self.dispatcher):
             res = self.dispatcher(agent_id=dst, prompt=full_task_prompt, path=path)
         else:
-            return {"success": False, "error": "Dispatcher not configured on FleetOrchestrator."}
+            return {"success": False, "error": "Dispatcher not configured on AgentOrchestrator."}
 
         if isinstance(res, dict):
             res["peer_session_id"] = sess_id
@@ -210,7 +210,7 @@ class FleetOrchestrator:
         """High-level Michael task decomposition into specialized subtasks with deliverable piping.
 
         When a complete deliverable archetype is detected in prompt, partitions the project
-        concurrently across the Scranton Fleet Swarm (Verve, Flux, Ahmad, Dwight).
+        concurrently across specialist agents (Verve, Flux, Ahmad, Dwight).
         Otherwise, routes to a targeted single-agent assignment.
         """
         low = prompt.lower()
@@ -258,7 +258,7 @@ class FleetOrchestrator:
         # Orchestrator agent
         orchestrator_agent = find_agent(
             lambda a: getattr(a, "is_core", False)
-            or any(c in (a.capabilities or []) for c in ("task_decomposition", "fleet_orchestration"))
+            or any(c in (a.capabilities or []) for c in ("task_decomposition", "agent_orchestration"))
             or any(w in (a.role or "").lower() for w in ("orchestrator", "architect", "lead"))
         )
 
@@ -341,7 +341,7 @@ class FleetOrchestrator:
                 try:
                     Path(sub_path).mkdir(parents=True, exist_ok=True)
                 except Exception as e:
-                    logger.warning("[FleetOrchestrator] Could not create subtask dir %s: %s", sub_path, e)
+                    logger.warning("[AgentOrchestrator] Could not create subtask dir %s: %s", sub_path, e)
             else:
                 sub_path = str(base_dir)
 
@@ -366,7 +366,7 @@ class FleetOrchestrator:
                 except TypeError:
                     res = self.dispatcher(agent_id, sub_prompt, path=sub_path, is_subtask=True)
             else:
-                res = {"success": False, "error": "Dispatcher not configured on FleetOrchestrator.", "agent_id": agent_id}
+                res = {"success": False, "error": "Dispatcher not configured on AgentOrchestrator.", "agent_id": agent_id}
 
             if isinstance(res, dict):
                 res["path"] = sub_path
@@ -412,11 +412,11 @@ class FleetOrchestrator:
         if merge_changes and getattr(agent, "active_worktree", None):
             success, merge_msg = git_sandbox.merge_worktree(wt_id)
             if not success:
-                logger.warning(f"[FleetOrchestrator] Merge failed: {merge_msg}")
+                logger.warning(f"[AgentOrchestrator] Merge failed: {merge_msg}")
 
         if getattr(agent, "active_worktree", None):
             teardown_msg = git_sandbox.safe_teardown(wt_id)
-            logger.info(f"[FleetOrchestrator] {teardown_msg}")
+            logger.info(f"[AgentOrchestrator] {teardown_msg}")
 
         lock = getattr(self.registry, "_lock", None)
 
@@ -439,7 +439,7 @@ class FleetOrchestrator:
         else:
             _update_agent_state()
 
-        self._broadcast_event("fleet_updated", {"fleet": self._get_fleet_deck_state()})
+        self._broadcast_event("agents_updated", {"agents": self._get_agents_state()})
 
         return {
             "success": True,

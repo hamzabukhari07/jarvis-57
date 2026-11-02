@@ -843,6 +843,6 @@ pytest tests/
 ## 15. Out of Scope & Future Roadmap
 
 The following capabilities are explicitly deferred to future milestones:
-- **Agent Namespacing (Option 2):** Isolating memory stores per fleet agent ID (`ZEZO:agent_id`).
+- **Agent Namespacing (Option 2):** Isolating memory stores per specialist agent ID (`ZEZO:agent_id`).
 - **Weekly Maintenance Synthesis:** Background LLM-driven memory summarization and deduping.
 - **Local Embedding Vector Search (Option 3):** Replacing FTS5 with ONNX / local embedding vectors.

@@ -12,9 +12,7 @@ import {
  Sliders,
  Check,
  Plus,
- Kanban,
  CheckCircle2,
- Clock,
  AlertCircle,
  Terminal,
  Cpu,
@@ -27,17 +25,11 @@ import {
  ShieldCheck,
  GitBranch,
  LayoutGrid,
- FileText,
- Save,
- User,
- Database,
- Volume2,
- VolumeX,
+ Users,
  Search,
  Play,
  Pause,
-} from 'lucide-react'
-import { Switch } from '../ui/switch'
+} from '@/lib/zezo-icons'
 import { Frame, FramePanel, FrameHeader, FrameTitle } from '../reui/frame'
 import { Card, CardContent } from '../reui/card'
 import { Badge } from '../reui/badge'
@@ -61,12 +53,18 @@ import { Blobatar } from 'blobatar/react'
 import 'blobatar/motion.css'
 import { AgentDirectChatView } from './AgentDirectChatView'
 import { AgentConfigModal } from './AgentConfigModal'
+import { AgentFilesPanel } from './AgentFilesPanel'
+import { AgentLogsView } from './AgentLogsView'
+import { AgentRosterTable, type AgentWorkspaceTab } from './AgentRosterTable'
+import { AgentWorkspaceView } from './AgentWorkspaceView'
 import { cn } from '@/lib/utils'
 import { api } from '../../lib/api'
 import type { LogEntry } from '../../hooks/useZezoSocket'
 
 export interface AutonomousOfficeScreenProps {
  backendLogs?: LogEntry[]
+ section?: 'manage' | 'chat-space'
+ onSectionChange?: (section: 'manage' | 'chat-space') => void
 }
 
 export interface AgentOfficeMember {
@@ -159,7 +157,7 @@ export function mapRawAgentToOfficeMember(
  : Array.isArray(raw.recent_logs) && raw.recent_logs.length > 0
  ? raw.recent_logs
  : [
- `[READY] Agent '${name}' online in autonomous fleet`,
+ `[READY] Agent '${name}' online in autonomous agents`,
  `[ENGINE] ${raw.default_tool || 'opencode_run'} | Model: ${raw.model_id || 'default'}`,
  `[STATUS] Standby on office deck`,
  ]
@@ -211,15 +209,15 @@ const INITIAL_AGENTS: AgentOfficeMember[] = [
  deskPct: { x: 8.0, y: 31.6 },
  currentPct: { x: 8.0, y: 31.6 },
  targetPct: { x: 8.0, y: 31.6 },
- speechBubble: 'Autonomous fleet standing by.',
+ speechBubble: 'Autonomous agents standing by.',
  isTyping: false,
  tools: ['opencode_run', 'web_search', 'file_processor'],
  logs: [
- '[READY] Agent Michael online in autonomous fleet',
+ '[READY] Agent Michael online in autonomous agents',
  '[ENGINE] opencode_run | Model: opencode/fledge-alpha-free',
  '[STATUS] Standby on office deck',
  ],
- personality: 'You are Michael, Lead Software Architect & Tech Lead of the Autonomous Coding Fleet.',
+ personality: 'You are Michael, Lead Software Architect & Tech Lead of the Autonomous Agent System.',
  engine: 'opencode_run',
  model: 'opencode/fledge-alpha-free',
  workspace: 'repo_active',
@@ -244,7 +242,7 @@ const INITIAL_AGENTS: AgentOfficeMember[] = [
  isTyping: false,
  tools: ['antigravity_run', 'browser_control', 'file_processor'],
  logs: [
- '[READY] Agent Verve online in autonomous fleet',
+ '[READY] Agent Verve online in autonomous agents',
  '[ENGINE] antigravity_run | Model: gemini-3.7-flash-medium',
  '[STATUS] Standby on office deck',
  ],
@@ -273,7 +271,7 @@ const INITIAL_AGENTS: AgentOfficeMember[] = [
  isTyping: false,
  tools: ['antigravity_run', 'file_processor'],
  logs: [
- '[READY] Agent Flux online in autonomous fleet',
+ '[READY] Agent Flux online in autonomous agents',
  '[ENGINE] antigravity_run | Model: gemini-3.8-flash-low',
  '[STATUS] Standby on office deck',
  ],
@@ -302,7 +300,7 @@ const INITIAL_AGENTS: AgentOfficeMember[] = [
  isTyping: false,
  tools: ['opencode_run', 'file_processor', 'file_controller'],
  logs: [
- '[READY] Agent Nexus online in autonomous fleet',
+ '[READY] Agent Nexus online in autonomous agents',
  '[ENGINE] opencode_run | Model: opencode/nemotron-3-ultra-free',
  '[STATUS] Standby on office deck',
  ],
@@ -331,7 +329,7 @@ const INITIAL_AGENTS: AgentOfficeMember[] = [
  isTyping: false,
  tools: ['kilo_run', 'file_processor', 'file_controller'],
  logs: [
- '[READY] Agent Dwight online in autonomous fleet',
+ '[READY] Agent Dwight online in autonomous agents',
  '[ENGINE] kilo_run | Model: kilo/stepfun/step-3.7-flash:free',
  '[STATUS] Standby on office deck',
  ],
@@ -360,7 +358,7 @@ const INITIAL_AGENTS: AgentOfficeMember[] = [
  isTyping: false,
  tools: ['antigravity_run', 'file_processor', 'file_controller'],
  logs: [
- '[READY] Agent Pam online in autonomous fleet',
+ '[READY] Agent Pam online in autonomous agents',
  '[ENGINE] antigravity | Model: default',
  '[STATUS] Standby on office deck',
  ],
@@ -389,7 +387,7 @@ const INITIAL_AGENTS: AgentOfficeMember[] = [
  isTyping: false,
  tools: ['agent_reach', 'web_search', 'web_reader', 'youtube_video'],
  logs: [
- '[READY] Agent Kelly online in autonomous fleet',
+ '[READY] Agent Kelly online in autonomous agents',
  '[ENGINE] agent_reach | Model: gemini-2.5-flash',
  '[STATUS] Standby on office deck',
  ],
@@ -418,11 +416,11 @@ const INITIAL_AGENTS: AgentOfficeMember[] = [
  isTyping: false,
  tools: ['web_search', 'agent_reach', 'web_reader'],
  logs: [
- '[READY] Agent Quantum online in autonomous fleet',
+ '[READY] Agent Quantum online in autonomous agents',
  '[ENGINE] kilo_run | Model: kilo/kilo-auto/free',
  '[STATUS] Standby on office deck',
  ],
- personality: 'You are Quantum, an autonomous fleet specialist focusing on deep web research and analysis.',
+ personality: 'You are Quantum, an autonomous agents specialist focusing on deep web research and analysis.',
  engine: 'kilo_run',
  model: 'kilo/kilo-auto/free',
  workspace: 'repo_active',
@@ -447,11 +445,11 @@ const INITIAL_AGENTS: AgentOfficeMember[] = [
  isTyping: false,
  tools: ['agent_reach', 'web_search', 'web_read_page', 'file_processor'],
  logs: [
- '[READY] Agent DevDynamo online in autonomous fleet',
+ '[READY] Agent DevDynamo online in autonomous agents',
  '[ENGINE] opencode_run | Model: default',
  '[STATUS] Standby on office deck',
  ],
- personality: 'You are DevDynamo, an autonomous fleet specialist focusing on Full-stack development.',
+ personality: 'You are DevDynamo, an autonomous agents specialist focusing on Full-stack development.',
  engine: 'opencode_run',
  model: 'opencode/fledge-alpha-free',
  workspace: 'repo_active',
@@ -476,11 +474,11 @@ const INITIAL_AGENTS: AgentOfficeMember[] = [
  isTyping: false,
  tools: ['opencode_run', 'file_processor', 'file_controller'],
  logs: [
- '[READY] Agent InsightAI online in autonomous fleet',
+ '[READY] Agent InsightAI online in autonomous agents',
  '[ENGINE] antigravity_run | Model: gemini-3.8-flash-low',
  '[STATUS] Standby on office deck',
  ],
- personality: 'You are Dataeinstein, an autonomous fleet specialist focusing on Machine Learning and Data Analysis.',
+ personality: 'You are Dataeinstein, an autonomous agents specialist focusing on Machine Learning and Data Analysis.',
  engine: 'antigravity_run',
  model: 'gemini-3.8-flash-low',
  workspace: 'repo_active',
@@ -754,7 +752,7 @@ export function getPersonaFileContent(
  }
 }
 
-export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ backendLogs = [] }) => {
+export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ backendLogs = [], section = 'manage', onSectionChange }) => {
  const [agents, setAgents] = useState<AgentOfficeMember[]>(INITIAL_AGENTS)
  const [availableSkills, setAvailableSkills] = useState<SkillDefinition[]>(FALLBACK_SKILLS)
  const [selectedAgentId, setSelectedAgentId] = useState<string>('MICHAEL')
@@ -824,10 +822,10 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  }).catch(() => {})
  }, [])
 
- const loadFleet = useCallback(async () => {
+ const loadAgent = useCallback(async () => {
  try {
- const res = await api.getFleetState()
- const rawList = res.fleet || (res.agents ? Object.values(res.agents) : [])
+ const res = await api.getAgentsState()
+ const rawList = res.agents || []
  if (rawList && rawList.length > 0) {
  setAgents((prev) => {
  const prevMap = new Map(prev.map((a) => [a.id, a]))
@@ -835,22 +833,22 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  })
  }
  } catch (e) {
- console.debug('Failed to fetch fleet state:', e)
+ console.debug('Failed to fetch agents state:', e)
  }
  }, [])
 
  useEffect(() => {
- loadFleet()
+ loadAgent()
  const handleUpdate = () => {
- loadFleet()
+ loadAgent()
  }
- window.addEventListener('zezo_fleet_updated', handleUpdate)
- const interval = setInterval(loadFleet, 4000)
+ window.addEventListener('zezo_agents_updated', handleUpdate)
+ const interval = setInterval(loadAgent, 4000)
  return () => {
- window.removeEventListener('zezo_fleet_updated', handleUpdate)
+ window.removeEventListener('zezo_agents_updated', handleUpdate)
  clearInterval(interval)
  }
- }, [loadFleet])
+ }, [loadAgent])
 
  const [agentToDismiss, setAgentToDismiss] = useState<AgentOfficeMember | null>(null)
  const [isDismissing, setIsDismissing] = useState(false)
@@ -865,12 +863,12 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  } catch {
  // ignore storage errors
  }
- triggerToast(`Agent ${agentToDismiss.name} dismissed from fleet`)
+ triggerToast(`Agent ${agentToDismiss.name} deleted from agents`)
  const remaining = agents.filter((a) => a.id !== agentToDismiss.id)
  setAgents(remaining)
  if (remaining.length > 0) setSelectedAgentId(remaining[0].id)
  setAgentToDismiss(null)
- loadFleet()
+ loadAgent()
  } catch (err) {
  console.error('Failed to delete agent:', err)
  } finally {
@@ -879,7 +877,8 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  }
  const [isEnvDrawerOpen, setIsEnvDrawerOpen] = useState(true)
  const [copiedLogs, setCopiedLogs] = useState(false)
- const [officeMode, setOfficeMode] = useState<'spatial' | 'matrix' | 'kanban' | 'chat'>('spatial')
+ const [officeMode, setOfficeMode] = useState<'agents' | 'workspace' | 'logs' | 'matrix' | 'chat'>('agents')
+ const [agentWorkspaceTab, setAgentWorkspaceTab] = useState<AgentWorkspaceTab>('edit')
  const [matrixFilter, setMatrixFilter] = useState<'ALL' | 'WORKING' | 'IDLE' | 'REVIEW'>('ALL')
  const [isAddAgentOpen, setIsAddAgentOpen] = useState(false)
  const [newAgentName, setNewAgentName] = useState('')
@@ -900,33 +899,16 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  const folderInputRef = useRef<HTMLInputElement>(null)
 
  // Edit Agent Modal State
- const [isEditAgentOpen, setIsEditAgentOpen] = useState(false)
- const [isFilesModalOpen, setIsFilesModalOpen] = useState(false)
- const [selectedPersonaFile, setSelectedPersonaFile] = useState<CorePersonaFileKey>('SOUL.md')
- const [personaEditorContent, setPersonaEditorContent] = useState<string>('')
  const [personaFileToggles, setPersonaFileToggles] = useState<Record<string, Record<CorePersonaFileKey, boolean>>>({})
  const [personaFileOverrides, setPersonaFileOverrides] = useState<Record<string, Partial<Record<CorePersonaFileKey, string>>>>({})
 
- const handleOpenFilesModal = () => {
- setSelectedPersonaFile('SOUL.md')
- const initialContent = getPersonaFileContent(
- 'SOUL.md',
- selectedAgent,
- personaFileOverrides[selectedAgent.id]
- )
- setPersonaEditorContent(initialContent)
- setIsFilesModalOpen(true)
- playOfficeFoley('click', soundEnabled)
- }
+ useEffect(() => {
+  if (section === 'manage') setOfficeMode('agents')
+ }, [section])
 
- const handleSelectPersonaFile = (fileKey: CorePersonaFileKey) => {
- setSelectedPersonaFile(fileKey)
- const content = getPersonaFileContent(
- fileKey,
- selectedAgent,
- personaFileOverrides[selectedAgent.id]
- )
- setPersonaEditorContent(content)
+ const handleOpenFilesModal = () => {
+ setAgentWorkspaceTab('files')
+ setOfficeMode('workspace')
  playOfficeFoley('click', soundEnabled)
  }
 
@@ -947,23 +929,23 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  triggerToast(`${fileKey} ${checked ? 'Enabled' : 'Disabled'} for ${selectedAgent.name}`)
  }
 
- const handleSavePersonaFile = () => {
+ const handleSavePersonaFile = (fileKey: CorePersonaFileKey, content: string) => {
  if (!selectedAgent) return
  setPersonaFileOverrides((prev) => ({
  ...prev,
  [selectedAgent.id]: {
  ...(prev[selectedAgent.id] || {}),
- [selectedPersonaFile]: personaEditorContent,
+ [fileKey]: content,
  },
  }))
 
- if (selectedPersonaFile === 'SOUL.md') {
+ if (fileKey === 'SOUL.md') {
  setAgents((prev) =>
  prev.map((ag) =>
  ag.id === selectedAgent.id
  ? {
  ...ag,
- personality: personaEditorContent.trim(),
+ personality: content.trim(),
  logs: [
  ...ag.logs,
  `[${new Date().toLocaleTimeString()}] SOUL.md prompt updated & saved.`,
@@ -975,24 +957,46 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  }
 
  playOfficeFoley('success', soundEnabled)
- triggerToast(`${selectedPersonaFile} saved for ${selectedAgent.name} ✓`)
+ triggerToast(`${fileKey} saved for ${selectedAgent.name} ✓`)
  }
 
- const handleOpenActiveWorktreeInExplorer = () => {
+ const handleOpenActiveWorktreeInExplorer = async () => {
  const worktreePath =
  selectedAgent.workspace === 'repo_active'
  ? 'c:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57'
  : selectedAgent.workspace
- navigator.clipboard.writeText(worktreePath)
- triggerToast(`Worktree path copied: ${worktreePath}`)
+ try {
+ await api.openAgentFolder(worktreePath)
  playOfficeFoley('click', soundEnabled)
+ } catch (error) {
+ console.error('Failed to open agent workspace folder:', error)
+ triggerToast('Could not open the selected workspace folder.')
+ }
  }
 
 	const handleOpenEditModal = (agent: AgentOfficeMember) => {
 		setSelectedAgentId(agent.id)
-		setIsEditAgentOpen(true)
+		setAgentWorkspaceTab('edit')
+		setOfficeMode('workspace')
 		playOfficeFoley('click', soundEnabled)
 	}
+
+ const handleOpenAgentWorkspace = (agent: AgentOfficeMember, tab: AgentWorkspaceTab) => {
+ setSelectedAgentId(agent.id)
+ if (tab === 'chat') {
+  onSectionChange?.('chat-space')
+  return
+ }
+ setAgentWorkspaceTab(tab)
+ setOfficeMode('workspace')
+ }
+
+ const handleOpenAgentLogs = (agent: AgentOfficeMember) => {
+ setSelectedAgentId(agent.id)
+ setLogFilterMode('agent')
+ setLogSearchQuery('')
+ setOfficeMode('logs')
+ }
 
  const toggleSkill = (skill: string) => {
  setNewAgentSelectedSkills((prev) =>
@@ -1024,14 +1028,14 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  hairColor: '#2b2926',
  shirtColor: pickedColor,
  status: 'IDLE',
- currentTask: newAgentInstructions.trim() || 'Initialized and waiting for fleet dispatch',
+ currentTask: newAgentInstructions.trim() || 'Initialized and waiting for agents dispatch',
  deskPct: { x: 50.0, y: 55.0 },
  currentPct: { x: 50.0, y: 55.0 },
  targetPct: { x: 50.0, y: 55.0 },
  speechBubble: `Agent ${name} online and ready!`,
  tools: newAgentSelectedTools.length > 0 ? newAgentSelectedTools : [newAgentEngine],
  logs: [
- `[${new Date().toLocaleTimeString()}] Agent ${name} joined fleet`,
+ `[${new Date().toLocaleTimeString()}] Agent ${name} joined agents`,
  `[${new Date().toLocaleTimeString()}] Engine initialized: ${newAgentEngine}`,
  `[${new Date().toLocaleTimeString()}] Workspace mounted: ${newAgentWorkspace}`,
  ],
@@ -1064,8 +1068,8 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  allowed_skills: newAgentSelectedSkills,
  prompt_prefix: newAgentInstructions.trim() || `You are ${name}, an autonomous specialist operating under Zezo OS.`,
  } as any).then(() => {
- triggerToast(`Agent ${name} joined autonomous fleet!`)
- loadFleet()
+ triggerToast(`Agent ${name} joined autonomous agents!`)
+ loadAgent()
  }).catch((err) => {
  console.error('Failed to save agent to backend:', err)
  })
@@ -1128,13 +1132,8 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  setCopiedLogs(true)
  setTimeout(() => setCopiedLogs(false), 1800)
  }
- const [soundEnabled, setSoundEnabled] = useState(true)
+ const [soundEnabled] = useState(true)
  const [simulationToast, setSimulationToast] = useState<string | null>(null)
- const [collabBeam] = useState<{
- from: { x: number; y: number }
- to: { x: number; y: number }
- label?: string
- } | null>(null)
 
  // Helper to show brief toast
  const triggerToast = (msg: string) => {
@@ -1144,7 +1143,93 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
 
  return (
  <div className="flex flex-col w-full h-full min-w-0 min-h-0 bg-[var(--background)] text-[var(--foreground)] overflow-hidden select-none transition-colors duration-200">
- {/* ── Main Workspace Layout using 100% ReUI Frames (Full Height & Fully Responsive) ── */}
+ {section === 'chat-space' ? (
+ <AgentDirectChatView
+  key={selectedAgent.id}
+  agent={selectedAgent}
+  agents={agents}
+  onSelectAgent={setSelectedAgentId}
+  onUpdateAgent={(updated) => {
+   const merged = { ...selectedAgent, ...updated }
+   setAgents((prev) => prev.map((agent) => agent.id === selectedAgent.id ? merged : agent))
+   api.saveAgent({
+    id: selectedAgent.id,
+    name: merged.name,
+    role: merged.role,
+    specialty: merged.specialty,
+    color: merged.color,
+    default_tool: merged.engine,
+    risk_tier: merged.safetyTier || 'L1_MUTATION',
+    model_id: merged.model,
+    worktree: merged.workspace,
+    allowed_tools: merged.tools,
+    allowed_skills: merged.allowed_skills || [],
+    prompt_prefix: merged.personality,
+   } as any).catch((err) => console.error('Failed to persist agent workspace:', err))
+  }}
+  onUpdateAgentStatus={(agentId, status, speech) => {
+   setAgents((prev) => prev.map((agent) => agent.id === agentId ? { ...agent, status, speechBubble: speech ?? agent.speechBubble } : agent))
+  }}
+ />
+ ) : officeMode === 'agents' ? (
+ <AgentRosterTable
+ agents={agents}
+ selectedAgentId={selectedAgentId}
+ onSelectAgent={setSelectedAgentId}
+ onOpenWorkspace={handleOpenAgentWorkspace}
+ onOpenLogs={handleOpenAgentLogs}
+ onDelete={setAgentToDismiss}
+ onAddAgent={() => setIsAddAgentOpen(true)}
+ />
+ ) : officeMode === 'workspace' && selectedAgent ? (
+ <AgentWorkspaceView
+ agent={selectedAgent}
+ activeTab={agentWorkspaceTab}
+ onTabChange={setAgentWorkspaceTab}
+ onBack={() => setOfficeMode('agents')}
+ >
+ {agentWorkspaceTab === 'edit' ? (
+ <AgentConfigModal
+ key={selectedAgent.id}
+ isOpen
+ embedded
+ onClose={() => setOfficeMode('agents')}
+ agent={selectedAgent}
+ onSave={(updated) => {
+ setAgents((prev) => prev.map((ag) => (ag.id === updated.id ? updated : ag)))
+ playOfficeFoley('success', soundEnabled)
+ triggerToast(`Agent ${updated.name} configuration updated!`)
+ loadAgent()
+ }}
+ />
+ ) : (
+ <AgentFilesPanel
+ agent={selectedAgent}
+ files={CORE_PERSONA_FILES}
+ toggles={personaFileToggles[selectedAgent.id] || { 'SOUL.md': true, 'AGENTS.md': true, 'PROFILE.md': true, 'MEMORY.md': true }}
+ getContent={(fileKey) => getPersonaFileContent(fileKey, selectedAgent, personaFileOverrides[selectedAgent.id])}
+ onToggle={handleTogglePersonaFile}
+ onSave={handleSavePersonaFile}
+ onOpenExplorer={handleOpenActiveWorktreeInExplorer}
+ />
+ )}
+ </AgentWorkspaceView>
+ ) : officeMode === 'logs' && selectedAgent ? (
+ <AgentLogsView
+ agent={selectedAgent}
+ entries={displayedLogs}
+ filterMode={logFilterMode}
+ onFilterModeChange={setLogFilterMode}
+ query={logSearchQuery}
+ onQueryChange={setLogSearchQuery}
+ autoFollow={autoFollowLogs}
+ onToggleAutoFollow={() => setAutoFollowLogs((value) => !value)}
+ copied={copiedLogs}
+ onCopy={handleCopyLogs}
+ endRef={logsEndRef}
+ onBack={() => setOfficeMode('agents')}
+ />
+ ) : (
  <div className={cn(
  "flex-1 min-h-0 min-w-0 grid gap-2 p-2 overflow-hidden w-full h-full bg-[var(--background)]",
  officeMode === 'chat'
@@ -1152,7 +1237,7 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  : "grid-cols-1 md:grid-cols-[300px_minmax(0,1fr)] lg:grid-cols-[310px_minmax(0,1fr)_330px]"
  )}>
 
- {/* LEFT PANEL: Agent Fleet Roster */}
+ {/* LEFT PANEL: Agent Roster */}
  <Frame className="h-full min-h-0 min-w-0 w-full overflow-hidden">
  <FramePanel className="flex flex-col h-full min-h-0 p-0 overflow-hidden bg-[var(--card)] border-[var(--border)]">
  <FrameHeader className="p-2.5 border-b border-[var(--border)] flex flex-row items-center justify-between">
@@ -1204,7 +1289,7 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  </FramePanel>
  </Frame>
 
- {/* CENTER PANEL: Authentic Scranton Office Floor with Live Blobatars */}
+ {/* Legacy agents workspace modes */}
  <Frame className="h-full min-h-0 min-w-0 w-full overflow-hidden">
  <FramePanel className="flex flex-col h-full min-h-0 min-w-0 w-full p-0 overflow-hidden bg-[var(--card)] border-[var(--border)] relative">
  {/* Header with Mode Switcher, Simulation Controls & Audio Toggle */}
@@ -1215,12 +1300,6 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  <>
  <MessageSquare className="w-3.5 h-3.5 text-[var(--muted-foreground)] shrink-0" />
  <span>Direct Chat</span>
- </>
- ) : officeMode === 'kanban' ? (
- <>
- <Kanban className="w-3.5 h-3.5 text-[var(--muted-foreground)] shrink-0" />
- <span className="hidden sm:inline">Task View</span>
- <span className="sm:hidden">Tasks</span>
  </>
  ) : (
  <>
@@ -1233,421 +1312,27 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  {officeMode !== 'chat' && (
  <Badge variant="outline" size="xs" className="hidden md:inline-flex font-mono text-[9px]">
  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1" />
- {officeMode === 'kanban'
- ? `${agents.length} AGENTS`
- : `${agents.filter((a) => a.status === 'WORKING').length} ACTIVE`}
+ {`${agents.filter((a) => a.status === 'WORKING').length} ACTIVE`}
  </Badge>
  )}
  </div>
 
  {/* Audio Foley & View Mode Controls */}
  <div className="flex items-center gap-1 shrink-0">
- {officeMode === 'spatial' && (
- <>
- <Button
- variant="ghost"
- size="sm"
- onClick={() => {
- setSoundEnabled(!soundEnabled)
- playOfficeFoley('click', !soundEnabled)
- }}
- className="h-6 text-[10px] px-2 font-mono text-[var(--muted-foreground)] hover:text-[var(--foreground)] gap-1"
- title={soundEnabled ? 'Audio Foley: ON' : 'Audio Foley: MUTED'}
- >
- {soundEnabled ? (
- <Volume2 className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
- ) : (
- <VolumeX className="w-3.5 h-3.5 text-muted-foreground" />
- )}
- <span className="hidden md:inline text-[9px] font-mono">
- {soundEnabled ? 'AUDIO' : 'MUTED'}
- </span>
- </Button>
-
- <div className="h-4 w-px bg-[var(--border)] mx-1" />
- </>
- )}
-
  {/* View Mode Controls */}
  <Button
- variant={officeMode === 'spatial' ? 'default' : 'outline'}
+ variant="outline"
  size="sm"
- onClick={() => setOfficeMode('spatial')}
+ onClick={() => setOfficeMode('agents')}
  className="h-6 text-[10px] px-2 gap-1 font-mono"
- title="Scranton 2D Office Floor"
+ title="Agent table"
  >
- <Boxes className="w-3 h-3" />
- <span className="hidden sm:inline">Floor</span>
+ <Users className="w-3 h-3" />
+ <span className="hidden sm:inline">Agents</span>
  </Button>
 
- <Button
- variant={officeMode === 'kanban' ? 'default' : 'outline'}
- size="sm"
- onClick={() => setOfficeMode('kanban')}
- className="h-6 text-[10px] px-2 gap-1 font-mono"
- title="Kanban Board"
- >
- <Kanban className="w-3 h-3" />
- <span className="hidden sm:inline">Tasks</span>
- </Button>
  </div>
  </FrameHeader>
-
- {/* ── VIEW 1: AUTHENTIC SCRANTON OFFICE FLOOR WITH LIVE BLOBATARS ── */}
- {officeMode === 'spatial' && (
- <div className="flex-1 min-h-0 min-w-0 w-full h-full relative overflow-hidden bg-[#050507] flex items-center justify-center p-3 select-none">
- {/* 988x640 Scaled Responsive Office Container */}
- <div
- className="relative w-full max-w-[988px] aspect-[988/640] rounded-sm overflow-hidden border-4 border-[#171717] shrink-0"
- style={{
- backgroundColor: '#e9e2de',
- boxShadow: '0 0 0 2px #d8d1cb inset, 0 15px 40px rgba(0,0,0,0.85)',
- }}
- >
- {/* 1. SAGE GREEN TILE FLOOR */}
- <div
- className="absolute inset-x-0 top-[12.5%] bottom-[1.4%] pointer-events-none"
- style={{
- backgroundColor: '#7d9989',
- backgroundImage: `linear-gradient(90deg, transparent 96%, #6c8d7d 96%, #6c8d7d 99%, transparent 99%), linear-gradient(0deg, transparent 96%, #6c8d7d 96%, #6c8d7d 99%, transparent 99%)`,
- backgroundSize: '78px 58px',
- }}
- >
- {/* Subtle Dot Grid */}
- <div
- className="absolute inset-0 opacity-80"
- style={{
- backgroundImage: `radial-gradient(circle at 50% 50%, #638779 0 3px, transparent 4px)`,
- backgroundSize: '78px 58px',
- }}
- />
- </div>
-
- {/* 2. TOP WALL DECORATIONS (Windows, Clock, Clipboard, Whiteboard, Plants) */}
- {/* Glass Windows */}
- <div
- className="absolute top-[3%] left-[4%] w-[4.6%] h-[8%] border-[3px] border-[#292929] z-10"
- style={{
- background: `linear-gradient(90deg, transparent 46%, #242424 46%, #242424 53%, transparent 53%), linear-gradient(0deg, transparent 46%, #242424 46%, #242424 53%, transparent 53%), #b8dce8`,
- }}
- />
- <div
- className="absolute top-[3%] left-[28%] w-[4.6%] h-[8%] border-[3px] border-[#292929] z-10"
- style={{
- background: `linear-gradient(90deg, transparent 46%, #242424 46%, #242424 53%, transparent 53%), linear-gradient(0deg, transparent 46%, #242424 46%, #242424 53%, transparent 53%), #b8dce8`,
- }}
- />
- <div
- className="absolute top-[3%] left-[40%] w-[4.6%] h-[8%] border-[3px] border-[#292929] z-10"
- style={{
- background: `linear-gradient(90deg, transparent 46%, #242424 46%, #242424 53%, transparent 53%), linear-gradient(0deg, transparent 46%, #242424 46%, #242424 53%, transparent 53%), #b8dce8`,
- }}
- />
-
- {/* Red Wall Clock */}
- <div className="absolute top-[4%] left-[1%] w-5 h-5 rounded-full border-[3px] border-[#a94343] bg-white z-10 flex items-center justify-center">
- <div className="w-0.5 h-2 bg-[#222] origin-bottom transform rotate-45 -translate-y-0.5" />
- </div>
-
- {/* Clipboard Calendar */}
- <div className="absolute top-[2.5%] left-[11%] w-3.5 h-6 bg-[#eeddb9] border-2 border-[#54483b] z-10 rounded-[1px] ">
- <div className="w-2 h-1 bg-[#888] mx-auto -mt-0.5" />
- </div>
-
- {/* Whiteboard "TODO" */}
- <div className="absolute top-[2%] left-[19%] w-[6%] h-[8.5%] bg-white border-2 border-[#47433e] z-10 p-0.5">
- <div className="text-[7px] font-mono font-bold text-blue-500">TODO</div>
- <div className="space-y-0.5 mt-0.5">
- <div className="w-3/4 h-0.5 bg-gray-400" />
- <div className="w-1/2 h-0.5 bg-gray-400" />
- </div>
- </div>
-
- {/* Clover Plant Pots */}
- <div className="absolute top-[9.5%] left-[16%] w-3.5 h-2 bg-[#c5b7a0] border-2 border-[#38342d] z-10">
- <span className="absolute -top-4 -left-0.5 text-emerald-700 text-sm font-bold">♣</span>
- </div>
- <div className="absolute top-[9.5%] left-[49%] w-3.5 h-2 bg-[#c5b7a0] border-2 border-[#38342d] z-10">
- <span className="absolute -top-4 -left-0.5 text-emerald-700 text-sm font-bold">♣</span>
- </div>
- <div className="absolute bottom-[0.5%] left-[68%] w-3.5 h-2 bg-[#c5b7a0] border-2 border-[#38342d] z-10">
- <span className="absolute -top-4 -left-0.5 text-emerald-700 text-sm font-bold">♣</span>
- </div>
- <div className="absolute bottom-[0.5%] left-[96%] w-3.5 h-2 bg-[#c5b7a0] border-2 border-[#38342d] z-10">
- <span className="absolute -top-4 -left-0.5 text-emerald-700 text-sm font-bold">♣</span>
- </div>
-
- {/* 3. PARTITION WALLS (Exact office.html architecture) */}
- {/* Michael's Office Partition */}
- <div className="absolute left-[18.2%] top-[12.5%] w-[1.6%] h-[27%] bg-[#f8f6f1] border-[3px] border-[#171717] z-10" />
- <div className="absolute left-0 top-[38%] w-[12.8%] h-[3.8%] bg-[#f8f6f1] border-[3px] border-[#171717] z-10" />
-
- {/* Conference Room Partitions */}
- <div className="absolute left-[21%] top-[12.5%] w-[1.6%] h-[27%] bg-[#f8f6f1] border-[3px] border-[#171717] z-10" />
- <div className="absolute left-[52%] top-[12.5%] w-[1.6%] h-[18%] bg-[#f8f6f1] border-[3px] border-[#171717] z-10" />
- <div className="absolute left-[15.2%] top-[38%] w-[23%] h-[3.8%] bg-[#f8f6f1] border-[3px] border-[#171717] z-10" />
- <div className="absolute left-[39.5%] top-[38%] w-[16.5%] h-[3.8%] bg-[#f8f6f1] border-[3px] border-[#171717] z-10" />
-
- {/* Annex Partitions */}
- <div className="absolute left-[74%] top-[12.5%] w-[1.6%] h-[32%] bg-[#f8f6f1] border-[3px] border-[#171717] z-10" />
- <div className="absolute left-[74%] top-[42%] w-[26%] h-[3.8%] bg-[#f8f6f1] border-[3px] border-[#171717] z-10" />
-
- {/* Kitchen & Breakroom Dividers */}
- <div className="absolute left-[73%] top-[56%] w-[1.6%] h-[14%] bg-[#f8f6f1] border-[3px] border-[#171717] z-10" />
- <div className="absolute left-[71%] top-[74%] w-[1.6%] h-[26%] bg-[#f8f6f1] border-[3px] border-[#171717] z-10" />
- <div className="absolute left-0 bottom-[1.4%] w-full h-[1.6%] bg-[#f8f6f1] border-[3px] border-[#171717] z-10" />
-
- {/* 4. CONFERENCE ROOM TABLE & PURPLE CHAIRS */}
- <div
- className="absolute left-[28%] top-[18.5%] w-[18.5%] h-[9.3%] border-2 border-[#4a3320] z-10"
- style={{
- backgroundColor: '#b88a4c',
- boxShadow: 'inset 0 3px #d5ae70',
- }}
- >
- {/* Green Folder */}
- <div className="absolute left-[8%] top-[15%] w-[7%] h-[12%] bg-[#2c9b59] border border-[#28472f]" />
- {/* Paper Sheet */}
- <div className="absolute right-[4%] top-[10%] w-[9%] h-[42%] bg-[#eee5ce] border border-[#443b31] -rotate-12" />
- </div>
- {/* Purple Conference Chairs */}
- {[31, 34, 37, 40].map((leftPct, i) => (
- <React.Fragment key={`conf-chair-${i}`}>
- <div
- className="absolute w-[2.3%] h-[3.8%] bg-[#914c66] border-2 border-[#49313a] z-5"
- style={{ left: `${leftPct}%`, top: '14.5%' }}
- />
- <div
- className="absolute w-[2.3%] h-[3.8%] bg-[#914c66] border-2 border-[#49313a] z-5"
- style={{ left: `${leftPct}%`, top: '28%' }}
- />
- </React.Fragment>
- ))}
-
- {/* 5. SERVER RACK HQ (Left Wall with blinking colored LEDs) */}
- <div className="absolute left-[1%] top-[42%] w-[4.8%] h-[9%] bg-[#080d12] border-2 border-[#333] z-10 p-0.5 space-y-1">
- <div className="w-full h-1 bg-[#06b6d4] " />
- <div className="w-full h-1 bg-[#10b981] animate-pulse" />
- <div className="w-full h-1 bg-[#f59e0b] " />
- </div>
-
- {/* 6. WATER COOLER & KITCHEN BREAKROOM */}
- {/* Glowing Water Cooler */}
- <div className="absolute right-[1.5%] top-[56%] w-[7.5%] h-[15%] bg-[#b1f4c9] border-[3px] border-[#273d32] z-10 p-1">
- <div className="w-full h-full bg-[#0c7654] border-2 border-[#214337] flex items-center justify-center">
- <div className="w-2 h-2 rounded-full bg-cyan-300 animate-pulse" />
- </div>
- </div>
-
- {/* Kitchen Counter, Fridge & Shelf */}
- <div className="absolute right-[3%] bottom-[8%] w-[18%] h-[10%] z-10 flex items-end gap-1">
- {/* Counter & Sink */}
- <div className="w-[47%] h-[75%] bg-[#b9b9ad] border-2 border-[#363632] relative">
- <div className="absolute left-2 top-1 w-4 h-3 bg-[#e2e5dc] border border-[#6e7770]" />
- </div>
- {/* Fridge */}
- <div className="w-[20%] h-full bg-[#c7c9c6] border-2 border-[#525653] relative">
- <div className="absolute inset-x-1 top-1/2 border-t-2 border-[#7b817d]" />
- </div>
- {/* Microwave Shelf */}
- <div
- className="w-[30%] h-full border-2 border-[#535752]"
- style={{
- background: `repeating-linear-gradient(0deg, #b6b9b4 0 7px, #474b48 7px 9px)`,
- }}
- />
- </div>
-
- {/* 7. ALL 18 WORKSTATION DESKS */}
- {WORKSTATION_SLOTS.map((desk) => {
- const seatedAgent = agents.find(
- (a) =>
- Math.abs(a.currentPct.x - (desk.x + 3.9)) < 4 &&
- Math.abs(a.currentPct.y - (desk.y + 8.8)) < 4
- )
- const isWorking = seatedAgent?.status === 'WORKING'
-
- return (
- <div
- key={desk.id}
- className="absolute w-[7.8%] h-[7.1%] z-10 pointer-events-none"
- style={{
- left: `${desk.x}%`,
- top: `${desk.y}%`,
- backgroundColor: '#b88b4e',
- border: '2px solid #4b3421',
- boxShadow: 'inset 0 3px #d5ae70',
- }}
- >
- {/* Underdesk Drawer Base */}
- <div className="absolute inset-x-[7%] bottom-[9%] h-[14%] bg-[#74502c] border border-[#392a1b]" />
-
- {/* Computer Monitor (Glows blue/cyan when working) */}
- <div
- className={`absolute left-[23%] -top-[48%] w-[54%] h-[55%] border-[3px] border-[#292b2d] z-10 overflow-hidden ${
- isWorking
- ? 'bg-[#071521] shadow-[inset_0_0_0_2px_#8bdcff,0_0_10px_rgba(56,190,255,0.75)]'
- : 'bg-[#080d12] shadow-[inset_0_0_0_2px_#414b54]'
- }`}
- >
- {isWorking && (
- <div className="w-full h-full bg-cyan-400/30 animate-pulse flex items-center justify-center">
- <div className="w-2 h-1 bg-cyan-200" />
- </div>
- )}
- </div>
-
- {/* Monitor Stand */}
- <div className="absolute left-[34%] -top-[8px] w-[32%] h-[5px] bg-[#c4b7a0] border border-[#39332e] z-5" />
-
- {/* Keyboard */}
- <div
- className="absolute left-[20%] bottom-[13%] w-[43%] h-[15%] border border-[#4b4439] z-10"
- style={{
- background: `repeating-linear-gradient(90deg, #e2dac7 0 3px, #aaa18d 3px 4px)`,
- }}
- />
-
- {/* Mouse */}
- <div className="absolute right-[15%] bottom-[10%] w-[9%] h-[18%] bg-[#ded8c8] border border-[#4b4439] rounded-full z-10" />
-
- {/* Coffee Mug */}
- <div className="absolute right-[5%] bottom-[20%] w-[7px] h-[7px] bg-[#eee7d7] border border-[#40372d] z-10" />
-
- {/* Wooden Desk Chair Base */}
- <div
- className="absolute left-[24%] top-[100%] w-[52%] h-[38%] bg-[#a17b43] border-2 border-[#46321f] z-5"
- style={{ boxShadow: 'inset 0 0 0 2px #c6a36a' }}
- />
- </div>
- )
- })}
-
- {/* ── 8. DYNAMIC SVG COLLABORATION BEAM LAYER ── */}
- {collabBeam && (
- <svg
- className="absolute inset-0 w-full h-full pointer-events-none z-30 overflow-visible"
- >
- <line
- x1={`${collabBeam.from.x}%`}
- y1={`${collabBeam.from.y}%`}
- x2={`${collabBeam.to.x}%`}
- y2={`${collabBeam.to.y}%`}
- stroke="#06b6d4"
- strokeWidth="2.5"
- strokeDasharray="5 5"
- className="animate-pulse"
- />
- {collabBeam.label && (
- <text
- x={`${(collabBeam.from.x + collabBeam.to.x) / 2}%`}
- y={`${(collabBeam.from.y + collabBeam.to.y) / 2 - 2}%`}
- fill="#ffffff"
- fontSize="9"
- fontFamily="monospace"
- fontWeight="bold"
- textAnchor="middle"
- className="drop-"
- >
- {collabBeam.label}
- </text>
- )}
- </svg>
- )}
-
- {/* ── 9. DYNAMIC ANIMATED BLOBATARS LAYER (Live Walking, Sitting, Speech) ── */}
- {agents.map((ag) => {
- const isSelected = ag.id === selectedAgentId
- const isWorking = ag.status === 'WORKING'
- const isWalking = ag.status === 'WALKING'
- const isInMeeting = ag.status === 'IN_MEETING'
- const isCoffee = ag.status === 'COFFEE_BREAK'
-
- return (
- <div
- key={ag.id}
- onClick={() => {
- setSelectedAgentId(ag.id)
- playOfficeFoley('click', soundEnabled)
- }}
- className={`absolute z-30 cursor-pointer flex flex-col items-center group select-none`}
- style={{
- left: `${ag.currentPct.x}%`,
- top: `${ag.currentPct.y}%`,
- transform: 'translate(-50%, -50%)',
- transition: isWalking
- ? 'left 1.2s cubic-bezier(0.2, 0.9, 0.4, 1), top 1.2s cubic-bezier(0.2, 0.9, 0.4, 1)'
- : 'left 0.8s ease-out, top 0.8s ease-out',
- }}
- >
- {/* Active Glowing Halation */}
- {(isSelected || isWorking || isWalking) && (
- <div
- className={`absolute -inset-1 rounded-full blur-[4px] animate-pulse pointer-events-none ${
- isSelected
- ? 'bg-[var(--primary)] opacity-80'
- : isWalking
- ? 'bg-cyan-400 opacity-70'
- : isWorking
- ? 'bg-orange-500 opacity-60'
- : 'bg-amber-400 opacity-50'
- }`}
- />
- )}
-
- {/* Live Animated Blobatar Avatar */}
- <div
- className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center p-0.5 bg-black/40 border border-white/20 relative z-10 transition-transform duration-150 ${
- isWalking ? 'animate-bounce' : 'group-hover:scale-110'
- }`}
- >
- <Blobatar
- name={ag.name}
- size={32}
- animate={isWorking || isWalking ? 'always' : 'hover'}
- className="w-full h-full object-contain"
- />
- </div>
-
- {/* Monospace Nameplate Label */}
- <div
- className={`mt-0.5 px-1.5 py-0.2 rounded text-[8px] font-mono font-bold tracking-wider uppercase border truncate max-w-[65px] ${
- isSelected
- ? 'bg-[var(--primary)] text-black border-white'
- : isWalking
- ? 'bg-cyan-900 text-cyan-200 border-cyan-400'
- : isInMeeting
- ? 'bg-purple-900 text-purple-200 border-purple-400'
- : isCoffee
- ? 'bg-amber-900 text-amber-200 border-amber-400'
- : isWorking
- ? 'bg-black text-white border-orange-500'
- : 'bg-black/90 text-white border-[#333]'
- }`}
- >
- {ag.name}
- </div>
-
- {/* Floating Comic Speech Bubble */}
- {ag.speechBubble && (
- <div className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-white text-black border-2 border-black text-[8px] font-sans font-bold whitespace-nowrap z-40 animate-bounce">
- {ag.speechBubble.slice(0, 30)}
- <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-black" />
- </div>
- )}
- </div>
- )
- })}
- </div>
-
- {/* Simulation Floating Toast */}
- {simulationToast && (
- <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded bg-black/90 text-white border border-cyan-400/60 text-xs font-mono font-bold z-50 animate-bounce">
- {simulationToast}
- </div>
- )}
- </div>
- )}
 
  {/* ── VIEW 2: TACTICAL WAR ROOM MATRIX ── */}
  {officeMode === 'matrix' && (
@@ -1899,216 +1584,14 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  </div>
  )}
 
- {/* ── VIEW 3: TASK KANBAN BOARD ── */}
- {officeMode === 'kanban' && (
- <div className="flex-1 min-h-0 min-w-0 w-full p-3 bg-[var(--background)] overflow-auto">
- <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 h-full">
- {/* Column 1: QUEUED */}
- <div className="flex flex-col gap-2 min-h-0">
- <div className="flex items-center justify-between px-1 py-0.5 border-b border-[var(--border)]">
- <div className="flex items-center gap-1.5">
- <Clock className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
- <span className="text-xs font-semibold text-[var(--foreground)]">Queued</span>
- </div>
- <Badge variant="secondary" size="xs">
- {agents.filter((a) => a.status === 'IDLE').length}
- </Badge>
- </div>
- <ScrollArea className="flex-1 [&>div]:!block">
- <div className="space-y-2 pr-1">
- {agents
- .filter((a) => a.status === 'IDLE')
- .map((ag) => (
- <Card
- key={ag.id}
- onClick={() => setSelectedAgentId(ag.id)}
- className={`cursor-pointer transition-all border ${
- ag.id === selectedAgentId
- ? 'border-[var(--primary)] bg-[var(--primary)]/10 '
- : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)]/50'
- }`}
- >
- <CardContent className="p-2.5 space-y-2">
- <div className="flex items-center justify-between gap-1">
- <div className="flex items-center gap-1.5 min-w-0">
- <div className="w-5 h-5 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] overflow-hidden flex items-center justify-center shrink-0 border border-[var(--border)] bg-[var(--input)]/40">
- <Blobatar name={ag.name} size={20} animate="hover" className="w-full h-full object-contain" />
- </div>
- <span className="text-xs font-medium truncate text-[var(--foreground)]">{ag.name}</span>
- </div>
- <Badge variant="outline" size="xs">{ag.badge}</Badge>
- </div>
- <p className="text-[11px] text-[var(--muted-foreground)] line-clamp-2 leading-tight">
- {ag.currentTask}
- </p>
- <div className="flex items-center justify-between text-[10px] font-mono text-[var(--muted-foreground)] pt-1 border-t border-[var(--border)]/50">
- <span className="truncate">{ag.engine}</span>
- <span className="text-[9px] uppercase opacity-75">{ag.safetyTier.split('_')[0]}</span>
- </div>
- </CardContent>
- </Card>
- ))}
- </div>
- </ScrollArea>
- </div>
-
- {/* Column 2: IN PROGRESS / RUNNING */}
- <div className="flex flex-col gap-2 min-h-0">
- <div className="flex items-center justify-between px-1 py-0.5 border-b border-[var(--border)]">
- <div className="flex items-center gap-1.5">
- <span className="w-2 h-2 rounded-full bg-[var(--primary)] animate-pulse" />
- <span className="text-xs font-semibold text-[var(--foreground)]">Running</span>
- </div>
- <Badge variant="running" size="xs">
- {agents.filter((a) => a.status === 'WORKING').length}
- </Badge>
- </div>
- <ScrollArea className="flex-1 [&>div]:!block">
- <div className="space-y-2 pr-1">
- {agents
- .filter((a) => a.status === 'WORKING')
- .map((ag) => (
- <Card
- key={ag.id}
- onClick={() => setSelectedAgentId(ag.id)}
- className={`cursor-pointer transition-all border ${
- ag.id === selectedAgentId
- ? 'border-[var(--primary)] bg-[var(--primary)]/10 '
- : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)]/50'
- }`}
- >
- <CardContent className="p-2.5 space-y-2">
- <div className="flex items-center justify-between gap-1">
- <div className="flex items-center gap-1.5 min-w-0">
- <div className="w-5 h-5 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] overflow-hidden flex items-center justify-center shrink-0 border border-[var(--border)] bg-[var(--input)]/40">
- <Blobatar name={ag.name} size={20} animate="hover" className="w-full h-full object-contain" />
- </div>
- <span className="text-xs font-medium truncate text-[var(--foreground)]">{ag.name}</span>
- </div>
- <Badge variant="running" size="xs">ACTIVE</Badge>
- </div>
- <p className="text-[11px] text-[var(--foreground)] font-medium line-clamp-2 leading-tight">
- {ag.currentTask}
- </p>
- <div className="flex items-center justify-between text-[10px] font-mono text-[var(--muted-foreground)] pt-1 border-t border-[var(--border)]/50">
- <span className="truncate">{ag.model}</span>
- <Badge variant="outline" size="xs">{ag.badge}</Badge>
- </div>
- </CardContent>
- </Card>
- ))}
- </div>
- </ScrollArea>
- </div>
-
- {/* Column 3: REVIEW / GOVERNANCE */}
- <div className="flex flex-col gap-2 min-h-0">
- <div className="flex items-center justify-between px-1 py-0.5 border-b border-[var(--border)]">
- <div className="flex items-center gap-1.5">
- <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
- <span className="text-xs font-semibold text-[var(--foreground)]">In Review</span>
- </div>
- <Badge variant="outline" size="xs">
- {agents.filter((a) => a.badge === 'SECURITY' || a.badge === 'SAFETY').length}
- </Badge>
- </div>
- <ScrollArea className="flex-1 [&>div]:!block">
- <div className="space-y-2 pr-1">
- {agents
- .filter((a) => a.badge === 'SECURITY' || a.badge === 'SAFETY')
- .map((ag) => (
- <Card
- key={ag.id}
- onClick={() => setSelectedAgentId(ag.id)}
- className={`cursor-pointer transition-all border ${
- ag.id === selectedAgentId
- ? 'border-[var(--primary)] bg-[var(--primary)]/10 '
- : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)]/50'
- }`}
- >
- <CardContent className="p-2.5 space-y-2">
- <div className="flex items-center justify-between gap-1">
- <div className="flex items-center gap-1.5 min-w-0">
- <div className="w-5 h-5 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] overflow-hidden flex items-center justify-center shrink-0 border border-[var(--border)] bg-[var(--input)]/40">
- <Blobatar name={ag.name} size={20} animate="hover" className="w-full h-full object-contain" />
- </div>
- <span className="text-xs font-medium truncate text-[var(--foreground)]">{ag.name}</span>
- </div>
- <Badge variant="destructive" size="xs">{ag.badge}</Badge>
- </div>
- <p className="text-[11px] text-[var(--muted-foreground)] line-clamp-2 leading-tight">
- {ag.currentTask}
- </p>
- <div className="flex items-center justify-between text-[10px] font-mono text-[var(--muted-foreground)] pt-1 border-t border-[var(--border)]/50">
- <span className="truncate">AST Gate / Verify</span>
- <span className="text-emerald-500 text-[10px]">PASS</span>
- </div>
- </CardContent>
- </Card>
- ))}
- </div>
- </ScrollArea>
- </div>
-
- {/* Column 4: COMPLETED */}
- <div className="flex flex-col gap-2 min-h-0">
- <div className="flex items-center justify-between px-1 py-0.5 border-b border-[var(--border)]">
- <div className="flex items-center gap-1.5">
- <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
- <span className="text-xs font-semibold text-[var(--foreground)]">Done</span>
- </div>
- <Badge variant="completed" size="xs">
- {agents.filter((a) => a.logs.length > 2).length}
- </Badge>
- </div>
- <ScrollArea className="flex-1 [&>div]:!block">
- <div className="space-y-2 pr-1">
- {agents
- .filter((a) => a.logs.length > 2)
- .map((ag) => (
- <Card
- key={ag.id}
- onClick={() => setSelectedAgentId(ag.id)}
- className={`cursor-pointer transition-all border ${
- ag.id === selectedAgentId
- ? 'border-[var(--primary)] bg-[var(--primary)]/10 '
- : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)]/50'
- }`}
- >
- <CardContent className="p-2.5 space-y-2">
- <div className="flex items-center justify-between gap-1">
- <div className="flex items-center gap-1.5 min-w-0">
- <div className="w-5 h-5 rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] overflow-hidden flex items-center justify-center shrink-0 border border-[var(--border)] bg-[var(--input)]/40">
- <Blobatar name={ag.name} size={20} animate="hover" className="w-full h-full object-contain" />
- </div>
- <span className="text-xs font-medium truncate text-[var(--foreground)]">{ag.name}</span>
- </div>
- <Badge variant="completed" size="xs">VERIFIED</Badge>
- </div>
- <p className="text-[11px] text-[var(--muted-foreground)] line-clamp-2 leading-tight">
- {ag.logs[ag.logs.length - 1]}
- </p>
- <div className="flex items-center justify-between text-[10px] font-mono text-[var(--muted-foreground)] pt-1 border-t border-[var(--border)]/50">
- <span className="truncate">{ag.engine}</span>
- <span className="text-emerald-500 text-[10px]">100% OK</span>
- </div>
- </CardContent>
- </Card>
- ))}
- </div>
- </ScrollArea>
- </div>
- </div>
- </div>
- )}
-
  {/* ── VIEW 4: DIRECT 1-ON-1 AGENT CHAT VIEW (ASSISTANT-UI + REUI) ── */}
  {officeMode === 'chat' && selectedAgent && (
  <div className="flex-1 min-h-0 min-w-0 w-full h-full flex flex-col overflow-hidden bg-[var(--background)]">
  <AgentDirectChatView
  key={selectedAgent.id}
  agent={selectedAgent}
- onBackToFloor={() => setOfficeMode('spatial')}
+ agents={agents}
+ onSelectAgent={setSelectedAgentId}
  onUpdateAgent={(updated) => {
  setAgents((prev) =>
  prev.map((a) => (a.id === selectedAgent.id ? { ...a, ...updated } : a))
@@ -2193,8 +1676,8 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  <Button
  variant="outline"
  size="sm"
- onClick={() => {
- setOfficeMode('chat')
+					onClick={() => {
+						handleOpenAgentWorkspace(selectedAgent, 'chat')
  setAgents((prev) =>
  prev.map((ag) =>
  ag.id === selectedAgent.id
@@ -2244,10 +1727,10 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  size="sm"
  onClick={() => setAgentToDismiss(selectedAgent)}
  className="h-7 px-2 text-[10px] font-semibold tracking-wider font-mono gap-1 text-[var(--foreground)] border-[var(--border)] hover:bg-[var(--muted)] shrink-0"
- title="Dismiss Agent from Fleet"
+ title="Delete Agent from Agent"
  >
  <Trash2 className="w-3 h-3 text-[var(--muted-foreground)] shrink-0" />
- <span className="hidden sm:inline">DISMISS</span>
+ <span className="hidden sm:inline">DELETE</span>
  </Button>
  )}
  </div>
@@ -2485,6 +1968,8 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  )}
 
  </div>
+
+ )}
 
  {/* ── Add Agent Modal Dialog ── */}
  {isAddAgentOpen && (
@@ -2822,191 +2307,19 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
  </div>
  )}
 
-			{/* ── Edit Agent Config Modal Dialog (ReUI AgentConfigModal) ── */}
-			<AgentConfigModal
-				isOpen={isEditAgentOpen}
-				onClose={() => setIsEditAgentOpen(false)}
-				agent={selectedAgent}
-				onSave={(updated) => {
-					setAgents((prev) => prev.map((ag) => (ag.id === updated.id ? updated : ag)))
-					playOfficeFoley('success', soundEnabled)
-					triggerToast(`Agent ${updated.name} configuration updated!`)
-					loadFleet()
-				}}
-			/>
-
- {/* ── Modal: Manage Files & Soul Live Editor (100% ReUI Component Architecture) ── */}
- {isFilesModalOpen && (
- <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-150">
- <Frame className="w-full max-w-3xl border-[var(--border)] max-h-[88vh] flex flex-col">
- <FramePanel className="bg-[var(--card)] border-[var(--border)] p-0 overflow-hidden flex flex-col max-h-[88vh]">
- {/* Modal Head */}
- <FrameHeader className="p-3 border-b border-[var(--border)] flex flex-row items-center justify-between shrink-0">
- <div className="flex items-center gap-2">
- <FileText className="w-4 h-4 text-[var(--muted-foreground)] shrink-0" />
- <FrameTitle className="text-sm font-semibold text-[var(--foreground)]">
- Files
- </FrameTitle>
- <Badge variant="outline" size="xs" className="font-mono text-[var(--muted-foreground)] border-cyan-500/30">
- {selectedAgent.name}
- </Badge>
- </div>
- <Button
- variant="ghost"
- size="sm"
- onClick={() => setIsFilesModalOpen(false)}
- className="h-6 w-6 p-0 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
- >
- <X className="w-4 h-4" />
- </Button>
- </FrameHeader>
-
- {/* Modal Body: Dual-Pane ReUI Architecture */}
- <div className="flex-1 grid grid-cols-1 md:grid-cols-[250px_1fr] min-h-[460px] overflow-hidden">
- {/* Left Pane: Core File Switchers */}
- <div className="border-r border-[var(--border)] p-3 flex flex-col gap-2.5 bg-[var(--input)]/15 overflow-hidden">
- <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[var(--muted-foreground)] px-0.5">
- Core Persona Files
- </div>
-
- <ScrollArea className="flex-1 pr-1">
- <div className="flex flex-col gap-1.5 pb-1">
- {CORE_PERSONA_FILES.map((file) => {
- const isSelected = selectedPersonaFile === file.id
- const agentToggles = personaFileToggles[selectedAgent.id] || {
- 'SOUL.md': true,
- 'AGENTS.md': true,
- 'PROFILE.md': true,
- 'MEMORY.md': true,
- }
- const isChecked = agentToggles[file.id] ?? true
-
- return (
- <Card
- key={file.id}
- onClick={() => handleSelectPersonaFile(file.id)}
- className={`cursor-pointer transition-colors ${
- isSelected
- ? 'bg-[var(--primary)]/10 border-[var(--primary)] text-[var(--foreground)] ring-1 ring-[var(--primary)]/30'
- : 'bg-[var(--card)] border-[var(--border)] hover:bg-[var(--input)]/50 text-[var(--muted-foreground)]'
- }`}
- >
- <CardContent className="p-2.5 flex items-center justify-between gap-2">
- <div className="min-w-0 flex items-start gap-2.5 flex-1">
- {file.id === 'SOUL.md' ? (
- <FileText className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${file.iconColor}`} />
- ) : file.id === 'AGENTS.md' ? (
- <ShieldCheck className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${file.iconColor}`} />
- ) : file.id === 'PROFILE.md' ? (
- <User className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${file.iconColor}`} />
- ) : (
- <Database className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${file.iconColor}`} />
- )}
- <div className="min-w-0 flex-1">
- <div className="text-xs font-mono font-semibold text-[var(--foreground)] truncate">
- {file.name}
- </div>
- <div className="text-[11px] text-[var(--muted-foreground)] truncate font-sans">
- {file.desc}
- </div>
- </div>
- </div>
-
- <div onClick={(e) => e.stopPropagation()} className="shrink-0 pl-1">
- <Switch
- checked={isChecked}
- onCheckedChange={(checked) => handleTogglePersonaFile(file.id, checked)}
- className="scale-75 origin-right"
- />
- </div>
- </CardContent>
- </Card>
- )
- })}
- </div>
- </ScrollArea>
-
- {/* Open in Explorer Button (Single Lucide icon, no duplicate emoji) */}
- <div className="pt-2 border-t border-[var(--border)] mt-auto shrink-0">
- <Button
- variant="outline"
- size="sm"
- onClick={handleOpenActiveWorktreeInExplorer}
- className="w-full h-8 text-xs font-mono justify-center gap-2 border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--foreground)]"
- title="Open active worktree folder in Explorer"
- >
- <FolderOpen className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
- <span>Open in Explorer</span>
- </Button>
- </div>
- </div>
-
- {/* Right Pane: Live Editor */}
- <div className="p-3 flex flex-col gap-2 min-h-0 bg-[var(--card)] overflow-hidden">
- <div className="flex items-center justify-between gap-2 shrink-0 pb-1.5 border-b border-[var(--border)]">
- <div className="flex items-center gap-2">
- <span className="text-xs font-mono font-semibold text-[var(--muted-foreground)] uppercase">
- {selectedPersonaFile}
- </span>
- <Badge variant="outline" size="xs" className="text-[10px] font-mono text-[var(--muted-foreground)]">
- {selectedPersonaFile === 'SOUL.md'
- ? 'config/fleet_agents.json'
- : selectedPersonaFile === 'AGENTS.md'
- ? 'AGENTS.md (Root Guidelines)'
- : selectedPersonaFile === 'PROFILE.md'
- ? 'Agent Identity Specification'
- : 'memory/zezo_brain.db'}
- </Badge>
- </div>
-
- <div className="text-[10px] font-mono text-[var(--muted-foreground)]">
- {personaEditorContent.length} chars
- </div>
- </div>
-
- {/* Live Monospace Textarea Editor */}
- <textarea
- value={personaEditorContent}
- onChange={(e) => setPersonaEditorContent(e.target.value)}
- placeholder="File content loading..."
- className="flex-1 w-full min-h-[280px] p-3 text-xs font-mono bg-[var(--input)]/25 border border-[var(--border)] rounded-[var(--radius-sm,calc(var(--radius,0.5rem)-2px))] text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] resize-none leading-relaxed select-text"
- />
-
- {/* Footer Action Buttons */}
- <div className="flex items-center justify-end gap-2 pt-1.5 border-t border-[var(--border)] shrink-0">
- <Button
- variant="outline"
- size="sm"
- onClick={() => setIsFilesModalOpen(false)}
- className="h-7 text-xs px-3"
- >
- Cancel
- </Button>
- <Button
- variant="default"
- size="sm"
- onClick={handleSavePersonaFile}
- className="h-7 text-xs px-3 gap-1.5"
- >
- <Save className="w-3.5 h-3.5" />
- <span>Save File</span>
- </Button>
- </div>
- </div>
- </div>
- </FramePanel>
- </Frame>
+ {simulationToast && (
+ <div role="status" className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--foreground)]">
+ {simulationToast}
  </div>
  )}
-
- {/* ReUI Confirmation Dialog for Dismissing Agent */}
+			{/* ReUI Confirmation Dialog for Dismissing Agent */}
  <ConfirmDialog
  open={Boolean(agentToDismiss)}
  onOpenChange={(open) => !open && setAgentToDismiss(null)}
- title="Dismiss Agent from Fleet"
- description={`Are you sure you want to dismiss agent "${agentToDismiss?.name || ''}" from the active fleet?`}
+ title="Delete Agent"
+ description={`Are you sure you want to delete agent "${agentToDismiss?.name || ''}" from the active agents?`}
  warningText="This agent process will be terminated, removed from the workspace office matrix, and its heartbeat monitoring will stop."
- confirmText="Dismiss Agent"
+ confirmText="Delete Agent"
  cancelText="Cancel"
  variant="destructive"
  isLoading={isDismissing}

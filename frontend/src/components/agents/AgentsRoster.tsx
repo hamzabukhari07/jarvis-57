@@ -1,15 +1,15 @@
 import React from 'react'
-import { Plus, Layers, Terminal } from 'lucide-react'
+import { Plus, Layers, Terminal } from '@/lib/zezo-icons'
 import type { AgentProfile } from '../../types/zezo'
 
-interface FleetRosterProps {
+interface AgentsRosterProps {
  agents: AgentProfile[]
  selectedAgentId: string | null
  onSelectAgent: (agent: AgentProfile) => void
  onAddNewAgent: () => void
 }
 
-export const FleetRoster: React.FC<FleetRosterProps> = ({
+export const AgentRoster: React.FC<AgentsRosterProps> = ({
  agents,
  selectedAgentId,
  onSelectAgent,
@@ -22,13 +22,13 @@ export const FleetRoster: React.FC<FleetRosterProps> = ({
  <div className="flex items-center gap-2">
  <Layers className="w-4 h-4 text-[#e2d8ca]" />
  <span className="font-semibold text-xs uppercase tracking-wider text-[#e4e0d8]">
- Active Fleet ({agents.length})
+ Active Agents ({agents.length})
  </span>
  </div>
  <button
  onClick={onAddNewAgent}
  className="p-1 rounded-md bg-[#1a1918] border border-white/10 hover:border-white/20 text-[#d8d2c8] hover:text-white transition-all cursor-pointer"
- title="Deploy New Agent to Fleet"
+ title="Add Agent"
  >
  <Plus className="w-4 h-4" />
  </button>

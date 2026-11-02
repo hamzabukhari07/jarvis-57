@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Plus, X, Loader2, Sparkles, Tag } from 'lucide-react'
+import { Plus, X, Loader2, Sparkles, Tag } from '@/lib/zezo-icons'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { api } from '../../lib/api'

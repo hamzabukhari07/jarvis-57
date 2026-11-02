@@ -28,7 +28,7 @@ import {
   EyeOff,
   Loader2,
   AlertTriangle,
-} from "lucide-react";
+} from "@/lib/zezo-icons";
 import { Button } from "../ui/button";
 import { Badge } from "../reui/badge";
 import { cn } from "@/lib/utils";

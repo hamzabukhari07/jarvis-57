@@ -257,7 +257,7 @@
       background: var(--border-subtle);
     }
 
-    /* ── Scranton Pixel Office Container & Viewport ── */
+    /* ── Agent Operations Container & Viewport ── */
     .canvas-wrapper {
       flex: 1;
       position: relative;
@@ -1627,7 +1627,7 @@
     <div class="telemetry-row">
       <div class="telemetry-item">
         <span>AGENTS:</span>
-        <span class="telemetry-value" id="hudFleet">12 ACTIVE</span>
+        <span class="telemetry-value" id="hudAgents">12 ACTIVE</span>
       </div>
       <div class="telemetry-item">
         <span>BRANCH:</span>
@@ -1658,7 +1658,7 @@
   <!-- Main Canvas & Inspector Layout -->
   <main class="deck-container">
 
-    <!-- Center Scranton Pixel Office View -->
+    <!-- Center Agent Operations View -->
     <div class="frame">
       <div class="corner corner-tl"></div>
       <div class="corner-v corner-v-tl"></div>
@@ -1805,7 +1805,7 @@
           <!-- Spec Grid with Openable OS Sandbox Folder Links -->
           <div class="spec-grid">
             <div class="spec-label">BRANCH</div>
-            <div class="spec-val" id="specWorktree">agent/fleet-orchestrator</div>
+            <div class="spec-val" id="specWorktree">agent/agents-orchestrator</div>
 
             <div class="spec-label">PATH</div>
             <div class="spec-val">
@@ -1873,7 +1873,7 @@
             </div>
             <div class="log-line">
               <span class="log-ts">[01:57:49]</span>
-              <span class="log-msg highlight">Autonomous fleet active: working, walking, breaks & banter</span>
+              <span class="log-msg highlight">Autonomous agents active: working, walking, breaks & banter</span>
             </div>
           </div>
 
@@ -1967,7 +1967,7 @@
 
     // 12 Full Scranton Agents with Dedicated Desks, Worktrees, Activity Logs & Files
     const agents = [
-      { name: 'MICHAEL', role: "Regional Manager & Orchestrator", worktree: 'agent/fleet-orchestrator', sandbox: '.agent_worktrees/task-100/', files: ['main.py', 'core/prompt.txt', 'AGENTS.md'], logs: ['[SYSTEM] Fleet Orchestrator attached to workspace.', '[MICHAEL] Sprint priorities aligned across 12 subagents.', '[MICHAEL] That is what she said!'], x: 6.5, y: 17, shirt: '#243b63', hair: '#33251e', skin: '#e9bd91', tie: '#b63e3b', state: 'working', deskX: 4, deskY: 23, isBusy: false },
+      { name: 'MICHAEL', role: "Regional Manager & Orchestrator", worktree: 'agent/agents-orchestrator', sandbox: '.agent_worktrees/task-100/', files: ['main.py', 'core/prompt.txt', 'AGENTS.md'], logs: ['[SYSTEM] Agents Orchestrator attached to workspace.', '[MICHAEL] Sprint priorities aligned across 12 subagents.', '[MICHAEL] That is what she said!'], x: 6.5, y: 17, shirt: '#243b63', hair: '#33251e', skin: '#e9bd91', tie: '#b63e3b', state: 'working', deskX: 4, deskY: 23, isBusy: false },
       { name: 'JIM', role: 'Lead Code Review & Staging', worktree: 'agent/pr-review-staging', sandbox: '.agent_worktrees/task-101/', files: ['actions/opencode_agent.py', 'core/task_manager.py'], logs: ['[JIM] Reviewing staged diff in opencode_agent.py.', '[JIM] Dwight, your stapler is in Jell-O again.', '[JIM] Staging PR assertions verified (12/12 passing).'], x: 37.5, y: 30, shirt: '#526f9a', hair: '#4b3023', skin: '#e8bd96', tie: '#d5d0c6', state: 'working', deskX: 56, deskY: 27.5, isBusy: false },
       { name: 'DWIGHT', role: 'OpenCode Refactoring & Security', worktree: 'agent/task-api-refactor', sandbox: '.agent_worktrees/task-102/', files: ['actions/kilo_agent.py', 'core/governance.py', 'core/action_loader.py'], logs: ['[DWIGHT] Scanning AST nodes with Tree-Sitter.', '[DWIGHT] MICHAEL!! Jim put my stapler in Jell-O!', '[DWIGHT] Security policy applied: 0 unsafe shell commands permitted.'], x: 40, y: 30, shirt: '#c49b31', hair: '#32251c', skin: '#e6b98e', tie: '#604b25', state: 'working', deskX: 65, deskY: 27.5, isBusy: false },
       { name: 'PAM', role: 'UI Token Extractor & Aesthetics', worktree: 'agent/design-tokens-v2', sandbox: '.agent_worktrees/task-103/', files: ['frontend/index.html', 'frontend/css/style.css', 'skills/hamza_taste/SKILL.md'], logs: ['[PAM] Extracted 42 new CSS color tokens from reference.', '[PAM] Fixed contrast ratios to AAA standard.', '[PAM] Rendered new procedural pixel avatars.'], x: 47, y: 68, shirt: '#ce789c', hair: '#80502f', skin: '#edc49f', tie: '#a84e76', state: 'working', deskX: 50, deskY: 55, isBusy: false },
@@ -2330,8 +2330,8 @@
       });
     }
 
-    // Master Autonomous Fleet Scheduler (Runs continuously every 3.5s)
-    function runAutonomousFleetCycle() {
+    // Master Autonomous Agents Scheduler (Runs continuously every 3.5s)
+    function runAutonomousAgentsCycle() {
       const available = agents.filter(ag => !ag.isBusy);
       if (available.length < 1) return;
 
@@ -2735,7 +2735,7 @@
       });
 
       setTimeout(() => {
-        appendLog('FLEET', `All-hands meeting concluded. Agents returning to workstations.`, 'success');
+        appendLog('AGENTS', `All-hands meeting concluded. Agents returning to workstations.`, 'success');
         agents.forEach(ag => goToDesk(ag));
       }, 7000);
     }

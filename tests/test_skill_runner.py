@@ -133,9 +133,9 @@ def test_run_skill_action_handler():
     assert "not found" in res.lower()
 
     # 2. Existing skill (warm up registry to avoid cold-import penalty in timing assertion)
-    from core.fleet_manager import get_fleet_manager
+    from core.agents_manager import get_agent_manager
     from core.action_loader import get_action_registry
-    fm = get_fleet_manager()
+    fm = get_agent_manager()
     get_action_registry()
 
     with mock.patch("core.skill_prompt_engineer.craft_skill_engine_prompt", return_value="[TASK DIRECTIVE] Build website"), \

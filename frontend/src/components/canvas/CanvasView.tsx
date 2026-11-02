@@ -10,7 +10,7 @@ import {
  Handle,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Zap } from 'lucide-react'
+import { Zap } from '@/lib/zezo-icons'
 import type { AgentProfile } from '../../types/zezo'
 
 interface CanvasViewProps {

@@ -2,7 +2,7 @@
 
 > **Project:** ZEZO  
 > **Creator & Lead Architect:** Hamza Bukhari  
-> **Target Subsystem:** Greenfield Website Generation, Design System, Skills & Fleet UI  
+> **Target Subsystem:** Greenfield Website Generation, Design System, Skills & Agents UI  
 > **Document Status:** Architectural Fix Plan & Implementation Blueprint  
 > **Scope:** Strictly the 4 identified issues (Zero Unrelated Changes)  
 
@@ -11,12 +11,12 @@
 ## 📑 Table of Contents
 1. [Executive Summary](#-executive-summary)
 2. [Target Issues Deep Dive (Root Causes & Impact)](#-target-issues-deep-dive)
-   - [Issue 1: UI vs Backend Desynchronization (Skills & Fleet Settings)](#issue-1-ui-vs-backend-desynchronization-skills--fleet-settings)
+   - [Issue 1: UI vs Backend Desynchronization (Skills & Agents Settings)](#issue-1-ui-vs-backend-desynchronization-skills--agents-settings)
    - [Issue 2: Portfolio Clarification & Entity/Content Discovery Gap](#issue-2-portfolio-clarification--entitycontent-discovery-gap)
    - [Issue 3: Raw Reference HTML Blueprint Pipeline & Handover Failure](#issue-3-raw-reference-html-blueprint-pipeline--handover-failure)
    - [Issue 4: `SKILL.md` Dictating Styling Over Reference Inspirations](#issue-4-skillmd-dictating-styling-over-reference-inspirations)
 3. [Visual Architecture: BEFORE vs. AFTER Diagrams](#-visual-architecture-before-vs-after-diagrams)
-   - [Diagram 1: UI Skills & Fleet Sync Flow](#diagram-1-ui-skills--fleet-sync-flow-before-vs-after)
+   - [Diagram 1: UI Skills & Agents Sync Flow](#diagram-1-ui-skills--agents-sync-flow-before-vs-after)
    - [Diagram 2: Portfolio Intake & Clarification Interview Flow](#diagram-2-portfolio-intake--clarification-interview-flow-before-vs-after)
    - [Diagram 3: Reference HTML Blueprint Handover & Generation Flow](#diagram-3-reference-html-blueprint-handover--generation-flow-before-vs-after)
    - [Diagram 4: Design Direction: Prescriptive Rules vs. Pure Inspiration](#diagram-4-design-direction-prescriptive-rules-vs-pure-inspiration-before-vs-after)
@@ -32,7 +32,7 @@
 
 ## 🎯 Executive Summary
 
-Following a deep multi-agent investigation across the frontend UI (`React/TypeScript`), server layer (`aiohttp/Python`), agent dispatchers (`fleet_control`, `antigravity_agent`), and design assets (`skills/website_build/references/`), this document specifies the precise root causes and surgical solutions for four core defects reported by lead architect **Hamza Bukhari**:
+Following a deep multi-agent investigation across the frontend UI (`React/TypeScript`), server layer (`aiohttp/Python`), agent dispatchers (`agents_control`, `antigravity_agent`), and design assets (`skills/website_build/references/`), this document specifies the precise root causes and surgical solutions for four core defects reported by lead architect **Hamza Bukhari**:
 
 1. **UI Skills / Agents Out of Sync:** Deleted or renamed skills (such as `hamza_taste` and `opencode`) linger indefinitely in the frontend due to aggressive browser `localStorage` caching, hardcoded `DEFAULT_SKILLS` markdown strings, disconnected static arrays in `AutonomousOfficeScreen.tsx`, and in-memory server singletons lacking filesystem modification checks.
 2. **Portfolio Intake Dialogue Gap:** When building a portfolio, ZEZO asks a rigid 1-turn question about HTML vs React and dark vs light themes, completely omitting who the portfolio belongs to, their profession, bio, experience, and projects. This happens due to a verbatim few-shot prompt script in `core/prompt.txt:252`, a 4-Pillar protocol in `SKILL.md` that strictly forbids asking content once the scope is known, and a Python gate in `antigravity_agent.py` that aggressively intercepts dialogue with a 1-sentence confirmation lock.
@@ -43,10 +43,10 @@ Following a deep multi-agent investigation across the frontend UI (`React/TypeSc
 
 ## 🔍 Target Issues Deep Dive
 
-### Issue 1: UI vs Backend Desynchronization (Skills & Fleet Settings)
+### Issue 1: UI vs Backend Desynchronization (Skills & Agents Settings)
 - **Frontend `localStorage` Hydration Trap (`SkillsSettingsTab.tsx:32-43`):** The tab initializes its React state from `localStorage.getItem('zezo_skills_state')`. Deleted skills like `hamza_taste` remain saved on the client machine and are never reconciled or evicted when disk files change.
 - **Hardcoded Markdown in `DEFAULT_SKILLS` (`SkillsSettingsTab.tsx:53-66`):** The default configuration still hardcodes `# 🎨 Hamza Taste — Studio UI Anti-Slop Directive`, causing the old title to render on reset or preview.
-- **Disconnected Static Array (`AutonomousOfficeScreen.tsx:662-673`):** The Scranton Pixel Office UI never queries `/api/skills`. It uses a hardcoded `AVAILABLE_SKILLS` array, ignoring backend changes.
+- **Disconnected Static Array (`AutonomousOfficeScreen.tsx:662-673`):** The Agent Operations UI never queries `/api/skills`. It uses a hardcoded `AVAILABLE_SKILLS` array, ignoring backend changes.
 - **Static In-Memory Backend Singleton (`skill_loader.py:521-529` & `ui_server.py:1307`):** The backend scans `skills/` only once during server boot. If files are deleted or edited via Git or disk, the running server returns stale in-memory data until a full restart.
 
 ### Issue 2: Portfolio Clarification & Entity/Content Discovery Gap
@@ -59,7 +59,7 @@ Following a deep multi-agent investigation across the frontend UI (`React/TypeSc
 ### Issue 3: Raw Reference HTML Blueprint Pipeline & Handover Failure
 - **CLI Prompt Truncation (`antigravity_agent.py:720-745`):** To avoid Windows 32K CLI limits, raw HTML is stripped from the prompt. While a file is dropped at `DESIGN_BLUEPRINT.html`, the agent is instructed to *"Build complete, production-ready source code files directly inside workspace"*, causing the agent to build from scratch rather than modifying the blueprint.
 - **Premature Blueprint Deletion (`antigravity_agent.py:980-988`):** The engine unlinks `DESIGN_BLUEPRINT.*` immediately upon task completion, discarding the reference asset.
-- **Prompt Poisoning in `design_resolver.py:650-670`):** `fleet_manager.py` injects the whole `SKILL.md` into the task prompt. `SKILL.md` contains every template filename (`saas.html`, `dub.html`), triggering false Priority 1 matches and picking incorrect templates.
+- **Prompt Poisoning in `design_resolver.py:650-670`):** `agents_manager.py` injects the whole `SKILL.md` into the task prompt. `SKILL.md` contains every template filename (`saas.html`, `dub.html`), triggering false Priority 1 matches and picking incorrect templates.
 - **OpenCode Windows CLI Overflow (`opencode_agent.py:395-404`):** Passing raw HTML (20KB–60KB) via command-line arguments exceeds the Windows 32,767 character limit, risking process crashes.
 
 ### Issue 4: `SKILL.md` Dictating Styling Over Reference Inspirations
@@ -71,7 +71,7 @@ Following a deep multi-agent investigation across the frontend UI (`React/TypeSc
 
 ## 📊 Visual Architecture: BEFORE vs. AFTER Diagrams
 
-### Diagram 1: UI Skills & Fleet Sync Flow (BEFORE vs. AFTER)
+### Diagram 1: UI Skills & Agents Sync Flow (BEFORE vs. AFTER)
 
 #### ❌ BEFORE (Current Flawed UI Sync)
 ```mermaid
@@ -140,7 +140,7 @@ sequenceDiagram
     Note over Live: Hardcoded prompt.txt:252 script executes
     Live->>User: "Zaroor! Single file HTML ya React, aur theme Dark Obsidian ya Clean Light?"
     User->>Live: "single file html or theme koi b use krlo"
-    Live->>Gate: fleet_control(scope='portfolio', stack='single_file_html', theme='dark_obsidian')
+    Live->>Gate: agents_control(scope='portfolio', stack='single_file_html', theme='dark_obsidian')
     Note over Gate: check_greenfield_gate() locks conversation
     Gate-->>Live: "BUILD NOT STARTED. Read plan back in 1 short sentence..."
     Live->>User: "Plan: Build portfolio in Desktop/portfolio using Dark Obsidian. Should I proceed?"
@@ -176,7 +176,7 @@ sequenceDiagram
     Live->>User: "Stack preference: Single-File HTML ya React + Tailwind? Aur visual vibe: Minimal Editorial, Dark Glassmorphism, ya Cyber Tech?"
     User->>Live: "Single-File HTML, Clean Minimal"
     
-    Live->>Gate: fleet_control(scope='portfolio', user_profile=ExtractedData, template='Hairline Grid')
+    Live->>Gate: agents_control(scope='portfolio', user_profile=ExtractedData, template='Hairline Grid')
     Gate-->>Live: "Plan confirmed with real user facts."
     Live->>CLI: Dispatches task WITH extracted facts, bio, real project links & reference template!
     Note over CLI: CLI adapts real template with real Hamza Bukhari content!
@@ -262,7 +262,7 @@ flowchart LR
 
 #### 1.3 Backend `reload_if_dirty()` in `core/ui_server.py` & `core/skill_loader.py`
 - In `_skills_list_handler` (`core/ui_server.py`), check the filesystem `mtime` of the `skills/` directory. If changed since the last scan, trigger `reg.reload()` dynamically before returning JSON.
-- Add an identical timestamp check to `_fleet_state_handler` for `config/fleet_agents.json`.
+- Add an identical timestamp check to `_agents_state_handler` for `config/agents.json`.
 
 ---
 
@@ -288,7 +288,7 @@ flowchart LR
   5. `key_sections`: Resolved dynamically based on content.
 - Amend Section 1.2: Remove *"Inquire only about Stack and Theme"*. Mandate content discovery for all portfolio and business website scopes.
 
-#### 2.3 Relax the Python Confirmation Gate (`actions/antigravity_agent.py` & `actions/fleet_control.py`)
+#### 2.3 Relax the Python Confirmation Gate (`actions/antigravity_agent.py` & `actions/agents_control.py`)
 - In `check_greenfield_gate()`, if `scope_type == 'portfolio'` and no user content/resume is provided, do NOT halt with the rigid read-back lock. Instead, instruct the agent: *"Prompt user for their name, professional role, and key projects (or ask if they want to read a desktop resume) before finalizing the build plan."*
 
 ---

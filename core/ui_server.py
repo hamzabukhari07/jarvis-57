@@ -199,7 +199,7 @@ class ZezoUIServer:
 
         # Filesystem modification tracking for dynamic reload
         self._skills_dir_mtime: float = 0.0
-        self._fleet_config_mtime: float = 0.0
+        self._agents_config_mtime: float = 0.0
 
         # Callbacks from main.py / engine
         self.on_text_command: Callable[[str], None] | None = None
@@ -247,16 +247,16 @@ class ZezoUIServer:
         app.router.add_post("/api/engines/{engine}/test", self._engine_test_handler)
         app.router.add_get("/api/engines/{engine}/test", self._engine_test_handler)
         app.router.add_get("/api/tasks", self._tasks_list_handler)
-        app.router.add_get("/api/fleet/state", self._fleet_state_handler)
-        app.router.add_get("/api/fleet/agent", self._fleet_agent_profile_handler)
-        app.router.add_post("/api/fleet/save_agent", self._fleet_save_agent_handler)
-        app.router.add_post("/api/fleet/agents", self._fleet_save_agent_handler)
-        app.router.add_post("/api/fleet/save_soul", self._fleet_save_soul_handler)
-        app.router.add_post("/api/fleet/dispatch_task", self._fleet_dispatch_task_handler)
-        app.router.add_post("/api/fleet/chat", self._fleet_chat_handler)
-        app.router.add_post("/api/fleet/delete_agent", self._fleet_delete_agent_handler)
-        app.router.add_post("/api/fleet/open_folder", self._fleet_open_folder_handler)
-        app.router.add_post("/api/fleet/pick_folder", self._fleet_pick_folder_handler)
+        app.router.add_get("/api/agents/state", self._agents_state_handler)
+        app.router.add_get("/api/agents/agent", self._agent_profile_handler)
+        app.router.add_post("/api/agents/save_agent", self._save_agent_handler)
+        app.router.add_post("/api/agents", self._save_agent_handler)
+        app.router.add_post("/api/agents/save_soul", self._save_soul_handler)
+        app.router.add_post("/api/agents/dispatch_task", self._dispatch_agent_task_handler)
+        app.router.add_post("/api/agents/chat", self._agent_chat_handler)
+        app.router.add_post("/api/agents/delete_agent", self._delete_agent_handler)
+        app.router.add_post("/api/agents/open_folder", self._open_agent_folder_handler)
+        app.router.add_post("/api/agents/pick_folder", self._pick_agent_folder_handler)
         app.router.add_post("/api/upload", self._upload_handler)
         app.router.add_get("/api/config", self._get_config_handler)
         app.router.add_post("/api/config", self._save_config_handler)
@@ -1279,82 +1279,82 @@ class ZezoUIServer:
         frontend_dist_idx = self.frontend_dir / "dist" / "index.html"
         if frontend_dist_idx.exists():
             return web.FileResponse(frontend_dist_idx)
-        return web.Response(text="<h1>Scranton Office Deck</h1><p>Open via ZEZO React Desktop Workstation.</p>", content_type="text/html")
+        return web.Response(text="<h1>Agents</h1><p>Open the Agents screen in ZEZO Desktop.</p>", content_type="text/html")
 
-    def _reload_fleet_if_modified(self, fleet_mgr: Any) -> None:
-        """Check file mtime of config/fleet_agents.json. If changed on disk, reload fleet manager state."""
-        config_file = getattr(fleet_mgr, "config_path", None)
+    def _reload_agents_if_modified(self, agents_mgr: Any) -> None:
+        """Check file mtime of config/agents.json. If changed on disk, reload agents manager state."""
+        config_file = getattr(agents_mgr, "config_path", None)
         if config_file and Path(config_file).exists():
             try:
                 mtime = Path(config_file).stat().st_mtime
-                if mtime != self._fleet_config_mtime:
-                    if hasattr(fleet_mgr, "_load_fleet"):
-                        fleet_mgr._load_fleet()
-                    elif hasattr(fleet_mgr, "reload"):
-                        fleet_mgr.reload()
-                    self._fleet_config_mtime = mtime
+                if mtime != self._agents_config_mtime:
+                    if hasattr(agents_mgr, "_load_agents"):
+                        agents_mgr._load_agents()
+                    elif hasattr(agents_mgr, "reload"):
+                        agents_mgr.reload()
+                    self._agents_config_mtime = mtime
             except OSError:
                 pass
 
-    async def _fleet_state_handler(self, request: web.Request) -> web.Response:
+    async def _agents_state_handler(self, request: web.Request) -> web.Response:
         try:
-            from core.fleet_manager import fleet_manager
-            self._reload_fleet_if_modified(fleet_manager)
+            from core.agents_manager import agent_manager
+            self._reload_agents_if_modified(agent_manager)
             return web.json_response({
                 "status": "success",
-                "fleet": fleet_manager.get_fleet_deck_state()
+                "agents": agent_manager.get_agents_state()
             })
         except Exception as e:
             return web.json_response({"status": "error", "message": str(e)}, status=500)
 
-    async def _fleet_agent_profile_handler(self, request: web.Request) -> web.Response:
+    async def _agent_profile_handler(self, request: web.Request) -> web.Response:
         agent_id = request.query.get("id", "").strip()
         try:
-            from core.fleet_manager import fleet_manager
-            self._reload_fleet_if_modified(fleet_manager)
-            res = fleet_manager.get_agent_full_profile(agent_id)
+            from core.agents_manager import agent_manager
+            self._reload_agents_if_modified(agent_manager)
+            res = agent_manager.get_agent_full_profile(agent_id)
             return web.json_response(res)
         except Exception as e:
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
-    async def _fleet_save_agent_handler(self, request: web.Request) -> web.Response:
+    async def _save_agent_handler(self, request: web.Request) -> web.Response:
         try:
             data = await request.json()
-            from core.fleet_manager import fleet_manager
-            res = fleet_manager.save_agent_profile(data)
-            self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
+            from core.agents_manager import agent_manager
+            res = agent_manager.save_agent_profile(data)
+            self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
             return web.json_response(res)
         except Exception as e:
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
-    async def _fleet_save_soul_handler(self, request: web.Request) -> web.Response:
+    async def _save_soul_handler(self, request: web.Request) -> web.Response:
         try:
             data = await request.json()
             agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
             soul = str(data.get("soul_prompt") or data.get("soul_md") or data.get("prompt_prefix") or "").strip()
-            from core.fleet_manager import fleet_manager
-            res = fleet_manager.save_agent_soul(agent_id, soul)
-            self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
+            from core.agents_manager import agent_manager
+            res = agent_manager.save_agent_soul(agent_id, soul)
+            self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
             return web.json_response(res)
         except Exception as e:
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
-    async def _fleet_dispatch_task_handler(self, request: web.Request) -> web.Response:
+    async def _dispatch_agent_task_handler(self, request: web.Request) -> web.Response:
         try:
             data = await request.json()
             agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
             prompt = str(data.get("prompt") or data.get("task") or "").strip()
             path = data.get("path")
-            from core.fleet_manager import fleet_manager
-            res = fleet_manager.dispatch_task(agent_id, prompt, path)
-            self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
+            from core.agents_manager import agent_manager
+            res = agent_manager.dispatch_task(agent_id, prompt, path)
+            self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
             return web.json_response(res)
         except Exception as e:
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
-    async def _fleet_chat_handler(self, request: web.Request) -> web.Response:
-        """Interactive real-time conversational chat response from a fleet agent.
-        Routes the prompt directly and verbatim to fleet_manager.dispatch_task using the agent's configured engine.
+    async def _agent_chat_handler(self, request: web.Request) -> web.Response:
+        """Interactive real-time conversational chat response from a agent.
+        Routes the prompt directly and verbatim to agent_manager.dispatch_task using the agent's configured engine.
         """
         try:
             data = await request.json()
@@ -1367,9 +1367,9 @@ class ZezoUIServer:
             if not prompt:
                 return web.json_response({"success": False, "error": "Prompt cannot be empty."}, status=400)
 
-            from core.fleet_manager import fleet_manager
-            self._reload_fleet_if_modified(fleet_manager)
-            agent = fleet_manager.get_agent(agent_id) or fleet_manager.resolve_agent_by_mention_or_capability(agent_id)
+            from core.agents_manager import agent_manager
+            self._reload_agents_if_modified(agent_manager)
+            agent = agent_manager.get_agent(agent_id) or agent_manager.resolve_agent_by_mention_or_capability(agent_id)
             if not agent:
                 return web.json_response({"success": False, "error": f"Agent '{agent_id}' not found."}, status=404)
 
@@ -1383,14 +1383,14 @@ class ZezoUIServer:
                 agent.engine = engine_name
                 agent.default_tool = engine_tool
 
-            logger.info("[FleetChat] Routing prompt for agent %s directly to engine %s: %s", agent.id, engine_tool, prompt[:60])
-            dispatch_res = fleet_manager.dispatch_task(
+            logger.info("[AgentChat] Routing prompt for agent %s directly to engine %s: %s", agent.id, engine_tool, prompt[:60])
+            dispatch_res = agent_manager.dispatch_task(
                 agent_id=agent.id,
                 prompt=prompt,
                 path=path,
                 model_override=model_override,
             )
-            self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
+            self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
 
             if isinstance(dispatch_res, dict) and dispatch_res.get("success") is False:
                 err_msg = dispatch_res.get("error") or "Task dispatch failed."
@@ -1423,21 +1423,21 @@ class ZezoUIServer:
                 "model": model_override or getattr(agent, "model_id", ""),
             })
         except Exception as e:
-            logger.exception("Error in _fleet_chat_handler: %s", e)
+            logger.exception("Error in _agent_chat_handler: %s", e)
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
-    async def _fleet_delete_agent_handler(self, request: web.Request) -> web.Response:
+    async def _delete_agent_handler(self, request: web.Request) -> web.Response:
         try:
             data = await request.json()
             agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
-            from core.fleet_manager import fleet_manager
-            res = fleet_manager.delete_agent(agent_id)
-            self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
+            from core.agents_manager import agent_manager
+            res = agent_manager.delete_agent(agent_id)
+            self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
             return web.json_response(res)
         except Exception as e:
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
-    async def _fleet_open_folder_handler(self, request: web.Request) -> web.Response:
+    async def _open_agent_folder_handler(self, request: web.Request) -> web.Response:
         try:
             data = await request.json()
             raw_path = str(data.get("path") or "").strip()
@@ -1467,7 +1467,7 @@ class ZezoUIServer:
             logger.warning("[UI Server] Failed to open folder in explorer: %s", e)
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
-    async def _fleet_pick_folder_handler(self, request: web.Request) -> web.Response:
+    async def _pick_agent_folder_handler(self, request: web.Request) -> web.Response:
         """Open native OS folder selection dialog and return the chosen path."""
         try:
             data = await request.json() if request.can_read_body else {}
@@ -1487,7 +1487,7 @@ class ZezoUIServer:
                 root.attributes("-topmost", True)
                 chosen = filedialog.askdirectory(
                     initialdir=initial_dir,
-                    title="Select Workspace Folder for Fleet Agent"
+                    title="Select Workspace Folder for Agent"
                 )
                 root.destroy()
                 if chosen:
@@ -1504,7 +1504,7 @@ class ZezoUIServer:
                             "[System.Reflection.Assembly]::LoadWithPartialName('System.windows.forms') | Out-Null; "
                             "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
                             f"$f.SelectedPath = '{initial_dir.replace('/', chr(92))}'; "
-                            "$f.Description = 'Select Workspace Folder for Fleet Agent'; "
+                            "$f.Description = 'Select Workspace Folder for Agent'; "
                             "if ($f.ShowDialog((New-Object System.Windows.Forms.NativeWindow)) -eq [System.Windows.Forms.DialogResult]::OK) { "
                             "Write-Output $f.SelectedPath }"
                         )
@@ -2630,22 +2630,22 @@ class ZezoUIServer:
             except Exception as e:
                 logger.warning("Failed to save API keys from WS: %s", e)
 
-        elif msg_type == "get_fleet_state":
+        elif msg_type == "get_agents_state":
             try:
-                from core.fleet_manager import fleet_manager
-                self._reload_fleet_if_modified(fleet_manager)
+                from core.agents_manager import agent_manager
+                self._reload_agents_if_modified(agent_manager)
                 await ws.send_str(json.dumps({
-                    "type": "fleet_state",
-                    "data": {"fleet": fleet_manager.get_fleet_deck_state()}
+                    "type": "agents_state",
+                    "data": {"agents": agent_manager.get_agents_state()}
                 }))
             except Exception as e:
-                logger.warning("Failed to send fleet state: %s", e)
+                logger.warning("Failed to send agents state: %s", e)
 
         elif msg_type == "get_agent_profile":
             agent_id = str(payload.get("agent_id") or payload.get("id") or "").strip()
             try:
-                from core.fleet_manager import fleet_manager
-                profile = fleet_manager.get_agent_full_profile(agent_id)
+                from core.agents_manager import agent_manager
+                profile = agent_manager.get_agent_full_profile(agent_id)
                 await ws.send_str(json.dumps({
                     "type": "agent_profile_data",
                     "data": profile
@@ -2657,22 +2657,22 @@ class ZezoUIServer:
             agent_id = str(payload.get("agent_id") or payload.get("id") or "").strip()
             soul = str(payload.get("soul_prompt") or payload.get("soul_md") or "").strip()
             try:
-                from core.fleet_manager import fleet_manager
-                res = fleet_manager.save_agent_soul(agent_id, soul)
-                self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
+                from core.agents_manager import agent_manager
+                res = agent_manager.save_agent_soul(agent_id, soul)
+                self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
             except Exception as e:
                 logger.warning("Failed to save agent soul: %s", e)
 
-        elif msg_type == "dispatch_fleet_task":
+        elif msg_type == "dispatch_agents_task":
             agent_id = str(payload.get("agent_id") or payload.get("id") or "").strip()
             prompt = str(payload.get("prompt") or payload.get("task") or "").strip()
             path = payload.get("path")
             try:
-                from core.fleet_manager import fleet_manager
-                res = fleet_manager.dispatch_task(agent_id, prompt, path)
-                self.broadcast("fleet_updated", {"fleet": fleet_manager.get_fleet_deck_state()})
+                from core.agents_manager import agent_manager
+                res = agent_manager.dispatch_task(agent_id, prompt, path)
+                self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
             except Exception as e:
-                logger.warning("Failed to dispatch fleet task: %s", e)
+                logger.warning("Failed to dispatch agents task: %s", e)
 
         elif msg_type == "get_audio_devices":
             try:

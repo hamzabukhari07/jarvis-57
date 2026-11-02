@@ -14,7 +14,7 @@ auto_activate: true
 # 🌐 Master Studio Website Creation Protocol (`website_build`)
 
 > **Lead Architect & Creator:** Hamza Bukhari  
-> **Target Audience:** Google Antigravity Agent, OpenCode, Kilo Code, Autonomous Office Fleet, and all UI coding agents.  
+> **Target Audience:** Google Antigravity Agent, OpenCode, Kilo Code, Autonomous Office Agents, and all UI coding agents.  
 > **Core Axiom:** Anti-Slop is strictly a **NEGATIVE QUALITY FILTER** (what to reject), while the **Reference HTML Template** is an **IMMUTABLE READ-ONLY SOURCE OF TRUTH** supplying 100% of the **DESIGN DIRECTION** (typography, colors, tokens, card geometry, micro-interactions, responsive grid, visual rhythm). The agent never mutates or overwrites the reference file; instead, it analyzes the reference design DNA and synthesizes the target deliverable (`index.html` or new pages/sections) with authentic client content, extending any new sections using the exact same structural patterns.
 
 ---

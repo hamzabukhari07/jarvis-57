@@ -40,7 +40,7 @@ import {
   Loader2,
   Terminal,
   Wrench,
-} from 'lucide-react'
+} from '@/lib/zezo-icons'
 import { cn } from '../../lib/utils'
 import { api } from '../../lib/api'
 import type { AudioDeviceState } from '../../hooks/useZezoSocket'

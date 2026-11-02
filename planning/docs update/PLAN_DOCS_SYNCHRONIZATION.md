@@ -73,7 +73,7 @@ These files represent the highest discrepancy impact where outdated information 
      - Relocate `manage_monitor` to [actions/background_monitor.py](actions/background_monitor.py).
      - Rename `shutdown_jarvis` to `shutdown_zezo` ([main.py:424](main.py#L424)).
   5. **Update Action Parameters:**
-     - Add `path` parameter to `fleet_control(action='dispatch', path=...)`.
+     - Add `path` parameter to `agents_control(action='dispatch', path=...)`.
 
 ### Task 1.2: Overhaul [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) & [docs/AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md)
 * **Status:** ❌ Severely Outdated
@@ -92,7 +92,7 @@ These files represent the highest discrepancy impact where outdated information 
   1. Document tech stack: **React 18 + Vite + Tailwind CSS + ReUI Component System**.
   2. Document key component views:
      - `AutonomousOfficeScreen.tsx`: 2D pixel desk grid, sprite animations, monitor telemetry, soul editing.
-     - `AgentDirectChatView.tsx`: 1-on-1 isolated context chat with fleet agents.
+     - `AgentDirectChatView.tsx`: 1-on-1 isolated context chat with specialist agents.
      - `MemoryGraphCanvas.tsx`: 3D Force-Directed Knowledge Graph with Viseme reactivity and inspector drawer.
      - `TaskManagerModal.tsx`: Background task tree viewer, subtask progress streaming, and cancellation.
      - `MobileRemoteModal.tsx`: Cloudflare Quick Tunnel QR code and OTP token pairing.
@@ -130,7 +130,7 @@ These files represent the highest discrepancy impact where outdated information 
   2. **Temporal Grounding Rule:** Local system clock lookup with 0ms tool overhead.
   3. **Tool Disambiguation:** "Rebuild/Scaffold/Teardown" = `reverse_engineer` vs "Clone/Offline copy" = `clone_website`.
   4. **Browser Control Guard:** Never open browser to search about self; forbid `file:///` scheme in `browser_control` and use `open_app`.
-  5. **Fleet Delegation Protocols:** Automatic assignment triggers for Verve, Flux, Ahmad, Michael, Kelly, etc.
+  5. **Agents Delegation Protocols:** Automatic assignment triggers for Verve, Flux, Ahmad, Michael, Kelly, etc.
 
 ---
 
@@ -159,9 +159,9 @@ Create dedicated, production-grade documentation for the 7 major subsystems curr
   - 5-minute TTL caching (`_CACHE`) preventing UI freezing.
   - REST endpoints: `GET /api/code_engines`, `POST /api/code_engines/probe`.
 
-### Task 2.3: Author `docs/FLEET_MANAGEMENT.md`
-* **File to Create:** `docs/FLEET_MANAGEMENT.md`
-* **Source Modules:** [core/fleet_manager.py](core/fleet_manager.py), [actions/fleet_control.py](actions/fleet_control.py), [frontend/src/components/office/AutonomousOfficeScreen.tsx](frontend/src/components/office/AutonomousOfficeScreen.tsx)
+### Task 2.3: Author `docs/AGENTS_MANAGEMENT.md`
+* **File to Create:** `docs/AGENTS_MANAGEMENT.md`
+* **Source Modules:** [core/agents_manager.py](core/agents_manager.py), [actions/agents_control.py](actions/agents_control.py), [frontend/src/components/office/AutonomousOfficeScreen.tsx](frontend/src/components/office/AutonomousOfficeScreen.tsx)
 * **Contents:**
   - The Scranton Office physical floor layout and 2D desk coordinates (`OFFICE_DESK_COORDINATES`).
   - Specialist agent roster and skills: Michael (Lead), Dwight (Ops), Jim (Comms), Pam (UI/UX), Verve (Frontend), DevDynamo/Haider (Fullstack), Flux (Design), Ahmad (Backend).

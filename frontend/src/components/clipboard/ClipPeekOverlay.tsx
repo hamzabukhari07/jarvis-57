@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Globe, Bot, Send, X, Code, FileText, Sparkles, Clipboard, ChevronDown } from "lucide-react";
+import { Copy, Globe, Bot, Send, X, Code, FileText, Sparkles, Clipboard, ChevronDown } from "@/lib/zezo-icons";
 
 interface ClipboardPayload {
   text: string;

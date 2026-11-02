@@ -9,7 +9,7 @@ import {
  ChevronDown,
  ChevronUp,
  X,
-} from 'lucide-react'
+} from '@/lib/zezo-icons'
 import type { AgentProfile } from '../../types/zezo'
 import { api } from '../../lib/api'
 

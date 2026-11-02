@@ -3,7 +3,7 @@
 > **Project:** ZEZO  
 > **Creator & Lead Architect:** Hamza Bukhari  
 > **Target Subsystem:** Greenfield Web Generation & Autonomous Design System (Hamza Taste 3.0)  
-> **Key Modules Investigated:** `actions/antigravity_agent.py`, `core/design_resolver.py`, `core/design_extractor.py`, `core/prompt.txt`, `skills/hamza_taste/`, `core/undo.py`, `actions/fleet_control.py`  
+> **Key Modules Investigated:** `actions/antigravity_agent.py`, `core/design_resolver.py`, `core/design_extractor.py`, `core/prompt.txt`, `skills/hamza_taste/`, `core/undo.py`, `actions/agents_control.py`  
 > **Scope:** Issues Diagnosis & Architectural Audit Only (Zero Code Modifications)
 
 ---
@@ -51,7 +51,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A["User: 'Build a website' (Open-Ended Query)"] --> B["Python Stateless Intake Gate (antigravity_agent / fleet_control)"]
+    A["User: 'Build a website' (Open-Ended Query)"] --> B["Python Stateless Intake Gate (antigravity_agent / agents_control)"]
     B --> C{"Are tech_stack, theme, and scope provided?"}
     C -- "No (Missing Details)" --> D["STEP 1 INTAKE: ZEZO halts and asks clarifying questions aloud: Stack, Theme, Scope"]
     D --> E["User responds with choices"]
@@ -96,7 +96,7 @@ Instead, the agent immediately announces: *"Building your website now..."* and b
 
 ### 1.2 Comparison with `clone_website`
 
-| Dimension | `clone_website` (`actions/website_cloner.py`) | Greenfield Creation (`antigravity_agent.py` / `fleet_control.py`) |
+| Dimension | `clone_website` (`actions/website_cloner.py`) | Greenfield Creation (`antigravity_agent.py` / `agents_control.py`) |
 | :--- | :--- | :--- |
 | **Tool Declaration Schema** | Explicitly declares `url`, `mode`, `output_format`, `target_dir`, and `confirmed`. Enforces negative constraints: *"Set ONLY if user explicitly stated... Otherwise OMIT it — ZEZO will ask."* | Only declares generic `task`, `project_path`, and `model`. No stack, theme, sections, or confirmation parameters exist in the schema. |
 | **Intake Gate (Python Code)** | **Stateless Python Gate:** If required arguments are missing, execution halts immediately and returns: `"CLONE NOT STARTED. Ask the user these questions out loud...: - scope... - output... - folder..."` | **None:** Evaluates `is_brand_new`, auto-allocates `Desktop/website_1`, auto-selects design, and submits background worker immediately. |
@@ -105,12 +105,12 @@ Instead, the agent immediately announces: *"Building your website now..."* and b
 
 ### 1.3 Root Causes in the Codebase
 1. **Absence of Action-Level Python Interception:**  
-   In `actions/antigravity_agent.py` line 980 and `actions/fleet_control.py` line 70, there is zero parameter inspection. The moment the tool is called, `tm.submit("antigravity_agent", _run_worker, ...)` runs.
+   In `actions/antigravity_agent.py` line 980 and `actions/agents_control.py` line 70, there is zero parameter inspection. The moment the tool is called, `tm.submit("antigravity_agent", _run_worker, ...)` runs.
 2. **Missing Schema Parameters in Tool Declarations:**  
    The function declaration for `antigravity_run` lacks `tech_stack`, `color_theme`, and `confirmed` properties. Gemini Live assumes all necessary information is present in `task` on turn 1.
 3. **Internal Contradictions in `core/prompt.txt`:**
    - While line 239 defines `PRE-FLIGHT PROJECT CLARIFICATION GUARD`, lines 252 and 255 provide few-shot examples demonstrating immediate dispatch without questions:  
-     `"Build landing page" -> fleet_control(action='dispatch', agent_id='FLUX', task='Build clean landing page')`
+     `"Build landing page" -> agents_control(action='dispatch', agent_id='FLUX', task='Build clean landing page')`
    - Line 58 states: *"When a request is ambiguous, take the most reasonable reading and act rather than asking."*
    - Line 176 mandates: *"The acknowledgement sentence and the tool call belong to the same turn."*  
    The LLM prioritizes tool execution over multi-turn conversation.
@@ -284,7 +284,7 @@ if "not logged into Antigravity" in cli_output:
 
 | ID | Component / File | Specific Defect | Severity | Impact on User Experience |
 | :---: | :--- | :--- | :---: | :--- |
-| **1** | `actions/antigravity_agent.py`<br/>`actions/fleet_control.py` | Missing intake parameters and confirmation gate | **HIGH** | Open-ended queries trigger immediate builds without asking for tech stack, color theme, or scope. |
+| **1** | `actions/antigravity_agent.py`<br/>`actions/agents_control.py` | Missing intake parameters and confirmation gate | **HIGH** | Open-ended queries trigger immediate builds without asking for tech stack, color theme, or scope. |
 | **2** | `core/design_resolver.py:240`<br/>`actions/antigravity_agent.py:481` | `.md` files prioritized over `.html`; `DESIGN_BLUEPRINT.md` emitted | **MEDIUM** | Intermediate markdown specs pollute the workspace instead of directly leveraging 13 raw HTML templates. |
 | **3** | `actions/antigravity_agent.py:825` | Blueprint cleanup gated strictly on `index.html` existence | **MEDIUM** | Blueprint files are permanently orphaned in React/Next.js projects and failed builds. |
 | **4** | `actions/antigravity_agent.py:841` | Preview opened via raw `file://` instead of HTTP server | **HIGH** | React/Vite projects open as a completely blank white screen due to CORS and uncompiled TSX. |
@@ -298,7 +298,7 @@ if "not logged into Antigravity" in cli_output:
 ## 🛠️ Recommended Architectural Remediation Blueprint
 
 ### Step 1: Implement a Stateless 2-Step Gate for Greenfield Builds
-- Upgrade `antigravity_run` and `fleet_control` tool declarations with optional parameters: `tech_stack` (`single_file_html`, `modular_html_css_js`, `react_vite`, `nextjs`), `color_theme`, and `confirmed`.
+- Upgrade `antigravity_run` and `agents_control` tool declarations with optional parameters: `tech_stack` (`single_file_html`, `modular_html_css_js`, `react_vite`, `nextjs`), `color_theme`, and `confirmed`.
 - In `antigravity_action()`, if the request is an open-ended greenfield build and parameters are missing, halt execution and return clarifying questions.
 - Once parameters are supplied, require `confirmed=True` before submitting the task.
 
@@ -322,7 +322,7 @@ if "not logged into Antigravity" in cli_output:
 
 ## 🚀 Detailed Phased Fix Plan
 
-Below is the concrete, step-by-step implementation plan designed to address every identified defect without causing regressions in existing cloner, reverse-engineering, or fleet systems.
+Below is the concrete, step-by-step implementation plan designed to address every identified defect without causing regressions in existing cloner, reverse-engineering, or agent systems.
 
 ```
                     PHASED FIX IMPLEMENTATION ROADMAP
@@ -370,7 +370,7 @@ To ensure zero ambiguity without overwhelming the user in voice conversations, t
 
 ---
 
-#### 1.2 Tool Schema Upgrade (`actions/antigravity_agent.py` & `actions/fleet_control.py`)
+#### 1.2 Tool Schema Upgrade (`actions/antigravity_agent.py` & `actions/agents_control.py`)
 Add explicit parameters with negative constraints to the `TOOL` declaration:
 - `scope_type` (string, enum: `["landing_page", "full_website", "hero_section", "component"]`):
   > *"Scope of the web build. Set ONLY if user stated (e.g. 'landing page', 'full website', 'hero section', 'pricing card'). Otherwise OMIT it — ZEZO will ask."*
@@ -442,7 +442,7 @@ Mirror the proven gate pattern from `actions/website_cloner.py`:
    - If the user already provided comprehensive specifications in their initial prompt (e.g. *"Build a React Vite landing page with dark theme for a dental clinic"*), skip the intake gate and proceed directly to execution.
 
 #### 1.6 Prompt Alignment (`core/prompt.txt`)
-- Under `[CODING DELEGATION — AUTONOMOUS FLEET ORCHESTRATOR]`:
+- Under `[CODING DELEGATION — AUTONOMOUS AGENTS ORCHESTRATOR]`:
   - Update few-shot examples so open-ended prompts show asking clarification rather than blind dispatch:
     - `"Build a portfolio website"` ➔ *"Ask: Would you prefer a lightweight single-file HTML site or a modular React project, and what visual theme do you like?"*
   - Explicitly exempt new Greenfield project intake from the *"act rather than asking"* and *"acknowledgement in same turn"* rules.
@@ -574,7 +574,7 @@ When deliverables include `package.json` and `vite.config.ts`:
 In accordance with **AGENTS.md Core Operating Rule 7**, any subsequent implementation must be strictly verified across all three layers:
 
 #### Layer 1: Static Verification
-- Run `python -m py_compile actions/antigravity_agent.py core/design_resolver.py core/undo.py actions/fleet_control.py`.
+- Run `python -m py_compile actions/antigravity_agent.py core/design_resolver.py core/undo.py actions/agents_control.py`.
 - Verify zero syntax errors, missing imports, or type annotation breaks.
 
 #### Layer 2: Runtime Verification
@@ -593,14 +593,14 @@ In accordance with **AGENTS.md Core Operating Rule 7**, any subsequent implement
 
 ---
 
-## 👥 Deep Audit: Fleet Agent Architecture & Newly Discovered Issues
+## 👥 Deep Audit: Specialist Agent Architecture & Newly Discovered Issues
 
-Following an in-depth investigation into `core/fleet_manager.py`, `config/fleet_agents.json`, `core/code_engines.py`, `core/skill_loader.py`, and `frontend/src/components/office/`, a second set of critical architectural defects and bugs was identified.
+Following an in-depth investigation into `core/agents_manager.py`, `config/agents.json`, `core/code_engines.py`, `core/skill_loader.py`, and `frontend/src/components/office/`, a second set of critical architectural defects and bugs was identified.
 
 ### 🚨 Issue 7: Engine vs. Tool Semantic Conflation (Category Error)
 
 #### Symptoms & Root Cause
-In `config/fleet_agents.json` and `core/fleet_manager.py`:
+In `config/agents.json` and `core/agents_manager.py`:
 - `VERVE` has `default_tool: "antigravity_run"` and `allowed_tools: ["antigravity_run", ...]`.
 - `AHMAD` has `default_tool: "opencode_run"` and `allowed_tools: ["opencode_run", ...]`.
 - `DWIGHT` has `default_tool: "kilo_run"` and `allowed_tools: ["kilo_run", ...]`.
@@ -608,9 +608,9 @@ In `config/fleet_agents.json` and `core/fleet_manager.py`:
 1. **The Category Error:**  
    `antigravity_run`, `opencode_run`, and `kilo_run` are **CLI Execution Engines / Runtimes** (wrapping `agy.exe`, `opencode.cmd`, and `kilo.exe`). They are NOT tools that the agent itself invokes.
 2. **The `allowed_tools` Illusion:**  
-   Listing `antigravity_run` inside Verve's `allowed_tools` is an illusion. When `fleet_manager.dispatch_task` runs, `allowed_tools` is **never passed to the subprocess**. The external `agy.exe` process has zero connection to ZEZO's Python `ActionRegistry` and cannot invoke `antigravity_run` or any other ZEZO action.
+   Listing `antigravity_run` inside Verve's `allowed_tools` is an illusion. When `agents_manager.dispatch_task` runs, `allowed_tools` is **never passed to the subprocess**. The external `agy.exe` process has zero connection to ZEZO's Python `ActionRegistry` and cannot invoke `antigravity_run` or any other ZEZO action.
 3. **Dead `engine: ""` Field:**  
-   In `config/fleet_agents.json`, every agent has `"engine": ""` (empty string) because a previous migration to `core/code_engines.py` was left half-finished.
+   In `config/agents.json`, every agent has `"engine": ""` (empty string) because a previous migration to `core/code_engines.py` was left half-finished.
 4. **Frontend/Backend Naming Inversion:**  
    `frontend/src/components/office/AutonomousOfficeScreen.tsx` renames `default_tool` to `engine` in React state, while the backend treats it as a tool name.
 
@@ -619,9 +619,9 @@ In `config/fleet_agents.json` and `core/fleet_manager.py`:
 ### 🚨 Issue 8: Direct Agent Chat Hallucination (Zero Files Written)
 
 #### Symptoms & Root Cause
-When a user chats directly with an agent in the Autonomous Office (`AgentDirectChatView.tsx` -> `POST /api/fleet/chat`):
+When a user chats directly with an agent in the Autonomous Office (`AgentDirectChatView.tsx` -> `POST /api/agents/chat`):
 1. **Pure Single-Turn Text Completion:**  
-   `_fleet_chat_handler` in `core/ui_server.py` routes directly to `gemini.text()` or `llm_router.generate_text()`.
+   `_agents_chat_handler` in `core/ui_server.py` routes directly to `gemini.text()` or `llm_router.generate_text()`.
 2. **Zero Tool Access & Zero Subprocesses:**  
    The chat endpoint has **no access to action tools**, **spawns no background tasks**, and **executes no CLI engines**.
 3. **Conversational Hallucination:**  
@@ -634,13 +634,13 @@ When a user chats directly with an agent in the Autonomous Office (`AgentDirectC
 ### 🚨 Issue 9: Dead `allowed_skills` Metadata
 
 #### Symptoms & Root Cause
-- In `config/fleet_agents.json`, agents are configured with skills:
+- In `config/agents.json`, agents are configured with skills:
   - Verve: `"allowed_skills": ["hamza_taste", "multi_agent_collaboration", "make_plan"]`
-- **The Defect:** In `core/fleet_manager.py:dispatch_task` (line 650):
+- **The Defect:** In `core/agents_manager.py:dispatch_task` (line 650):
   ```python
   enriched_prompt = f"[{agent.name} • {agent.role}]\n{agent.prompt_prefix}\n\nTask: {prompt}"
   ```
-  `core/fleet_manager.py` **never imports `core/skill_loader.py`**, never queries `SkillRegistry`, and **never injects the text of `allowed_skills` into the prompt**.
+  `core/agents_manager.py` **never imports `core/skill_loader.py`**, never queries `SkillRegistry`, and **never injects the text of `allowed_skills` into the prompt**.
 - `skills/hamza_taste/SKILL.md` is only used as a regex string extraction target by `core/design_resolver.py`.
 - **Impact:** `allowed_skills` is completely dead configuration metadata in the backend.
 
@@ -649,7 +649,7 @@ When a user chats directly with an agent in the Autonomous Office (`AgentDirectC
 ### 🚨 Issue 10: Catastrophic Worktree Code Discard & ID Mismatch
 
 #### Symptoms & Root Cause
-In `core/fleet_manager.py` lines 630–640 and 785–798:
+In `core/agents_manager.py` lines 630–640 and 785–798:
 1. **Worktree ID Mismatch:**  
    Line 630 generates a local `task_id = uuid.uuid4().hex[:8]` and creates the worktree named `f"{agent.id.lower()}_{task_id}"` (e.g. `ahmad_4f8a12bc`).  
    Line 832 calls `tm.submit(...)`, generating a completely **different UUID** (`submitted_id`).  
@@ -663,7 +663,7 @@ In `core/fleet_manager.py` lines 630–640 and 785–798:
 
 ---
 
-### 🚨 Issue 11: Configuration Inconsistencies & Ghost Tools in `config/fleet_agents.json`
+### 🚨 Issue 11: Configuration Inconsistencies & Ghost Tools in `config/agents.json`
 
 1. **Michael's Ghost Tool `"groq"`:**  
    Michael's `default_tool` is set to `"groq"`. There is **no `actions/groq.py` file** in the repository. Dispatches to Michael silently fall back to `quick_snippet` or `opencode_run`.
@@ -672,7 +672,7 @@ In `core/fleet_manager.py` lines 630–640 and 785–798:
 3. **Office Desk Coordinate Collision:**  
    Both **FLUX** and **PAM** are set to `(desk_x: 320, desk_y: 280)`. Both agent sprites sit on top of each other at the exact same desk in the Scranton Office UI.
 4. **Pam Parameter Mismatch in `dispatch_task`:**  
-   Pam's tool `extract_design_system` expects parameter `file_path` or `path` to be a URL or reference name. `fleet_manager.py:711` sets `"path": target_dir` (local folder), causing Pam to search for URLs on the local disk and fail.
+   Pam's tool `extract_design_system` expects parameter `file_path` or `path` to be a URL or reference name. `agents_manager.py:711` sets `"path": target_dir` (local folder), causing Pam to search for URLs on the local disk and fail.
 
 ---
 
@@ -687,20 +687,20 @@ In `core/fleet_manager.py` lines 630–640 and 785–798:
 | **5** | `core/undo.py:173` | `if not snapshot: return 0` rejects empty initial states | **HIGH** | Greenfield website builds have zero undo capability. |
 | **6** | `actions/antigravity_agent.py` | Gemini REST fallback hardcodes multi-file HTML/CSS | **HIGH** | Explicit requests for React or Single-File HTML are ignored if CLI fails. |
 | **7** | `actions/antigravity_agent.py` | Hard `RuntimeError` on unauthenticated CLI | **HIGH** | Bypasses REST fallback, causing immediate crash. |
-| **8** | `fleet_agents.json`<br/>`fleet_manager.py` | Engine vs Tool conflation (`antigravity_run` in `allowed_tools`) | **HIGH** | Conceptual category error; `engine: ""` is dead; agent cannot call its own runner. |
-| **9** | `/api/fleet/chat`<br/>`AgentDirectChatView` | Direct chat is pure text completion; zero tools/CLI | **CRITICAL** | Verve hallucinates building websites in direct chat, but writes zero files. |
-| **10** | `core/fleet_manager.py:650` | `allowed_skills` never injected into prompts | **HIGH** | Skills like `hamza_taste` are dead metadata for fleet agents. |
-| **11** | `core/fleet_manager.py:785` | Worktree changes discarded without merging; ID mismatch | **CRITICAL** | Destructive worktree tasks delete all agent deliverables. |
-| **12** | `config/fleet_agents.json:9` | Ghost tool `"groq"` on Michael | **MEDIUM** | `actions/groq.py` does not exist; silent fallback occurs. |
-| **13** | `config/fleet_agents.json` | String `"None"` for worktrees; desk collision at (320, 280) | **LOW** | Phantom folder teardowns; Flux and Pam overlap on desk floor. |
-| **14** | `fleet_manager.py:711` | Pam parameter mismatch (`path: target_dir` overrides URL) | **HIGH** | Design extraction fails on live URLs when dispatched through fleet. |
+| **8** | `agents.json`<br/>`agents_manager.py` | Engine vs Tool conflation (`antigravity_run` in `allowed_tools`) | **HIGH** | Conceptual category error; `engine: ""` is dead; agent cannot call its own runner. |
+| **9** | `/api/agents/chat`<br/>`AgentDirectChatView` | Direct chat is pure text completion; zero tools/CLI | **CRITICAL** | Verve hallucinates building websites in direct chat, but writes zero files. |
+| **10** | `core/agents_manager.py:650` | `allowed_skills` never injected into prompts | **HIGH** | Skills like `hamza_taste` are dead metadata for specialist agents. |
+| **11** | `core/agents_manager.py:785` | Worktree changes discarded without merging; ID mismatch | **CRITICAL** | Destructive worktree tasks delete all agent deliverables. |
+| **12** | `config/agents.json:9` | Ghost tool `"groq"` on Michael | **MEDIUM** | `actions/groq.py` does not exist; silent fallback occurs. |
+| **13** | `config/agents.json` | String `"None"` for worktrees; desk collision at (320, 280) | **LOW** | Phantom folder teardowns; Flux and Pam overlap on desk floor. |
+| **14** | `agents_manager.py:711` | Pam parameter mismatch (`path: target_dir` overrides URL) | **HIGH** | Design extraction fails on live URLs when dispatched through agents. |
 
 ---
 
-## 🛠️ Phased Fix Plan: Fleet Architecture, Skills & Engine Disentanglement
+## 🛠️ Phased Fix Plan: Agents Architecture, Skills & Engine Disentanglement
 
 ```
-           EXTENDED FLEET & SKILLS FIX ROADMAP
+           EXTENDED AGENTS & SKILLS FIX ROADMAP
  ┌──────────────────────────────────────────────────────────────┐
  │ Phase 7: Disentangle Engines vs. Tools & Schema Cleanup      │
  └──────────────────────────────┬───────────────────────────────┘
@@ -722,9 +722,9 @@ In `core/fleet_manager.py` lines 630–640 and 785–798:
 
 ### Phase 7: Disentangle Engines vs. Tools & Config Normalization
 
-**Objective:** Separate execution environments from invokable action tools and clean up `config/fleet_agents.json`.
+**Objective:** Separate execution environments from invokable action tools and clean up `config/agents.json`.
 
-#### 7.1 Normalize Agent Schema in `config/fleet_agents.json`
+#### 7.1 Normalize Agent Schema in `config/agents.json`
 1. **Populate `engine` as the Execution Runtime:**
    - For `VERVE` and `FLUX`: `"engine": "antigravity"` (maps to `core/code_engines.py`).
    - For `AHMAD`: `"engine": "opencode"`.
@@ -738,8 +738,8 @@ In `core/fleet_manager.py` lines 630–640 and 785–798:
 4. **Fix Desk Coordinate Collision:**
    - Move `PAM` to `(desk_x: 460, desk_y: 280)` to separate her from `FLUX` at `(320, 280)`.
 
-#### 7.2 Backend Dispatch Decoupling (`core/fleet_manager.py`)
-- In `FleetAgent`: Rename `default_tool` to `engine` (or maintain backward-compatible alias).
+#### 7.2 Backend Dispatch Decoupling (`core/agents_manager.py`)
+- In `AgentProfile`: Rename `default_tool` to `engine` (or maintain backward-compatible alias).
 - In `dispatch_task`: Resolve the binary runner through `core/code_engines.py::resolve_binary(agent.engine)`.
 
 ---
@@ -749,7 +749,7 @@ In `core/fleet_manager.py` lines 630–640 and 785–798:
 **Objective:** Transform website creation from hardcoded Python regexes into a declarative procedural skill that any agent can read and execute, replacing redundant skills.
 
 #### 8.1 Removal of `hamza_taste` from Agent Skills & Replacement with `website_build`
-- **In `config/fleet_agents.json`:**
+- **In `config/agents.json`:**
   - Remove `"hamza_taste"` from `allowed_skills` for `VERVE` and `FLUX`.
   - Add `"website_build"` as the single, authoritative master skill for web creation:
     ```json
@@ -871,8 +871,8 @@ Do NOT invent or hallucinate design tokens. Adopt visual foundations directly fr
 
 ---
 
-#### 8.3 Inject `allowed_skills` in `fleet_manager.py:dispatch_task`
-In `core/fleet_manager.py`:
+#### 8.3 Inject `allowed_skills` in `agents_manager.py:dispatch_task`
+In `core/agents_manager.py`:
 - Import `get_skill_registry` from `core.skill_loader`.
 - For each skill in `agent.allowed_skills`:
   Resolve its `SKILL.md` content and append it to `enriched_prompt`:
@@ -893,11 +893,11 @@ In `core/fleet_manager.py`:
 
 **Objective:** Eliminate conversational hallucinations in direct agent chat (`AgentDirectChatView.tsx`) when users ask agents to build or mutate code.
 
-#### 9.1 Task Intent Detection in `_fleet_chat_handler` (`core/ui_server.py`)
-In `core/ui_server.py::_fleet_chat_handler`:
+#### 9.1 Task Intent Detection in `_agents_chat_handler` (`core/ui_server.py`)
+In `core/ui_server.py::_agents_chat_handler`:
 1. Inspect the incoming message for actionable task verbs (`"build"`, `"create"`, `"fix"`, `"write"`, `"redesign"`, `"make"`).
 2. If the user asks an agent to execute a task:
-   - Instead of returning plain hallucinatory text, trigger `fleet_manager.dispatch_task(agent_id, prompt)` in the background.
+   - Instead of returning plain hallucinatory text, trigger `agents_manager.dispatch_task(agent_id, prompt)` in the background.
    - Reply conversationally with the real Task ID:
      `"Starting the build for you now in background! You can follow real-time progress on my desk monitor (Task ID: <id>)."`
 3. If the user is having a conceptual/factual chat:
@@ -910,7 +910,7 @@ In `core/ui_server.py::_fleet_chat_handler`:
 **Objective:** Guarantee that agent work in isolated worktrees is never lost.
 
 #### 10.1 Align Worktree ID with Task Submission
-In `core/fleet_manager.py`:
+In `core/agents_manager.py`:
 - Store the generated `worktree_name = f"{agent.id.lower()}_{task_id}"` directly in `worker_params` and link it to `submitted_id`.
 
 #### 10.2 Auto-Merge on Successful Completion
@@ -919,8 +919,8 @@ In `_worker_fn` (lines 785–798):
   Call `complete_task(agent.id, submitted_id, merge_changes=True)`.
 - `git_sandbox.merge_worktree(...)` merges the worktree branch into `main` before `safe_teardown` deletes the worktree.
 
-#### 10.3 Fix Pam Parameter Mapping in `fleet_manager.py:711`
-In `core/fleet_manager.py:711`:
+#### 10.3 Fix Pam Parameter Mapping in `agents_manager.py:711`
+In `core/agents_manager.py:711`:
 - If `effective_tool == "extract_design_system"`:
   Set `"target_file": extracted_target` and `"file_path": extracted_target` so URLs and design names reach `actions/design_extractor.py` correctly.
 

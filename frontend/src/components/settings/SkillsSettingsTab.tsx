@@ -35,7 +35,7 @@ import {
   AlertCircle,
   Check,
   Loader2,
-} from 'lucide-react'
+} from '@/lib/zezo-icons'
 
 export interface SkillItem {
   id: string
@@ -57,7 +57,7 @@ const DOMAIN_OPTIONS = [
   { value: 'coding', label: 'Coding' },
   { value: 'design', label: 'Design' },
   { value: 'research', label: 'Research' },
-  { value: 'orchestration', label: 'Fleet & Orchestration' },
+  { value: 'orchestration', label: 'Agent & Orchestration' },
   { value: 'system', label: 'System' },
   { value: 'media', label: 'Media & Office' },
 ]
@@ -383,7 +383,7 @@ export const SkillsSettingsTab: React.FC = () => {
             { id: 'design', label: 'Design', icon: Palette },
             { id: 'coding', label: 'Coding', icon: Code2 },
             { id: 'research', label: 'Research', icon: Globe },
-            { id: 'orchestration', label: 'Fleet', icon: Bot },
+            { id: 'orchestration', label: 'Agent', icon: Bot },
             { id: 'system', label: 'System', icon: Cpu },
             { id: 'media', label: 'Media', icon: FileCode },
           ].map((cat) => {

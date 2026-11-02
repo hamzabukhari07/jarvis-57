@@ -2,9 +2,9 @@
 
 > **Project:** ZEZO  
 > **Lead Architect & Creator:** Hamza Bukhari  
-> **Target Subsystems:** `actions/antigravity_agent.py`, `actions/opencode_agent.py`, `actions/kilo_agent.py`, `core/design_resolver.py`, `core/fleet_manager.py`  
+> **Target Subsystems:** `actions/antigravity_agent.py`, `actions/opencode_agent.py`, `actions/kilo_agent.py`, `core/design_resolver.py`, `core/agents_manager.py`  
 > **Status:** APPROVED FOR IMPLEMENTATION  
-> **Core Mandate:** Transition ZEZO from over-engineered heuristic prompt wrapping to a clean, transparent, and direct CLI pass-through orchestrator (`agy`, `opencode`, `kilo`) while strictly preserving Windows OS stability, Fleet invariants, and curated human design templates.
+> **Core Mandate:** Transition ZEZO from over-engineered heuristic prompt wrapping to a clean, transparent, and direct CLI pass-through orchestrator (`agy`, `opencode`, `kilo`) while strictly preserving Windows OS stability, Agents invariants, and curated human design templates.
 
 ---
 
@@ -16,7 +16,7 @@ ZEZO acts as a high-speed, direct pass-through orchestrator.
 
 ```mermaid
 flowchart TD
-    subgraph User["👤 User / Fleet Request"]
+    subgraph User["👤 User / Agents Request"]
         A["User Task Prompt\n('Build a full stack FastAPI app...' OR 'Build a portfolio...')"]
     end
 
@@ -76,10 +76,10 @@ A multi-agent audit across the codebase revealed 5 critical invariants that a na
 - On Windows, this starves the PortAudio microphone/speaker threads and asyncio loop, dropping the Gemini Live WebSocket real-time voice connection.
 - **Solution:** Keep lightweight OS kernel governance: `subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS` and kernel CPU affinity leaving at least 2 cores free for the live voice loop.
 
-### 4. Fleet System Invariant (`run_in_place`)
-- When Autonomous Office fleet agents (Verve, Ahmad, Michael) dispatch coding tasks, they already run inside background worker threads.
+### 4. Agent System Invariant (`run_in_place`)
+- When Autonomous Office specialist agents (Verve, Ahmad, Michael) dispatch coding tasks, they already run inside background worker threads.
 - `run_in_place=True` tells the tool action to execute synchronously under the existing `task_ctx`.
-- If stripped, the action spawns a duplicate "phantom" task card, returns prematurely, and causes the fleet system to tear down the Git sandbox worktree while the CLI is still running!
+- If stripped, the action spawns a duplicate "phantom" task card, returns prematurely, and causes the agent system to tear down the Git sandbox worktree while the CLI is still running!
 - **Solution:** Preserve `run_in_place` and `task_ctx` forwarding across all three actions.
 
 ### 5. UI Streaming, Cancellation, and Undo
@@ -158,9 +158,9 @@ A multi-agent audit across the codebase revealed 5 critical invariants that a na
 
 ---
 
-## 🤖 5. How Zezo & Autonomous Office Fleet Agents Manage CLIs as Dedicated Tools
+## 🤖 5. How Zezo & Autonomous Office Specialist Agents Manage CLIs as Dedicated Tools
 
-Under this architecture, Zezo and the Autonomous Office fleet manage the CLI engines (`agy`, `opencode`, `kilo`) as **pure, dedicated action tools** rather than heavy wrappers:
+Under this architecture, Zezo and the Autonomous Office agents manage the CLI engines (`agy`, `opencode`, `kilo`) as **pure, dedicated action tools** rather than heavy wrappers:
 
 ### 5.1 Zezo Direct Invocation (Voice Assistant / Live HUD)
 1. **User Voice Prompt:** User commands Zezo: *"Build a Python FastAPI CRUD API for books in Desktop/fastapi-books"*.
@@ -181,8 +181,8 @@ Under this architecture, Zezo and the Autonomous Office fleet manage the CLI eng
    with `cwd=Desktop/fastapi-books`. Zero prompt mangling, zero unsolicited frontend templates injected.
 4. **Result Reporting:** The CLI outputs deliverables directly to disk. Zezo reads stdout progress, registers a repo undo snapshot, and gives a 1-sentence voice update.
 
-### 5.2 Autonomous Office Fleet Agents Invocation
-Each fleet agent in the Autonomous Office operates with a specialized role and an assigned default coding engine:
+### 5.2 Autonomous Office Specialist Agents Invocation
+Each specialist agent in the Autonomous Office operates with a specialized role and an assigned default coding engine:
 
 * **Michael (Lead Software Architect & Tech Lead):**
   - **Role:** Structural architecture, task breakdown, and technical oversight.
@@ -197,7 +197,7 @@ Each fleet agent in the Autonomous Office operates with a specialized role and a
   - **Assigned Engine:** `kilo_run` (Kilo Code CLI).
   - **Flow:** Handles rapid code mutations, chunk refactoring, and quick bug fixes directly via Kilo CLI.
 
-### 5.3 Step-by-Step Fleet Execution Lifecycle
+### 5.3 Step-by-Step Agents Execution Lifecycle
 ```
 [User / Michael Assigns Task to Agent (e.g. Ahmad)]
                      │
@@ -241,12 +241,12 @@ python -m py_compile actions/antigravity_agent.py actions/opencode_agent.py acti
 3. **Windows CLI Buffer Safety Test:**
    - Submit a 6,000-character detailed prompt.
    - Assert: Handled safely via `TASK_SPEC.md`, process launches without `[WinError 206]`.
-4. **Fleet & Cancellation Test:**
+4. **Agents & Cancellation Test:**
    - Dispatch task with `run_in_place=True`. Assert no duplicate task cards.
    - Issue cancellation mid-run. Assert process terminates cleanly.
 
 ### Layer 3: Regression Test Suite
 ```bash
-pytest tests/test_skill_hub_suite.py tests/test_design_system_suite.py tests/test_fleet_control_suite.py tests/test_code_engines_phase1.py
+pytest tests/test_skill_hub_suite.py tests/test_design_system_suite.py tests/test_agents_control_suite.py tests/test_code_engines_phase1.py
 ```
 - Verify all existing regression test suites pass with 100% success.

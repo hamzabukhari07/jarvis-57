@@ -2,7 +2,7 @@
 
 > **Creator & Lead Architect:** Hamza Bukhari  
 > **System Component:** Modern Single-Page Tactical Interface & Autonomous Office Deck  
-> **Frontend Stack:** React 18 / 19, Vite, Tailwind CSS v4, ReUI Component System, Assistant-UI  
+> **Frontend Stack:** React 18 / 19, Vite, Tailwind CSS v4, ReUI Component System, Assistant-UI, Hugeicons free Stroke Rounded
 > **Backend Integration:** FastAPI WebSocket Server (`core/ui_server.py`), REST API (`/api/*`), Live Gemini Streaming (`main.py`)  
 
 ---
@@ -14,6 +14,7 @@ The ZEZO frontend is a high-performance, dark cyberpunk single-page application 
 ### Core Technology Stack:
 - **Framework:** React 18/19 with Vite bundler (`@vitejs/plugin-react`).
 - **Design System:** ReUI (`components/reui/*`) providing high-contrast tactical frames, cards, badges, callouts, and confirm dialogs.
+- **Icons:** Free Hugeicons Stroke Rounded via `@hugeicons/react` and `@hugeicons/core-free-icons`; `src/lib/zezo-icons.tsx` resolves the app's semantic icon aliases to verified free exports. No Pro icon package is used.
 - **Styling:** Tailwind CSS v4 (`@tailwindcss/vite`) with strict semantic tokens (`--background`, `--foreground`, `--primary`, `--border`, etc.).
 - **Conversational UI:** Assistant-UI (`@assistant-ui/react`, `@assistant-ui/react-markdown`) powering the streaming chat thread, reasoning collapse, and tool execution cards.
 - **3D & Visualizations:** Three.js (`three`), 3D Force Graph (`3d-force-graph`, `react-force-graph-3d`), Qivi holographic point-cloud avatar (`qivi-react`), and Blobatar (`blobatar/react`).
@@ -49,43 +50,43 @@ The root `App.tsx` controls global telemetry, active modals, WebSocket streaming
 ### 1. Left Power Sidebar (`w-56`)
 - **Primary Navigation**: A sidebar toggle collapses the `w-56` sidebar to an icon-only `w-16` rail; icon tooltips retain access to every control. The workspace utility buttons have extra vertical separation. Navigation seamlessly toggles the root operational view:
   - `HOME` (`activeTab === 'tactical'`): Enters the primary conversational / voice workspace.
-  - `AGENTS` (`activeTab === 'office'`): Scranton Office 2D pixel desk simulation.
+  - `AGENTS`: Disclosure control only; expands `Manage Agents` and `Chat Space`. Selecting a submenu destination changes the workspace view.
   - `WORKFLOW` (`activeTab === 'workflow'`): Node-based agent pipeline execution builder.
-- **Workspace Utilities**: Settings, theme toggle, and round menu button share one footer row in that order. The menu button switches from a menu icon to a close icon while its compact popup is open; the popup lists Tasks, Logs, and Remote.
+- **Workspace Utilities**: Settings, theme toggle, and round menu button share one footer row when expanded; in the collapsed rail they stack vertically to stay within its width. The menu button switches from a menu icon to a close icon while its compact popup is open; the popup lists Tasks, Logs, and Remote.
 - **Footer**: `SettingsModal` trigger, workspace menu, theme mode switcher (`light` / `dark`), and connection health status indicator.
 
 ### 2. Top Header (`h-12`)
 - **System Readiness**: Ambient pulsing status beacon (`● Ready`).
 - **Interactive Session Dropdown**: Breadcrumb navigation (`Chat / "Active Session" ▾`) opens a bounded session picker with a fixed header and New action, title search, and a scrollable saved-chat list with an empty-search state.
-- **Segmented Operational Mode Pill**: Smoothly toggles between `[ 💬 Chat | 🎙️ Live ]` modes.
+- **Segmented Operational Mode Pill**: Smoothly toggles between `[ 💬 Chat | 🎙️ Live ]` modes, using the same primary/foreground selection colors for either active mode.
 - **Action Button**: `+ New chat` to reset thread state and initiate a clean conversation.
 
 ### 3. Dual-Mode Adaptive Canvas
-- **Chat Mode (`operationalMode === 'chat'`)**: Distraction-free conversational view powered by `@assistant-ui/react`. Features auto-scrolling message bubbles, markdown code rendering, file attachment chips, and Web Speech API voice dictation directly into the pill composer without triggering speech synthesis.
-- **Live Voice Mode (`operationalMode === 'live'`)**: Frame-free companion interface centered on the 3D WebGL point-cloud avatar (`QiviAvatarVisualizer`) with a gradient that responds to the stronger of microphone input and assistant playback levels. A single subtitle slot switches between user and ZEZO transcripts, using different text colors instead of speaker labels; it remains empty when nobody is speaking, and completed ZEZO captions fade away after a short pause. Four controls (`MUTE`, `SPEAKER`, `STOP`, `OFF`) live in a circular menu that expands into a horizontal control bar.
+- **Chat Mode (`operationalMode === 'chat'`)**: Distraction-free conversational view powered by `@assistant-ui/react`. Features auto-scrolling message bubbles, markdown code rendering, file attachment chips, and Web Speech API voice dictation directly into the shared `ZezoPillComposer` without triggering speech synthesis. Agents Chat Space reuses the same `ZezoChatThread` composer.
+- **Live Voice Mode (`operationalMode === 'live'`)**: Frame-free companion interface centered on the 3D WebGL point-cloud avatar (`QiviAvatarVisualizer`) with a gradient that responds to the stronger of microphone input and assistant playback levels. A single subtitle slot switches between user and ZEZO transcripts, using different text colors instead of speaker labels; it remains empty when nobody is speaking, and completed ZEZO captions fade away after a short pause. Four controls (`MUTE`, `SPEAKER`, `STOP`, `OFF`) live in a circular menu that expands into a horizontal control bar with a transparent, borderless outer frame.
 
 ---
 
 ## 🧩 3. Key Component Directory & Specifications
 
-### 3.1. Autonomous Scranton Office (`AutonomousOfficeScreen.tsx`)
+### 3.1. Agent Management (`AutonomousOfficeScreen.tsx`)
 - **Path:** `frontend/src/components/office/AutonomousOfficeScreen.tsx`
-- **Purpose:** Full-featured 2D pixel desk simulation representing the autonomous fleet in their physical workspace layout.
+- **Purpose:** Searchable agent table with dedicated Edit, Chat, Files, and Logs views.
 - **Key Capabilities:**
-  - **Workstation Matrix:** 18 workstation slots (`WORKSTATION_SLOTS`) positioned on precise percentage coordinates (Michael, Ali, Haider, Ahmad, Dwight, Pam, Kelly, Quantum, DevDynamo, DataEinstein, Annex desks).
-  - **Sprite & Monitor Telemetry:** Real-time agent status states (`idle`, `working`, `thinking`, `speaking`, `offline`) reflected through avatar motion, desk monitor glow, and speech bubbles.
-  - **Agent Soul Editor:** Inspect and modify individual agent `SOUL.md` persona files directly in the HUD with persistent saving via `/api/fleet/save_soul`.
+  - **Roster:** Search and filter agents by status, inspect short profiles, and open Edit, Chat, Files, Logs, or Delete actions.
+  - **Agent Settings:** Configure identity, instructions, workspace, engine/model, risk tier, skills, and tools; persona files are managed in the Files tab.
+  - **Direct Chat:** Configure engine/model and workspace folder for each agent conversation.
   - **Task Dispatch:** Assign tasks to isolated Git worktrees with safety tier verification (`L0_READ_ONLY`, `L1_MUTATION`, `L2_DESTRUCTIVE`).
-  - **Zero Fake Simulation:** Renders purely from live WebSocket fleet events (`agent_task_started`, `task_progress`, `task_done`, `fleet_updated`).
+  - **Live State:** Refresh agent status from the backend and `agents_updated` WebSocket event.
 
 ### 3.2. Agent Direct 1-on-1 Chat (`AgentDirectChatView.tsx`)
 - **Path:** `frontend/src/components/office/AgentDirectChatView.tsx`
-- **Purpose:** Isolated, direct conversational thread with a specific fleet agent.
+- **Purpose:** Isolated, direct conversational thread with a specific agent.
 - **Key Capabilities:**
   - **Context Isolation:** Conversations are scoped to the selected specialist agent without polluting the main live voice pipeline context.
   - **Thread Persistence:** Chat threads are stored locally per agent (`zezo_agent_threads_<agent_id>`), allowing multi-session history tracking.
   - **Model & Engine Overrides:** Direct selection of coding engines and LLM models for the specific conversation.
-  - **Seamless Floor Navigation:** Toggle between the wide office floor view and deep direct chat.
+  - **Workspace Navigation:** Return to the Agents table from the dedicated chat view.
 
 ### 3.3. 3D Memory Knowledge Graph (`MemoryGraphCanvas.tsx`)
 - **Path:** `frontend/src/components/memory/MemoryGraphCanvas.tsx`

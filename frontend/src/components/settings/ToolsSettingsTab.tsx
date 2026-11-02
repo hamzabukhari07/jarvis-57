@@ -31,7 +31,7 @@ import {
   Layers,
   Monitor,
   Radio,
-} from 'lucide-react'
+} from '@/lib/zezo-icons'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/utils'
 

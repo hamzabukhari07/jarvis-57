@@ -19,7 +19,7 @@ The subsystem guarantees that tasks are never dispatched to missing or unauthent
 
 ```mermaid
 flowchart TD
-    A["Voice Prompt or UI Trigger"] --> B["Action / Fleet Agent Dispatch"]
+    A["Voice Prompt or UI Trigger"] --> B["Action / Agent Dispatch"]
     B --> C["Code Engines Registry (core/code_engines.py)"]
     C --> D{"Cached in _CACHE?<br/>(TTL < 300s)"}
     D -- "Hit" --> E["Return Cached EngineStatus"]

@@ -107,7 +107,7 @@ Configured in `core/models.py`, the official Antigravity CLI (`actions/antigravi
 - `gemini-3.8-flash-low` — Low-latency tier for simple scripts.
 - **Cross-Provider Fallbacks:** `claude-sonnet-4-6`, `claude-opus-4-6-thinking`, and `gpt-oss-120b-medium`.
 
-### 2. Autonomous Agent Fleet Delegation
+### 2. Autonomous Agent Delegation
 - **OpenCode Agent (`actions/opencode_agent.py`):** OpenCode implementation engine for autonomous multi-file generation with full test suite verification.
 - **Kilo Code Agent (`actions/kilo_agent.py`):** Fast multi-file refactoring agent supporting StepFun and Gemini free tiers.
 - **Quick Snippet Engine (`actions/quick_snippet.py`):** 1-second inline code snippet generator and silent background terminal executor.

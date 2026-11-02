@@ -181,7 +181,7 @@ Ed25519-signed; public key pinned inside the compiled binary; private key lives 
 {
   "sub": "lic_9f2c...",
   "plan": "pro",
-  "entitlements": ["voice", "automation", "fleet"],
+  "entitlements": ["voice", "automation", "agents"],
   "seats": 2,
   "machine_id": "a91c...",
   "iat": 1760000000,

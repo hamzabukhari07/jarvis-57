@@ -7,7 +7,7 @@
 
 ## Overview
 
-ZEZO manages Gemini Live sessions with support for resumption, reconnection, and context compression. Sessions can last for hours thanks to sliding-window compression. In addition, ZEZO supports composite session IDs for autonomous fleet agent lineages and peer delegations.
+ZEZO manages Gemini Live sessions with support for resumption, reconnection, and context compression. Sessions can last for hours thanks to sliding-window compression. In addition, ZEZO supports composite session IDs for autonomous agent lineages and peer delegations.
 
 ---
 
@@ -45,17 +45,17 @@ session = await asyncio.wait_for(cm.__aenter__(), 30)
 
 ---
 
-## Composite Session IDs & Fleet Lineage
+## Composite Session IDs & agents Lineage
 
 In ZEZO's multi-agent architecture, sessions operate on two levels:
 
 1. **Core Voice Session**: Managed directly via `genai.Client.aio.live.connect()`, streaming bidirectional PCM audio with Gemini Live.
-2. **Composite Agent & Task Sessions**: Specialist fleet agents (e.g. Verve, Flux, Ahmad, Michael) and background execution tasks use composite session IDs structured as:
+2. **Composite Agent & Task Sessions**: Specialist agents (e.g. Verve, Flux, Ahmad, Michael) and background execution tasks use composite session IDs structured as:
    ```
    <agent_id>:<session_uuid>
    ```
    - **Agent Thread Isolation:** Stored and tracked per agent (`zezo_agent_threads_<agent_id>`), guaranteeing isolated multi-turn context without memory contamination between agents.
-   - **Autonomous P2P Peer Sessions:** When agents hand off tasks via `fleet_control(action='peer_chat')`, `core.fleet_manager.generate_peer_session_id()` generates deterministic lineage tokens:
+   - **Autonomous P2P Peer Sessions:** When agents hand off tasks via `agents_control(action='peer_chat')`, `core.agents_manager.generate_peer_session_id()` generates deterministic lineage tokens:
      ```
      peer:<from_agent>-><to_agent>:<timestamp>
      ```

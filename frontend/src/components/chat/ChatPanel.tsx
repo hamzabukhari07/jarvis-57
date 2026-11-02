@@ -7,7 +7,7 @@ import {
  Sparkles,
  Paperclip,
  Code2
-} from 'lucide-react'
+} from '@/lib/zezo-icons'
 import { ChatAvatarIcon } from '../avatar/ChatAvatarIcon'
 import type { ChatMessage, AgentProfile } from '../../types/zezo'
 
@@ -86,7 +86,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
  <div>
  <p className="text-sm font-semibold text-[#e4e0d8]">Autonomous Assistant Ready</p>
  <p className="text-xs text-[#9a948a] max-w-sm mt-1">
- Ask {currentAgent?.displayName || 'ZEZO'} to analyze code, refactor components, trigger fleet agents, or control desktop settings.
+ Ask {currentAgent?.displayName || 'ZEZO'} to analyze code, refactor components, delegate work to agents, or control desktop settings.
  </p>
  </div>
  </div>

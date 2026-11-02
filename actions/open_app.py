@@ -857,14 +857,14 @@ def open_app(
         else:
             return "No application name provided."
 
-    # ── Scranton Agent Office Screen Voice Navigation (Full Main Screen) ──
-    if clean_token in ("officeview", "officefloor", "agentview", "agentsview", "agentviews", "fleet", "fleetdeck", "fleetview", "scrantonoffice", "scranton", "agents", "office"):
+    # ── Agents Screen Voice Navigation ──
+    if clean_token in ("officeview", "agentview", "agentsview", "agents", "agentsdeck", "office"):
         if action in ("close", "exit", "stop", "hide", "back"):
             try:
                 from core.ui_server import get_ui_server
                 get_ui_server().broadcast("switch_view", {"view": "home"})
                 if player:
-                    player.write_log("[open_app] Closed Scranton Agent Office Floor and returned to Tactical Dashboard")
+                    player.write_log("[open_app] Closed Agents screen and returned to Tactical Dashboard")
                 return "Closed office view and returned to Tactical Dashboard."
             except Exception as e:
                 return f"Failed to switch to dashboard: {e}"
@@ -873,8 +873,8 @@ def open_app(
             from core.ui_server import get_ui_server
             get_ui_server().broadcast("switch_view", {"view": "office"})
             if player:
-                player.write_log("[open_app] Switched to Scranton Agent Office Floor screen")
-            return "Switched display to Scranton Agent Office Floor screen."
+                    player.write_log("[open_app] Switched to Agents screen")
+            return "Switched display to Agents screen."
         except Exception as e:
             return f"Failed to switch to office view: {e}"
 

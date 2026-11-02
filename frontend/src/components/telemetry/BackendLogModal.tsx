@@ -26,7 +26,7 @@ import {
  Check,
  Search,
  X,
-} from 'lucide-react'
+} from '@/lib/zezo-icons'
 import type { LogEntry } from '../../hooks/useZezoSocket'
 
 interface BackendLogModalProps {

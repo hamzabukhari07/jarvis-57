@@ -107,7 +107,7 @@ flowchart TD
 ## 🏛️ The 3 Core Skills Standard
 
 ZEZO standardizes on 3 production core skills, all unified under the declarative two-phase architecture and standardized `agent_directive_section: "Agent Directive"` contract:
-1. **`website_build` (`skills/website_build/`)**: Greenfield UI creation protocol with catalog-driven references, anti-slop quality gates, live preview servers, and authoritative taste prompts in `## 🤖 Agent Directive` (Scenario 1: Portfolio, Scenario 2: SaaS Landing Page, Scenario 3: CloudFleet Analytics Dashboard, embedding 6 negative rejection gates and 4 visual authority guards).
+1. **`website_build` (`skills/website_build/`)**: Greenfield UI creation protocol with catalog-driven references, anti-slop quality gates, live preview servers, and authoritative taste prompts in `## 🤖 Agent Directive` (Scenario 1: Portfolio, Scenario 2: SaaS Landing Page, Scenario 3: CloudAgent Analytics Dashboard, embedding 6 negative rejection gates and 4 visual authority guards).
 2. **`website_clone` (`skills/website_clone/`)**: High-fidelity offline website capture, asset localization, and reverse-engineering rebuilds via the Uncage Ingestion Engine and autonomous coding agents, featuring Phase 1 Uncage CLI ingestion (`pre_flight_action: "uncage_capture"`), physical verification gates, and Phase 2 Master System Directives (Scenario A: Single-File Raw HTML, Scenario B: Clean Modular React/Next.js Framework).
 3. **`generate_design_md` (`skills/generate_design_md/`)**: Studio design token extraction and canonical specification generator (`DESIGN.md` & `preview.html`) via Scrapling pre-flight ingestion (`pre_flight_action: "scrapling_extract"`), featuring Scenario A (Live URL Mode via pre-flight ingested assets) and Scenario B (Local Codebase / Workspace Mode).
 
@@ -217,7 +217,7 @@ Procedural declarative skills (`SKILL.md`) are executed by the **Dual-AI Skill R
   - **Stateful Fallback**: Maintains a live ledger of `completed_steps = []`. If Groq encounters HTTP 429 rate limits or network drops, it immediately hands over to Gemini (`gemini-3.8-flash`) with full execution history so the remaining steps resume without repeating step 1.
 - **Output Truncation & Memory Guard**: Large tool returns are truncated and summarized to a maximum of 1500 characters to safeguard the context window.
 - **Task Telemetry**: Reports step-by-step progress to `TaskManager` (`task_manager.report(progress=..., message=...)`).
-- **Fleet Delegation Routing**: If a skill specifies or requires autonomous fleet execution, `actions/run_skill.py` dispatches to `FleetDispatcher.dispatch_task()` while local execution runs in a non-blocking background thread.
+- **Agent Delegation Routing**: If a skill specifies or requires agent execution, `actions/run_skill.py` dispatches to `AgentDispatcher.dispatch_task()` while local execution runs in a non-blocking background thread.
 
 ---
 

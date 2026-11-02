@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, ChevronDown } from "lucide-react";
+import { CheckCircle2, ChevronDown } from "@/lib/zezo-icons";
 import { cn } from "@/lib/utils";
 
 export interface TurnProcessPillProps {

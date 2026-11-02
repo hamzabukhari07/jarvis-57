@@ -1680,33 +1680,33 @@ class ZezoLive:
             "language_directive": lang_dir,
         })
 
-        # Format active registered fleet roster so model only delegates to live agents
-        fleet_ctx = ""
+        # Format active agent roster so model only delegates to live agents
+        agents_ctx = ""
         try:
-            from core.fleet_manager import fleet_manager
-            active_agents = fleet_manager.get_all_agents()
+            from core.agents_manager import agent_manager
+            active_agents = agent_manager.get_all_agents()
             if active_agents:
                 roster_lines = [
                     f"- {a.id} ({a.name}): {a.role} [Engine/Tool: {a.default_tool or a.engine or 'opencode_run'}, Skills: {', '.join(a.allowed_skills or [])}]"
                     for a in active_agents
                 ]
-                fleet_ctx = (
-                    "[ACTIVE AUTONOMOUS FLEET ROSTER]\n"
+                agents_ctx = (
+                    "[ACTIVE AGENTS]\n"
                     "The currently registered, active specialist agents on the office deck are:\n"
                     + "\n".join(roster_lines) + "\n"
-                    "ACTION-FIRST FLEET INVARIANTS:\n"
-                    "- When delegating or dispatching tasks to the fleet (via fleet_control), "
+                    "AGENT DELEGATION RULES:\n"
+                    "- When delegating or dispatching tasks to agents (via agents_control), "
                     "ONLY assign work to agents currently listed above. Never guess, invent, or use decommissioned agents.\n"
                     "- ZERO VERBAL SIMULATION: You have NO ability to assign, dispatch, or reassign tasks by speaking alone. "
-                    "You MUST call fleet_control(action='dispatch', ...) in the exact same turn. "
+                    "You MUST call agents_control(action='dispatch', ...) in the exact same turn. "
                     "NEVER say 'Assigning...', 'Working on it...', or 'I\'ve dispatched...' unless a tool call was executed.\n"
                     "- UNNAMED REASSIGNMENT: If the user says an agent is not working or asks to assign to 'someone else' "
                     "('kisi or ko task assign kr de', 'switch agent'), dynamically pick an alternative active specialist "
-                    "sharing the required skill/capabilities from the active roster above and immediately invoke fleet_control(action='dispatch', agent_id=..., task=..., confirmed=true).\n"
+                    "sharing the required skill/capabilities from the active roster above and immediately invoke agents_control(action='dispatch', agent_id=..., task=..., confirmed=true).\n"
                     "- If user says task is not showing, NEVER claim 'display lag'. Immediately verify via task_status or dispatch.\n\n"
                 )
         except Exception as e:
-            logger.debug("[FleetManager] Fleet context formatting skipped: %s", e)
+            logger.debug("[AgentManager] Agent context formatting skipped: %s", e)
 
         # Workspace awareness injection
         from core.repo_context import get_last_repo
@@ -1796,8 +1796,8 @@ class ZezoLive:
             parts.append(intent_ctx)
         if history_ctx:
             parts.append(history_ctx)
-        if fleet_ctx:
-            parts.append(fleet_ctx)
+        if agents_ctx:
+            parts.append(agents_ctx)
         if mem_str:
             parts.append(mem_str)
         skills_str = self._skill_registry.format_prompt_block()

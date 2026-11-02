@@ -27,9 +27,9 @@ flowchart TD
         Server <-->|IPC Telemetry & Actions| ReactHUD
     end
 
-    subgraph AutonomousFleet["Multi-Agent Fleet & Tools"]
+    subgraph AutonomousAgent["Agents & Tools"]
         ZezoLive -->|Function Calling| Tools["actions/*.py (33 Tools)"]
-        Tools --> Fleet["Fleet Agents (Verve, Flux, Ahmad)"]
+        Tools --> agents["Agents (Verve, Flux, Ahmad)"]
         Tools --> CodeEngines["Code Engines (Antigravity CLI, OpenCode, Kilo)"]
         Tools --> Teardown["REA Teardown Engine (rea-agents@6.7.0)"]
         Tools --> ComputerPerception["3-Tier Perception (UIA / RapidOCR / Vision)"]
@@ -61,7 +61,7 @@ flowchart TD
         useZezoSocket <-->|ws://127.0.0.1:8765/ws| UIServer
 
         App --> Office["AutonomousOfficeScreen.tsx (2D Pixel Desks)"]
-        App --> DirectChat["AgentDirectChatView.tsx (1-on-1 Fleet Chat)"]
+        App --> DirectChat["AgentDirectChatView.tsx (1-on-1 agents Chat)"]
         App --> MemoryCanvas["MemoryGraphCanvas.tsx (3D Force Knowledge Graph)"]
         App --> ChatThread["ZezoChatThread.tsx (Assistant-UI Primitives)"]
         App --> TaskModal["TaskManagerModal.tsx (Task Tree & Logs)"]
@@ -223,23 +223,23 @@ sequenceDiagram
 
 ---
 
-## 9. Autonomous Fleet Coordination & Workspace Isolation
+## 9. Autonomous agents Coordination & Workspace Isolation
 
 ```mermaid
 flowchart TD
-    ZezoCommander["ZEZO Primary Orchestrator (main.py)"] -->|fleet_control action| FleetMgr["core/fleet_manager.py"]
+    ZezoCommander["ZEZO Primary Orchestrator (main.py)"] -->|agents_control action| AgentMgr["core/agents_manager.py"]
     
-    subgraph FleetRoster["Autonomous Specialist Roster"]
+    subgraph AgentsRoster["Autonomous Specialist Roster"]
         Verve["Verve (Lead Frontend Architect)"]
         Flux["Flux (Backend & Database Engineer)"]
         Ahmad["Ahmad (DevOps & Deployment Specialist)"]
         Michael["Michael (Security & Code Reviewer)"]
     end
 
-    FleetMgr -->|Dispatch Task| Verve
-    FleetMgr -->|Dispatch Task| Flux
-    FleetMgr -->|Dispatch Task| Ahmad
-    FleetMgr -->|Dispatch Task| Michael
+    AgentMgr -->|Dispatch Task| Verve
+    AgentMgr -->|Dispatch Task| Flux
+    AgentMgr -->|Dispatch Task| Ahmad
+    AgentMgr -->|Dispatch Task| Michael
 
     subgraph Sandboxes["Git Worktree Workspace Isolation"]
         Verve --> Worktree1[".git-worktrees/workspace_verve/"]
@@ -247,8 +247,8 @@ flowchart TD
         Ahmad --> Worktree3[".git-worktrees/workspace_ahmad/"]
     end
 
-    FleetMgr --> Lineage["Composite Session ID: peer:<from>-><to>:<timestamp>"]
-    FleetMgr --> Telemetry["Broadcast desk status to AutonomousOfficeScreen.tsx"]
+    AgentMgr --> Lineage["Composite Session ID: peer:<from>-><to>:<timestamp>"]
+    AgentMgr --> Telemetry["Broadcast desk status to AutonomousOfficeScreen.tsx"]
 ```
 
 ---
@@ -265,4 +265,4 @@ flowchart TD
 | **6** | Task Completion Watcher | `main.py:2940`, `core/task_manager.py` |
 | **7** | 3-Tier Memory | `long_term.json`, `sqlite_memory.py`, `vault_engine.py` |
 | **8** | Cloudflare Mobile Tunnel | `tunnel_manager.py`, `MobileRemoteModal.tsx`, `cloudflared` |
-| **9** | Multi-Agent Fleet | `fleet_manager.py`, `fleet_control.py`, `git_sandbox.py` |
+| **9** | Agent coordination | `agents_manager.py`, `agents_control.py`, `git_sandbox.py` |

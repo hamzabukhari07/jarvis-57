@@ -27,12 +27,12 @@ ZEZO/
 │   ├── teardown_engine.py           # REA Teardown Engine via rea-agents@6.7.0 CLI
 │   ├── tunnel_manager.py            # Cloudflare Quick Tunnel daemon manager
 │   ├── action_loader.py             # Dynamic action discoverer & registry (33 actions)
-│   ├── fleet/                       # Modular Fleet Management subsystem
-│   │   ├── __init__.py              # Subsystem exports (FleetAgent, FleetRegistry, FleetDispatcher, FleetOrchestrator)
-│   │   ├── registry.py              # FleetRegistry: Storage, CRUD, desk coordinates, JSON persistence
-│   │   ├── dispatcher.py            # FleetDispatcher: Sandboxing, skill injection, task dispatch, telemetry
-│   │   └── orchestrator.py          # FleetOrchestrator: Multi-agent decomposition, peer delegation, Git worktrees
-│   ├── fleet_manager.py             # Backward-compatible Facade uniting registry, dispatcher & orchestrator
+│   ├── agents/                       # Modular Agent Management subsystem
+│   │   ├── __init__.py              # Subsystem exports (AgentProfile, AgentRegistry, AgentDispatcher, AgentOrchestrator)
+│   │   ├── registry.py              # AgentRegistry: Storage, CRUD, desk coordinates, JSON persistence
+│   │   ├── dispatcher.py            # AgentDispatcher: Sandboxing, skill injection, task dispatch, telemetry
+│   │   └── orchestrator.py          # AgentOrchestrator: Multi-agent decomposition, peer delegation, Git worktrees
+│   ├── agent_manager.py             # Backward-compatible Facade uniting registry, dispatcher & orchestrator
 │   ├── antigravity_runner.py        # Antigravity CLI worker engine, Windows Job throttling, snapshot diffs
 │   ├── plugin_loader.py             # Plugin discoverer & execution sandbox
 │   ├── skill_loader.py              # Declarative skill registry (`skills/<name>/SKILL.md`)
@@ -46,7 +46,7 @@ ZEZO/
 │   ├── wake_word.py                 # Offline openwakeword detection engine
 │   ├── viseme.py                    # Real-time phoneme-to-viseme mouth shape engine
 │   ├── loop_gates.py                # Loop iteration guards & tool execution quotas
-│   ├── git_sandbox.py               # Isolated Git worktree sandboxing for fleet agents
+│   ├── git_sandbox.py               # Isolated Git worktree sandboxing for agents
 │   ├── repo_context.py              # Active workspace resolver & desktop project tracker
 │   ├── design_resolver.py           # Blueprint injector & adaptive design resolver
 │   ├── undo.py                      # Undo stack & contextual GUI undo dispatcher
@@ -71,7 +71,7 @@ ZEZO/
 │   ├── desktop.py                   # Desktop workspace & active window controller
 │   ├── file_controller.py           # Filesystem mutations, directory navigation, safe trash
 │   ├── file_processor.py            # Rich document ingestion (PDF, DOCX, XLSX, PPTX, CSV)
-│   ├── fleet_control.py             # Autonomous multi-agent fleet orchestrator
+│   ├── agents_control.py             # Autonomous agent coordinator
 │   ├── flight_finder.py             # Flight schedule & price aggregator
 │   ├── game_updater.py              # Gaming platform updates & launcher
 │   ├── kilo_agent.py                # Kilo terminal coding engine wrapper
@@ -102,8 +102,8 @@ ZEZO/
 │       ├── hooks/useZezoSocket.ts   # WebSocket client with auto-reconnect & packet dispatcher
 │       ├── lib/api.ts               # REST API fetch client (/api/settings, /api/tasks, etc.)
 │       └── components/
-│           ├── office/              # Scranton Autonomous Office Screen
-│           │   ├── AutonomousOfficeScreen.tsx  # 2D pixel desk grid, sprite rendering, monitor telemetry
+│           ├── office/              # Agent management screens
+│           │   ├── AutonomousOfficeScreen.tsx  # Agents table, workspace tabs, and logs routing
 │           │   └── AgentDirectChatView.tsx     # 1-on-1 isolated context chat thread per agent
 │           ├── memory/              # Knowledge Graph & Vault Visualization
 │           │   ├── MemoryGraphCanvas.tsx       # 3D Force-Directed Knowledge Graph (Three.js)
@@ -129,8 +129,8 @@ ZEZO/
 │           │   ├── SettingsModal.tsx           # 9-tab settings modal dialog
 │           │   ├── CodeEnginesSettingsTab.tsx  # Antigravity/OpenCode/Kilo status & configuration
 │           │   └── SkillsSettingsTab.tsx       # Declarative skills viewer & editor
-│           ├── fleet/               # Multi-Agent Management & Roster
-│           │   ├── FleetRoster.tsx             # Interactive agent roster sidebar
+│           ├── agents/               # Multi-Agent Management & Roster
+│           │   ├── AgentsRoster.tsx             # Interactive agent roster sidebar
 │           │   └── AgentInspector.tsx          # Agent profile, permissions & sandbox inspector
 │           ├── avatar/              # Avatar Badges & Icons
 │           │   └── ChatAvatarIcon.tsx          # Real-time state-reactive agent avatar badge
@@ -181,7 +181,7 @@ ZEZO/
   - REST endpoints for settings, task telemetry, skills, and code engine probing.
 
 ### 3. Modern React 18 SPA (`frontend/src/`)
-- **AutonomousOfficeScreen:** Visualizes the autonomous fleet (Verve, Flux, Ahmad, Michael, Kelly) in an interactive 2D pixel-art office grid. Supports live task telemetry, desk coordinates, and instant 1-on-1 direct chat.
+- **AutonomousOfficeScreen:** Routes the agent roster, dedicated Edit/Chat/Files workspace, and Logs view. The old Floor and Tasks views have been removed.
 - **MemoryGraphCanvas:** Renders the 3D Force-Directed Knowledge Graph powered by Three.js, visualising memory nodes and wikilink topologies with audio-reactive viseme pulsing.
 - **TaskManagerModal:** Provides real-time visibility into background subagents, displaying progress trees, execution logs, and immediate task cancellation buttons.
 - **ClipPeekOverlay:** Non-intrusive floating HUD widget that detects clipboard updates and provides 1-click refactoring, explanation, or execution actions.
@@ -210,7 +210,7 @@ Every action adheres strictly to `AGENTS.md` Rule 4 (one file per action, export
   [ core/action_loader.py ] ───────────────────────────────────────┘
            │
            ├──> [ actions/reverse_engineer.py ] ──> [ rea-agents@6.7.0 ]
-           ├──> [ actions/fleet_control.py ]    ──> [ Git Sandboxed Workspaces ]
+           ├──> [ actions/agents_control.py ]    ──> [ Git Sandboxed Workspaces ]
            ├──> [ actions/code_engines_status.py ] ──> [ agy / opencode / kilo ]
            └──> [ actions/computer_control.py ] ──> [ 3-Tier Perception: UIA / RapidOCR / Vision ]
                                                │

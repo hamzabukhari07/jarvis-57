@@ -649,9 +649,9 @@ def handler(parameters: dict, **kwargs) -> dict:
 **✅ What Should Happen (Use Official ReUI Component & Semantic Tokens)**
 
 ```tsx
-// ✅ Uses ReUI Button, Lucide icons, and semantic CSS variables
+// ✅ Uses ReUI Button, the shared free Hugeicons set, and semantic CSS variables
 import { Button } from "@/components/ui/button"
-import { RefreshCw } from "lucide-react"
+import { RefreshCw } from "@/lib/zezo-icons"
 
 <Button 
   variant="outline" 
@@ -669,18 +669,18 @@ import { RefreshCw } from "lucide-react"
 
 ### Example 4: Pre-Flight Docs Reading & Post-Flight Docs Sync
 
-**User Request:** "Add a new specialized agent 'Scout' to the fleet management system"
+**User Request:** "Add a new specialized agent 'Scout' to the agent management system"
 
 **❌ What LLMs Do (Guessing Architecture & Leaving Docs Stale)**
 - Hardcodes the agent in a random dictionary in `main.py`.
-- Doesn't read `docs/FLEET_MANAGEMENT.md` to see that Scranton Office uses `OFFICE_DESK_COORDINATES` in `core/fleet_manager.py` and React coordinates in `AutonomousOfficeScreen.tsx`.
-- Completes the code but leaves `docs/FLEET_MANAGEMENT.md` outdated.
+- Doesn't read `docs/AGENTS_MANAGEMENT.md` to see how the agent registry stores desk assignments and how agent state is represented in `AutonomousOfficeScreen.tsx`.
+- Completes the code but leaves `docs/AGENTS_MANAGEMENT.md` outdated.
 
 **✅ What Should Happen**
-1. **Pre-Flight (Rule 1):** Read `docs/FLEET_MANAGEMENT.md` to understand desk coordinates, risk tiers (`L0_READ_ONLY`, `L1_MUTATION`, `L2_DESTRUCTIVE`), and role dispatch keywords.
-2. **Execute (Rule 3 & 4):** Add 'Scout' with assigned desk coordinates in `core/fleet_manager.py` and update `AutonomousOfficeScreen.tsx`.
+1. **Pre-Flight (Rule 1):** Read `docs/AGENTS_MANAGEMENT.md` to understand desk coordinates, risk tiers (`L0_READ_ONLY`, `L1_MUTATION`, `L2_DESTRUCTIVE`), and role dispatch keywords.
+2. **Execute (Rule 3 & 4):** Add 'Scout' with assigned desk coordinates in `core/agents_manager.py` and update `AutonomousOfficeScreen.tsx`.
 3. **Post-Flight Sync (Rule 10):**
-   - Update `docs/FLEET_MANAGEMENT.md` with Scout's role, coordinates, and skills.
+   - Update `docs/AGENTS_MANAGEMENT.md` with Scout's role, coordinates, and skills.
    - Append entry to `LEARNING_JOURNAL.md`.
 4. **Verify (Rule 7):** Check syntax (`python -m py_compile`), test desk rendering, and confirm existing agents are unaffected.
 

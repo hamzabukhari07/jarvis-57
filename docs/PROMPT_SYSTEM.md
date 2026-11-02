@@ -96,12 +96,12 @@ ZEZO enforces strict disambiguation between inspecting/rebuilding web architectu
   4. *L2 (Gemini Multimodal Vision):* Semantic visual comprehension (`screen_process`) reserved for spatial and icon reasoning.
 - **Anti-Looping Invariant:** Exactly **one** perception query per user turn. If an element returns `NOT_FOUND`, ZEZO immediately informs the user instead of searching blind in repetitive loops.
 
-### 6. Autonomous Fleet Delegation Protocols (`[CODING DELEGATION]`)
-ZEZO operates on the architectural philosophy: **"ZEZO Manages the Work. Agents Execute the Work."** Rather than writing raw code directly in the live session, ZEZO orchestrates specialized autonomous workers via `fleet_control`:
+### 6. Autonomous Agent Delegation Protocols (`[CODING DELEGATION]`)
+ZEZO operates on the architectural philosophy: **"ZEZO Manages the Work. Agents Execute the Work."** Rather than writing raw code directly in the live session, ZEZO orchestrates specialized autonomous workers via `agents_control`:
 
 ```mermaid
 flowchart TD
-    ZEZO["ZEZO (Live Orchestrator)"] --> DISPATCH{"fleet_control(action='dispatch', ...)"}
+    ZEZO["ZEZO (Live Orchestrator)"] --> DISPATCH{"agents_control(action='dispatch', ...)"}
     
     DISPATCH -->|Frontend / UI / Styling| VERVE["Verve (Senior Frontend Specialist)\nAntigravity CLI / React / Tailwind"]
     DISPATCH -->|Frontend Overflow| FLUX["Flux (Frontend Overflow Developer)"]
@@ -113,13 +113,13 @@ flowchart TD
     DISPATCH -->|Design Systems & Tokens| PAM["Pam (Brand & Token Architect)"]
 ```
 
-#### Fleet Delegation Invariants:
+#### Agent Delegation Invariants:
 - **Workspace Isolation (Zero-Clobber Rule):** Every independent build is assigned an isolated folder (e.g. `Desktop/portfolio-build`) or Git worktree. Dispatched agents never clobber existing workspaces.
-- **Handoff Continuity (`path` parameter):** When handing over a project or continuing a website rebuild, ZEZO **must** pass the existing directory via `fleet_control(action='dispatch', agent_id='...', path='<exact_path>', task='...')`.
-- **Anti-Hallucination Gate:** ZEZO must never verbally claim to have dispatched, renamed, or updated an agent without executing the tool call in that exact turn. ZEZO has NO ability to assign or reassign tasks by speaking alone; it MUST invoke `fleet_control`.
+- **Handoff Continuity (`path` parameter):** When handing over a project or continuing a website rebuild, ZEZO **must** pass the existing directory via `agents_control(action='dispatch', agent_id='...', path='<exact_path>', task='...')`.
+- **Anti-Hallucination Gate:** ZEZO must never verbally claim to have dispatched, renamed, or updated an agent without executing the tool call in that exact turn. ZEZO has NO ability to assign or reassign tasks by speaking alone; it MUST invoke `agents_control`.
 - **Named & Unnamed Reassignments:** If the user corrects, redirects, or reassigns an agent mid-stream (whether named like "assign to Flux" or unnamed like "kisi or ko task assign kr de", "someone else", "switch agent", "Verve is not working"), ZEZO automatically routes to the matching alternative specialist (e.g. FLUX for frontend) with the remembered task prompt, setting `confirmed=true`.
 - **Imperative Urgency Guard:** On nudges like "kr naa", "do it", "jaldi karo", ZEZO must not speak conversational filler or stall; it must immediately dispatch the tool in the exact same turn.
-- **Anti-Gaslighting Guard:** If the user states a task is not showing or wasn't assigned ("task show nahi ho raha", "tu ne assign nahi kiya"), ZEZO is strictly forbidden from claiming display lag or network delay, and must immediately call `task_status(action='status')` or `fleet_control`.
+- **Anti-Gaslighting Guard:** If the user states a task is not showing or wasn't assigned ("task show nahi ho raha", "tu ne assign nahi kiya"), ZEZO is strictly forbidden from claiming display lag or network delay, and must immediately call `task_status(action='status')` or `agents_control`.
 
 ---
 
@@ -133,7 +133,7 @@ These messages arrive from the runtime engine, not the user. ZEZO never speaks t
 | `[SYSTEM_ALERT]` | Critical hardware threshold exceeded (CPU/GPU temperature, battery low). | Speak a brief, natural warning in the user's language. |
 | `[STARTUP_BRIEFING]` | Application initialization complete. | Deliver the morning briefing (weather, scheduled reminders, system health). |
 | `[PROACTIVE_CHECK]` | User has been silent past configured thresholds. | Evaluate time and memory context to offer a timely, non-intrusive observation in 1–3 short sentences without tool calls. |
-| `[TASK_FAILURE_NOTIFICATION]` | Background coding or rebuild engine failed. | Explain the reason in 1 sentence, identify the preserved directory, and offer to hand it to a fleet agent. |
+| `[TASK_FAILURE_NOTIFICATION]` | Background coding or rebuild engine failed. | Explain the reason in 1 sentence, identify the preserved directory, and offer to hand it to a agent. |
 | `[TASK_CANCELLED_NOTIFICATION]` | User aborted an active task via `task_status(action='cancel')`. | Confirm cancellation in 1 short sentence. Never assert that files are ready. |
 
 ---

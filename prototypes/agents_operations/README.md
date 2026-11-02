@@ -1,4 +1,4 @@
-# 🏢 Scranton Pixel Office & Multi-Agent Fleet Deck (ZEZO OS)
+# 🏢 Agent Operations Deck (ZEZO OS)
 
 Autonomous pixel-art simulation and tactical command deck built for ZEZO Desktop OS.
 

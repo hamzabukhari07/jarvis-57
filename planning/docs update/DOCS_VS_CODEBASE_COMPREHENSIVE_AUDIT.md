@@ -35,7 +35,7 @@ The audit conclusively proves that the codebase has undergone a **massive archit
 | **3** | **Frontend UI** | Modern **React 18 + Vite + Tailwind CSS + ReUI** SPA ([frontend/src/](frontend/src/)) with Autonomous Office Floor, 3D Memory Canvas, Task Matrix, and Assistant-UI chat threads. | Docs me purani **PyQt6 QWebEngineView + monolithic vanilla HTML/CSS/JS (`frontend/index.html`, `ui.js`)** cockpit likhi hui hai. |
 | **4** | **Coding Engines** | Central **Code Engines Registry** ([core/code_engines.py](core/code_engines.py)): Google Antigravity CLI (`agy`), OpenCode (`opencode`), aur Kilo (`kilo`), with honest CLI authentication probing aur 5-min TTL caching. | Docs me sirf purane single helper scripts (`code_helper.py`, `dev_agent.py`) mention hain jo delete ho chuke hain. |
 | **5** | **Website Cloner & REA** | **Website Cloner v6 (Prompt-driven verbatim RE)** + **Official REA CLI (`rea-agents@6.7.0` browser scenario captures)** + Dynamic Tech Stack detection + Obligation Ledgers (`ledger.json`). | Docs me v5 React scaffolding (6000-char cap) ya purani basic Playwright web scraping likhi hui hai. |
-| **6** | **Multi-Agent Fleet** | **Scranton Office Floor** ([core/fleet_manager.py](core/fleet_manager.py)) with interactive desks, named specialized agents (Verve, Flux, Ahmad, Michael, Dwight, Kelly, Jim, Pam, Haider/DevDynamo), isolated git sandboxes, aur direct 1-on-1 chat channels. | Docs me fleet system ka koi concept hi nahi hai; sirf flat single-agent execution samjhi gayi hai. |
+| **6** | **Agents** | **Scranton Office Floor** ([core/agents_manager.py](core/agents_manager.py)) with interactive desks, named specialized agents (Verve, Flux, Ahmad, Michael, Dwight, Kelly, Jim, Pam, Haider/DevDynamo), isolated git sandboxes, aur direct 1-on-1 chat channels. | Docs me agent system ka koi concept hi nahi hai; sirf flat single-agent execution samjhi gayi hai. |
 | **7** | **Memory & Storage** | **3-Tier Engine**: `long_term.json` + **SQLite WAL + FTS5 Full-Text Search ([memory/sqlite_memory.py](memory/sqlite_memory.py) -> `zezo_brain.db`)** + **Local Markdown Vault ([memory/vault_engine.py](memory/vault_engine.py) -> `memory/vault/*.md`)** with 3D Graph visualization. Desktop Teardowns workspace (`~/Desktop/ZEZO_Teardowns/`). | Docs me sirf flat key-value JSON storage ya purani generic vector DB assumptions hain. |
 
 ---
@@ -67,7 +67,7 @@ Docs state: *"Eight tools are defined directly in main.py"*. Reality: **9 inline
 
 ### C. Ghost / Non-Existent Tools Listed in Docs
 - [docs/TOOLS.md](docs/TOOLS.md) lists `actions/code_helper.py` and `actions/dev_agent.py`.
-- **Reality:** Neither file exists in `actions/`. Code generation has transitioned to `quick_snippet.py`, specialist fleet agents, and local code engines (`agy`, `opencode`, `kilo`).
+- **Reality:** Neither file exists in `actions/`. Code generation has transitioned to `quick_snippet.py`, specialist specialist agents, and local code engines (`agy`, `opencode`, `kilo`).
 
 ### D. Misattributed Tool Locations
 - **`system_status`**: Docs claim it is in `main.py`. In reality, it is in [actions/system_monitor.py](actions/system_monitor.py).
@@ -75,7 +75,7 @@ Docs state: *"Eight tools are defined directly in main.py"*. Reality: **9 inline
 - **`shutdown_jarvis`**: Docs claim `shutdown_jarvis` in `main.py`. In reality, it is **`shutdown_zezo`** ([main.py:424](main.py#L424)).
 
 ### E. Parameter Divergence
-- **`fleet_control`**: Docs omit the `path` parameter. Actual code supports `fleet_control(action='dispatch', path=...)` for directory context inheritance.
+- **`agents_control`**: Docs omit the `path` parameter. Actual code supports `agents_control(action='dispatch', path=...)` for directory context inheritance.
 
 ---
 
@@ -91,7 +91,7 @@ Both files describe a long-retired monolithic HTML/CSS/JS frontend embedded in a
 ### Live Implementation Reality ([frontend/src/](frontend/src/)):
 Production-grade **React 18 + TypeScript + Vite + Tailwind CSS + ReUI System**:
 1. **Autonomous Office Screen** ([frontend/src/components/office/AutonomousOfficeScreen.tsx](frontend/src/components/office/AutonomousOfficeScreen.tsx)):
-   - Interactive 2D pixel office grid displaying live fleet agent desk sprites, monitor telemetry, agent soul editing (`/api/fleet/save_soul`), and typing animations.
+   - Interactive 2D pixel office grid displaying live specialist agent desk sprites, monitor telemetry, agent soul editing (`/api/agents/save_soul`), and typing animations.
 2. **Agent Direct Chat** ([frontend/src/components/office/AgentDirectChatView.tsx](frontend/src/components/office/AgentDirectChatView.tsx)):
    - Isolated 1-on-1 direct conversational channel with any individual specialist agent.
 3. **3D Interactive Memory Graph Canvas** ([frontend/src/components/memory/MemoryGraphCanvas.tsx](frontend/src/components/memory/MemoryGraphCanvas.tsx)):
@@ -182,7 +182,7 @@ Production-grade **React 18 + TypeScript + Vite + Tailwind CSS + ReUI System**:
 | 31 | [docs/VISION.md](docs/VISION.md) | ⚠️ **Minor Outdated** | Missing [core/visual_qa.py](core/visual_qa.py) closed-loop automated visual diff QA engine. |
 | 32 | [docs/PLUGIN_SYSTEM.md](docs/PLUGIN_SYSTEM.md) | ⚠️ **Outdated** | Focuses heavily on legacy plugins vs new Declarative Skills Hub (`skills/`). |
 | 33 | [docs/PROACTIVE_SYSTEM.md](docs/PROACTIVE_SYSTEM.md) | ⚠️ **Minor Outdated** | Needs addition of task completion watcher loop `_run_task_completion_watcher()` ([main.py:3464](main.py#L3464)). |
-| 34 | [docs/PROMPT_SYSTEM.md](docs/PROMPT_SYSTEM.md) | ❌ **Severely Outdated** | Documents 160-line basic prompt. Reality is 480-line [core/prompt.txt](core/prompt.txt) with Executive Brevity, Temporal Grounding, and Fleet triggers. |
+| 34 | [docs/PROMPT_SYSTEM.md](docs/PROMPT_SYSTEM.md) | ❌ **Severely Outdated** | Documents 160-line basic prompt. Reality is 480-line [core/prompt.txt](core/prompt.txt) with Executive Brevity, Temporal Grounding, and Agents triggers. |
 | 35 | [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) | ⚠️ **Outdated** | Misses frontend npm dependencies (`@assistant-ui/react`, `@tailwindcss/vite`, `three`, etc.) and `rea-agents`, `cloudflared`, `uncage`. |
 | 36 | [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) | ⚠️ **Outdated** | Misses Cloudflare Tunnels, Uncage crawler, and Antigravity CLI integration. |
 | 37 | [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md) | ✅ **Mostly Updated** | Correctly highlights Windows primary (DPI, UIA, Win32 PTT) with macOS/Linux fallbacks. |
@@ -215,8 +215,8 @@ To bring documentation to 100% parity with the codebase, these 7 dedicated docum
   - 5-minute TTL caching (`_CACHE`) preventing UI freezing.
   - UI Server REST endpoints: `GET /api/code_engines`, `POST /api/code_engines/probe`.
 
-### 3. `docs/FLEET_MANAGEMENT.md`
-- **Source Modules:** [core/fleet_manager.py](core/fleet_manager.py), [actions/fleet_control.py](actions/fleet_control.py), [frontend/src/components/office/AutonomousOfficeScreen.tsx](frontend/src/components/office/AutonomousOfficeScreen.tsx).
+### 3. `docs/AGENTS_MANAGEMENT.md`
+- **Source Modules:** [core/agents_manager.py](core/agents_manager.py), [actions/agents_control.py](actions/agents_control.py), [frontend/src/components/office/AutonomousOfficeScreen.tsx](frontend/src/components/office/AutonomousOfficeScreen.tsx).
 - **Core Topics:**
   - The Scranton Office layout and 2D desk coordinate grid (`OFFICE_DESK_COORDINATES`).
   - Specialist agent roster: Michael (Lead), Dwight (Ops), Jim (Comms), Pam (UI/UX), Verve (Frontend), DevDynamo/Haider (Fullstack), Flux (Design), Ahmad (Backend).
@@ -277,7 +277,7 @@ graph TD
     subgraph "Phase 2: New Subsystem Docs"
         P2_1[docs/REVERSE_ENGINEERING.md]
         P2_2[docs/CODE_ENGINES.md]
-        P2_3[docs/FLEET_MANAGEMENT.md]
+        P2_3[docs/AGENTS_MANAGEMENT.md]
         P2_4[docs/TASK_SYSTEM.md]
         P2_5[docs/REMOTE_TUNNELING.md]
         P2_6[docs/CLIPBOARD_WATCHER.md]

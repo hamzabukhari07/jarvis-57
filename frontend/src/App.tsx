@@ -49,7 +49,7 @@ import {
   Ellipsis,
   Plus,
   X,
-} from 'lucide-react'
+} from '@/lib/zezo-icons'
 
 export default function App() {
   const {
@@ -85,6 +85,8 @@ export default function App() {
 
   const [tasks, setTasks] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'tactical' | 'office' | 'workflow'>('tactical')
+  const [agentsSection, setAgentsSection] = useState<'manage' | 'chat-space'>('manage')
+  const [agentsNavExpanded, setAgentsNavExpanded] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isLogModalOpen, setIsLogModalOpen] = useState(false)
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
@@ -656,7 +658,16 @@ export default function App() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('office')}
+              onClick={() => {
+                if (isSidebarCollapsed) {
+                  setIsSidebarCollapsed(false)
+                  setAgentsNavExpanded(true)
+                  return
+                }
+                setAgentsNavExpanded((expanded) => !expanded)
+              }}
+              aria-expanded={!isSidebarCollapsed && agentsNavExpanded}
+              aria-controls="agents-navigation-submenu"
               title={isSidebarCollapsed ? "Agents" : undefined}
               className={cn(
                 "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-colors cursor-pointer text-left",
@@ -667,8 +678,31 @@ export default function App() {
               )}
             >
               <Users className="w-4 h-4 shrink-0" />
-              {!isSidebarCollapsed && <span>AGENTS</span>}
+              {!isSidebarCollapsed && <><span className="flex-1">AGENTS</span><ChevronDown className={cn("h-3.5 w-3.5 transition-transform", agentsNavExpanded && "rotate-180")} /></>}
             </button>
+
+            {!isSidebarCollapsed && agentsNavExpanded && (
+              <div id="agents-navigation-submenu" className="ml-7 flex flex-col gap-1 border-l border-[var(--border)] pl-2">
+                {([
+                  ['manage', 'Manage Agents'],
+                  ['chat-space', 'Chat Space'],
+                ] as const).map(([section, label]) => (
+                  <button
+                    key={section}
+                    type="button"
+                    onClick={() => { setActiveTab('office'); setAgentsSection(section) }}
+                    className={cn(
+                      "rounded-md px-2.5 py-2 text-left text-xs transition-colors",
+                      activeTab === 'office' && agentsSection === section
+                        ? "bg-[var(--primary)]/12 font-medium text-[var(--foreground)]"
+                        : "text-[var(--muted-foreground)] hover:bg-[var(--secondary)] hover:text-[var(--foreground)]"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <button
               type="button"
@@ -691,13 +725,13 @@ export default function App() {
 
         {/* Sidebar Footer: Settings, Theme & Live Connection Indicator */}
         <div className="flex flex-col gap-2 pt-2 border-t border-[var(--border)]">
-          <div className="flex items-center gap-1.5">
+          <div className={cn("flex items-center gap-1.5", isSidebarCollapsed && "flex-col")}>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setIsSettingsOpen(true)}
               title="System & Pipeline Settings"
-              className={cn("flex-1 justify-start gap-2 h-8 px-2.5 text-xs font-medium border-[var(--border)] hover:bg-[var(--secondary)] cursor-pointer", isSidebarCollapsed && "w-8 flex-none justify-center px-0")}
+              className={cn("flex-1 justify-start gap-2 h-8 px-2.5 text-xs font-medium border-[var(--border)] hover:bg-[var(--secondary)] cursor-pointer", isSidebarCollapsed && "h-8 w-8 flex-none justify-center px-0")}
             >
               <Settings className="w-3.5 h-3.5 shrink-0" />
               {!isSidebarCollapsed && <span>Settings</span>}
@@ -829,9 +863,9 @@ export default function App() {
                 type="button"
                 onClick={() => handleModeSwitch('chat')}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                  "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer",
                   operationalMode === 'chat'
-                    ? "bg-[var(--card)] text-[var(--foreground)] shadow-xs"
+                    ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
                     : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                 )}
               >
@@ -843,13 +877,13 @@ export default function App() {
                 type="button"
                 onClick={() => handleModeSwitch('live')}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer",
+                  "flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer",
                   operationalMode === 'live'
-                    ? "bg-[var(--card)] text-[var(--foreground)] shadow-xs"
+                    ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
                     : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                 )}
               >
-                <Radio className="w-3.5 h-3.5 text-emerald-400" />
+                <Radio className="w-3.5 h-3.5" />
                 <span>Live</span>
               </button>
             </div>
@@ -976,7 +1010,7 @@ export default function App() {
                     pointerEvents: isLiveControlsExpanded ? 'auto' : 'none',
                   }}
                 >
-                  <div className="flex w-max items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--card)]/90 p-1.5">
+                  <div className="flex w-max items-center gap-1.5 rounded-full border border-transparent bg-transparent p-1.5 shadow-none">
                   {/* Mic Mute Toggle */}
                   <Button
                     variant={isMicMuted ? "destructive" : "outline"}
@@ -985,7 +1019,7 @@ export default function App() {
                     title={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
                     className="h-9 px-3 gap-1.5 rounded-full text-xs font-medium cursor-pointer"
                   >
-                    {isMicMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-primary" />}
+                    {isMicMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />}
                     <span className="hidden sm:inline text-[10px] font-mono font-semibold">{isMicMuted ? 'UNMUTE' : 'MUTE'}</span>
                   </Button>
 
@@ -996,7 +1030,7 @@ export default function App() {
                     title={isSpeakerMuted ? "Unmute Assistant Voice Output" : "Mute Assistant Voice Output"}
                     className="h-9 px-3 gap-1.5 rounded-full text-xs font-medium cursor-pointer"
                   >
-                    {isSpeakerMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-primary" />}
+                    {isSpeakerMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />}
                     <span className="hidden sm:inline text-[10px] font-mono font-semibold">{isSpeakerMuted ? 'MUTED' : 'SPEAKER'}</span>
                   </Button>
 
@@ -1007,7 +1041,7 @@ export default function App() {
                     title="Emergency Stop (Interrupt Agent Execution)"
                     className="h-9 px-3 gap-1.5 rounded-full text-xs font-medium hover:bg-destructive/15 hover:border-destructive/50 hover:text-destructive cursor-pointer"
                   >
-                    <Square className="w-3.5 h-3.5 text-destructive" />
+                    <Square className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
                     <span className="hidden sm:inline text-[10px] font-mono font-semibold">STOP</span>
                   </Button>
 
@@ -1018,7 +1052,7 @@ export default function App() {
                     title={isSleeping ? "Wake Assistant (Resume Active Mode)" : "Put Assistant to Sleep (Standby Mode)"}
                     className="h-9 px-3 gap-1.5 rounded-full text-xs font-medium cursor-pointer"
                   >
-                    <Power className={`w-3.5 h-3.5 ${isSleeping ? 'text-amber-400' : 'text-emerald-500'}`} />
+                    <Power className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
                     <span className="hidden sm:inline text-[10px] font-mono font-semibold">{isSleeping ? 'ON' : 'OFF'}</span>
                   </Button>
 
@@ -1046,7 +1080,7 @@ export default function App() {
       {/* ── SCRANTON OFFICE SCREEN ── */}
       {activeTab === 'office' && (
           <main className="flex-1 w-full min-h-0 overflow-hidden bg-[var(--background)]">
-          <AutonomousOfficeScreen backendLogs={liveLogs} />
+          <AutonomousOfficeScreen backendLogs={liveLogs} section={agentsSection} onSectionChange={setAgentsSection} />
         </main>
       )}
 

@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { AlertTriangle, Trash2, X, Loader2 } from "lucide-react"
+import { AlertTriangle, Trash2, X, Loader2 } from "@/lib/zezo-icons"
 import { Button } from "../ui/button"
 import { Badge } from "./badge"
 import { Callout } from "./callout"

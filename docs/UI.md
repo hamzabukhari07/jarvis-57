@@ -18,7 +18,7 @@ ZEZO features a high-performance, dark cyberpunk tactical HUD built on the **ReU
    - **No Fullscreen Backdrop Blur Stalls:** Fullscreen overlays use solid high-opacity backdrops (`rgba(0, 0, 0, 0.85)` / `var(--background)`) to eliminate GPU re-rasterization bottlenecks in fullscreen mode.
    - **Strict Explicit Transitions:** `transition: all` is strictly forbidden. All animated components declare exact CSS properties (e.g., `border-color`, `background-color`, `opacity`, `transform`) to avoid layout invalidation cascades.
    - **Visualizer Render Gating:** WebGL point-cloud visualizers (`QiviAvatarVisualizer`) and particle canvas loops gate their render loops when modal dialogs are active to preserve CPU and GPU resources.
-4. **Multi-View Operational Ergonomics:** Seamless view transitions between the primary **Tactical Workspace**, the **Autonomous Scranton Office Deck**, and the **Workflow Builder**.
+4. **Multi-View Operational Ergonomics:** Seamless view transitions between the primary **Tactical Workspace**, **Agents**, and the **Workflow Builder**.
 
 ---
 
@@ -30,7 +30,7 @@ The top-level shell (`App.tsx`) hosts a fixed tactical header and switches dynam
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                             HEADER (Header.tsx)                             │
 │  [⚙ CONTROLS] [⧉ LOGS] [⊞ TASKS] [📱 REMOTE]    ZEZO OS 2.0    [14:20 CLOCK]│
-│  Tabs: [ ⚡ TACTICAL ]  [ 🏢 SCRANTON OFFICE ]  [ 🔀 WORKFLOW CANVAS ]       │
+│  Tabs: [ ⚡ TACTICAL ]  [ 👥 AGENTS ]  [ 🔀 WORKFLOW CANVAS ]                │
 ├───────────────────┬─────────────────────────────────────┬───────────────────┤
 │                   │      CENTER DISPLAY                 │                   │
 │   LEFT TELEMETRY  │  ┌───────────────────────────────┐  │   RIGHT ACTIVITY  │
@@ -53,12 +53,11 @@ The top-level shell (`App.tsx`) hosts a fixed tactical header and switches dynam
   - **Live Execution Canvas:** Dynamic output viewport (`CanvasView.tsx`) streaming code diffs, reverse-engineered artifacts, and tool outputs.
 - **Right Column:** Conversational stream powered by Assistant-UI (`ZezoChatThread.tsx`), providing speech turn transcriptions, collapsible chain-of-thought reasoning, and tool status chips.
 
-### 2. Autonomous Scranton Office View (`AutonomousOfficeScreen.tsx`)
-- Dedicated full-screen multi-agent office deck simulating the Scranton Business Park floor plan.
-- Real-time agent sprites positioned at distinct desk coordinates (`WORKSTATION_SLOTS`).
-- Desk monitor screens glow during active code generation; speech bubbles show task objectives.
-- Full agent inspection drawer with live telemetry, Git worktree paths, and `SOUL.md` persona editor.
-- Embedded 1-on-1 private chat view (`AgentDirectChatView.tsx`) with dedicated local thread history.
+### 2. Agents View (`AutonomousOfficeScreen.tsx`)
+- Searchable, status-filtered agent table with a short profile view and row actions.
+- Dedicated Edit, Chat, and Files workspace tabs plus a separate Logs view.
+- Chat supports agent-specific engine, model, and workspace folder selection.
+- Floor and Tasks visualizations are not part of the Agents screen.
 
 ### 3. Workflow Canvas View
 - Interactive visual graph view for orchestrating multi-agent pipelines and chained background tasks.
