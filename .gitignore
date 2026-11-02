@@ -38,3 +38,6 @@ memory/*.json.bak
 .agent_worktrees/
 # Local test scratch files
 /test_sample_resume_text.txt
+
+# Auto-added ignore rules
+*.log
