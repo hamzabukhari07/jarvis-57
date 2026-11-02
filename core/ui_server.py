@@ -2297,7 +2297,13 @@ class ZezoUIServer:
     async def _handle_client_message(self, ws: web.WebSocketResponse, payload: dict) -> None:
         msg_type = payload.get("type", "")
 
-        if msg_type in ("user_message", "text_command"):
+        if msg_type == "get_clipboard":
+            watcher = getattr(self, "clipboard_watcher", None)
+            current = watcher.get_current_payload() if watcher else None
+            if current:
+                await ws.send_str(json.dumps({"type": "clipboard_update", "data": current}))
+
+        elif msg_type in ("user_message", "text_command"):
             text = str(payload.get("text") or payload.get("command") or "").strip()
             if text and self.on_text_command:
                 threading.Thread(target=self.on_text_command, args=(text,), daemon=True).start()

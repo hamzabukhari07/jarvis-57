@@ -155,14 +155,7 @@ export default function App() {
     createdAt?: Date
   }
 
-  const [chatMessages, setChatMessages] = useState<ChatTurn[]>([
-    {
-      id: 'msg-welcome',
-      role: 'assistant',
-      text: 'ZEZO online.',
-      createdAt: new Date(),
-    },
-  ])
+  const [chatMessages, setChatMessages] = useState<ChatTurn[]>([])
 
   // Live bidirectional voice transcription listener (User & Zezo)
   useEffect(() => {
@@ -481,14 +474,7 @@ export default function App() {
     const newTitle = 'New Directive'
     setSessionTitle(newTitle)
     localStorage.setItem('zezo_active_session_title', newTitle)
-    setChatMessages([
-      {
-        id: `init-${Date.now()}`,
-        role: 'assistant',
-        text: 'ZEZO online. How can I assist you?',
-        createdAt: new Date(),
-      },
-    ])
+    setChatMessages([])
     setSavedSessions((prev) => {
       const next = [{ id: newId, title: newTitle, date: 'Just now' }, ...prev.slice(0, 8)]
       localStorage.setItem('zezo_saved_sessions', JSON.stringify(next))
@@ -775,7 +761,7 @@ export default function App() {
       {/* ── 2. MAIN APPLICATION CANVAS CONTAINER ── */}
       <div className="flex-1 h-full min-w-0 flex flex-col overflow-hidden bg-[var(--background)]">
         {/* ── TOP HEADER BAR ── */}
-        <header className="h-12 border-b border-[var(--border)] bg-[var(--card)]/80 backdrop-blur-md px-4 flex items-center justify-between shrink-0 select-none z-20 gap-3">
+        <header className={cn("h-12 border-b border-[var(--border)] bg-[var(--card)]/80 backdrop-blur-md px-4 flex items-center justify-between shrink-0 select-none gap-3", isSessionDropdownOpen ? "relative z-50" : "relative z-20")}>
           {/* Left: Session Breadcrumb Dropdown */}
           <div className="relative" ref={sessionDropdownRef}>
             <button
@@ -790,7 +776,7 @@ export default function App() {
 
             {/* Session Switcher Popover Dropdown */}
             {isSessionDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1.5 w-72 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-xl p-1.5 z-50 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute top-full left-0 mt-1.5 w-72 rounded-xl bg-[var(--background)] border border-[var(--border)] shadow-xl p-1.5 z-[60] flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
                 <div className="px-2 py-1 text-[10px] font-mono font-semibold uppercase text-[var(--muted-foreground)] flex items-center justify-between">
                   <span>Chat Sessions</span>
                   <button

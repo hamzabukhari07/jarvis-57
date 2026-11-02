@@ -38,6 +38,7 @@ flowchart TD
 The background watcher is implemented in [`core/clipboard_watcher.py`](file:///d:/anitgravity/zezo%20work/jarvis-57/core/clipboard_watcher.py):
 - **Daemon Thread:** Operates on an isolated thread (`name="ClipboardWatcher"`, `daemon=True`) with a configurable polling interval (default: `1.0s`).
 - **Low Overhead:** Compares string references and immediately skips polling if the clipboard content has not changed.
+- **Connect-Time Snapshot:** A UI client requests the current clipboard payload after its WebSocket connects. This covers the startup race where the watcher detects a clipboard update before the frontend is ready to receive broadcasts.
 - **Graceful Fallback:** If `pyperclip` is absent or the clipboard is locked by another host application, exceptions are caught cleanly without interrupting system audio or primary loops.
 
 ---
@@ -74,6 +75,7 @@ def _classify_content(self, text: str) -> str:
 ## 🪟 Interactive Floating HUD Overlay (`ClipPeekOverlay.tsx`)
 
 Rendered on top of the React 18 interface in the lower-right viewport corner:
+- **Docked Bubble:** New clipboard content appears as a compact circular launcher; click it to expand the preview. The expanded card can be collapsed back to the bubble or dismissed until the next clipboard update.
 - **Badge & Icon:** Displays the detected type with dedicated Lucide icons (`Globe`, `Code`, `FileText`, `Copy`).
 - **Snippet Preview:** Displays a monospace, truncated preview of the captured data.
 - **Contextual Action Buttons:**

@@ -50,6 +50,24 @@ class ClipboardWatcher:
         self.is_running = False
         logger.info("ClipboardWatcher stopped.")
 
+    def get_current_payload(self) -> Optional[dict]:
+        """Return the current clipboard snapshot for newly connected UIs."""
+        if not _PYPERCLIP:
+            return None
+        try:
+            current = pyperclip.paste() or ""
+        except Exception as e:
+            logger.debug("Clipboard snapshot unavailable: %s", e)
+            return None
+        if not current:
+            return None
+        return {
+            "text": current,
+            "type": self._classify_content(current),
+            "timestamp": time.time(),
+            "preview": current[:80] + ("..." if len(current) > 80 else ""),
+        }
+
     def _run_loop(self) -> None:
         while not self._stopped.is_set():
             try:

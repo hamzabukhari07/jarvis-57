@@ -1016,7 +1016,13 @@ class ZezoLive:
         if getattr(self, "_active_language", None) == current_lang:
             return
         self._active_language = current_lang
-        self.request_reconnect(reason=f"response language set to {current_lang}")
+        # A resumed Gemini session can retain its original system instruction.
+        # Language changes must reconnect without the old resumption handle so
+        # the newly configured response-language rule is actually applied.
+        self.request_reconnect(
+            keep_context=False,
+            reason=f"response language set to {current_lang}",
+        )
 
     def _on_accent_change(self, new_accent: str = ""):
         from memory.config_manager import get_voice_accent
@@ -1801,6 +1807,14 @@ class ZezoLive:
         accent_dir = _build_accent_directive(get_voice_accent())
         if accent_dir:
             parts.append(accent_dir)
+        if resp_lang and resp_lang.lower() != "auto":
+            parts.append(
+                "[FINAL RESPONSE LANGUAGE OVERRIDE]\n"
+                f"The configured response language is {resp_lang}. Every user-facing spoken and written response MUST be in {resp_lang}. "
+                "The language of the user's latest utterance, including Urdu or Roman Urdu, does not change this setting. "
+                "Keep tool results and internal reasoning separate from the language of your user-facing response. "
+                "Change languages only when the user explicitly asks you to change the response language."
+            )
 
         # Map response language to robust ASR language hints / codes to prevent language mixing / hallucination
         lang_map = {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Globe, Bot, Send, X, Code, FileText, Sparkles } from "lucide-react";
+import { Copy, Globe, Bot, Send, X, Code, FileText, Sparkles, Clipboard, ChevronDown } from "lucide-react";
 
 interface ClipboardPayload {
   text: string;
@@ -13,7 +13,8 @@ interface ClipboardPayload {
 export function ClipPeekOverlay() {
   const [clipData, setClipData] = useState<ClipboardPayload | null>(null);
   const [prompt, setPrompt] = useState("");
-  const [visible, setVisible] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -26,12 +27,17 @@ export function ClipPeekOverlay() {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: "get_clipboard" }));
+      };
+
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === "clipboard_update" && msg.data) {
             setClipData(msg.data);
-            setVisible(true);
+            setDismissed(false);
+            setExpanded(false);
           }
         } catch (e) {
           console.error("Failed to parse websocket message:", e);
@@ -53,7 +59,7 @@ export function ClipPeekOverlay() {
     };
   }, []);
 
-  if (!visible || !clipData) return null;
+  if (dismissed || !clipData) return null;
 
   const sendMessageToZezo = (text: string) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -77,7 +83,7 @@ export function ClipPeekOverlay() {
     } else if (action === "chat") {
       sendMessageToZezo(`Here is content from my clipboard: ${clipData.text}`);
     }
-    setVisible(false);
+    setDismissed(true);
   };
 
   const handleSendPrompt = (e: React.FormEvent) => {
@@ -85,11 +91,26 @@ export function ClipPeekOverlay() {
     if (!prompt.trim()) return;
     sendMessageToZezo(`${prompt}\n\nClipboard Content:\n${clipData.text}`);
     setPrompt("");
-    setVisible(false);
+    setDismissed(true);
   };
 
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        aria-label={`Open ClipPeek. Latest copied content: ${clipData.preview}`}
+        title={`ClipPeek · ${clipData.type}`}
+        className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card text-primary shadow-xl transition-[transform,box-shadow,background-color] duration-200 hover:scale-105 hover:shadow-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary animate-in zoom-in-90"
+      >
+        <Clipboard className="h-5 w-5" />
+        <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-card bg-primary" />
+      </button>
+    );
+  }
+
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-96 max-w-[calc(100vw-32px)] bg-card border border-border shadow-2xl rounded-xl p-4 animate-in slide-in-from-bottom-5 duration-300">
+    <div className="fixed bottom-6 right-6 z-50 w-96 max-w-[calc(100vw-32px)] bg-card border border-border shadow-2xl rounded-xl p-4 animate-in slide-in-from-bottom-3 zoom-in-95 duration-200">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2 text-xs font-semibold text-primary uppercase tracking-wider">
           {clipData.type === "url" && <Globe className="w-3.5 h-3.5" />}
@@ -98,14 +119,28 @@ export function ClipPeekOverlay() {
           {clipData.type === "text" && <Copy className="w-3.5 h-3.5" />}
           <span>ClipPeek — {clipData.type}</span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 text-muted-foreground hover:text-foreground"
-          onClick={() => setVisible(false)}
-        >
-          <X className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            onClick={() => setExpanded(false)}
+            aria-label="Collapse ClipPeek"
+            title="Collapse"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            onClick={() => setDismissed(true)}
+            aria-label="Dismiss ClipPeek"
+            title="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="bg-background/80 border border-border/60 rounded-lg p-2.5 text-xs font-mono text-foreground mb-3 truncate">

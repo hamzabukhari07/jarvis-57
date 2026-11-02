@@ -3091,3 +3091,38 @@ pm --prefix frontend run build passed with 0 errors (Vite production bundle gene
   - Layer 1 (Static): `python -m py_compile` on touched files passed with 0 errors. `npm --prefix frontend run build` passed with 0 errors (Vite production bundle generated in 2.37s).
   - Layer 2 (Runtime): Verified action discovery loads 31 tools with no trace of `extract_design_system`; verified `SkillRegistry` loads the new `generate_design_md` direct engine SOP; verified fleet manager resolves design token queries to Pam Beesly.
   - Layer 3 (Regression): `pytest tests/test_skill_runner.py` passed (7/7 passed).
+
+## [2026-11-02] — Enforce Configured Response Language at Final Prompt Layer
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** The selected response language was injected into a rendered system prompt alongside recent conversation, memory, tool, and task context. Although English Strict already had a directive, subsequent context could compete with it and allow language matching to follow Urdu input.
+- **Fix:** Appended an explicit final response-language override to the live system instruction after all dynamic context and accent directives. It requires user-facing spoken and written output to remain in the configured language, independent of the user's latest utterance, unless the user explicitly asks to change languages.
+- **Key File:** `main.py` (`ZezoLive._build_config`).
+- **Verification:** `python -m py_compile main.py`; `pytest tests/test_voice_accent.py -q` (7 passed); `pytest tests/test_live_reconnect_intent.py -q` (3 passed). Pytest emitted a cache permission warning; tests passed.
+
+## [2026-11-02] — Fresh Gemini Session on Response Language Changes
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** The response-language callback requested a reconnect while preserving Gemini's session-resumption handle. A resumed Live session may retain the original system instruction, so changing the setting could leave language-following behavior unchanged and make the bug recur.
+- **Fix:** Response-language changes now clear the resumption handle on reconnect, ensuring `_build_config()`'s latest language directive is used by a fresh session. Added a regression test asserting the language callback reconnects with `keep_context=False`.
+- **Key Files:** `main.py`, `tests/test_voice_accent.py`, `docs/SETTINGS.md`.
+- **Verification:** `python -m py_compile main.py tests/test_voice_accent.py` passed; `pytest tests/test_voice_accent.py tests/test_live_reconnect_intent.py -q` passed (11 tests). Pytest emitted cache permission and pywinauto STA warnings; neither affected results.
+
+## [2026-11-02] — Docked Bubble Interaction for ClipPeek
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why:** The full ClipPeek panel appeared on every clipboard update and visually interrupted the workspace.
+- **Change:** New clipboard updates now show a compact circular launcher in the lower-right corner. Clicking opens the existing preview and actions; a collapse control returns to the launcher, while dismiss hides ClipPeek until another clipboard update.
+- **Files:** `frontend/src/components/clipboard/ClipPeekOverlay.tsx`, `docs/CLIPBOARD_WATCHER.md`.
+- **Verification:** `npx tsc -b --pretty false` passed. `npm run build` could not load the installed Tailwind native binding and Vite also reported `spawn EPERM`, so production bundling remains unverified.
+
+## [2026-11-02] — ClipPeek Connect-Time Clipboard Snapshot
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** Clipboard updates were broadcast only at the moment of change. If the watcher observed clipboard content before the frontend WebSocket connected, the event was lost and the docked bubble remained hidden until another clipboard change.
+- **Fix:** ClipPeek now requests the current clipboard snapshot on WebSocket open; the server returns the current classified clipboard payload directly to that client. Later changes continue to use the existing broadcast path.
+- **Files:** `core/clipboard_watcher.py`, `core/ui_server.py`, `frontend/src/components/clipboard/ClipPeekOverlay.tsx`, `tests/test_clipboard_watcher.py`, `docs/CLIPBOARD_WATCHER.md`.
+- **Verification:** `python -m py_compile core/clipboard_watcher.py core/ui_server.py tests/test_clipboard_watcher.py` passed; `pytest tests/test_clipboard_watcher.py -q` passed (1 test); frontend `tsc -b --pretty false` passed. Pytest reported the existing cache permission warning. Production Vite build not rerun because its known Tailwind native binding load failure remains.
+
+## [2026-11-02] — Remove Automatic ZEZO Online Chat Messages
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** `App.tsx` seeded a synthetic “ZEZO online” assistant turn at application startup and inserted another greeting for every new chat, making the status notice appear as conversation content whenever the UI reopened.
+- **Fix:** Initialize chat history empty and clear it when creating a new chat; actual assistant replies and live transcripts remain unchanged.
+- **Key File:** `frontend/src/App.tsx`.
+- **Verification:** The TypeScript phase of `npm run build` passed. Vite bundling remains blocked by the unavailable Tailwind native binding and `spawn EPERM` in this environment.

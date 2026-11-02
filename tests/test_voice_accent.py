@@ -121,6 +121,21 @@ def test_main_on_accent_change_delta_guard():
     )
 
 
+def test_main_on_language_change_starts_fresh_session():
+    mock_ui = MagicMock()
+    live = ZezoLive(ui=mock_ui)
+    live.request_reconnect = MagicMock()
+    live._active_language = "auto"
+
+    live._on_language_change("English Strict")
+
+    live.request_reconnect.assert_called_once_with(
+        keep_context=False,
+        reason="response language set to English Strict",
+    )
+    assert live._active_language == "English Strict"
+
+
 def test_ui_accent_callback_bridge():
     from ui import ZezoUI, MainWindow
 

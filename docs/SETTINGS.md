@@ -61,7 +61,7 @@ Identity, voice profile, dialect, and companion customization:
 - **Assistant Name (`assistant_name`)**: Sets the identity and wake phrase (*"Hey Zezo"*).
 - **Live Voice Profile (`voice_name`)**: Selects Gemini Live vocal timbre (`Charon`, `Puck`, `Kore`, `Fenrir`, `Aoede`) with interactive audio sample preview.
 - **Voice Accent & Dialect (`voice_accent`)**: Selects speech accent and cadence (`auto` Adaptive Neutral, `american` US General American, `british` UK Received Pronunciation, `pakistani` Pakistani/South Asian, `australian` Australian) while preserving base vocal timbre.
-- **Response Language Mode (`response_language`)**: Matches spoken and written output language (`auto`, `English Strict`, `Urdu`, `Hindi`, `Spanish`, `French`, `German`, `Arabic`, `Turkish`).
+- **Response Language Mode (`response_language`)**: Selects the spoken and written output language (`auto`, `English Strict`, `Urdu`, `Hindi`, `Spanish`, `French`, `German`, `Arabic`, `Turkish`). Changing this setting starts a fresh Gemini Live session so the new system instruction is applied instead of resuming a session with the old language prompt.
 - **Holographic Avatar Presets**: Controls companion archetype (`qivi`, `nova`, `sol`, `ember`, `sage`, `atlas`), geometry shape, theme match, and lighting.
 
 ### 4. 💻 Autonomous Code Engines
