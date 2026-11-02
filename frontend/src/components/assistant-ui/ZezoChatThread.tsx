@@ -403,14 +403,14 @@ export const ZezoPillComposer: FC<{
 
         <ComposerPrimitive.Root
           data-slot="aui-composer-root"
-          className="group relative flex items-center w-full rounded-full border border-[var(--border)] bg-[var(--card)]/90 backdrop-blur-xl hover:border-[var(--border)]/80 focus-within:border-[var(--accent)]/80 focus-within:ring-2 focus-within:ring-[var(--accent)]/20 pl-2.5 pr-1.5 py-1 transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        className="group relative flex min-h-[52px] w-full items-center rounded-full border border-[var(--border)] bg-[var(--card)]/90 backdrop-blur-xl hover:border-[var(--border)]/80 focus-within:border-[var(--accent)]/80 focus-within:ring-2 focus-within:ring-[var(--accent)]/20 pl-3 pr-2 py-2 transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
         >
           {/* File Attachment Action Button */}
           {onAttachFile && (
             <button
               type="button"
               onClick={onAttachFile}
-              className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)] transition-colors rounded-full cursor-pointer shrink-0"
+              className="p-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)] transition-colors rounded-full cursor-pointer shrink-0"
               title="Attach files or folder"
             >
               <Paperclip className="w-4 h-4" />
@@ -424,7 +424,7 @@ export const ZezoPillComposer: FC<{
               type="button"
               onClick={onToggleDictate}
               className={cn(
-                "p-1.5 transition-colors rounded-full cursor-pointer shrink-0 mr-1",
+                "p-2 transition-colors rounded-full cursor-pointer shrink-0 mr-1",
                 isDictating
                   ? "text-red-400 bg-red-500/20 animate-pulse ring-1 ring-red-400/40"
                   : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
@@ -438,7 +438,7 @@ export const ZezoPillComposer: FC<{
           <ComposerPrimitive.Input
             data-slot="aui-composer-input"
             placeholder={placeholder || (isDictating ? "Listening... speak now" : "Ask or enter directive (or tap mic to dictate)...")}
-            className="flex-1 bg-transparent border-0 px-2 py-1 text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none resize-none leading-normal min-h-[28px] max-h-[80px]"
+            className="flex-1 bg-transparent border-0 px-2 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none resize-none leading-relaxed min-h-[36px] max-h-[96px]"
             rows={1}
             autoFocus={false}
           />
@@ -449,7 +449,7 @@ export const ZezoPillComposer: FC<{
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 w-7 p-0 rounded-full border border-[var(--border)] hover:bg-[var(--secondary)] text-[var(--foreground)] transition-all shrink-0 cursor-pointer flex items-center justify-center animate-in zoom-in-95"
+                  className="h-9 w-9 p-0 rounded-full border border-[var(--border)] hover:bg-[var(--secondary)] text-[var(--foreground)] transition-all shrink-0 cursor-pointer flex items-center justify-center animate-in zoom-in-95"
                   title="Stop speaking"
                 >
                   <Square className="w-3.5 h-3.5 fill-current" />
@@ -459,7 +459,7 @@ export const ZezoPillComposer: FC<{
               <ComposerPrimitive.Send asChild>
                 <Button
                   size="sm"
-                  className="h-7 w-7 p-0 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground transition-all shrink-0 cursor-pointer flex items-center justify-center shadow-xs"
+                  className="h-9 w-9 p-0 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground transition-all shrink-0 cursor-pointer flex items-center justify-center shadow-xs"
                   title="Send directive"
                 >
                   <ArrowUp className="w-3.5 h-3.5" />
@@ -542,7 +542,7 @@ export const ZezoChatThread: FC<{
       </div>
       <ThreadPrimitive.Viewport
         data-slot="aui-thread-viewport"
-        className="flex-1 overflow-y-auto px-4 py-3 space-y-4 focus:outline-none scroll-smooth"
+        className="flex-1 overflow-y-auto px-4 pb-4 pt-10 sm:pt-12 space-y-4 focus:outline-none scroll-smooth"
       >
         <ThreadPrimitive.Messages
           components={{

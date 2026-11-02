@@ -59,7 +59,7 @@ export function ClipPeekOverlay() {
     };
   }, []);
 
-  if (dismissed || !clipData) return null;
+  if (!clipData) return null;
 
   const sendMessageToZezo = (text: string) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -83,6 +83,7 @@ export function ClipPeekOverlay() {
     } else if (action === "chat") {
       sendMessageToZezo(`Here is content from my clipboard: ${clipData.text}`);
     }
+    setExpanded(false);
     setDismissed(true);
   };
 
@@ -91,26 +92,30 @@ export function ClipPeekOverlay() {
     if (!prompt.trim()) return;
     sendMessageToZezo(`${prompt}\n\nClipboard Content:\n${clipData.text}`);
     setPrompt("");
+    setExpanded(false);
     setDismissed(true);
   };
 
-  if (!expanded) {
-    return (
+  return (
+    <div className="fixed bottom-6 right-6 z-50 h-12 w-12 pointer-events-none">
       <button
         type="button"
         onClick={() => setExpanded(true)}
         aria-label={`Open ClipPeek. Latest copied content: ${clipData.preview}`}
+        aria-hidden={expanded || dismissed}
+        inert={expanded || dismissed}
         title={`ClipPeek · ${clipData.type}`}
-        className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card text-primary shadow-xl transition-[transform,box-shadow,background-color] duration-200 hover:scale-105 hover:shadow-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary animate-in zoom-in-90"
+        className={`absolute bottom-0 right-0 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card text-primary shadow-xl transition-[opacity,transform,background-color] duration-300 ease-out hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${!expanded && !dismissed ? "pointer-events-auto opacity-100 scale-100" : "pointer-events-none opacity-0 scale-90"}`}
       >
         <Clipboard className="h-5 w-5" />
         <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-card bg-primary" />
       </button>
-    );
-  }
 
-  return (
-    <div className="fixed bottom-6 right-6 z-50 w-96 max-w-[calc(100vw-32px)] bg-card border border-border shadow-2xl rounded-xl p-4 animate-in slide-in-from-bottom-3 zoom-in-95 duration-200">
+      <div
+        aria-hidden={!expanded || dismissed}
+        inert={!expanded || dismissed}
+        className={`absolute bottom-0 right-0 w-96 max-w-[calc(100vw-32px)] origin-bottom-right rounded-xl border border-border bg-card p-4 shadow-2xl transition-[opacity,transform] duration-300 ease-out ${expanded && !dismissed ? "pointer-events-auto opacity-100 translate-y-0 scale-100" : "pointer-events-none opacity-0 translate-y-2 scale-95"}`}
+      >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2 text-xs font-semibold text-primary uppercase tracking-wider">
           {clipData.type === "url" && <Globe className="w-3.5 h-3.5" />}
@@ -187,6 +192,7 @@ export function ClipPeekOverlay() {
           <Send className="w-3 h-3" />
         </Button>
       </form>
+      </div>
     </div>
   );
 }

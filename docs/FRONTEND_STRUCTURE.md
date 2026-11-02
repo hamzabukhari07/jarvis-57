@@ -23,11 +23,11 @@ The ZEZO frontend is a high-performance, dark cyberpunk single-page application 
 
 ## 📐 2. Application Layout Structure (`frontend/src/App.tsx`)
 
-The root `App.tsx` controls global telemetry, active modals, WebSocket streaming, and master view switching using ZEZO's signature dashboard layout:
+The root `App.tsx` controls global telemetry, active modals, WebSocket streaming, and master view switching. The session and Chat/Live header appears only in the Home/Tactical view; Agents and Workflow use the full canvas height:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
-│ ── LEFT POWER SIDEBAR (w-56) ── │ ── TOP HEADER (h-12) ─────────────────────────────────── │
+│ ── LEFT POWER SIDEBAR (w-56 / w-16 collapsed) ── │ ── TOP HEADER (h-12) ────────────────── │
 │                                 │  ● Ready     Home / "Active Session" ▾   [ 💬 Chat | 🎙️ Live ] [+ New]│
 │  ZEZO OS                        ├───────────────────────────────────────────────────────────┤
 │  Hamza Bukhari                  │ ── ADAPTIVE MAIN CANVAS ───────────────────────────────── │
@@ -37,9 +37,7 @@ The root `App.tsx` controls global telemetry, active modals, WebSocket streaming
 │  [⚡ WORKFLOW]                  │  • Single-row bottom pill composer dock                  │
 │                                 │  • File attachment [📎] & Web Speech dictation [🎙️]       │
 │  ── WORKSPACE ──                │  • Stop / Send controls                                   │
-│  [📋 Tasks]       [Running]     │                                                           │
-│  [📜 Logs]           [Live]     │  — OR —                                                   │
-│  [📱 Remote]           [QR]     │                                                           │
+│  [⚙ Settings] [🌓 Theme] [☰ Menu]                          │  — OR —                 │
 │                                 │  [ Live Voice Mode ]                                      │
 │  ── FOOTER ──                   │  • Centered 3D particle companion avatar (Qivi WebGL)     │
 │  [⚙️ Settings]   [🌓 Theme]     │  • State badge: [ ● LISTENING ] + Equalizer waveform      │
@@ -49,25 +47,22 @@ The root `App.tsx` controls global telemetry, active modals, WebSocket streaming
 ```
 
 ### 1. Left Power Sidebar (`w-56`)
-- **Primary Navigation**: Seamlessly toggles the root operational view:
+- **Primary Navigation**: A sidebar toggle collapses the `w-56` sidebar to an icon-only `w-16` rail; icon tooltips retain access to every control. The workspace utility buttons have extra vertical separation. Navigation seamlessly toggles the root operational view:
   - `HOME` (`activeTab === 'tactical'`): Enters the primary conversational / voice workspace.
   - `AGENTS` (`activeTab === 'office'`): Scranton Office 2D pixel desk simulation.
   - `WORKFLOW` (`activeTab === 'workflow'`): Node-based agent pipeline execution builder.
-- **Workspace Utilities**: Direct access buttons for system inspection dialogs without cluttering the canvas:
-  - `[Tasks]`: Opens `TaskManagerModal` with a live running tasks counter badge.
-  - `[Logs]`: Opens `BackendLogModal` with a live stream badge.
-  - `[Remote]`: Opens `MobileRemoteModal` with QR tunnel pairing.
-- **Footer**: `SettingsModal` trigger, theme mode switcher (`light` / `dark`), and connection health status indicator.
+- **Workspace Utilities**: Settings, theme toggle, and round menu button share one footer row in that order. The menu button switches from a menu icon to a close icon while its compact popup is open; the popup lists Tasks, Logs, and Remote.
+- **Footer**: `SettingsModal` trigger, workspace menu, theme mode switcher (`light` / `dark`), and connection health status indicator.
 
 ### 2. Top Header (`h-12`)
 - **System Readiness**: Ambient pulsing status beacon (`● Ready`).
-- **Interactive Session Dropdown**: Breadcrumb navigation (`Home / "Active Session" ▾`) providing quick switching between active chats and history search.
+- **Interactive Session Dropdown**: Breadcrumb navigation (`Chat / "Active Session" ▾`) opens a bounded session picker with a fixed header and New action, title search, and a scrollable saved-chat list with an empty-search state.
 - **Segmented Operational Mode Pill**: Smoothly toggles between `[ 💬 Chat | 🎙️ Live ]` modes.
 - **Action Button**: `+ New chat` to reset thread state and initiate a clean conversation.
 
 ### 3. Dual-Mode Adaptive Canvas
 - **Chat Mode (`operationalMode === 'chat'`)**: Distraction-free conversational view powered by `@assistant-ui/react`. Features auto-scrolling message bubbles, markdown code rendering, file attachment chips, and Web Speech API voice dictation directly into the pill composer without triggering speech synthesis.
-- **Live Voice Mode (`operationalMode === 'live'`)**: Immersive companion interface centered on the 3D WebGL point-cloud avatar (`QiviAvatarVisualizer`), an audio-reactive equalizer soundwave, real-time live transcription stream for user and assistant speech turns, and the 4-button hardware control cluster (`MUTE`, `SPEAKER`, `STOP`, `OFF`).
+- **Live Voice Mode (`operationalMode === 'live'`)**: Frame-free companion interface centered on the 3D WebGL point-cloud avatar (`QiviAvatarVisualizer`) with a gradient that responds to the stronger of microphone input and assistant playback levels. A single subtitle slot switches between user and ZEZO transcripts, using different text colors instead of speaker labels; it remains empty when nobody is speaking, and completed ZEZO captions fade away after a short pause. Four controls (`MUTE`, `SPEAKER`, `STOP`, `OFF`) live in a circular menu that expands into a horizontal control bar.
 
 ---
 

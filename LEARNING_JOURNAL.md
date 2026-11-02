@@ -2,6 +2,72 @@
 
 # LEARNING JOURNAL (active — last 25 entries)
 
+## [2026-11-03] — Searchable, Scrollable Chat Session Picker
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root cause:** The session dropdown displayed saved conversations in a small unfiltered list, which becomes difficult to navigate as chat history grows.
+- **Change:** `frontend/src/App.tsx` adds title search, a fixed header with the existing New action, a max-height scrollable list, and a no-results state. Selection behavior and stored session schema remain unchanged.
+- **Documentation:** Updated `docs/FRONTEND_STRUCTURE.md` with the session picker behavior.
+- **Verification:** TypeScript check pending.
+
+## [2026-11-03] — Show Workspace Menu Toggle State
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root cause:** The workspace menu trigger kept the same hamburger icon when open, so its expanded state was not visible.
+- **Change:** `frontend/src/App.tsx` now shows a close icon while the menu is open and updates the button's accessible label and tooltip between Open menu and Close menu.
+- **Documentation:** Updated `docs/FRONTEND_STRUCTURE.md` with the toggle state behavior.
+- **Verification:** TypeScript check pending.
+
+## [2026-11-03] — Keep Footer Controls on One Row
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Kept Settings, theme toggle, and round menu button together on a single footer row in that order. The compact popup remains anchored to the right of the menu button.
+- **Files:** `frontend/src/App.tsx`, `docs/FRONTEND_STRUCTURE.md`.
+- **Verification:** TypeScript check pending.
+
+## [2026-11-03] — Fit Menu Popup Beside Footer Controls
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Kept the requested Settings → theme toggle → Menu order. Narrowed the popup and anchored it 12px to the right of the menu button to avoid crowding the sidebar edge.
+- **Files:** `frontend/src/App.tsx`, `docs/FRONTEND_STRUCTURE.md`.
+- **Verification:** TypeScript check pending.
+
+## [2026-11-03] — Simplify Workspace Menu Labels
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Renamed the popup heading to `Menu` and removed the READY, LIVE, and QR badges from its entries as requested.
+- **Files:** `frontend/src/App.tsx`, `docs/FRONTEND_STRUCTURE.md`.
+- **Verification:** TypeScript check pending.
+
+## [2026-11-03] — Open Workspace Menu to the Right
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Positioned the Workspace tools popup to the right of the Settings/menu/theme footer row so it opens beside its trigger rather than above it.
+- **Documentation:** Updated `docs/FRONTEND_STRUCTURE.md` to reflect the popup direction.
+- **Verification:** TypeScript check pending.
+
+## [2026-11-03] — Move Workspace Menu Beside Settings
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root cause:** The workspace menu and utility icons were placed in the sidebar's main section instead of beside Settings as requested.
+- **Change:** `frontend/src/App.tsx` removes those main-section icons and places one menu button between Settings and the theme control. Its anchored popup opens upward with Tasks, Logs, and Remote and their status badges; selecting an item opens the existing dialog and closes the popup.
+- **Documentation:** Updated `docs/FRONTEND_STRUCTURE.md` with the footer placement and menu behavior.
+- **Verification:** TypeScript check pending.
+
+## [2026-11-03] — Compact Sidebar Utilities and Launcher Popup
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root cause:** Tasks, Logs, and Remote were presented as large sidebar rows, making each look like a separate persistent screen.
+- **Change:** `frontend/src/App.tsx` replaces the rows with compact icon actions and an anchored Workspace tools popup. Direct icons and popup entries route to the existing dialogs; selecting a popup entry closes the menu. Existing task and live status badges remain available in the popup.
+- **Documentation:** Updated `docs/FRONTEND_STRUCTURE.md` with the utility launcher behavior.
+- **Verification:** TypeScript check pending.
+
+## [2026-11-03] — Restrict Session Header to Home View
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root cause:** The session header sat unconditionally in the shared application shell, so its chat/session controls also appeared over Agents and Workflow.
+- **Change:** `frontend/src/App.tsx` now renders that header only when `activeTab === 'tactical'`; Agents and Workflow canvases occupy the available height.
+- **Documentation:** Updated `docs/FRONTEND_STRUCTURE.md` to specify the Home-only header contract.
+- **Verification:** TypeScript check pending.
+
+## [2026-11-03] — Sidebar Spacing and Collapse Control
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root cause:** The workspace Tasks, Logs, and Remote controls used a 4px vertical gap, making the group feel crowded. The fixed-width sidebar had no collapse control.
+- **Change:** `frontend/src/App.tsx` increases the workspace controls' separation and adds an accessible toggle between the full `w-56` sidebar and an icon-only `w-16` rail. Tooltips preserve discoverability in collapsed mode.
+- **Documentation:** Updated `docs/FRONTEND_STRUCTURE.md` with the collapse behavior and spacing.
+- **Verification:** Frontend build attempted; blocked by an unloadable Tailwind Windows native binding and Vite `spawn EPERM` in the local environment.
+
 ## [2026-11-02] — Startup Performance Optimization, Dynamic Obsidian Graph & Chat/Live Mode Audio Decoupling
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Why this was built / Root Cause & Motivation:**
@@ -3126,3 +3192,74 @@ pm --prefix frontend run build passed with 0 errors (Vite production bundle gene
 - **Fix:** Initialize chat history empty and clear it when creating a new chat; actual assistant replies and live transcripts remain unchanged.
 - **Key File:** `frontend/src/App.tsx`.
 - **Verification:** The TypeScript phase of `npm run build` passed. Vite bundling remains blocked by the unavailable Tailwind native binding and `spawn EPERM` in this environment.
+
+## [2026-11-02] — Suppress Legacy ZEZO Online Greeting in Active Chat
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** Removing the startup greeting initializer did not clear copies already held in a running React page's state during hot reload, and a matching assistant transcript could reintroduce the status line.
+- **Fix:** Filter the synthetic greeting phrases from the visible assistant runtime and live transcript handler. Real conversation messages remain unchanged.
+- **Key File:** `frontend/src/App.tsx`.
+- **Verification:** `npm run build` passed its `tsc -b` phase. Vite bundling could not load Tailwind's native binding and reported `spawn EPERM`.
+
+## [2026-11-02] — Frame-Free Live Voice Stage with Reactive Gradient and Expandable Controls
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Why:** The existing Live Voice subtitle/control card felt visually heavy, showed user and assistant transcripts in separate rows, and kept all controls permanently visible.
+- **Change:** Removed the subtitle card; added a soft gradient behind the avatar whose opacity, scale, and vertical position respond to the higher mic-input or assistant-playback audio level. Replaced the two transcript rows with one accessible active-speaker line. Moved status to a floating top-center label and put the four existing controls behind a circular toggle that expands to a horizontal bar.
+- **Files:** `frontend/src/App.tsx`, `docs/FRONTEND_STRUCTURE.md`.
+- **Verification:** `npm run build` passed the TypeScript (`tsc -b`) phase. Vite bundling remains blocked because Tailwind's Windows native binding fails to load and Vite reports `spawn EPERM`.
+
+## [2026-11-02] — Color-Code Live Voice Transcripts Without Speaker Labels
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Removed the visible You/ZEZO prefix from the single Live Voice transcript slot. User and assistant speech are distinguished by semantic primary and accent text colors.
+- **Files:** `frontend/src/App.tsx`, `docs/FRONTEND_STRUCTURE.md`.
+- **Verification:** `npm run build` passed the TypeScript phase. Vite bundling remains blocked by the Tailwind Windows native binding load failure and `spawn EPERM`.
+
+## [2026-11-02] — Fade Completed ZEZO Live Captions
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** The active Live Voice subtitle slot retained ZEZO's final transcript after the backend emitted the completed-turn event.
+- **Fix:** Use the existing `done` transcript signal to keep ZEZO's final caption visible briefly, fade it, then clear it. New transcript text cancels the fade and immediately takes the shared subtitle slot.
+- **Files:** `frontend/src/App.tsx`, `docs/FRONTEND_STRUCTURE.md`.
+- **Verification:** `npm run build` passed TypeScript (`tsc -b`). Vite bundling remains blocked by the Tailwind Windows native binding load failure and `spawn EPERM`.
+
+## [2026-11-02] — Hide Empty Live Voice Subtitle Placeholder
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Removed the idle “Listening for speech...” prompt from the Live Voice subtitle slot. The area stays blank until an actual transcript arrives.
+- **Files:** `frontend/src/App.tsx`, `docs/FRONTEND_STRUCTURE.md`.
+- **Verification:** `npm run build` passed the TypeScript phase. Vite bundling remains blocked by the Tailwind Windows native binding load failure and `spawn EPERM`.
+
+## [2026-11-02] — Smooth Expand and Collapse for Live Voice Controls
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** The expanded controls were conditionally mounted, allowing an entrance animation but preventing a smooth close transition.
+- **Fix:** Keep the control rail mounted and animate max width, opacity, and horizontal position in both directions. The circular toggle rotates and switches to a close icon; collapsed controls are inert and non-interactive.
+- **Key File:** `frontend/src/App.tsx`.
+- **Verification:** `npm run build` passed TypeScript (`tsc -b`); Vite bundling remains blocked by the Tailwind Windows native binding error and `spawn EPERM`.
+
+## [2026-11-02] — Chat Breadcrumb and More Comfortable Chat Spacing
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Renamed the header breadcrumb from Home to Chat, increased chat viewport top padding so the first turn sits lower from the header, and enlarged the pill composer to a 52px minimum height with more input/button padding.
+- **Files:** `frontend/src/App.tsx`, `frontend/src/components/assistant-ui/ZezoChatThread.tsx`, `docs/FRONTEND_STRUCTURE.md`.
+- **Verification:** `npm run build` passed the TypeScript phase. Vite bundling remains blocked by the Tailwind Windows native binding error and `spawn EPERM`.
+
+## [2026-11-02] — Remove Shadow from Live Voice Controls
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Removed drop shadows from the expanded Live Voice control bar and its circular toggle, preserving the border, surface, and transition behavior.
+- **File:** `frontend/src/App.tsx`.
+- **Verification:** `npm run build` passed TypeScript; Vite bundling remains blocked by the Tailwind Windows native binding load failure and `spawn EPERM`.
+
+## [2026-11-02] — Smooth ClipPeek Transitions and Theme-Safe Live Transcript Colors
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Changes:** Keep ClipPeek bubble/card mounted and transition opacity, scale, and position for smooth open, collapse, and dismiss states. Use a foreground-mixed primary color for user speech and the theme foreground for ZEZO speech so both remain distinguishable with readable contrast in light and dark modes.
+- **Files:** `frontend/src/components/clipboard/ClipPeekOverlay.tsx`, `frontend/src/App.tsx`, `docs/CLIPBOARD_WATCHER.md`.
+- **Verification:** `npm run build` passed TypeScript; Vite bundling remains blocked by the Tailwind Windows native binding load failure and `spawn EPERM`.
+
+## [2026-11-03] — Add Speech-Reactive Live Voice Waveform
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Root Cause:** Live Voice had a responsive avatar gradient but no visible waveform in the space beneath the avatar.
+- **Change:** Added a theme-token gradient heartbeat line that scales with the existing combined mic/playback level, stays flat at silence, and respects reduced-motion preferences. The frontend receives amplitude levels but no pitch contour, so this waveform represents speech loudness rather than measured pitch.
+- **Files:** `frontend/src/App.tsx`, `docs/FRONTEND_STRUCTURE.md`.
+- **Verification:** `npm run build` passed `tsc -b`; Vite bundling then failed because the installed Tailwind Windows native binding could not load and Vite reported `spawn EPERM`.
+
+## [2026-11-03] — Remove Live Voice Waveform
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Change:** Removed the waveform from the Live Voice stage at the user's request and reverted its frontend documentation; retained the existing avatar gradient and voice-level signals.
+- **Files:** `frontend/src/App.tsx`, `docs/FRONTEND_STRUCTURE.md`.
+- **Verification:** `npm run build` passed `tsc -b`; Vite bundling failed because the Tailwind Windows native binding could not load and Vite reported `spawn EPERM`.

@@ -75,7 +75,7 @@ def _classify_content(self, text: str) -> str:
 ## 🪟 Interactive Floating HUD Overlay (`ClipPeekOverlay.tsx`)
 
 Rendered on top of the React 18 interface in the lower-right viewport corner:
-- **Docked Bubble:** New clipboard content appears as a compact circular launcher; click it to expand the preview. The expanded card can be collapsed back to the bubble or dismissed until the next clipboard update.
+- **Docked Bubble:** New clipboard content appears as a compact circular launcher; click it to smoothly expand the preview. The expanded card smoothly collapses back to the bubble or dismisses until the next clipboard update.
 - **Badge & Icon:** Displays the detected type with dedicated Lucide icons (`Globe`, `Code`, `FileText`, `Copy`).
 - **Snippet Preview:** Displays a monospace, truncated preview of the captured data.
 - **Contextual Action Buttons:**

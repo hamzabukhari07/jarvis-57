@@ -13,6 +13,7 @@ import { Frame, FramePanel } from './components/reui/frame'
 import { Badge } from './components/reui/badge'
 import { ConfirmDialog } from './components/reui/confirm-dialog'
 import { Button } from './components/ui/button'
+import { Input } from './components/ui/input'
 import { Separator } from './components/ui/separator'
 
 // Official Assistant-UI Components & Runtime
@@ -41,7 +42,13 @@ import {
   MessageSquare,
   Radio,
   ChevronDown,
+  Search,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Menu,
+  Ellipsis,
   Plus,
+  X,
 } from 'lucide-react'
 
 export default function App() {
@@ -83,9 +90,14 @@ export default function App() {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [isMobileRemoteOpen, setIsMobileRemoteOpen] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [isUtilityMenuOpen, setIsUtilityMenuOpen] = useState(false)
   const [isMicMuted, setIsMicMuted] = useState(false)
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false)
   const [isSleeping, setIsSleeping] = useState(false)
+  const [isLiveControlsExpanded, setIsLiveControlsExpanded] = useState(false)
+  const [liveVoiceSubtitle, setLiveVoiceSubtitle] = useState<{ speaker: 'user' | 'assistant'; text: string; done: boolean } | null>(null)
+  const [isLiveSubtitleFading, setIsLiveSubtitleFading] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; size: string; type: string; path?: string }>>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
@@ -108,6 +120,7 @@ export default function App() {
     return localStorage.getItem('zezo_active_session_title') || 'Main Directive'
   })
   const [isSessionDropdownOpen, setIsSessionDropdownOpen] = useState(false)
+  const [sessionSearch, setSessionSearch] = useState('')
   const sessionDropdownRef = useRef<HTMLDivElement>(null)
   const [savedSessions, setSavedSessions] = useState<{ id: string; title: string; date: string }[]>(() => {
     try {
@@ -123,8 +136,11 @@ export default function App() {
   const recognitionRef = useRef<any>(null)
 
   const effectiveSystemState = systemState
-  const effectiveAudioLevel = audioLevel || micLevel
+  const effectiveAudioLevel = Math.max(audioLevel, micLevel)
   const isAnyModalOpen = isSettingsOpen || isLogModalOpen || isTaskModalOpen || isMobileRemoteOpen
+  const filteredSessions = savedSessions.filter((session) =>
+    session.title.toLowerCase().includes(sessionSearch.trim().toLowerCase())
+  )
 
   // Rule 4: Hide avatar while modal is open to prevent QtWebEngine WebGL compositor flickering
   useEffect(() => {
@@ -164,6 +180,11 @@ export default function App() {
     const speaker = transcriptStream.speaker === 'user' ? 'user' : 'assistant'
     const text = (transcriptStream.text || '').trim()
     const isDone = Boolean(transcriptStream.done)
+    if (speaker === 'assistant' && /^zezo online(?:\. how can i assist you\?)?\s*$/i.test(text)) return
+    if (text) {
+      setIsLiveSubtitleFading(false)
+      setLiveVoiceSubtitle({ speaker, text, done: isDone })
+    }
 
     setChatMessages((prev) => {
       // Find any existing live message for this speaker
@@ -227,6 +248,17 @@ export default function App() {
       ]
     })
   }, [transcriptStream])
+
+  useEffect(() => {
+    if (liveVoiceSubtitle?.speaker !== 'assistant' || !liveVoiceSubtitle.done) return
+
+    const fadeTimer = window.setTimeout(() => setIsLiveSubtitleFading(true), 2200)
+    const clearTimer = window.setTimeout(() => setLiveVoiceSubtitle(null), 2700)
+    return () => {
+      window.clearTimeout(fadeTimer)
+      window.clearTimeout(clearTimer)
+    }
+  }, [liveVoiceSubtitle])
 
   // Initial fetch of attachments from backend
   useEffect(() => {
@@ -332,8 +364,12 @@ export default function App() {
     sendUserMessage(text)
   }, [sendUserMessage])
 
+  const visibleChatMessages = chatMessages.filter(
+    (message) => !(message.role === 'assistant' && /^zezo online(?:\. how can i assist you\?)?\s*$/i.test(message.text.trim()))
+  )
+
   const assistantRuntime = useExternalStoreRuntime({
-    messages: chatMessages,
+    messages: visibleChatMessages,
     convertMessage,
     onNew: handleNewAssistantMessage,
   })
@@ -555,19 +591,6 @@ export default function App() {
     }
   }
 
-  // Parent task metrics for sidebar
-  const parentTasks = tasks.filter((t) => !t.parent_id)
-  const runningTasksCount = parentTasks.filter((t) => {
-    const s = (t.status || '').toUpperCase()
-    return s === 'RUNNING' || s === 'IN_PROGRESS' || s === 'PROCESSING'
-  }).length
-
-  // Subtitles for Live Voice Mode
-  const latestUserMessage = [...chatMessages].reverse().find((m) => m.role === 'user')
-  const latestAssistantMessage = [...chatMessages].reverse().find((m) => m.role === 'assistant')
-
-
-
   return (
     <div className="flex w-screen h-screen bg-[var(--background)] text-[var(--foreground)] overflow-hidden font-sans select-none antialiased">
       {/* Hidden Native File & Directory Inputs */}
@@ -594,130 +617,76 @@ export default function App() {
       />
 
       {/* ── 1. LEFT POWER SIDEBAR (Option B Signature Navigation) ── */}
-      <aside className="w-56 h-full border-r border-[var(--border)] bg-[var(--card)]/90 backdrop-blur-md flex flex-col justify-between p-3 select-none shrink-0 z-30">
-        <div className="flex flex-col gap-4">
+      <aside className={cn("h-full border-r border-[var(--border)] bg-[var(--card)]/90 backdrop-blur-md flex flex-col justify-between p-3 select-none shrink-0 z-30 transition-[width] duration-200", isSidebarCollapsed ? "w-16" : "w-56")}>
+        <div className="flex flex-col gap-5">
           {/* Brand & Lead Title */}
-          <div className="flex items-center gap-2.5 px-2 py-1">
+          <div className={cn("flex items-center gap-2.5 px-2 py-1", isSidebarCollapsed && "flex-wrap justify-center px-0")}>
             <img
               src="/logo.png"
               alt="ZEZO Logo"
               className="w-8 h-8 rounded-lg object-contain shrink-0 border border-[var(--border)] shadow-xs bg-black"
             />
-            <span className="font-bold text-base tracking-wider text-[var(--foreground)] truncate">ZEZO</span>
+            {!isSidebarCollapsed && <span className="font-bold text-base tracking-wider text-[var(--foreground)] truncate">ZEZO</span>}
+            <Button variant="ghost" size="icon" onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)} aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} className={cn("ml-auto h-7 w-7 shrink-0 cursor-pointer", isSidebarCollapsed && "ml-0")}>
+              {isSidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+            </Button>
           </div>
 
           {/* Primary Navigation Tabs */}
-          <div className="flex flex-col gap-1">
-            <div className="text-[10px] font-mono font-medium text-[var(--muted-foreground)] uppercase tracking-wider px-2 py-1">
+          <div className="flex flex-col gap-1.5">
+            {!isSidebarCollapsed && <div className="text-[10px] font-mono font-medium text-[var(--muted-foreground)] uppercase tracking-wider px-2 py-1">
               Navigation
-            </div>
+            </div>}
 
             <button
               type="button"
               onClick={() => setActiveTab('tactical')}
+              title={isSidebarCollapsed ? "Home" : undefined}
               className={cn(
-                "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer text-left",
+                "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-colors cursor-pointer text-left",
+                isSidebarCollapsed && "justify-center px-0",
                 activeTab === 'tactical'
                   ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-2xs"
                   : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
               )}
             >
               <Home className="w-4 h-4 shrink-0" />
-              <span>HOME</span>
+              {!isSidebarCollapsed && <span>HOME</span>}
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('office')}
+              title={isSidebarCollapsed ? "Agents" : undefined}
               className={cn(
-                "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer text-left",
+                "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-colors cursor-pointer text-left",
+                isSidebarCollapsed && "justify-center px-0",
                 activeTab === 'office'
                   ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-2xs"
                   : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
               )}
             >
               <Users className="w-4 h-4 shrink-0" />
-              <span>AGENTS</span>
+              {!isSidebarCollapsed && <span>AGENTS</span>}
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('workflow')}
+              title={isSidebarCollapsed ? "Workflow" : undefined}
               className={cn(
-                "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer text-left",
+                "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-colors cursor-pointer text-left",
+                isSidebarCollapsed && "justify-center px-0",
                 activeTab === 'workflow'
                   ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-2xs"
                   : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
               )}
             >
               <GitBranch className="w-4 h-4 shrink-0" />
-              <span>WORKFLOW</span>
+              {!isSidebarCollapsed && <span>WORKFLOW</span>}
             </button>
           </div>
 
-          {/* Workspace Tools Cluster */}
-          <div className="flex flex-col gap-1 mt-1">
-            <div className="text-[10px] font-mono font-medium text-[var(--muted-foreground)] uppercase tracking-wider px-2 py-1">
-              Workspace
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSelectedTaskId(null)
-                setIsTaskModalOpen(true)
-              }}
-              className="w-full justify-between h-8 px-2.5 text-xs font-normal border-[var(--border)] hover:bg-[var(--secondary)] cursor-pointer"
-            >
-              <div className="flex items-center gap-2 truncate">
-                <Layers className="w-3.5 h-3.5 text-[var(--muted-foreground)] shrink-0" />
-                <span className="truncate">Tasks</span>
-              </div>
-              <Badge
-                variant="outline"
-                size="xs"
-                className={cn(
-                  "font-mono text-[9px] px-1.5 py-0 h-4 border",
-                  runningTasksCount > 0
-                    ? "bg-[var(--primary)]/15 text-[var(--primary)] border-[var(--primary)]/30 animate-pulse"
-                    : "text-[var(--muted-foreground)] border-[var(--border)]"
-                )}
-              >
-                {runningTasksCount > 0 ? `${runningTasksCount} Running` : 'Ready'}
-              </Badge>
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsLogModalOpen(true)}
-              className="w-full justify-between h-8 px-2.5 text-xs font-normal border-[var(--border)] hover:bg-[var(--secondary)] cursor-pointer"
-            >
-              <div className="flex items-center gap-2 truncate">
-                <Terminal className="w-3.5 h-3.5 text-[var(--muted-foreground)] shrink-0" />
-                <span className="truncate">Logs</span>
-              </div>
-              <Badge variant="outline" size="xs" className="font-mono text-[9px] px-1.5 py-0 h-4 text-emerald-400 border-emerald-500/30">
-                Live
-              </Badge>
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsMobileRemoteOpen(true)}
-              className="w-full justify-between h-8 px-2.5 text-xs font-normal border-[var(--border)] hover:bg-[var(--secondary)] cursor-pointer"
-            >
-              <div className="flex items-center gap-2 truncate">
-                <QrCode className="w-3.5 h-3.5 text-[var(--muted-foreground)] shrink-0" />
-                <span className="truncate">Remote</span>
-              </div>
-              <Badge variant="outline" size="xs" className="font-mono text-[9px] px-1.5 py-0 h-4 text-[var(--muted-foreground)] border-[var(--border)]">
-                QR
-              </Badge>
-            </Button>
-          </div>
         </div>
 
         {/* Sidebar Footer: Settings, Theme & Live Connection Indicator */}
@@ -728,10 +697,10 @@ export default function App() {
               size="sm"
               onClick={() => setIsSettingsOpen(true)}
               title="System & Pipeline Settings"
-              className="flex-1 justify-start gap-2 h-8 px-2.5 text-xs font-medium border-[var(--border)] hover:bg-[var(--secondary)] cursor-pointer"
+              className={cn("flex-1 justify-start gap-2 h-8 px-2.5 text-xs font-medium border-[var(--border)] hover:bg-[var(--secondary)] cursor-pointer", isSidebarCollapsed && "w-8 flex-none justify-center px-0")}
             >
               <Settings className="w-3.5 h-3.5 shrink-0" />
-              <span>Settings</span>
+              {!isSidebarCollapsed && <span>Settings</span>}
             </Button>
 
             <Button
@@ -743,41 +712,69 @@ export default function App() {
             >
               {isLightMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
             </Button>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsUtilityMenuOpen((open) => !open)}
+              title={isUtilityMenuOpen ? "Close menu" : "Open menu"}
+              aria-label={isUtilityMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={isUtilityMenuOpen}
+              className="h-8 w-8 shrink-0 rounded-full border-[var(--border)] hover:bg-[var(--secondary)] cursor-pointer"
+            >
+              {isUtilityMenuOpen ? <X className="w-3.5 h-3.5" /> : <Menu className="w-3.5 h-3.5" />}
+            </Button>
           </div>
 
-          <div className="flex items-center justify-between px-2 py-1 text-[10px] font-mono text-[var(--muted-foreground)] bg-[var(--input)]/60 rounded border border-[var(--border)]/60">
+          {isUtilityMenuOpen && <div className="absolute bottom-[3.25rem] left-[calc(100%+12px)] z-[70] w-40 rounded-xl border border-[var(--border)] bg-[var(--popover)] p-1.5 shadow-xl">
+              <div className="px-2 py-1.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Menu</div>
+              <button type="button" onClick={() => { setSelectedTaskId(null); setIsTaskModalOpen(true); setIsUtilityMenuOpen(false) }} className="flex w-full items-center rounded-lg px-2.5 py-2 text-xs text-left text-[var(--foreground)] hover:bg-[var(--secondary)] cursor-pointer">
+                <span className="flex items-center gap-2"><Layers className="h-3.5 w-3.5" />Tasks</span>
+              </button>
+              <button type="button" onClick={() => { setIsLogModalOpen(true); setIsUtilityMenuOpen(false) }} className="flex w-full items-center rounded-lg px-2.5 py-2 text-xs text-left text-[var(--foreground)] hover:bg-[var(--secondary)] cursor-pointer">
+                <span className="flex items-center gap-2"><Terminal className="h-3.5 w-3.5" />Logs</span>
+              </button>
+              <button type="button" onClick={() => { setIsMobileRemoteOpen(true); setIsUtilityMenuOpen(false) }} className="flex w-full items-center rounded-lg px-2.5 py-2 text-xs text-left text-[var(--foreground)] hover:bg-[var(--secondary)] cursor-pointer">
+                <span className="flex items-center gap-2"><QrCode className="h-3.5 w-3.5" />Remote</span>
+              </button>
+          </div>}
+
+          <div className={cn("flex items-center justify-between px-2 py-1 text-[10px] font-mono text-[var(--muted-foreground)] bg-[var(--input)]/60 rounded border border-[var(--border)]/60", isSidebarCollapsed && "justify-center px-0")}>
             <div className="flex items-center gap-1.5">
               <span className={cn(
                 "w-1.5 h-1.5 rounded-full shrink-0",
                 isConnected ? "bg-emerald-400" : "bg-zinc-500"
               )} />
-              <span>{isConnected ? "Connected" : "Offline"}</span>
+              {!isSidebarCollapsed && <span>{isConnected ? "Connected" : "Offline"}</span>}
             </div>
-            <span>v0.61</span>
+            {!isSidebarCollapsed && <span>v0.61</span>}
           </div>
         </div>
       </aside>
 
       {/* ── 2. MAIN APPLICATION CANVAS CONTAINER ── */}
       <div className="flex-1 h-full min-w-0 flex flex-col overflow-hidden bg-[var(--background)]">
-        {/* ── TOP HEADER BAR ── */}
-        <header className={cn("h-12 border-b border-[var(--border)] bg-[var(--card)]/80 backdrop-blur-md px-4 flex items-center justify-between shrink-0 select-none gap-3", isSessionDropdownOpen ? "relative z-50" : "relative z-20")}>
+        {/* ── HOME SESSION HEADER ── */}
+        {activeTab === 'tactical' && <header className={cn("h-12 border-b border-[var(--border)] bg-[var(--card)]/80 backdrop-blur-md px-4 flex items-center justify-between shrink-0 select-none gap-3", isSessionDropdownOpen ? "relative z-50" : "relative z-20")}>
           {/* Left: Session Breadcrumb Dropdown */}
           <div className="relative" ref={sessionDropdownRef}>
             <button
               type="button"
-              onClick={() => setIsSessionDropdownOpen((prev) => !prev)}
+              onClick={() => {
+                setIsSessionDropdownOpen((prev) => !prev)
+                setSessionSearch('')
+              }}
               className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--secondary)] border border-transparent hover:border-[var(--border)] transition-all cursor-pointer"
             >
-              <span className="text-[var(--muted-foreground)] font-mono text-[11px]">Home /</span>
+              <span className="text-[var(--muted-foreground)] font-mono text-[11px]">Chat /</span>
               <span className="font-semibold max-w-[200px] truncate">&quot;{sessionTitle}&quot;</span>
               <ChevronDown className={cn("w-3 h-3 text-[var(--muted-foreground)] transition-transform duration-200", isSessionDropdownOpen && "rotate-180")} />
             </button>
 
             {/* Session Switcher Popover Dropdown */}
             {isSessionDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1.5 w-72 rounded-xl bg-[var(--background)] border border-[var(--border)] shadow-xl p-1.5 z-[60] flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-2 py-1 text-[10px] font-mono font-semibold uppercase text-[var(--muted-foreground)] flex items-center justify-between">
+              <div className="absolute top-full left-0 mt-1.5 w-80 max-w-[calc(100vw-2rem)] rounded-xl bg-[var(--background)] border border-[var(--border)] shadow-xl p-1.5 z-[60] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-2 py-1.5 text-[10px] font-mono font-semibold uppercase text-[var(--muted-foreground)] flex items-center justify-between shrink-0">
                   <span>Chat Sessions</span>
                   <button
                     type="button"
@@ -788,23 +785,37 @@ export default function App() {
                   </button>
                 </div>
                 <Separator className="bg-[var(--border)] my-0.5" />
-                <div className="max-h-60 overflow-y-auto space-y-0.5">
-                  {savedSessions.map((s) => (
+                <div className="relative shrink-0 px-1.5 py-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--muted-foreground)]" aria-hidden="true" />
+                  <Input
+                    type="search"
+                    value={sessionSearch}
+                    onChange={(event) => setSessionSearch(event.target.value)}
+                    placeholder="Search chats..."
+                    aria-label="Search chats"
+                    className="h-8 pl-8 text-xs"
+                  />
+                </div>
+                <div className="max-h-60 min-h-0 overflow-y-auto overscroll-contain space-y-0.5" role="listbox" aria-label="Saved chats">
+                  {filteredSessions.map((s) => (
                     <button
                       key={s.id}
                       type="button"
-                      onClick={() => handleSelectSession(s)}
+                      onClick={() => { handleSelectSession(s); setSessionSearch('') }}
+                      role="option"
+                      aria-selected={sessionTitle === s.title}
                       className={cn(
-                        "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-left transition-colors cursor-pointer",
+                        "w-full flex items-center justify-between gap-3 px-2.5 py-2 rounded-lg text-xs text-left transition-colors cursor-pointer",
                         sessionTitle === s.title
                           ? "bg-[var(--primary)]/15 text-[var(--primary)] font-semibold"
                           : "text-[var(--foreground)] hover:bg-[var(--secondary)]"
                       )}
                     >
-                      <span className="truncate max-w-[170px]">{s.title}</span>
-                      <span className="text-[10px] font-mono text-[var(--muted-foreground)]">{s.date}</span>
+                      <span className="truncate min-w-0">{s.title}</span>
+                      <span className="shrink-0 text-[10px] font-mono text-[var(--muted-foreground)]">{s.date}</span>
                     </button>
                   ))}
+                  {filteredSessions.length === 0 && <p className="px-2.5 py-5 text-center text-xs text-[var(--muted-foreground)]">No chats found</p>}
                 </div>
               </div>
             )}
@@ -854,7 +865,7 @@ export default function App() {
               <span className="hidden sm:inline">New chat</span>
             </Button>
           </div>
-        </header>
+        </header>}
 
       {/* ── 2. MAIN ADAPTIVE WORKSPACE CANVAS ── */}
       {activeTab === 'tactical' && (
@@ -902,7 +913,7 @@ export default function App() {
         ) : (
           /* ── LIVE VOICE MODE: Exact Image 5 3D Companion Avatar + Live Subtitles + Control Buttons ── */
           <main className="flex-1 min-h-0 h-[calc(100vh-48px)] flex flex-col items-center justify-center p-4 overflow-y-auto bg-[var(--background)] relative">
-            <div className="w-full max-w-xl flex flex-col items-center justify-center gap-3 my-auto py-2">
+            <div className="w-full max-w-4xl flex flex-col items-center justify-center gap-3 my-auto py-2">
               {/* Center 3D Qivi Particle Companion Avatar (Exact Image 5 Visualizer) */}
               <div
                 className={`w-full max-w-md h-[280px] sm:h-[320px] flex items-center justify-center relative ${
@@ -910,6 +921,15 @@ export default function App() {
                 }`}
                 id="vortex-gif"
               >
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-[8%] rounded-full blur-3xl pointer-events-none transition-[opacity,transform] duration-100 ease-out"
+                  style={{
+                    background: 'radial-gradient(ellipse at 32% 42%, color-mix(in srgb, var(--accent) 78%, transparent) 0%, transparent 58%), radial-gradient(ellipse at 68% 58%, color-mix(in srgb, var(--primary) 75%, transparent) 0%, transparent 62%), radial-gradient(ellipse at 50% 78%, color-mix(in srgb, var(--secondary) 82%, transparent) 0%, transparent 60%)',
+                    opacity: 0.12 + Math.min(effectiveAudioLevel, 1) * 0.58,
+                    transform: `translate3d(0, ${10 - Math.min(effectiveAudioLevel, 1) * 24}px, 0) scale(${0.86 + Math.min(effectiveAudioLevel, 1) * 0.42})`,
+                  }}
+                />
                 {!isAnyModalOpen && (
                   <QiviAvatarVisualizer
                     systemState={effectiveSystemState}
@@ -920,116 +940,103 @@ export default function App() {
                 )}
               </div>
 
-              {/* ── UNIFIED LIVE VOICE CONTROL & SUBTITLES FRAME ── */}
-              <div className="w-full max-w-lg rounded-2xl bg-[var(--card)]/90 backdrop-blur-md border border-[var(--border)] shadow-md p-3.5 flex flex-col gap-3">
-                {/* Frame Header: State Badge with Equalizer & Stream Status */}
-                <div className="flex items-center justify-between gap-2 pb-2 border-b border-[var(--border)]/60">
-                  {/* State Badge with Pulse */}
-                  <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-[var(--input)]/80 border border-[var(--border)]/60">
-                    <span className={cn(
-                      "w-2 h-2 rounded-full transition-colors duration-150 shrink-0",
-                      effectiveSystemState === 'listening' ? "bg-emerald-500 animate-pulse ring-2 ring-emerald-500/40" :
-                      effectiveSystemState === 'thinking' ? "bg-amber-500 animate-pulse ring-2 ring-amber-500/40" :
-                      effectiveSystemState === 'speaking' ? "bg-[var(--accent)] animate-pulse ring-2 ring-[var(--accent)]/40" :
-                      "bg-[var(--muted-foreground)]"
-                    )} />
-                    <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--foreground)] font-semibold">
-                      {effectiveSystemState}
-                    </span>
+              <div className="absolute top-8 left-1/2 -translate-x-1/2 flex items-center gap-2 text-xs font-mono uppercase tracking-[0.18em] text-[var(--foreground)]/80">
+                <span className={cn(
+                  "h-2 w-2 rounded-full",
+                  effectiveSystemState === 'listening' ? "bg-rose-400 animate-pulse" :
+                  effectiveSystemState === 'speaking' ? "bg-[var(--accent)] animate-pulse" :
+                  effectiveSystemState === 'thinking' ? "bg-amber-400 animate-pulse" :
+                  "bg-[var(--muted-foreground)]"
+                )} />
+                <span>{effectiveSystemState}</span>
+              </div>
 
-                    {/* Soundwave Equalizer when speaking */}
-                    {effectiveSystemState === 'speaking' && (
-                      <div className="flex items-center gap-0.5 h-3 px-1 ml-1 rounded-full bg-[var(--background)] border border-[var(--border)]/60">
-                        <div className="w-0.5 bg-emerald-400 rounded-full animate-soundwave-1" />
-                        <div className="w-0.5 bg-emerald-500 rounded-full animate-soundwave-2" />
-                        <div className="w-0.5 bg-cyan-400 rounded-full animate-soundwave-3" />
-                        <div className="w-0.5 bg-[var(--accent)] rounded-full animate-soundwave-4" />
-                        <div className="w-0.5 bg-amber-400 rounded-full animate-soundwave-5" />
-                        <div className="w-0.5 bg-emerald-400 rounded-full animate-soundwave-6" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Live Stream Label */}
-                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-[var(--muted-foreground)] uppercase">
-                    <Radio className="w-3 h-3 text-[var(--primary)] animate-pulse" />
-                    <span>Live Voice Subtitles</span>
-                  </div>
-                </div>
-
-                {/* Frame Body: Live Speech Transcript Stream */}
-                <div className="min-h-[44px] max-h-[88px] overflow-y-auto px-1 space-y-1.5 text-xs">
-                  {latestUserMessage && (
-                    <div className="flex items-start gap-2">
-                      <span className="font-semibold text-[var(--primary)] shrink-0 font-mono text-[11px]">You:</span>
-                      <span className="line-clamp-2 leading-relaxed text-[var(--foreground)]">{latestUserMessage.text}</span>
-                    </div>
+              <div className="w-full max-w-2xl min-h-12 flex items-center justify-center gap-3 px-4 text-center" aria-live="polite" aria-atomic="true">
+                {liveVoiceSubtitle ? (
+                  <span className={cn(
+                    "max-w-full text-sm sm:text-base leading-relaxed line-clamp-2 transition-[color,opacity] duration-500",
+                    isLiveSubtitleFading && "opacity-0",
                   )}
+                    style={{ color: liveVoiceSubtitle.speaker === 'user' ? 'color-mix(in oklch, var(--primary) 45%, var(--foreground))' : 'var(--foreground)' }}
+                  >
+                    {liveVoiceSubtitle.text}
+                  </span>
+                ) : null}
+              </div>
 
-                  {latestAssistantMessage && (
-                    <div className={cn("flex items-start gap-2", latestUserMessage && "border-t border-[var(--border)]/40 pt-1.5")}>
-                      <span className="font-semibold text-emerald-400 shrink-0 font-mono text-[11px]">ZEZO:</span>
-                      <span className="line-clamp-2 leading-relaxed text-[var(--foreground)]/90">{latestAssistantMessage.text}</span>
-                    </div>
-                  )}
-
-                  {!latestUserMessage && !latestAssistantMessage && (
-                    <div className="text-[11px] text-[var(--muted-foreground)] italic text-center py-2 font-mono">
-                      Listening for speech... Say &quot;Hey Zezo&quot; or start speaking.
-                    </div>
-                  )}
-                </div>
-
-                {/* Frame Footer: 4 Control Buttons Cluster (MUTE, SPEAKER, STOP, OFF) */}
-                <div className="pt-2.5 border-t border-[var(--border)]/60 flex items-center justify-between gap-2">
+              <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2">
+                <div
+                  aria-hidden={!isLiveControlsExpanded}
+                  inert={!isLiveControlsExpanded}
+                  className="overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-300 ease-out"
+                  style={{
+                    maxWidth: isLiveControlsExpanded ? 'min(420px, calc(100vw - 88px))' : '0px',
+                    opacity: isLiveControlsExpanded ? 1 : 0,
+                    transform: isLiveControlsExpanded ? 'translateX(0) scale(1)' : 'translateX(12px) scale(0.96)',
+                    pointerEvents: isLiveControlsExpanded ? 'auto' : 'none',
+                  }}
+                >
+                  <div className="flex w-max items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--card)]/90 p-1.5">
                   {/* Mic Mute Toggle */}
                   <Button
                     variant={isMicMuted ? "destructive" : "outline"}
                     size="sm"
                     onClick={handleToggleMic}
                     title={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
-                    className="flex-1 h-8 px-2 gap-1.5 text-xs font-medium cursor-pointer"
+                    className="h-9 px-3 gap-1.5 rounded-full text-xs font-medium cursor-pointer"
                   >
                     {isMicMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-primary" />}
-                    <span className="text-[11px] font-mono font-semibold">{isMicMuted ? 'UNMUTE' : 'MUTE'}</span>
+                    <span className="hidden sm:inline text-[10px] font-mono font-semibold">{isMicMuted ? 'UNMUTE' : 'MUTE'}</span>
                   </Button>
 
-                  {/* Speaker Voice Output Toggle */}
                   <Button
                     variant={isSpeakerMuted ? "destructive" : "outline"}
                     size="sm"
                     onClick={handleToggleSpeaker}
                     title={isSpeakerMuted ? "Unmute Assistant Voice Output" : "Mute Assistant Voice Output"}
-                    className="flex-1 h-8 px-2 gap-1.5 text-xs font-medium cursor-pointer"
+                    className="h-9 px-3 gap-1.5 rounded-full text-xs font-medium cursor-pointer"
                   >
                     {isSpeakerMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-primary" />}
-                    <span className="text-[11px] font-mono font-semibold">{isSpeakerMuted ? 'MUTED' : 'SPEAKER'}</span>
+                    <span className="hidden sm:inline text-[10px] font-mono font-semibold">{isSpeakerMuted ? 'MUTED' : 'SPEAKER'}</span>
                   </Button>
 
-                  {/* Emergency Stop */}
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleEmergencyStop}
                     title="Emergency Stop (Interrupt Agent Execution)"
-                    className="flex-1 h-8 px-2 gap-1.5 text-xs font-medium hover:bg-destructive/15 hover:border-destructive/50 hover:text-destructive cursor-pointer"
+                    className="h-9 px-3 gap-1.5 rounded-full text-xs font-medium hover:bg-destructive/15 hover:border-destructive/50 hover:text-destructive cursor-pointer"
                   >
                     <Square className="w-3.5 h-3.5 text-destructive" />
-                    <span className="text-[11px] font-mono font-semibold">STOP</span>
+                    <span className="hidden sm:inline text-[10px] font-mono font-semibold">STOP</span>
                   </Button>
 
-                  {/* Power / Sleep Mode Toggle */}
                   <Button
                     variant={isSleeping ? "secondary" : "outline"}
                     size="sm"
                     onClick={handleToggleSleep}
                     title={isSleeping ? "Wake Assistant (Resume Active Mode)" : "Put Assistant to Sleep (Standby Mode)"}
-                    className="flex-1 h-8 px-2 gap-1.5 text-xs font-medium cursor-pointer"
+                    className="h-9 px-3 gap-1.5 rounded-full text-xs font-medium cursor-pointer"
                   >
                     <Power className={`w-3.5 h-3.5 ${isSleeping ? 'text-amber-400' : 'text-emerald-500'}`} />
-                    <span className="text-[11px] font-mono font-semibold">{isSleeping ? 'ON' : 'OFF'}</span>
+                    <span className="hidden sm:inline text-[10px] font-mono font-semibold">{isSleeping ? 'ON' : 'OFF'}</span>
                   </Button>
+
+                  </div>
                 </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsLiveControlsExpanded((expanded) => !expanded)}
+                  title={isLiveControlsExpanded ? "Close voice controls" : "Open voice controls"}
+                  aria-label={isLiveControlsExpanded ? "Close voice controls" : "Open voice controls"}
+                  aria-expanded={isLiveControlsExpanded}
+                  className="h-12 w-12 shrink-0 rounded-full border-[var(--border)] bg-[var(--card)]/90 text-[var(--foreground)] transition-[transform,background-color] duration-300 ease-out"
+                >
+                  <span className="transition-transform duration-300 ease-out" style={{ transform: isLiveControlsExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+                    {isLiveControlsExpanded ? <X className="h-5 w-5" /> : <Ellipsis className="h-5 w-5" />}
+                  </span>
+                </Button>
               </div>
           </div>
         </main>
@@ -1038,14 +1045,14 @@ export default function App() {
 
       {/* ── SCRANTON OFFICE SCREEN ── */}
       {activeTab === 'office' && (
-        <main className="flex-1 w-full h-[calc(100vh-48px)] overflow-hidden bg-[var(--background)]">
+          <main className="flex-1 w-full min-h-0 overflow-hidden bg-[var(--background)]">
           <AutonomousOfficeScreen backendLogs={liveLogs} />
         </main>
       )}
 
       {/* ── WORKFLOW AUTOMATION PIPELINES (COMING SOON) ── */}
       {activeTab === 'workflow' && (
-        <main className="flex-1 flex items-center justify-center p-6 bg-[var(--background)]">
+          <main className="flex-1 min-h-0 flex items-center justify-center p-6 bg-[var(--background)]">
           <Frame className="max-w-md w-full shadow-none">
             <FramePanel className="p-8 flex flex-col items-center text-center bg-[var(--card)] border-[var(--border)]">
               <div className="w-12 h-12 rounded-xl bg-[var(--primary)]/10 border border-[var(--primary)]/20 flex items-center justify-center text-[var(--primary)] mb-4">
