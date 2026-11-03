@@ -12,7 +12,7 @@ import {
  useLocalRuntime,
  type ThreadMessageLike,
 } from '@assistant-ui/react'
-import { ZezoChatThread } from '../assistant-ui/ZezoChatThread'
+import { AgentChatThread } from './AgentChatThread'
 import { Frame } from '../reui/frame'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -63,13 +63,20 @@ export const AgentDirectChatView: React.FC<AgentDirectChatViewProps> = ({
  if (saved) {
  const parsed = JSON.parse(saved)
  if (Array.isArray(parsed) && parsed.length > 0) {
- // Filter out any legacy dummy initialized threads
- return parsed.filter(
- (t: ChatThreadItem) =>
- !t.id.endsWith('-init') &&
- t.title !== `Chat with ${agent.name}` &&
- (t.messageCount || 0) > 0
- )
+  // Filter out any legacy dummy initialized threads
+  return parsed
+   .filter(
+    (t: ChatThreadItem) =>
+     !t.id.endsWith('-init') &&
+     t.title !== `Chat with ${agent.name}` &&
+     (t.messageCount || 0) > 0
+   )
+   .map((t: any) => ({
+    ...t,
+    messages: (t.messages || []).map((m: any) =>
+     m.role === 'user' ? { id: m.id, role: 'user', content: m.content } : m
+    ),
+   }))
  }
  }
  } catch {
@@ -303,7 +310,7 @@ function AgentChatRuntime({ agent, workspace, threadMessages, uploadedFiles, onA
      if (words.length > 10) await new Promise((resolve) => setTimeout(resolve, 24))
     }
     const savedMessages: ThreadMessageLike[] = [
-     { id: `user-${Date.now()}`, role: 'user', content: [{ type: 'text', text: userText }], status: { type: 'complete', reason: 'stop' } },
+     { id: `user-${Date.now()}`, role: 'user', content: [{ type: 'text', text: userText }] },
      { id: `assistant-${Date.now()}`, role: 'assistant', content: [{ type: 'text', text: replyText }], status: { type: 'complete', reason: 'stop' } },
     ]
     onConversationComplete(userText, replyText, savedMessages)
@@ -316,5 +323,5 @@ function AgentChatRuntime({ agent, workspace, threadMessages, uploadedFiles, onA
   },
  }, { initialMessages: threadMessages })
 
- return <AssistantRuntimeProvider runtime={runtime}><ZezoChatThread className="h-full min-h-0" onAttachFile={onAttachFile} uploadedFiles={uploadedFiles} onRemoveFile={onRemoveFile} /></AssistantRuntimeProvider>
+ return <AssistantRuntimeProvider runtime={runtime}><AgentChatThread agent={agent} className="h-full min-h-0" onAttachFile={onAttachFile} uploadedFiles={uploadedFiles} onRemoveFile={onRemoveFile} /></AssistantRuntimeProvider>
 }

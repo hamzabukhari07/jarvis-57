@@ -9,7 +9,7 @@
       "default_tool": "antigravity_run",
       "risk_tier": "L1_MUTATION",
       "prompt_prefix": "You are MICHAEL, Lead Software Architect & Tech Lead.",
-      "model_id": "gemini-3.7-flash-high",
+      "model_id": "gemini-3.8-flash-low",
       "desk_x": 180,
       "desk_y": 160,
       "worktree": "repo_active",
@@ -30,7 +30,7 @@
         "multi_agent_delegation"
       ],
       "is_core": true,
-      "engine": "opencode",
+      "engine": "kilo",
       "soul_markdown": "You are MICHAEL, Lead Software Architect & Tech Lead."
     },
     "VERVE": {
@@ -109,14 +109,14 @@
       "specialty": "FastAPI, PostgreSQL, microservices, complex business logic, and database schemas",
       "color": "#06b6d4",
       "avatar_pixel": "ryan_pixel.png",
-      "default_tool": "opencode_run",
+      "default_tool": "antigravity_run",
       "risk_tier": "L2_DESTRUCTIVE",
-      "prompt_prefix": "You are Ahmad, Senior Python Backend Specialist. Build scalable backend architectures, clean REST/GraphQL APIs, and bulletproof database models with OpenCode.",
-      "model_id": "opencode/nemotron-3-ultra-free",
+      "prompt_prefix": "You are Nexus, Full-Stack & Backend Specialist.",
+      "model_id": "gemini-3.7-flash-high",
       "desk_x": 460,
       "desk_y": 160,
-      "worktree": null,
-      "active_worktree": null,
+      "worktree": "repo_active",
+      "active_worktree": "repo_active",
       "allowed_tools": [
         "opencode_run",
         "quick_snippet",
@@ -139,7 +139,7 @@
       ],
       "is_core": false,
       "engine": "opencode",
-      "soul_markdown": "You are Ahmad, Senior Python Backend Specialist. Build scalable backend architectures, clean REST/GraphQL APIs, and bulletproof database models with OpenCode."
+      "soul_markdown": "You are Nexus, Full-Stack & Backend Specialist."
     },
     "DWIGHT": {
       "name": "Dwight",
@@ -147,14 +147,14 @@
       "specialty": "Multi-file refactoring, test suites, edge-case audit, and clean architecture",
       "color": "#eab308",
       "avatar_pixel": "dwight_pixel.png",
-      "default_tool": "kilo_run",
+      "default_tool": "antigravity_run",
       "risk_tier": "L1_MUTATION",
-      "prompt_prefix": "You are Dwight Schrute, Senior Refactoring & QA Specialist. Ensure codebases are robust, thoroughly tested, and adhere to strict cyclomatic complexity limits.",
-      "model_id": "kilo/stepfun/step-3.7-flash:free",
+      "prompt_prefix": "You are Dwight, Senior Refactoring & QA Specialist.",
+      "model_id": "gemini-3.8-flash-low",
       "desk_x": 460,
       "desk_y": 280,
-      "worktree": null,
-      "active_worktree": null,
+      "worktree": "repo_active",
+      "active_worktree": "repo_active",
       "allowed_tools": [
         "kilo_run",
         "quick_snippet",
@@ -176,7 +176,7 @@
       ],
       "is_core": false,
       "engine": "kilo",
-      "soul_markdown": "You are Dwight Schrute, Senior Refactoring & QA Specialist. Ensure codebases are robust, thoroughly tested, and adhere to strict cyclomatic complexity limits."
+      "soul_markdown": "You are Dwight, Senior Refactoring & QA Specialist."
     },
     "PAM": {
       "name": "Pam Beesly",

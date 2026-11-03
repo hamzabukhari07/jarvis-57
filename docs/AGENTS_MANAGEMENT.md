@@ -12,7 +12,7 @@
 
 The **Autonomous Agent Management System** enables ZEZO to orchestrate a distributed team of specialized, autonomous sub-agents. The frontend presents the agents through a compact Agents roster and dedicated agent workspaces for Edit, Chat, and Files, with a separate Logs view. The former Floor and Tasks visualizations have been removed.
 
-Agent execution supports **Git worktree sandboxing**, **3-tier risk gates**, **keyword-driven role inference**, and direct 1-on-1 chat through Assistant-UI.
+Agent execution supports **Git worktree sandboxing**, **3-tier risk gates**, **keyword-driven role inference**, and direct conversational 1-on-1 chat through Assistant-UI with authentic persona dialogue (reserving background CLI task dispatch for explicit directives).
 
 ```mermaid
 flowchart TD
