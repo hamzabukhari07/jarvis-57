@@ -1,0 +1,85 @@
+{
+  "suite": "Suite J: Streaming",
+  "timestamp": "2026-11-04 20:25:15",
+  "tests": {
+    "J05_no_fake_timer_streaming": {
+      "status": "FAIL",
+      "details": {
+        "buffers_entire_list": true,
+        "simulates_streaming_with_sleep": true,
+        "source_evidence": "Line 460: return list(gemini.stream_text(...)); Line 463: chunks = await loop.run_in_executor(None, _do_stream); Line 467: await asyncio.sleep(0.01)"
+      },
+      "finding": "CRITICAL DEFECT: runtime.step_stream_async buffers all chunks from Gemini via list(...) before yielding, then simulates streaming with await asyncio.sleep(0.01)."
+    },
+    "J01_long_conversational_request": {
+      "status": "PASS",
+      "total_events": 19,
+      "chunk_count": 18,
+      "total_duration_s": 11.724
+    },
+    "J02_first_chunk_timing": {
+      "status": "FAIL",
+      "first_chunk_timestamp_s": 11.433,
+      "total_duration_s": 11.724,
+      "ratio_first_chunk_to_end": 0.975,
+      "finding": "First chunk arrived at 11.433s out of 11.724s total duration (97.5% of total time elapsed before any chunk was yielded)."
+    },
+    "J03_incremental_chunks": {
+      "status": "PASS",
+      "chunk_count": 18,
+      "inter_chunk_deltas_sample": [
+        0.0245,
+        0.0159,
+        0.0162,
+        0.0146,
+        0.0155,
+        0.0153,
+        0.0161,
+        0.0159,
+        0.0159,
+        0.0158
+      ],
+      "avg_delta_s": 0.0162,
+      "note": "Chunks arrive at ~10ms synthetic intervals due to asyncio.sleep(0.01) after full buffering."
+    },
+    "J04_frontend_sse_contract": {
+      "status": "PASS",
+      "http_status": 200,
+      "content_type": "text/event-stream; charset=utf-8",
+      "has_status_event": true,
+      "has_chunk_event": true,
+      "has_done_event": true
+    },
+    "J06_completion_events": {
+      "status": "PASS",
+      "done_event_present": true,
+      "sample_payload": [
+        "event: done",
+        "data: {\"reply\": \"Hello, Lead Architect.\", \"conversation_id\": \"conv_c270f53afa2e\", \"agent_id\": \"MICHAEL\"}"
+      ]
+    },
+    "J07_streaming_errors": {
+      "status": "PASS",
+      "error_event_present": true,
+      "raw_sse": "event: error\ndata: {\"error\": \"Agent 'NON_EXISTENT_AGENT_12345' not found.\"}\n\nevent: done\ndata: {}"
+    },
+    "J08_empty_response_handling": {
+      "status": "PASS",
+      "raw_sse": "event: error\ndata: {\"error\": \"Prompt cannot be empty.\"}\n\nevent: done\ndata: {}"
+    },
+    "J09_conversation_persistence": {
+      "status": "PASS",
+      "conversation_id": "conv_d862b076c0f2",
+      "message_count": 2,
+      "user_persisted": true,
+      "assistant_persisted": true
+    },
+    "J10_provider_and_context_architecture": {
+      "status": "PASS",
+      "provider": "Google Gemini (tier=fast, gemini.stream_text)",
+      "context_assembly": "AgentRuntime.build_system_prompt() + load_messages()",
+      "streaming_endpoint": "/api/agents/chat/stream",
+      "frontend_consumer": "streamAgentChat in frontend/src/lib/api.ts"
+    }
+  }
+}

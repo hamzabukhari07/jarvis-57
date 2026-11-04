@@ -1,0 +1,37 @@
+{
+  "audit_name": "Audit Subagent 2 - Conversation Continuity & Frontend Integration",
+  "timestamp": "2026-11-04T15:55:00Z",
+  "scope": {
+    "component": "frontend/src/components/office/AgentDirectChatView.tsx",
+    "backend_streaming": "core/ui_server.py (_agent_chat_stream_handler)",
+    "test_suite": "tests/run_suite_e_tests.py (E00_CORE_ALEX_DENTAL_SAAS)"
+  },
+  "findings": {
+    "1_thread_id_generation": {
+      "observed": "In AgentDirectChatView.tsx lines 88-90 and 107, threads and activeThreadId initialize with or create IDs formatted as `thread-${agent.id}-${Date.now()}`.",
+      "code_snippet": "const [activeThreadId, setActiveThreadId] = useState<string>(() => threads[0]?.id || `thread-${agent.id}-${Date.now()}`); const handleCreateNewThread = () => setActiveThreadId(`thread-${agent.id}-${Date.now()}`)"
+    },
+    "2_conversation_id_prop_passing": {
+      "observed": "At line 260 of AgentDirectChatView.tsx, AgentChatRuntime is passed conversationId as: `conversationId={activeThreadId.startsWith('conv_') ? activeThreadId : undefined}`.",
+      "impact": "Because all newly created threads start with 'thread-', `activeThreadId.startsWith('conv_')` evaluates to false. Consequently, `conversationId` is passed as `undefined` to AgentChatRuntime and in turn to `api.streamAgentChat`."
+    },
+    "3_backend_sse_and_missing_state_update": {
+      "backend_behavior": "In core/ui_server.py line 1576-1580, `_agent_chat_stream_handler` sends SSE event: 'done' with data containing `conversation_id: item.get('conversation_id')` (which is a real backend ID prefixed with 'conv_').",
+      "frontend_handler": "In AgentDirectChatView.tsx lines 305-341, the SSE consumer loops over chunks. When `chunk.type === 'done'`, it only checks `chunk.reply`. It completely ignores `chunk.conversation_id`.",
+      "thread_completion": "In lines 336-341, `onConversationComplete` is called, which invokes `handleConversationComplete` (lines 184-199). `handleConversationComplete` preserves `activeThreadId` (the original `thread-${agent.id}-${Date.now()}`) and never updates `activeThreadId` or the thread object with the backend's `conv_...` ID.",
+      "impact": "When the user types a second message in the same chat thread, `activeThreadId` is STILL `thread-...`, so `activeThreadId.startsWith('conv_')` remains false, and `conversationId` is passed as `undefined` AGAIN. The backend treats it as a brand-new conversation on turn 2, breaking server-side conversational continuity across consecutive user turns in the UI."
+    },
+    "4_suite_e_testing_methodology": {
+      "scenario_A_direct_runtime": true,
+      "scenario_B_backend_api_explicit_conv_id": false,
+      "scenario_C_frontend_ui_consecutive_messages": false,
+      "details": "Inspection of tests/run_suite_e_tests.py (lines 56-135) reveals that E00_CORE_ALEX_DENTAL_SAAS was executed strictly via Scenario A (in-process Python AgentRuntime directly, with a mock ProviderAdapter and explicit conv_id = runtime.get_or_create_conversation()). It was NOT tested through the backend REST/SSE API, nor through the actual frontend AgentDirectChatView UI with consecutive messages."
+    }
+  },
+  "conclusion": {
+    "scenario_c_tested": false,
+    "frontend_conversation_continuity_status": "NOT VERIFIED",
+    "critical_defect_identified": true,
+    "defect_summary": "Frontend AgentDirectChatView fails to capture and store the backend `conversation_id` emitted by SSE `done` event. As a result, subsequent messages sent within the same thread always pass `conversationId: undefined`, creating isolated one-shot backend conversations instead of maintaining ongoing multi-turn context in live UI chat."
+  }
+}

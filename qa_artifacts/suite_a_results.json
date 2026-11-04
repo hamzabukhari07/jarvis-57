@@ -1,0 +1,372 @@
+{
+  "suite": "Suite A: Agent Creation",
+  "timestamp": "2026-11-04T15:25:33Z",
+  "total_tests": 15,
+  "passed": 15,
+  "failed": 0,
+  "test_cases": {
+    "A01": {
+      "name": "Create a new custom agent",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "endpoint": "http://127.0.0.1:8991/api/agents/save_agent",
+        "response": {
+          "success": true,
+          "agent": {
+            "id": "CYBER_SENTINEL",
+            "name": "Cyber Sentinel",
+            "role": "Security Auditing & Threat Detection Specialist",
+            "specialty": "Vulnerability scanning, AST audit, secure architecture validation",
+            "color": "#10b981",
+            "avatar_pixel": "cyber_sentinel_pixel.png",
+            "default_tool": "opencode_run",
+            "risk_tier": "L1_MUTATION",
+            "prompt_prefix": "You are Cyber Sentinel, an elite cybersecurity autonomous auditor for ZEZO.",
+            "model_id": "gemini-2.5-pro",
+            "status": "idle",
+            "current_task_id": null,
+            "active_worktree": "None",
+            "desk_x": 320,
+            "desk_y": 160,
+            "logs": [
+              "[READY] Agent 'Cyber Sentinel' registered into autonomous agents",
+              "[MODEL] Engine: opencode_run | Model: gemini-2.5-pro",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Cyber Sentinel' registered into autonomous agents",
+              "[MODEL] Engine: opencode_run | Model: gemini-2.5-pro",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "opencode_run",
+              "task_status",
+              "web_search"
+            ],
+            "allowed_skills": [
+              "kilo_code",
+              "multi_agent_collaboration",
+              "make_plan",
+              "git_workflow"
+            ],
+            "capabilities": [
+              "security_audit",
+              "code_review"
+            ],
+            "is_core": false,
+            "engine": "opencode",
+            "soul_markdown": "# Cyber Sentinel Soul\nAutonomous security auditing agent.",
+            "chat_history": []
+          }
+        }
+      }
+    },
+    "A02": {
+      "name": "Assign a unique name",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "assigned_name": "Cyber Sentinel",
+        "assigned_id": "CYBER_SENTINEL"
+      }
+    },
+    "A03": {
+      "name": "Configure its role",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "role": "Security Auditing & Threat Detection Specialist"
+      }
+    },
+    "A04": {
+      "name": "Configure its specialty",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "specialty": "Vulnerability scanning, AST audit, secure architecture validation"
+      }
+    },
+    "A05": {
+      "name": "Set custom personality/system instructions",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "soul_resp": {
+          "success": true,
+          "agent_id": "CYBER_SENTINEL",
+          "soul": "You are Cyber Sentinel. Never bypass security boundaries. Audit rigorously."
+        },
+        "verified_soul_md": "You are Cyber Sentinel. Never bypass security boundaries. Audit rigorously."
+      }
+    },
+    "A06": {
+      "name": "Select a conversational model",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "model_id": "gemini-2.5-pro"
+      }
+    },
+    "A07": {
+      "name": "Select a task execution engine",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "engine": "opencode",
+        "default_tool": "opencode_run"
+      }
+    },
+    "A08": {
+      "name": "Configure available tools",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "allowed_tools": [
+          "opencode_run",
+          "task_status",
+          "web_search"
+        ]
+      }
+    },
+    "A09": {
+      "name": "Configure agent permissions",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "CYBER_SENTINEL_risk_tier": "L1_MUTATION",
+        "allowed_tool_granted_check": [
+          true,
+          ""
+        ],
+        "unallowed_tool_denied_check": [
+          false,
+          "Tool 'file_controller' is not in allowed_tools for agent 'Cyber Sentinel' (CYBER_SENTINEL)."
+        ],
+        "L0_sanitized_tools": [
+          "web_search",
+          "task_status"
+        ]
+      }
+    },
+    "A10": {
+      "name": "Save the agent",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "save_response": true,
+        "in_memory_id": "CYBER_SENTINEL",
+        "desk_coordinates": [
+          320,
+          160
+        ]
+      }
+    },
+    "A11": {
+      "name": "Verify that the agent appears in the UI (via live UI server /api/agents/state)",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "total_agents_in_ui_state": 17,
+        "matched_agent_in_ui": {
+          "id": "CYBER_SENTINEL",
+          "name": "Cyber Sentinel",
+          "role": "Security Auditing & Threat Detection Specialist",
+          "specialty": "Vulnerability scanning, AST audit, secure architecture validation",
+          "color": "#10b981",
+          "avatar_pixel": "cyber_sentinel_pixel.png",
+          "default_tool": "opencode_run",
+          "risk_tier": "L1_MUTATION",
+          "model_id": "gemini-2.5-pro",
+          "status": "idle",
+          "task_id": null,
+          "task_title": null,
+          "task_progress": 0,
+          "worktree": "None",
+          "desk_x": 320,
+          "desk_y": 160,
+          "logs": [
+            "[READY] Agent 'Cyber Sentinel' registered into autonomous agents",
+            "[MODEL] Engine: opencode_run | Model: gemini-2.5-pro",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "recent_logs": [
+            "[READY] Agent 'Cyber Sentinel' registered into autonomous agents",
+            "[MODEL] Engine: opencode_run | Model: gemini-2.5-pro",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "allowed_tools": [
+            "opencode_run",
+            "task_status",
+            "web_search"
+          ],
+          "allowed_skills": [
+            "kilo_code",
+            "multi_agent_collaboration",
+            "make_plan",
+            "git_workflow"
+          ],
+          "capabilities": [
+            "security_audit",
+            "code_review"
+          ],
+          "is_core": false,
+          "engine": "opencode",
+          "soul_markdown": "You are Cyber Sentinel. Never bypass security boundaries. Audit rigorously.",
+          "chat_history": []
+        }
+      }
+    },
+    "A12": {
+      "name": "Verify that its configuration is persisted (in config/agents.json and memory)",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "persisted_in_disk": true,
+        "disk_entry": {
+          "name": "Cyber Sentinel",
+          "role": "Security Auditing & Threat Detection Specialist",
+          "specialty": "Vulnerability scanning, AST audit, secure architecture validation",
+          "color": "#10b981",
+          "avatar_pixel": "cyber_sentinel_pixel.png",
+          "default_tool": "opencode_run",
+          "risk_tier": "L1_MUTATION",
+          "prompt_prefix": "You are Cyber Sentinel. Never bypass security boundaries. Audit rigorously.",
+          "model_id": "gemini-2.5-pro",
+          "desk_x": 320,
+          "desk_y": 160,
+          "worktree": "None",
+          "active_worktree": "None",
+          "allowed_tools": [
+            "opencode_run",
+            "task_status",
+            "web_search"
+          ],
+          "allowed_skills": [
+            "kilo_code",
+            "multi_agent_collaboration",
+            "make_plan",
+            "git_workflow"
+          ],
+          "capabilities": [
+            "security_audit",
+            "code_review"
+          ],
+          "is_core": false,
+          "engine": "opencode",
+          "soul_markdown": "You are Cyber Sentinel. Never bypass security boundaries. Audit rigorously."
+        },
+        "persisted_in_memory_db": true
+      }
+    },
+    "A13": {
+      "name": "Restart ZEZO / registry refresh and verify the agent still exists",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "reloaded_agent_id": "CYBER_SENTINEL",
+        "reloaded_agent_name": "Cyber Sentinel",
+        "reloaded_agent_role": "Security Auditing & Threat Detection Specialist",
+        "reloaded_agent_desk": [
+          320,
+          160
+        ]
+      }
+    },
+    "A14": {
+      "name": "Create multiple agents with different identities",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "created_count": 3,
+        "created_identities": [
+          "PIXEL_ARTIST",
+          "DATA_ARCHEOLOGIST",
+          "DOCS_SCRIBE"
+        ],
+        "distinct_desk_coordinates": [
+          [
+            320,
+            880
+          ],
+          [
+            460,
+            880
+          ],
+          [
+            600,
+            880
+          ]
+        ]
+      }
+    },
+    "A15": {
+      "name": "Verify duplicate or invalid configurations are handled correctly",
+      "status": "PASSED",
+      "notes": "",
+      "evidence": {
+        "empty_id_rejected": {
+          "success": false,
+          "error": "Agent name or ID cannot be empty."
+        },
+        "invalid_chars_rejected": {
+          "success": false,
+          "error": "Agent identifier must contain alphanumeric characters."
+        },
+        "duplicate_id_safe_update": {
+          "success": true,
+          "agent": {
+            "id": "CYBER_SENTINEL",
+            "name": "Cyber Sentinel Upgraded",
+            "role": "Lead Security Architect & Auditor",
+            "specialty": "Lead Security Architect & Auditor",
+            "color": "#10b981",
+            "avatar_pixel": "cyber_sentinel_pixel.png",
+            "default_tool": "opencode_run",
+            "risk_tier": "L1_MUTATION",
+            "prompt_prefix": "You are Cyber Sentinel. Never bypass security boundaries. Audit rigorously.",
+            "model_id": "gemini-2.5-pro",
+            "status": "idle",
+            "current_task_id": null,
+            "active_worktree": "None",
+            "desk_x": 320,
+            "desk_y": 160,
+            "logs": [
+              "[READY] Agent 'Cyber Sentinel Upgraded' registered into autonomous agents",
+              "[MODEL] Engine: opencode_run | Model: gemini-2.5-pro",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Cyber Sentinel Upgraded' registered into autonomous agents",
+              "[MODEL] Engine: opencode_run | Model: gemini-2.5-pro",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "opencode_run",
+              "task_status",
+              "web_search"
+            ],
+            "allowed_skills": [
+              "kilo_code",
+              "multi_agent_collaboration",
+              "make_plan",
+              "git_workflow"
+            ],
+            "capabilities": [
+              "security_audit",
+              "code_review"
+            ],
+            "is_core": false,
+            "engine": "opencode",
+            "soul_markdown": "You are Cyber Sentinel. Never bypass security boundaries. Audit rigorously.",
+            "chat_history": []
+          }
+        },
+        "core_agent_protected": {
+          "success": false,
+          "error": "Cannot decommission core builtin agent 'MICHAEL'."
+        }
+      }
+    }
+  }
+}

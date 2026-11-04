@@ -1,0 +1,83 @@
+{
+  "suite": "Suite I: External Execution Engines - Antigravity Engine",
+  "timestamp": "2026-11-04T15:26:48Z",
+  "tests": [
+    {
+      "id": "I01",
+      "title": "Verify CLI availability (agy / antigravity binary resolution)",
+      "status": "PASS",
+      "details": {
+        "binary_path": "C:\\Users\\Hamza Bukhari\\AppData\\Local\\agy\\bin\\agy.exe",
+        "version_output": "1.4.12",
+        "returncode": 0
+      }
+    },
+    {
+      "id": "I02",
+      "title": "Dispatch a read-only workspace inspection task to Antigravity engine",
+      "status": "PASS",
+      "details": {
+        "status": "done",
+        "exit_code": 0,
+        "duration_sec": 7.53,
+        "workspace": "C:\\Users\\HAMZAB~1\\AppData\\Local\\Temp\\qa_antigravity_run_jd851g31"
+      }
+    },
+    {
+      "id": "I03",
+      "title": "Verify the actual Antigravity process starts (via ProcessSupervisor / logs)",
+      "status": "PASS",
+      "details": {
+        "pid_assigned_to_context": 27076,
+        "report_count": 4,
+        "initial_report": "Launching antigravity (gemini-3.6-flash-high)..."
+      }
+    },
+    {
+      "id": "I04",
+      "title": "Verify correct output is captured",
+      "status": "PASS",
+      "details": {
+        "target_string_found": true,
+        "stdout_lines_count": 10,
+        "last_event": "{\"event\":\"result\",\"result\":{\"conversation_id\":\"9fa5ed6f-8840-4888-ae8e-f00615706a22\",\"status\":\"SUCCESS\",\"response\":\"ZEZO_INSPECTION_OK_12345\\n\",\"duration_seconds\":6.0101899,\"num_turns\":1,\"usage\":{\"input_tokens\":14011,\"output_tokens\":309,\"thinking_tokens\":244,\"cache_read_tokens\":0,\"total_tokens\":14320}}}"
+      }
+    },
+    {
+      "id": "I05",
+      "title": "Verify selected agent configuration is respected",
+      "status": "PASS",
+      "details": {
+        "alias_resolution": {
+          "input": "flash",
+          "resolved": "gemini-3.8-flash-medium"
+        },
+        "cli_flag_generation": [
+          {
+            "model": "gemini-3.8-flash-high",
+            "present_in_cmd": true
+          },
+          {
+            "model": "claude-sonnet-4-6",
+            "present_in_cmd": true
+          },
+          {
+            "model": "gemini-3.6-flash-high",
+            "present_in_cmd": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "I16-I22",
+      "title": "Shared engine checks (Process cancellation, exit codes, process tree termination)",
+      "status": "PASS",
+      "details": {
+        "cancellation_status": "cancelled",
+        "exit_code_propagation": 42,
+        "process_tree_grandchild_killed": true,
+        "grandchild_pid": 22400
+      }
+    }
+  ]
+}

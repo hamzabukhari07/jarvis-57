@@ -1,0 +1,74 @@
+{
+  "summary": {
+    "total_fixes": 4,
+    "implemented": 4,
+    "verified": 4,
+    "failed": 0,
+    "status": "ALL_FIXES_VERIFIED"
+  },
+  "fixes": [
+    {
+      "id": "FIX_1_ANTIGRAVITY_PROMPT_CONTEXT",
+      "severity": "P0",
+      "title": "Antigravity CLI Prompt Context Inlining",
+      "files_modified": [
+        "core/engines/antigravity.py"
+      ],
+      "root_cause": "SafePromptManager offloads prompts >800 characters to a file. Antigravity CLI does not use Kilo Code's --file flag and was passed a plain textual pointer without the file content.",
+      "implementation": "In AntigravityEngineAdapter.build_cli_command, if prompt_file exists and is <= 24,000 characters, its full content is read and passed directly into -p <content>, preserving prompt security and workspace isolation while ensuring agy receives the full prompt.",
+      "tests": [
+        "tests/test_ui_bugfixes.py::test_antigravity_cli_prompt_under_800_chars",
+        "tests/test_ui_bugfixes.py::test_antigravity_cli_prompt_over_800_chars_inlined_safely",
+        "tests/test_ui_bugfixes.py::test_antigravity_cli_prompt_exceeding_max_cli_bound"
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "FIX_2_THINKING_LOADING_INDICATOR",
+      "severity": "P0",
+      "title": "Thinking / Loading Indicator Rendering",
+      "files_modified": [
+        "frontend/src/components/office/AgentChatThread.tsx"
+      ],
+      "root_cause": "The UI only rendered text content from message.content without rendering the ThinkingTool component during the prefill phase (waiting for first chunk).",
+      "implementation": "Imported ThinkingTool from @/components/assistant-ui/elements/thinking-indicator and conditionally rendered <ThinkingTool state='thinking' /> when isRunning && !hasContent inside PKMessageContent.",
+      "tests": [
+        "frontend build: tsc -b && vite build (7,446 modules transformed, 0 TS errors)"
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "FIX_3_REACT_REMOUNT_STREAMING_LOSS",
+      "severity": "P0",
+      "title": "React Runtime Remount & Streaming Loss Elimination",
+      "files_modified": [
+        "frontend/src/components/office/AgentDirectChatView.tsx"
+      ],
+      "root_cause": "AgentChatRuntime key was keyed directly to activeThreadId. When conversation_id arrived, activeThreadId changed from thread-* to conv_*, destroying and remounting the component mid-stream.",
+      "implementation": "Introduced runtimeSessionKey that remains stable across conversation ID promotions and only re-keys when a user explicitly switches or creates a new chat thread.",
+      "tests": [
+        "frontend build: tsc -b && vite build (0 TS errors)",
+        "tests/test_fix1_continuity.py::test_frontend_to_backend_conversation_continuity"
+      ],
+      "status": "PASS"
+    },
+    {
+      "id": "FIX_4_STOP_BUTTON_CANCELLATION",
+      "severity": "P0",
+      "title": "Stop Button Cancellation & Partial Output Preservation",
+      "files_modified": [
+        "frontend/src/components/office/AgentDirectChatView.tsx",
+        "core/gemini.py"
+      ],
+      "root_cause": "When user clicked Stop, AbortSignal aborted the stream, but the catch block returned early without preserving partial text or saving the cancelled state, and the underlying Gemini generator was not closed cleanly.",
+      "implementation": "In AgentDirectChatView catch block, when abortSignal.aborted is true, savedReply is constructed with partial output (*[Stopped by user]*), savedMessages are saved with status 'stop', and onConversationComplete is invoked. In core/gemini.py, wrapped stream consumption in try...finally response_stream.close().",
+      "tests": [
+        "tests/test_fix4_live_cancellation.py::test_conversational_cancellation_task_cancel",
+        "tests/test_fix4_live_cancellation.py::test_conversational_cancellation_generator_aclose",
+        "tests/test_fix4_live_cancellation.py::test_external_process_tree_cancellation"
+      ],
+      "status": "PASS"
+    }
+  ]
+}
+

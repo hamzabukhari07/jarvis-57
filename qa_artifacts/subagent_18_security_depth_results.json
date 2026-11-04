@@ -1,0 +1,367 @@
+{
+  "subagent": "Subagent 18 (Security Architecture & Isolation In-Depth QA)",
+  "timestamp": "2026-11-04 20:22:57",
+  "environment": {
+    "os": "win32",
+    "python_version": "3.14.0 (tags/v3.14.0:ebf955d, Oct  7 2025, 10:15:03) [MSC v.1944 64 bit (AMD64)]",
+    "is_windows": true,
+    "workspace": "C:\\Users\\Hamza Bukhari\\Documents\\antigravity\\jarvis-57"
+  },
+  "test_suites": {
+    "path_jail_isolation": [
+      {
+        "name": "legitimate_subpath",
+        "status": "PASS",
+        "details": {
+          "resolved": "C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\zezo_jail_test_otpo7xow\\subdir\\valid_file.txt"
+        }
+      },
+      {
+        "name": "traversal_dot_dot_escape",
+        "status": "PASS",
+        "details": {
+          "blocked_exception": "Access Denied: Path escapes workspace boundary!\n  Target (resolved):   C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\outside.txt\n  Workspace jail root: C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\zezo_jail_test_otpo7xow"
+        }
+      },
+      {
+        "name": "deep_traversal_escape",
+        "status": "PASS",
+        "details": {
+          "blocked_exception": "Access Denied: Path escapes workspace boundary!\n  Target (resolved):   C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\outside.txt\n  Workspace jail root: C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\zezo_jail_test_otpo7xow"
+        }
+      },
+      {
+        "name": "absolute_system_escape",
+        "status": "PASS",
+        "details": {
+          "blocked_exception": "Access Denied: Path escapes workspace boundary!\n  Target (resolved):   C:\\Windows\n  Workspace jail root: C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\zezo_jail_test_otpo7xow"
+        }
+      },
+      {
+        "name": "unc_path_escape",
+        "status": "PASS",
+        "details": {
+          "blocked_exception": "Access Denied: Path escapes workspace boundary!\n  Target (resolved):   \\\\attacker.evil.com\\share\\payload.exe\n  Workspace jail root: C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\zezo_jail_test_otpo7xow"
+        }
+      },
+      {
+        "name": "null_byte_injection",
+        "status": "PASS",
+        "details": {
+          "blocked_exception": "Embedded null byte detected in path."
+        }
+      },
+      {
+        "name": "symlink_reparse_point_escape",
+        "status": "PASS",
+        "details": {
+          "blocked_exception": "Access Denied: Path escapes workspace boundary!\n  Target (resolved):   C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\zezo_ext_target_64o1hipb\\external_secret.txt\n  Workspace jail root: C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\zezo_jail_test_otpo7xow"
+        }
+      },
+      {
+        "name": "alternate_data_stream",
+        "status": "PASS",
+        "details": {
+          "resolved": "C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\zezo_jail_test_otpo7xow\\subdir\\valid_file.txt:hidden",
+          "contained": true
+        }
+      },
+      {
+        "name": "oracle_leak_containment_first",
+        "status": "PASS",
+        "details": {
+          "raised": "SecurityAccessDenied (containment check occurred before existence check)"
+        }
+      },
+      {
+        "name": "allow_nonexistent_outside_escape",
+        "status": "PASS",
+        "details": {
+          "blocked_exception": "Access Denied: Path escapes workspace boundary!\n  Target (resolved):   C:\\NonExistentOutsideDir\\newfile.txt\n  Workspace jail root: C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\zezo_jail_test_otpo7xow"
+        }
+      },
+      {
+        "name": "empty_target_path",
+        "status": "PASS",
+        "details": {
+          "blocked_exception": "Target path cannot be empty."
+        }
+      }
+    ],
+    "tool_executor_privileges": [
+      {
+        "name": "spoof_main_session_no_token",
+        "status": "PASS",
+        "details": {
+          "blocked_by": "identity",
+          "msg": "Unauthorized claim of MAIN_SESSION privileges."
+        }
+      },
+      {
+        "name": "spoof_main_session_bad_token",
+        "status": "PASS",
+        "details": {
+          "blocked_by": "identity",
+          "msg": "Unauthorized claim of MAIN_SESSION privileges."
+        }
+      },
+      {
+        "name": "valid_main_session_token",
+        "status": "PASS",
+        "details": {
+          "success": true,
+          "output": "pong"
+        }
+      },
+      {
+        "name": "agent_context_missing_id",
+        "status": "PASS",
+        "details": {
+          "blocked_by": "identity",
+          "msg": "Agent execution requires a valid, non-null agent_id."
+        }
+      },
+      {
+        "name": "agent_context_unknown_id",
+        "status": "PASS",
+        "details": {
+          "blocked_by": "identity",
+          "msg": "Unknown or unauthenticated agent: MALICIOUS_NONEXISTENT_AGENT_999"
+        }
+      },
+      {
+        "name": "l0_agent_blocks_opencode_run",
+        "status": "PASS",
+        "details": {
+          "blocked_by": "permission",
+          "reason": "Tool 'opencode_run' is not in allowed_tools for agent 'Test L0 Bot' (TEST_L0_BOT)."
+        }
+      },
+      {
+        "name": "l0_agent_blocks_shutdown_zezo",
+        "status": "PASS",
+        "details": {
+          "blocked_by": "permission",
+          "reason": "Tool 'shutdown_zezo' is not in allowed_tools for agent 'Test L0 Bot' (TEST_L0_BOT)."
+        }
+      },
+      {
+        "name": "l1_agent_blocks_shutdown_zezo",
+        "status": "PASS",
+        "details": {
+          "blocked_by": "permission",
+          "reason": "Tool 'shutdown_zezo' is not in allowed_tools for agent 'Test L1 Bot' (TEST_L1_BOT)."
+        }
+      },
+      {
+        "name": "path_arg_jail_interception",
+        "status": "PASS",
+        "details": {
+          "blocked_by": "path_jail",
+          "reason": "Path security violation on argument 'path': Access Denied: Path escapes workspace boundary!\n  Target (resolved):   C:\\Windows\\System32\\cmd.exe\n  Workspace jail root: C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\zezo_ws_test_45cxvz9a"
+        }
+      },
+      {
+        "name": "path_bearing_tool_no_workspace",
+        "status": "PASS",
+        "details": {
+          "blocked_by": "path_jail",
+          "reason": "Path-bearing tool execution under agent requires an assigned workspace jail."
+        }
+      },
+      {
+        "name": "destructive_confirmation_gate",
+        "status": "PASS",
+        "details": {
+          "blocked_by": "confirmation",
+          "error": "Confirmation pending user approval."
+        }
+      }
+    ],
+    "external_engines_restriction": [
+      {
+        "name": "l0_denied_antigravity_run",
+        "status": "PASS",
+        "details": {
+          "tool": "antigravity_run",
+          "blocked_reason": "Tool 'antigravity_run' is not in allowed_tools for agent 'Security Audit L0' (SECURITY_AUDIT_L0)."
+        }
+      },
+      {
+        "name": "l0_denied_opencode_run",
+        "status": "PASS",
+        "details": {
+          "tool": "opencode_run",
+          "blocked_reason": "Tool 'opencode_run' is not in allowed_tools for agent 'Security Audit L0' (SECURITY_AUDIT_L0)."
+        }
+      },
+      {
+        "name": "l0_denied_kilo_run",
+        "status": "PASS",
+        "details": {
+          "tool": "kilo_run",
+          "blocked_reason": "Tool 'kilo_run' is not in allowed_tools for agent 'Security Audit L0' (SECURITY_AUDIT_L0)."
+        }
+      },
+      {
+        "name": "hire_sanitization_purges_engines",
+        "status": "PASS",
+        "details": {
+          "allowed_tools": [
+            "web_search"
+          ]
+        }
+      },
+      {
+        "name": "antigravity_rejects_drive_root",
+        "status": "PASS",
+        "details": {
+          "blocked_exception": "Access to filesystem root 'C:\\' is strictly denied."
+        }
+      },
+      {
+        "name": "opencode_rejects_drive_root",
+        "status": "PASS",
+        "details": {
+          "blocked_exception": "Access to filesystem root 'C:\\' is strictly denied."
+        }
+      },
+      {
+        "name": "kilo_rejects_drive_root",
+        "status": "PASS",
+        "details": {
+          "blocked_exception": "Access to filesystem root 'C:\\' is strictly denied."
+        }
+      }
+    ],
+    "env_leaks_and_redaction": [
+      {
+        "name": "build_sanitized_environment_isolation",
+        "status": "PASS",
+        "details": {
+          "retained_count": 17,
+          "forbidden_keys_excluded": [
+            "AWS_SECRET_ACCESS_KEY",
+            "DATABASE_URL",
+            "SECRET_HOST_TOKEN"
+          ]
+        }
+      },
+      {
+        "name": "redact_secrets_google_aizasy_key",
+        "status": "PASS",
+        "details": {
+          "redacted": "Found key [REDACTED_SECRET]78 in config"
+        }
+      },
+      {
+        "name": "redact_secrets_google_aq_format_key",
+        "status": "PASS",
+        "details": {
+          "redacted": "Gemini key is [REDACTED_SECRET]"
+        }
+      },
+      {
+        "name": "redact_secrets_openai_sk_key",
+        "status": "PASS",
+        "details": {
+          "redacted": "Connecting with [REDACTED_SECRET]"
+        }
+      },
+      {
+        "name": "redact_secrets_tavily_key",
+        "status": "PASS",
+        "details": {
+          "redacted": "[REDACTED_SECRET]"
+        }
+      },
+      {
+        "name": "redact_secrets_github_token",
+        "status": "PASS",
+        "details": {
+          "redacted": "[REDACTED_SECRET]"
+        }
+      },
+      {
+        "name": "redact_secrets_bearer_token",
+        "status": "PASS",
+        "details": {
+          "redacted": "Bearer [REDACTED_SECRET]"
+        }
+      },
+      {
+        "name": "redact_secrets_authorization_header",
+        "status": "PASS",
+        "details": {
+          "redacted": "authorization: Bearer [REDACTED_SECRET]"
+        }
+      },
+      {
+        "name": "redact_secrets_password_expression",
+        "status": "PASS",
+        "details": {
+          "redacted": "password is \"[REDACTED_SECRET]\""
+        }
+      },
+      {
+        "name": "telemetry_thought_suppression_and_masking",
+        "status": "PASS",
+        "details": {
+          "sanitized": {
+            "status": "processing",
+            "step_label": "Generating HTML  Done.",
+            "output": "Clean output text",
+            "nested": {
+              "gemini_api_key": "[REDACTED_API_KEY]",
+              "public_key": "12345"
+            }
+          }
+        }
+      },
+      {
+        "name": "safe_prompt_manager_file_spill",
+        "status": "PASS",
+        "details": {
+          "prompt_file": "C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\zezo_prompt_ws_1qusje8b\\.zezo_tmp\\prompt_task_test_001.md",
+          "size": 1500
+        }
+      }
+    ],
+    "job_object_sandbox_boundaries": [
+      {
+        "name": "process_tree_termination",
+        "status": "PASS",
+        "details": {
+          "pid": 4996,
+          "is_windows": true,
+          "kill_on_close_verified": true
+        }
+      },
+      {
+        "name": "job_object_boundary_audit",
+        "status": "PASS",
+        "details": {
+          "sandbox_type": "Win32 Job Object Process Lifecycle Supervisor",
+          "guaranteed_protections": [
+            "JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE enforces 100% elimination of orphaned child/grandchild processes upon task completion, cancellation, or crash.",
+            "CREATE_SUSPENDED + AssignProcessToJobObject before ResumeThread eliminates startup race conditions.",
+            "CREATE_NO_WINDOW prevents spawned processes from stealing GUI focus or popping terminal windows on Windows.",
+            "Clean stdout/stderr pipe encapsulation avoids leaking handles across process trees."
+          ],
+          "true_security_boundaries_and_limits": [
+            "NO Filesystem Isolation: Win32 Job Objects alone do NOT restrict filesystem access. A spawned process inherits the user token's read/write ACLs. Filesystem boundary containment is strictly enforced at the application layer via core/path_jail.py (PathJail) and git worktrees.",
+            "NO Network Sandbox: Win32 Job Objects do NOT filter network sockets or block outbound TCP/UDP requests. Network boundary containment is governed at the application layer via URL prefetch sanitization and engine adapters.",
+            "NO Token Privilege Drop: The process executes with the caller's Windows Integrity Level (Medium/High) unless wrapped in an AppContainer token (UWP style) or restricted token. Application-level authorization via core/tool_executor.py (ToolExecutor) provides the identity gating.",
+            "Conclusion: Win32 Job Object provides PROCESS LIFECYCLE & CRASH CONTAINMENT; application layers (ToolExecutor, PathJail, AgentRegistry, ActionRegistry) provide AUTHORIZATION, PATH CONTAINMENT, and CREDENTIAL HYGIENE."
+          ]
+        }
+      }
+    ]
+  },
+  "summary": {
+    "total_tests": 42,
+    "passed": 42,
+    "failed": 0,
+    "skipped": 0
+  }
+}

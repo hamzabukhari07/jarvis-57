@@ -529,11 +529,18 @@ def stream_text(contents, tier: str = FAST, config=None, timeout_ms: int = DEFAU
                 kwargs['config'] = config
             response_stream = cl.models.generate_content_stream(**kwargs)
             has_yielded = False
-            for chunk in response_stream:
-                txt = getattr(chunk, 'text', '') or ''
-                if txt:
-                    has_yielded = True
-                    yield txt
+            try:
+                for chunk in response_stream:
+                    txt = getattr(chunk, 'text', '') or ''
+                    if txt:
+                        has_yielded = True
+                        yield txt
+            finally:
+                if hasattr(response_stream, 'close'):
+                    try:
+                        response_stream.close()
+                    except Exception:
+                        pass
             if has_yielded:
                 return
         except Exception as e:

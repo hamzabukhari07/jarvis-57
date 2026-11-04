@@ -1,0 +1,28 @@
+[
+  {
+    "failure_id": "FAIL-J05_no_fake_timer_streaming",
+    "related_test_ids": [
+      "J05_no_fake_timer_streaming"
+    ],
+    "severity": "HIGH",
+    "expected_behavior": "First response chunk arrives before the complete response is generated and chunks are yielded in real-time as received from LLM",
+    "actual_behavior": "AgentRuntime.step_stream_async buffers entire LLM stream via list(gemini.stream_text(...)) before yielding chunks with simulated asyncio.sleep(0.01)",
+    "evidence": "{'buffers_entire_list': True, 'simulates_streaming_with_sleep': True, 'source_evidence': 'Line 460: return list(gemini.stream_text(...)); Line 463: chunks = await loop.run_in_executor(None, _do_stream); Line 467: await asyncio.sleep(0.01)'}",
+    "reproduction_steps": "Call AgentRuntime.step_stream_async with long prompt and measure t_first_chunk vs t_total",
+    "suspected_root_cause": "Synchronous list() conversion in thread executor in core/agents/runtime.py line 459-468",
+    "root_cause_confirmed": true
+  },
+  {
+    "failure_id": "FAIL-J02_first_chunk_timing",
+    "related_test_ids": [
+      "J02_first_chunk_timing"
+    ],
+    "severity": "HIGH",
+    "expected_behavior": "First response chunk arrives before the complete response is generated and chunks are yielded in real-time as received from LLM",
+    "actual_behavior": "AgentRuntime.step_stream_async buffers entire LLM stream via list(gemini.stream_text(...)) before yielding chunks with simulated asyncio.sleep(0.01)",
+    "evidence": "",
+    "reproduction_steps": "Call AgentRuntime.step_stream_async with long prompt and measure t_first_chunk vs t_total",
+    "suspected_root_cause": "Synchronous list() conversion in thread executor in core/agents/runtime.py line 459-468",
+    "root_cause_confirmed": true
+  }
+]

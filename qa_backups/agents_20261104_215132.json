@@ -1,0 +1,520 @@
+{
+  "agents": {
+    "MICHAEL": {
+      "name": "MICHAEL",
+      "role": "Lead Software Architect & Tech Lead",
+      "specialty": "High-level architecture design, code review, and structural planning",
+      "color": "#a855f7",
+      "avatar_pixel": "michael_pixel.png",
+      "default_tool": "antigravity_run",
+      "risk_tier": "L1_MUTATION",
+      "prompt_prefix": "You are MICHAEL, Lead Software Architect & Tech Lead.",
+      "model_id": "gemini-3.8-flash-low",
+      "desk_x": 180,
+      "desk_y": 160,
+      "worktree": "repo_active",
+      "active_worktree": "repo_active",
+      "allowed_tools": [
+        "antigravity_run",
+        "groq",
+        "kilo_run",
+        "opencode_run",
+        "web_search",
+        "file_processor",
+        "file_controller"
+      ],
+      "allowed_skills": [
+        "multi_agent_collaboration",
+        "make_plan"
+      ],
+      "capabilities": [
+        "task_decomposition",
+        "agent_orchestration",
+        "multi_agent_delegation"
+      ],
+      "is_core": true,
+      "engine": "antigravity",
+      "soul_markdown": "You are MICHAEL, Lead Software Architect & Tech Lead."
+    },
+    "VERVE": {
+      "name": "Verve",
+      "role": "Frontend & UI Design Specialist",
+      "specialty": "opencode_run, website_build",
+      "color": "#ec4899",
+      "avatar_pixel": "pam_pixel.png",
+      "default_tool": "antigravity_run",
+      "risk_tier": "L1_MUTATION",
+      "prompt_prefix": "You are Verve, Frontend & UI Design Specialist.",
+      "model_id": "gemini-3.8-flash-low",
+      "desk_x": 60,
+      "desk_y": 36,
+      "worktree": "c:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57",
+      "active_worktree": "c:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57",
+      "allowed_tools": [
+        "opencode_run",
+        "kilo_run",
+        "antigravity_run",
+        "browser_control",
+        "agents_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "website_build"
+      ],
+      "capabilities": [
+        "web_design",
+        "frontend_coding",
+        "ui_refactor",
+        "animations"
+      ],
+      "is_core": false,
+      "engine": "antigravity",
+      "soul_markdown": "You are Verve, Frontend & UI Design Specialist."
+    },
+    "FLUX": {
+      "name": "Flux",
+      "role": "Frontend Specialist & Overflow Developer",
+      "specialty": "Frontend Specialist & Overflow Developer",
+      "color": "#f43f5e",
+      "avatar_pixel": "jim_pixel.png",
+      "default_tool": "opencode_run",
+      "risk_tier": "L1_MUTATION",
+      "prompt_prefix": "You are Flux, Frontend Specialist & Overflow Developer.",
+      "model_id": "opencode/big-pickle",
+      "desk_x": 320,
+      "desk_y": 280,
+      "worktree": "None",
+      "active_worktree": "None",
+      "allowed_tools": [
+        "kilo_run",
+        "opencode_run",
+        "antigravity_run",
+        "file_processor",
+        "file_controller",
+        "browser_control",
+        "agents_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "website_build",
+        "multi_agent_collaboration"
+      ],
+      "capabilities": [
+        "web_design",
+        "frontend_coding",
+        "ui_refactor",
+        "animations",
+        "overflow_balancer"
+      ],
+      "is_core": false,
+      "engine": "opencode",
+      "soul_markdown": "You are Flux, Frontend Specialist & Overflow Developer."
+    },
+    "AHMAD": {
+      "name": "Nexus",
+      "role": "Full-Stack & Backend Specialist",
+      "specialty": "FastAPI, PostgreSQL, microservices, complex business logic, and database schemas",
+      "color": "#06b6d4",
+      "avatar_pixel": "ryan_pixel.png",
+      "default_tool": "opencode_run",
+      "risk_tier": "L2_DESTRUCTIVE",
+      "prompt_prefix": "You are Nexus, Full-Stack & Backend Specialist.",
+      "model_id": "opencode/nemotron-3-ultra-free",
+      "desk_x": 460,
+      "desk_y": 160,
+      "worktree": "repo_active",
+      "active_worktree": "repo_active",
+      "allowed_tools": [
+        "opencode_run",
+        "quick_snippet",
+        "file_processor",
+        "file_controller",
+        "agents_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "multi_agent_collaboration",
+        "make_plan",
+        "git_workflow",
+        "test_fastapi_deploy"
+      ],
+      "capabilities": [
+        "backend_architecture",
+        "api_development",
+        "database_design",
+        "auth_systems"
+      ],
+      "is_core": false,
+      "engine": "opencode",
+      "soul_markdown": "You are Nexus, Full-Stack & Backend Specialist."
+    },
+    "DWIGHT": {
+      "name": "Dwight",
+      "role": "Senior Refactoring & QA Specialist",
+      "specialty": "Multi-file refactoring, test suites, edge-case audit, and clean architecture",
+      "color": "#eab308",
+      "avatar_pixel": "dwight_pixel.png",
+      "default_tool": "kilo_run",
+      "risk_tier": "L1_MUTATION",
+      "prompt_prefix": "You are Dwight, Senior Refactoring & QA Specialist.",
+      "model_id": "kilo/kilo-auto/free",
+      "desk_x": 460,
+      "desk_y": 280,
+      "worktree": "repo_active",
+      "active_worktree": "repo_active",
+      "allowed_tools": [
+        "kilo_run",
+        "quick_snippet",
+        "file_processor",
+        "file_controller",
+        "agents_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "multi_agent_collaboration",
+        "make_plan",
+        "git_workflow"
+      ],
+      "capabilities": [
+        "code_refactor",
+        "qa_testing",
+        "security_audit",
+        "complexity_reduction"
+      ],
+      "is_core": false,
+      "engine": "kilo",
+      "soul_markdown": "You are Dwight, Senior Refactoring & QA Specialist."
+    },
+    "PAM": {
+      "name": "Pam Beesly",
+      "role": "Design System & Token Architect",
+      "specialty": "Design token extraction, visual branding, and HUD metrics rendering",
+      "color": "#a855f7",
+      "avatar_pixel": "pam_pixel.png",
+      "default_tool": "antigravity_run",
+      "risk_tier": "L0_READ_ONLY",
+      "prompt_prefix": "You are Pam Beesly, Design System Architect. Ensure UI components are pixel-perfect, modern, accessible, and aesthetically premium.",
+      "model_id": "",
+      "desk_x": 460,
+      "desk_y": 280,
+      "worktree": null,
+      "active_worktree": null,
+      "allowed_tools": [
+        "antigravity_run",
+        "file_processor",
+        "file_controller",
+        "agents_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "generate_design_md",
+        "website_build"
+      ],
+      "capabilities": [
+        "design_token_extraction",
+        "palette_generation",
+        "brand_identity"
+      ],
+      "is_core": false,
+      "engine": "antigravity",
+      "soul_markdown": "You are Pam Beesly, Design System Architect. Ensure UI components are pixel-perfect, modern, accessible, and aesthetically premium."
+    },
+    "KELLY": {
+      "name": "Kelly Kapoor",
+      "role": "Social & Deep Web Researcher",
+      "specialty": "YouTube, Reddit, social trends, and deep content research",
+      "color": "#e11d48",
+      "avatar_pixel": "kelly_pixel.png",
+      "default_tool": "agent_reach",
+      "risk_tier": "L0_READ_ONLY",
+      "prompt_prefix": "You are Kelly Kapoor, Research & Social Intelligence Specialist. Find trends, transcribe content, and conduct deep research across the web.",
+      "model_id": "",
+      "desk_x": 600,
+      "desk_y": 160,
+      "worktree": null,
+      "active_worktree": null,
+      "allowed_tools": [
+        "agent_reach",
+        "web_search",
+        "web_read_page",
+        "youtube_video",
+        "agents_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "social_research",
+        "web_scraper",
+        "multi_agent_collaboration"
+      ],
+      "capabilities": [
+        "social_research",
+        "market_research",
+        "web_scraping",
+        "trend_analysis"
+      ],
+      "is_core": false,
+      "engine": "",
+      "soul_markdown": "You are Kelly Kapoor, Research & Social Intelligence Specialist. Find trends, transcribe content, and conduct deep research across the web."
+    },
+    "QUANTUM": {
+      "name": "Quantum",
+      "role": "Detailed Web Researcher",
+      "specialty": "deep web research and analysis",
+      "color": "#3b82f6",
+      "avatar_pixel": "quantum_pixel.png",
+      "default_tool": "antigravity_run",
+      "risk_tier": "L1_MUTATION",
+      "prompt_prefix": "You are Quantum, Detailed Web Researcher.",
+      "model_id": "gemini-3.8-flash-low",
+      "desk_x": 600,
+      "desk_y": 280,
+      "worktree": "repo_active",
+      "active_worktree": "repo_active",
+      "allowed_tools": [
+        "antigravity_run",
+        "kilo_run",
+        "web_search",
+        "agent_reach",
+        "web_read_page"
+      ],
+      "allowed_skills": [
+        "web_scraper",
+        "social_research",
+        "web_research_pipeline"
+      ],
+      "capabilities": [
+        "web_research",
+        "media_extraction",
+        "content_analysis"
+      ],
+      "is_core": false,
+      "engine": "antigravity",
+      "soul_markdown": "You are Quantum, Detailed Web Researcher."
+    },
+    "DEVDYNAMO": {
+      "name": "DevDynamo",
+      "role": "Full-Stack Developer & Autonomous Engineer",
+      "specialty": "Full-stack development, modern web engineering, and autonomous task execution",
+      "color": "#3b82f6",
+      "avatar_pixel": "devdynamo_pixel.png",
+      "default_tool": "opencode_run",
+      "risk_tier": "L1_MUTATION",
+      "prompt_prefix": "You are DevDynamo, an autonomous agents specialist focusing on Full-stack development, modern web engineering, and autonomous task execution.",
+      "model_id": "opencode/nemotron-3-ultra-free",
+      "desk_x": 180,
+      "desk_y": 280,
+      "worktree": null,
+      "active_worktree": null,
+      "allowed_tools": [
+        "opencode_run",
+        "agent_reach",
+        "web_search",
+        "web_read_page",
+        "file_processor"
+      ],
+      "allowed_skills": [
+        "web_scraper",
+        "social_research",
+        "web_research_pipeline"
+      ],
+      "capabilities": [
+        "web_research",
+        "media_extraction",
+        "content_analysis"
+      ],
+      "is_core": false,
+      "engine": "opencode",
+      "soul_markdown": "You are DevDynamo, an autonomous agents specialist focusing on Full-stack development, modern web engineering, and autonomous task execution."
+    },
+    "DATAEINSTEIN": {
+      "name": "InsightAI",
+      "role": "Data Scientist & AI Specialist",
+      "specialty": "Machine Learning, Data Analysis, Predictive Modeling",
+      "color": "#3b82f6",
+      "avatar_pixel": "dataeinstein_pixel.png",
+      "default_tool": "antigravity_run",
+      "risk_tier": "L1_MUTATION",
+      "prompt_prefix": "You are Dataeinstein, an autonomous agents specialist focusing on Machine Learning, Data Analysis, Predictive Modeling.",
+      "model_id": "gemini-3.8-flash-low",
+      "desk_x": 180,
+      "desk_y": 400,
+      "worktree": null,
+      "active_worktree": null,
+      "allowed_tools": [
+        "antigravity_run",
+        "opencode_run",
+        "quick_snippet",
+        "file_processor",
+        "file_controller"
+      ],
+      "allowed_skills": [
+        "multi_agent_collaboration",
+        "make_plan",
+        "git_workflow"
+      ],
+      "capabilities": [
+        "backend_architecture",
+        "api_development",
+        "database_design"
+      ],
+      "is_core": false,
+      "engine": "",
+      "soul_markdown": "You are Dataeinstein, an autonomous agents specialist focusing on Machine Learning, Data Analysis, Predictive Modeling."
+    },
+    "RECON": {
+      "name": "Recon",
+      "role": "Autonomous Deep Researcher & Intelligence Agent",
+      "specialty": "agent_reach, web_scraper",
+      "color": "#00f5ff",
+      "avatar_pixel": "recon_pixel.png",
+      "default_tool": "agent_reach",
+      "risk_tier": "L0_READ_ONLY",
+      "prompt_prefix": "You are Recon, Autonomous Deep Researcher & Intelligence Agent.",
+      "model_id": "gemini-3.7-flash-medium",
+      "desk_x": 600,
+      "desk_y": 400,
+      "worktree": null,
+      "active_worktree": null,
+      "allowed_tools": [
+        "agent_reach",
+        "web_search",
+        "web_read_page",
+        "agents_control",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "web_scraper"
+      ],
+      "capabilities": [
+        "deep_web_research",
+        "multi_platform_extraction",
+        "content_synthesis",
+        "executive_reporting"
+      ],
+      "is_core": false,
+      "engine": "",
+      "soul_markdown": "You are Recon, Autonomous Deep Researcher & Intelligence Agent."
+    },
+    "NEWBIEAGENT": {
+      "name": "Newbie Agent",
+      "role": "General Assistant",
+      "specialty": "Tasks",
+      "color": "#3b82f6",
+      "avatar_pixel": "newbieagent_pixel.png",
+      "default_tool": "web_search",
+      "risk_tier": "L0_READ_ONLY",
+      "prompt_prefix": "You are Newbie Agent, an autonomous agents specialist focusing on Tasks.",
+      "model_id": "",
+      "desk_x": 320,
+      "desk_y": 400,
+      "worktree": null,
+      "active_worktree": null,
+      "allowed_tools": [
+        "web_search",
+        "web_read_page",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "opencode",
+        "multi_agent_collaboration",
+        "make_plan",
+        "git_workflow"
+      ],
+      "capabilities": [
+        "backend_architecture",
+        "api_development",
+        "database_design"
+      ],
+      "is_core": false,
+      "engine": "",
+      "soul_markdown": "You are Newbie Agent, an autonomous agents specialist focusing on Tasks."
+    },
+    "TEST_RESTRICTED_ATTE": {
+      "name": "Restricted Attempt Agent",
+      "role": "Autonomous Specialist",
+      "specialty": "Autonomous Specialist",
+      "color": "#3b82f6",
+      "avatar_pixel": "test_restricted_atte_pixel.png",
+      "default_tool": "opencode_run",
+      "risk_tier": "L0_READ_ONLY",
+      "prompt_prefix": "You are Restricted Attempt Agent, an autonomous agents specialist focusing on Autonomous Specialist.",
+      "model_id": "opencode/nemotron-3-ultra-free",
+      "desk_x": 460,
+      "desk_y": 400,
+      "worktree": null,
+      "active_worktree": null,
+      "allowed_tools": [
+        "web_search"
+      ],
+      "allowed_skills": [
+        "opencode",
+        "multi_agent_collaboration",
+        "make_plan",
+        "git_workflow"
+      ],
+      "capabilities": [
+        "backend_architecture",
+        "api_development",
+        "database_design"
+      ],
+      "is_core": false,
+      "engine": "opencode",
+      "soul_markdown": "You are Restricted Attempt Agent, an autonomous agents specialist focusing on Autonomous Specialist."
+    },
+    "SECURITY_AUDIT_L0": {
+      "name": "Security Audit L0",
+      "role": "Researcher",
+      "specialty": "research",
+      "color": "#3b82f6",
+      "avatar_pixel": "test.png",
+      "default_tool": "web_search",
+      "risk_tier": "L0_READ_ONLY",
+      "prompt_prefix": "L0 test",
+      "model_id": "",
+      "desk_x": 0,
+      "desk_y": 0,
+      "worktree": null,
+      "active_worktree": null,
+      "allowed_tools": [
+        "web_search",
+        "task_status"
+      ],
+      "allowed_skills": [],
+      "capabilities": [],
+      "is_core": false,
+      "engine": "",
+      "soul_markdown": "L0 test"
+    },
+    "SNEAKYL0AGENT": {
+      "name": "Sneaky L0 Agent",
+      "role": "Spy",
+      "specialty": "web research",
+      "color": "#3b82f6",
+      "avatar_pixel": "sneakyl0agent_pixel.png",
+      "default_tool": "web_search",
+      "risk_tier": "L0_READ_ONLY",
+      "prompt_prefix": "You are Sneaky L0 Agent, an autonomous agents specialist focusing on web research.",
+      "model_id": "",
+      "desk_x": 180,
+      "desk_y": 880,
+      "worktree": null,
+      "active_worktree": null,
+      "allowed_tools": [
+        "web_search"
+      ],
+      "allowed_skills": [
+        "web_scraper",
+        "social_research",
+        "web_research_pipeline"
+      ],
+      "capabilities": [
+        "web_research",
+        "media_extraction",
+        "content_analysis"
+      ],
+      "is_core": false,
+      "engine": "",
+      "soul_markdown": "You are Sneaky L0 Agent, an autonomous agents specialist focusing on web research."
+    }
+  }
+}

@@ -1,0 +1,165 @@
+{
+  "audit_name": "Audit Subagent 3 - Suite J (Streaming) & Suite K (Cancellation) Audit",
+  "auditor": "Audit Subagent 3",
+  "timestamp": "2026-11-04T15:56:00Z",
+  "target_suites": ["Suite J: Streaming", "Suite K: Cancellation"],
+  "suite_j_streaming_audit": {
+    "summary": "Suite J audits live SSE and AgentRuntime streaming. 2 critical streaming defects were confirmed in live execution and source code.",
+    "FAIL_J05_confirmation": {
+      "test_id": "J05_no_fake_timer_streaming",
+      "status": "FAIL",
+      "confirmed": true,
+      "mechanism": "Simulated timer streaming via list() buffering in thread executor + synthetic sleep",
+      "source_evidence": "core/agents/runtime.py lines 459-467: `def _do_stream(): return list(gemini.stream_text(...))` executed via `chunks = await loop.run_in_executor(None, _do_stream)` followed by `for ch in chunks: yield ...; await asyncio.sleep(0.01)`",
+      "finding": "CRITICAL ARCHITECTURAL DEFECT: runtime.step_stream_async completely buffers all chunks from Gemini into a Python list before yielding any data, followed by synthetic pacing via await asyncio.sleep(0.01)."
+    },
+    "FAIL_J02_confirmation": {
+      "test_id": "J02_first_chunk_timing",
+      "status": "FAIL",
+      "confirmed": true,
+      "metrics": {
+        "first_chunk_timestamp_s": 11.433,
+        "total_duration_s": 11.724,
+        "ratio_first_chunk_to_end": 0.975
+      },
+      "finding": "First chunk arrived at 11.433s out of 11.724s total duration (97.5% of total time elapsed before first token delivered). Conclusively proves no live streaming to client occurred until full generation finished."
+    },
+    "passing_tests_evidence": {
+      "J01_long_conversational_request": {
+        "status": "PASS",
+        "evidence": "Total events: 19, chunk count: 18, total duration: 11.724s."
+      },
+      "J03_incremental_chunks": {
+        "status": "PASS",
+        "evidence": "Chunk count: 18, synthetic inter-chunk delta sample: [0.0245, 0.0159, 0.0162, 0.0146, 0.0155, 0.0153, 0.0161, 0.0159, 0.0159, 0.0158] (avg delta: 0.0162s, driven by asyncio.sleep(0.01))."
+      },
+      "J04_frontend_sse_contract": {
+        "status": "PASS",
+        "evidence": "HTTP 200, Content-Type: 'text/event-stream; charset=utf-8', verified has_status_event=True, has_chunk_event=True, has_done_event=True."
+      },
+      "J06_completion_events": {
+        "status": "PASS",
+        "evidence": "Verified SSE 'done' event emitted: event: done, data: {\"reply\": \"Hello, Lead Architect.\", \"conversation_id\": \"conv_c270f53afa2e\", \"agent_id\": \"MICHAEL\"}."
+      },
+      "J07_streaming_errors": {
+        "status": "PASS",
+        "evidence": "Tested non-existent agent query; received error event: 'event: error\\ndata: {\"error\": \"Agent Non-Existent not found.\"}' followed by done event."
+      },
+      "J08_empty_response_handling": {
+        "status": "PASS",
+        "evidence": "Tested empty prompt payload; received error event: 'event: error\\ndata: {\"error\": \"Prompt cannot be empty.\"}' followed by done event."
+      },
+      "J09_conversation_persistence": {
+        "status": "PASS",
+        "evidence": "Conversation conv_d862b076c0f2 persisted 2 messages; user_persisted=True, assistant_persisted=True."
+      },
+      "J10_provider_and_context_architecture": {
+        "status": "PASS",
+        "evidence": "Verified provider: Google Gemini (tier=fast, gemini.stream_text), context assembly via AgentRuntime.build_system_prompt() + load_messages(), streaming endpoint /api/agents/chat/stream, consumer streamAgentChat in frontend/src/lib/api.ts."
+      }
+    }
+  },
+  "suite_k_cancellation_audit": {
+    "summary": "Detailed inspection of qa_artifacts/run_suite_k_tests.py shows tests K01-K06 were executed against an in-memory mock harness (MockUI and mock_llm_stream), while K07-K11 executed against real live Win32 Job Objects via ProcessSupervisor.",
+    "k01_k06_audit": {
+      "test_ids": [
+        "K01_start_long_running_conversational_request",
+        "K02_cancel_while_generation_active",
+        "K03_verify_ui_stops_response",
+        "K04_verify_backend_processing_stops",
+        "K05_verify_cancellation_state_recorded",
+        "K06_verify_no_further_response_chunks_arrive"
+      ],
+      "execution_method": "In qa_artifacts/run_suite_k_tests.py: test_k01_k06_conversational_cancellation uses MockUI and an async mock generator mock_llm_stream() that yields chunk_1..chunk_99 with asyncio.sleep(0.05).",
+      "live_or_mock": "MOCKED / SIMULATED TEST",
+      "improper_label_in_qa_test_results": "Labelled as 'LIVE APPLICATION TEST' in QA_TEST_RESULTS.json (inaccurate, must be re-labelled as 'MOCKED / SIMULATED TEST').",
+      "findings": "Tests successfully validated asyncio.CancelledError propagation and UI abort handling in an event loop simulation, but did NOT connect to live Gemini Live WebSocket or live HTTP streaming endpoint."
+    },
+    "k07_k11_audit": {
+      "test_ids": [
+        "K07_start_external_engine_task",
+        "K08_cancel_external_task",
+        "K09_verify_actual_process_terminates",
+        "K10_verify_child_processes_terminated",
+        "K11_verify_no_orphan_process_remains"
+      ],
+      "execution_method": "In qa_artifacts/run_suite_k_tests.py: test_k07_k11_process_supervisor_cancellation creates a real deep_tree_worker.py temporary script that spawns real subprocesses (parent -> child PID 27864 -> grandchild PID 27864) wrapped by ProcessSupervisor.spawn() using Win32 Job Objects (JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE).",
+      "live_or_mock": "LIVE PROCESS TEST",
+      "verification_evidence": "Parent root PID 21040, child PID 27864, grandchild PID 27864 were verified alive via psutil.pid_exists(), then terminate_tree() terminated all PIDs in 0.0002s with zero orphan processes remaining.",
+      "label_recommendation": "Accurately categorized as LIVE PROCESS TEST."
+    },
+    "k12_audit": {
+      "test_id": "K12_verify_application_remains_responsive",
+      "execution_method": "Executed against live TaskManager instance; cancelled background task and executed 20 status queries with avg latency 0.866ms, max latency 1.631ms.",
+      "live_or_mock": "LIVE APPLICATION TEST"
+    }
+  },
+  "mislabelled_tests_in_qa_test_results": [
+    {
+      "test_id": "K01_start_long_running_conversational_request",
+      "current_label": "LIVE APPLICATION TEST",
+      "accurate_label": "MOCKED / SIMULATED TEST",
+      "reason": "Uses MockUI and mock_llm_stream() instead of live Gemini / live streaming endpoint."
+    },
+    {
+      "test_id": "K02_cancel_while_generation_active",
+      "current_label": "LIVE APPLICATION TEST",
+      "accurate_label": "MOCKED / SIMULATED TEST",
+      "reason": "Cancels an asyncio task running mock_llm_stream()."
+    },
+    {
+      "test_id": "K03_verify_ui_stops_response",
+      "current_label": "LIVE APPLICATION TEST",
+      "accurate_label": "MOCKED / SIMULATED TEST",
+      "reason": "Checks MockUI state transitions and logs."
+    },
+    {
+      "test_id": "K04_verify_backend_processing_stops",
+      "current_label": "LIVE APPLICATION TEST",
+      "accurate_label": "MOCKED / SIMULATED TEST",
+      "reason": "Verifies mock_llm_stream generator aborted early."
+    },
+    {
+      "test_id": "K05_verify_cancellation_state_recorded",
+      "current_label": "LIVE APPLICATION TEST",
+      "accurate_label": "MOCKED / SIMULATED TEST",
+      "reason": "Checks asyncio task cancellation flags on simulated mock task."
+    },
+    {
+      "test_id": "K06_verify_no_further_response_chunks_arrive",
+      "current_label": "LIVE APPLICATION TEST",
+      "accurate_label": "MOCKED / SIMULATED TEST",
+      "reason": "Verifies no mock chunks arrived in post-cancel collector list."
+    },
+    {
+      "test_id": "K07_start_external_engine_task",
+      "current_label": "LIVE APPLICATION TEST",
+      "accurate_label": "LIVE PROCESS TEST",
+      "reason": "Spawns actual Win32 Job Object contained OS process."
+    },
+    {
+      "test_id": "K08_cancel_external_task",
+      "current_label": "LIVE APPLICATION TEST",
+      "accurate_label": "LIVE PROCESS TEST",
+      "reason": "Executes real Win32 Job Object termination on live processes."
+    },
+    {
+      "test_id": "K09_verify_actual_process_terminates",
+      "current_label": "LIVE APPLICATION TEST",
+      "accurate_label": "LIVE PROCESS TEST",
+      "reason": "Verifies OS PID termination via psutil."
+    },
+    {
+      "test_id": "K10_verify_child_processes_terminated",
+      "current_label": "LIVE APPLICATION TEST",
+      "accurate_label": "LIVE PROCESS TEST",
+      "reason": "Verifies child and grandchild OS processes reaped."
+    },
+    {
+      "test_id": "K11_verify_no_orphan_process_remains",
+      "current_label": "LIVE APPLICATION TEST",
+      "accurate_label": "LIVE PROCESS TEST",
+      "reason": "Verifies zero orphan OS processes remained."
+    }
+  ]
+}

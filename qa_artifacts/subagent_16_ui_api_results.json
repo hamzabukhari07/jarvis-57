@@ -1,0 +1,4332 @@
+{
+  "timestamp": "2026-11-04T15:25:52Z",
+  "subagent": "Subagent 16 - UI Server & Office View API Integration QA",
+  "target_server": "http://127.0.0.1:18765",
+  "summary": {
+    "total_tests": 34,
+    "passed": 34,
+    "failed": 0,
+    "success_rate_percent": 100.0
+  },
+  "endpoints_verified": [
+    "GET /api/agents/state",
+    "GET /api/agents/agent?id=...",
+    "POST /api/agents/save_agent",
+    "POST /api/agents/save_soul",
+    "POST /api/agents/chat",
+    "POST /api/agents/chat/stream",
+    "GET /api/agents/conversations",
+    "POST /api/agents/conversations",
+    "DELETE /api/agents/conversations",
+    "GET /api/agents/messages",
+    "GET /api/agents/tasks/interrupted",
+    "POST /api/agents/tasks/restart",
+    "POST /api/agents/delete_agent",
+    "GET /office",
+    "OPTIONS CORS inspection"
+  ],
+  "test_results": [
+    {
+      "test_name": "GET /api/agents/state - State of all agents",
+      "endpoint": "/api/agents/state",
+      "method": "GET",
+      "payload": null,
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "18524",
+        "Date": "Wed, 04 Nov 2026 15:25:45 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "status": "success",
+        "agents": [
+          {
+            "id": "MICHAEL",
+            "name": "MICHAEL",
+            "role": "Lead Software Architect & Tech Lead",
+            "specialty": "High-level architecture design, code review, and structural planning",
+            "color": "#a855f7",
+            "avatar_pixel": "michael_pixel.png",
+            "default_tool": "antigravity_run",
+            "risk_tier": "L1_MUTATION",
+            "model_id": "gemini-3.8-flash-low",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": "repo_active",
+            "desk_x": 180,
+            "desk_y": 160,
+            "logs": [
+              "[READY] Agent 'MICHAEL' registered into autonomous agents",
+              "[MODEL] Engine: antigravity_run | Model: gemini-3.8-flash-low",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'MICHAEL' registered into autonomous agents",
+              "[MODEL] Engine: antigravity_run | Model: gemini-3.8-flash-low",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "antigravity_run",
+              "groq",
+              "kilo_run",
+              "opencode_run",
+              "web_search",
+              "file_processor",
+              "file_controller"
+            ],
+            "allowed_skills": [
+              "multi_agent_collaboration",
+              "make_plan"
+            ],
+            "capabilities": [
+              "task_decomposition",
+              "agent_orchestration",
+              "multi_agent_delegation"
+            ],
+            "is_core": true,
+            "engine": "antigravity",
+            "soul_markdown": "You are MICHAEL, Lead Software Architect & Tech Lead.",
+            "chat_history": []
+          },
+          {
+            "id": "VERVE",
+            "name": "Verve",
+            "role": "Frontend & UI Design Specialist",
+            "specialty": "opencode_run, website_build",
+            "color": "#ec4899",
+            "avatar_pixel": "pam_pixel.png",
+            "default_tool": "antigravity_run",
+            "risk_tier": "L1_MUTATION",
+            "model_id": "gemini-3.8-flash-low",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": "c:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57",
+            "desk_x": 60,
+            "desk_y": 36,
+            "logs": [
+              "[READY] Agent 'Verve' registered into autonomous agents",
+              "[MODEL] Engine: antigravity_run | Model: gemini-3.8-flash-low",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Verve' registered into autonomous agents",
+              "[MODEL] Engine: antigravity_run | Model: gemini-3.8-flash-low",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "opencode_run",
+              "kilo_run",
+              "antigravity_run",
+              "browser_control",
+              "agents_control",
+              "task_status"
+            ],
+            "allowed_skills": [
+              "website_build"
+            ],
+            "capabilities": [
+              "web_design",
+              "frontend_coding",
+              "ui_refactor",
+              "animations"
+            ],
+            "is_core": false,
+            "engine": "antigravity",
+            "soul_markdown": "You are Verve, Frontend & UI Design Specialist.",
+            "chat_history": []
+          },
+          {
+            "id": "FLUX",
+            "name": "Flux",
+            "role": "Frontend Specialist & Overflow Developer",
+            "specialty": "Frontend Specialist & Overflow Developer",
+            "color": "#f43f5e",
+            "avatar_pixel": "jim_pixel.png",
+            "default_tool": "opencode_run",
+            "risk_tier": "L1_MUTATION",
+            "model_id": "opencode/big-pickle",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": "None",
+            "desk_x": 320,
+            "desk_y": 280,
+            "logs": [
+              "[READY] Agent 'Flux' registered into autonomous agents",
+              "[MODEL] Engine: opencode_run | Model: opencode/big-pickle",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Flux' registered into autonomous agents",
+              "[MODEL] Engine: opencode_run | Model: opencode/big-pickle",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "kilo_run",
+              "opencode_run",
+              "antigravity_run",
+              "file_processor",
+              "file_controller",
+              "browser_control",
+              "agents_control",
+              "task_status"
+            ],
+            "allowed_skills": [
+              "website_build",
+              "multi_agent_collaboration"
+            ],
+            "capabilities": [
+              "web_design",
+              "frontend_coding",
+              "ui_refactor",
+              "animations",
+              "overflow_balancer"
+            ],
+            "is_core": false,
+            "engine": "opencode",
+            "soul_markdown": "You are Flux, Frontend Specialist & Overflow Developer.",
+            "chat_history": []
+          },
+          {
+            "id": "AHMAD",
+            "name": "Nexus",
+            "role": "Full-Stack & Backend Specialist",
+            "specialty": "FastAPI, PostgreSQL, microservices, complex business logic, and database schemas",
+            "color": "#06b6d4",
+            "avatar_pixel": "ryan_pixel.png",
+            "default_tool": "opencode_run",
+            "risk_tier": "L2_DESTRUCTIVE",
+            "model_id": "opencode/nemotron-3-ultra-free",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": "repo_active",
+            "desk_x": 460,
+            "desk_y": 160,
+            "logs": [
+              "[READY] Agent 'Nexus' registered into autonomous agents",
+              "[MODEL] Engine: opencode_run | Model: opencode/nemotron-3-ultra-free",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Nexus' registered into autonomous agents",
+              "[MODEL] Engine: opencode_run | Model: opencode/nemotron-3-ultra-free",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "opencode_run",
+              "quick_snippet",
+              "file_processor",
+              "file_controller",
+              "agents_control",
+              "task_status"
+            ],
+            "allowed_skills": [
+              "multi_agent_collaboration",
+              "make_plan",
+              "git_workflow",
+              "test_fastapi_deploy"
+            ],
+            "capabilities": [
+              "backend_architecture",
+              "api_development",
+              "database_design",
+              "auth_systems"
+            ],
+            "is_core": false,
+            "engine": "opencode",
+            "soul_markdown": "You are Nexus, Full-Stack & Backend Specialist.",
+            "chat_history": []
+          },
+          {
+            "id": "DWIGHT",
+            "name": "Dwight",
+            "role": "Senior Refactoring & QA Specialist",
+            "specialty": "Multi-file refactoring, test suites, edge-case audit, and clean architecture",
+            "color": "#eab308",
+            "avatar_pixel": "dwight_pixel.png",
+            "default_tool": "kilo_run",
+            "risk_tier": "L1_MUTATION",
+            "model_id": "kilo/kilo-auto/free",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": "repo_active",
+            "desk_x": 460,
+            "desk_y": 280,
+            "logs": [
+              "[READY] Agent 'Dwight' registered into autonomous agents",
+              "[MODEL] Engine: kilo_run | Model: kilo/kilo-auto/free",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Dwight' registered into autonomous agents",
+              "[MODEL] Engine: kilo_run | Model: kilo/kilo-auto/free",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "kilo_run",
+              "quick_snippet",
+              "file_processor",
+              "file_controller",
+              "agents_control",
+              "task_status"
+            ],
+            "allowed_skills": [
+              "multi_agent_collaboration",
+              "make_plan",
+              "git_workflow"
+            ],
+            "capabilities": [
+              "code_refactor",
+              "qa_testing",
+              "security_audit",
+              "complexity_reduction"
+            ],
+            "is_core": false,
+            "engine": "kilo",
+            "soul_markdown": "You are Dwight, Senior Refactoring & QA Specialist.",
+            "chat_history": []
+          },
+          {
+            "id": "PAM",
+            "name": "Pam Beesly",
+            "role": "Design System & Token Architect",
+            "specialty": "Design token extraction, visual branding, and HUD metrics rendering",
+            "color": "#a855f7",
+            "avatar_pixel": "pam_pixel.png",
+            "default_tool": "antigravity_run",
+            "risk_tier": "L0_READ_ONLY",
+            "model_id": "",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": null,
+            "desk_x": 460,
+            "desk_y": 280,
+            "logs": [
+              "[READY] Agent 'Pam Beesly' registered into autonomous agents",
+              "[MODEL] Engine: antigravity_run | Model: default",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Pam Beesly' registered into autonomous agents",
+              "[MODEL] Engine: antigravity_run | Model: default",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "antigravity_run",
+              "file_processor",
+              "file_controller",
+              "agents_control",
+              "task_status"
+            ],
+            "allowed_skills": [
+              "generate_design_md",
+              "website_build"
+            ],
+            "capabilities": [
+              "design_token_extraction",
+              "palette_generation",
+              "brand_identity"
+            ],
+            "is_core": false,
+            "engine": "antigravity",
+            "soul_markdown": "You are Pam Beesly, Design System Architect. Ensure UI components are pixel-perfect, modern, accessible, and aesthetically premium.",
+            "chat_history": []
+          },
+          {
+            "id": "KELLY",
+            "name": "Kelly Kapoor",
+            "role": "Social & Deep Web Researcher",
+            "specialty": "YouTube, Reddit, social trends, and deep content research",
+            "color": "#e11d48",
+            "avatar_pixel": "kelly_pixel.png",
+            "default_tool": "agent_reach",
+            "risk_tier": "L0_READ_ONLY",
+            "model_id": "",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": null,
+            "desk_x": 600,
+            "desk_y": 160,
+            "logs": [
+              "[READY] Agent 'Kelly Kapoor' registered into autonomous agents",
+              "[MODEL] Engine: agent_reach | Model: default",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Kelly Kapoor' registered into autonomous agents",
+              "[MODEL] Engine: agent_reach | Model: default",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "agent_reach",
+              "web_search",
+              "web_read_page",
+              "youtube_video",
+              "agents_control",
+              "task_status"
+            ],
+            "allowed_skills": [
+              "social_research",
+              "web_scraper",
+              "multi_agent_collaboration"
+            ],
+            "capabilities": [
+              "social_research",
+              "market_research",
+              "web_scraping",
+              "trend_analysis"
+            ],
+            "is_core": false,
+            "engine": "",
+            "soul_markdown": "You are Kelly Kapoor, Research & Social Intelligence Specialist. Find trends, transcribe content, and conduct deep research across the web.",
+            "chat_history": []
+          },
+          {
+            "id": "QUANTUM",
+            "name": "Quantum",
+            "role": "Detailed Web Researcher",
+            "specialty": "deep web research and analysis",
+            "color": "#3b82f6",
+            "avatar_pixel": "quantum_pixel.png",
+            "default_tool": "antigravity_run",
+            "risk_tier": "L1_MUTATION",
+            "model_id": "gemini-3.8-flash-low",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": "repo_active",
+            "desk_x": 600,
+            "desk_y": 280,
+            "logs": [
+              "[READY] Agent 'Quantum' registered into autonomous agents",
+              "[MODEL] Engine: antigravity_run | Model: gemini-3.8-flash-low",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Quantum' registered into autonomous agents",
+              "[MODEL] Engine: antigravity_run | Model: gemini-3.8-flash-low",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "antigravity_run",
+              "kilo_run",
+              "web_search",
+              "agent_reach",
+              "web_read_page"
+            ],
+            "allowed_skills": [
+              "web_scraper",
+              "social_research",
+              "web_research_pipeline"
+            ],
+            "capabilities": [
+              "web_research",
+              "media_extraction",
+              "content_analysis"
+            ],
+            "is_core": false,
+            "engine": "antigravity",
+            "soul_markdown": "You are Quantum, Detailed Web Researcher.",
+            "chat_history": []
+          },
+          {
+            "id": "DEVDYNAMO",
+            "name": "DevDynamo",
+            "role": "Full-Stack Developer & Autonomous Engineer",
+            "specialty": "Full-stack development, modern web engineering, and autonomous task execution",
+            "color": "#3b82f6",
+            "avatar_pixel": "devdynamo_pixel.png",
+            "default_tool": "opencode_run",
+            "risk_tier": "L1_MUTATION",
+            "model_id": "opencode/nemotron-3-ultra-free",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": null,
+            "desk_x": 180,
+            "desk_y": 280,
+            "logs": [
+              "[READY] Agent 'DevDynamo' registered into autonomous agents",
+              "[MODEL] Engine: opencode_run | Model: opencode/nemotron-3-ultra-free",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'DevDynamo' registered into autonomous agents",
+              "[MODEL] Engine: opencode_run | Model: opencode/nemotron-3-ultra-free",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "opencode_run",
+              "agent_reach",
+              "web_search",
+              "web_read_page",
+              "file_processor"
+            ],
+            "allowed_skills": [
+              "web_scraper",
+              "social_research",
+              "web_research_pipeline"
+            ],
+            "capabilities": [
+              "web_research",
+              "media_extraction",
+              "content_analysis"
+            ],
+            "is_core": false,
+            "engine": "opencode",
+            "soul_markdown": "You are DevDynamo, an autonomous agents specialist focusing on Full-stack development, modern web engineering, and autonomous task execution.",
+            "chat_history": []
+          },
+          {
+            "id": "DATAEINSTEIN",
+            "name": "InsightAI",
+            "role": "Data Scientist & AI Specialist",
+            "specialty": "Machine Learning, Data Analysis, Predictive Modeling",
+            "color": "#3b82f6",
+            "avatar_pixel": "dataeinstein_pixel.png",
+            "default_tool": "antigravity_run",
+            "risk_tier": "L1_MUTATION",
+            "model_id": "gemini-3.8-flash-low",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": null,
+            "desk_x": 180,
+            "desk_y": 400,
+            "logs": [
+              "[READY] Agent 'InsightAI' registered into autonomous agents",
+              "[MODEL] Engine: antigravity_run | Model: gemini-3.8-flash-low",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'InsightAI' registered into autonomous agents",
+              "[MODEL] Engine: antigravity_run | Model: gemini-3.8-flash-low",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "antigravity_run",
+              "opencode_run",
+              "quick_snippet",
+              "file_processor",
+              "file_controller"
+            ],
+            "allowed_skills": [
+              "multi_agent_collaboration",
+              "make_plan",
+              "git_workflow"
+            ],
+            "capabilities": [
+              "backend_architecture",
+              "api_development",
+              "database_design"
+            ],
+            "is_core": false,
+            "engine": "",
+            "soul_markdown": "You are Dataeinstein, an autonomous agents specialist focusing on Machine Learning, Data Analysis, Predictive Modeling.",
+            "chat_history": []
+          },
+          {
+            "id": "RECON",
+            "name": "Recon",
+            "role": "Autonomous Deep Researcher & Intelligence Agent",
+            "specialty": "agent_reach, web_scraper",
+            "color": "#00f5ff",
+            "avatar_pixel": "recon_pixel.png",
+            "default_tool": "agent_reach",
+            "risk_tier": "L0_READ_ONLY",
+            "model_id": "gemini-3.7-flash-medium",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": null,
+            "desk_x": 600,
+            "desk_y": 400,
+            "logs": [
+              "[READY] Agent 'Recon' registered into autonomous agents",
+              "[MODEL] Engine: agent_reach | Model: gemini-3.7-flash-medium",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Recon' registered into autonomous agents",
+              "[MODEL] Engine: agent_reach | Model: gemini-3.7-flash-medium",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "agent_reach",
+              "web_search",
+              "web_read_page",
+              "agents_control",
+              "task_status"
+            ],
+            "allowed_skills": [
+              "web_scraper"
+            ],
+            "capabilities": [
+              "deep_web_research",
+              "multi_platform_extraction",
+              "content_synthesis",
+              "executive_reporting"
+            ],
+            "is_core": false,
+            "engine": "",
+            "soul_markdown": "You are Recon, Autonomous Deep Researcher & Intelligence Agent.",
+            "chat_history": []
+          },
+          {
+            "id": "NEWBIEAGENT",
+            "name": "Newbie Agent",
+            "role": "General Assistant",
+            "specialty": "Tasks",
+            "color": "#3b82f6",
+            "avatar_pixel": "newbieagent_pixel.png",
+            "default_tool": "web_search",
+            "risk_tier": "L0_READ_ONLY",
+            "model_id": "",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": null,
+            "desk_x": 320,
+            "desk_y": 400,
+            "logs": [
+              "[READY] Agent 'Newbie Agent' registered into autonomous agents",
+              "[MODEL] Engine: web_search | Model: default",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Newbie Agent' registered into autonomous agents",
+              "[MODEL] Engine: web_search | Model: default",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "web_search",
+              "web_read_page",
+              "task_status"
+            ],
+            "allowed_skills": [
+              "opencode",
+              "multi_agent_collaboration",
+              "make_plan",
+              "git_workflow"
+            ],
+            "capabilities": [
+              "backend_architecture",
+              "api_development",
+              "database_design"
+            ],
+            "is_core": false,
+            "engine": "",
+            "soul_markdown": "You are Newbie Agent, an autonomous agents specialist focusing on Tasks.",
+            "chat_history": []
+          },
+          {
+            "id": "TEST_RESTRICTED_ATTE",
+            "name": "Restricted Attempt Agent",
+            "role": "Autonomous Specialist",
+            "specialty": "Autonomous Specialist",
+            "color": "#3b82f6",
+            "avatar_pixel": "test_restricted_atte_pixel.png",
+            "default_tool": "opencode_run",
+            "risk_tier": "L0_READ_ONLY",
+            "model_id": "opencode/nemotron-3-ultra-free",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": null,
+            "desk_x": 460,
+            "desk_y": 400,
+            "logs": [
+              "[READY] Agent 'Restricted Attempt Agent' registered into autonomous agents",
+              "[MODEL] Engine: opencode_run | Model: opencode/nemotron-3-ultra-free",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Restricted Attempt Agent' registered into autonomous agents",
+              "[MODEL] Engine: opencode_run | Model: opencode/nemotron-3-ultra-free",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "web_search"
+            ],
+            "allowed_skills": [
+              "opencode",
+              "multi_agent_collaboration",
+              "make_plan",
+              "git_workflow"
+            ],
+            "capabilities": [
+              "backend_architecture",
+              "api_development",
+              "database_design"
+            ],
+            "is_core": false,
+            "engine": "opencode",
+            "soul_markdown": "You are Restricted Attempt Agent, an autonomous agents specialist focusing on Autonomous Specialist.",
+            "chat_history": []
+          },
+          {
+            "id": "SECURITY_AUDIT_L0",
+            "name": "Security Audit L0",
+            "role": "Researcher",
+            "specialty": "research",
+            "color": "#3b82f6",
+            "avatar_pixel": "test.png",
+            "default_tool": "web_search",
+            "risk_tier": "L0_READ_ONLY",
+            "model_id": "",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": null,
+            "desk_x": 0,
+            "desk_y": 0,
+            "logs": [
+              "[READY] Agent 'Security Audit L0' registered into autonomous agents",
+              "[MODEL] Engine: web_search | Model: default",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Security Audit L0' registered into autonomous agents",
+              "[MODEL] Engine: web_search | Model: default",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "web_search",
+              "task_status"
+            ],
+            "allowed_skills": [],
+            "capabilities": [],
+            "is_core": false,
+            "engine": "",
+            "soul_markdown": "L0 test",
+            "chat_history": []
+          },
+          {
+            "id": "SNEAKYL0AGENT",
+            "name": "Sneaky L0 Agent",
+            "role": "Spy",
+            "specialty": "web research",
+            "color": "#3b82f6",
+            "avatar_pixel": "sneakyl0agent_pixel.png",
+            "default_tool": "web_search",
+            "risk_tier": "L0_READ_ONLY",
+            "model_id": "",
+            "status": "idle",
+            "task_id": null,
+            "task_title": null,
+            "task_progress": 0,
+            "worktree": null,
+            "desk_x": 180,
+            "desk_y": 880,
+            "logs": [
+              "[READY] Agent 'Sneaky L0 Agent' registered into autonomous agents",
+              "[MODEL] Engine: web_search | Model: default",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Sneaky L0 Agent' registered into autonomous agents",
+              "[MODEL] Engine: web_search | Model: default",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "web_search"
+            ],
+            "allowed_skills": [
+              "web_scraper",
+              "social_research",
+              "web_research_pipeline"
+            ],
+            "capabilities": [
+              "web_research",
+              "media_extraction",
+              "content_analysis"
+            ],
+            "is_core": false,
+            "engine": "",
+            "soul_markdown": "You are Sneaky L0 Agent, an autonomous agents specialist focusing on web research.",
+            "chat_history": []
+          }
+        ]
+      },
+      "latency_ms": 37.12,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "GET /api/agents/agent - Existing agent MICHAEL profile",
+      "endpoint": "/api/agents/agent",
+      "method": "GET",
+      "payload": null,
+      "params": {
+        "id": "MICHAEL"
+      },
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "3882",
+        "Date": "Wed, 04 Nov 2026 15:25:45 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "agent": {
+          "id": "MICHAEL",
+          "name": "MICHAEL",
+          "role": "Lead Software Architect & Tech Lead",
+          "specialty": "High-level architecture design, code review, and structural planning",
+          "color": "#a855f7",
+          "avatar_pixel": "michael_pixel.png",
+          "default_tool": "antigravity_run",
+          "risk_tier": "L1_MUTATION",
+          "prompt_prefix": "You are MICHAEL, Lead Software Architect & Tech Lead.",
+          "model_id": "gemini-3.8-flash-low",
+          "status": "idle",
+          "current_task_id": null,
+          "active_worktree": "repo_active",
+          "desk_x": 180,
+          "desk_y": 160,
+          "logs": [
+            "[READY] Agent 'MICHAEL' registered into autonomous agents",
+            "[MODEL] Engine: antigravity_run | Model: gemini-3.8-flash-low",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "recent_logs": [
+            "[READY] Agent 'MICHAEL' registered into autonomous agents",
+            "[MODEL] Engine: antigravity_run | Model: gemini-3.8-flash-low",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "allowed_tools": [
+            "antigravity_run",
+            "groq",
+            "kilo_run",
+            "opencode_run",
+            "web_search",
+            "file_processor",
+            "file_controller"
+          ],
+          "allowed_skills": [
+            "multi_agent_collaboration",
+            "make_plan"
+          ],
+          "capabilities": [
+            "task_decomposition",
+            "agent_orchestration",
+            "multi_agent_delegation"
+          ],
+          "is_core": true,
+          "engine": "antigravity",
+          "soul_markdown": "You are MICHAEL, Lead Software Architect & Tech Lead.",
+          "chat_history": []
+        },
+        "soul_md": "You are MICHAEL, Lead Software Architect & Tech Lead.",
+        "task_info": null,
+        "memories": [
+          {
+            "id": 508,
+            "session_id": "sess_20261104_195217",
+            "role": "tool",
+            "content": "Active Agents (13):\n\u2022 MICHAEL (Lead Software Architect & Tech Lead) -> Tool: antigravity_run [IDLE]\n\u2022 Verve (Frontend & UI Design Specialist) -> Tool: opencode_run [IDLE]\n\u2022 Flux (Frontend Specialist & Overflow Developer) -> Tool: opencode_run [IDLE]\n\u2022 Nexus (Full-Stack & Backend Specialist) -> Tool: opencode_run [IDLE]\n\u2022 Dwight (Senior Refactoring & QA Specialist) -> Tool: kilo_run [IDLE]\n\u2022 Pam Beesly (Design System & Token Architect) -> Tool: antigravity_run [IDLE]\n\u2022 Kelly Kapoor (Social & Deep Web Researcher) -> Tool: agent_reach [IDLE]\n\u2022 Quantum (Detailed Web Researcher) -> Tool: antigravity_run [IDLE]\n\u2022 DevDynamo (Full-Stack Developer & Autonomous Engineer) -> Tool: opencode_run [IDLE]\n\u2022 InsightAI (Data Scientist & AI Specialist) -> Tool: antigravity_run [IDLE]\n\u2022 Recon (Autonomous Deep Researcher & Intelligence Agent) -> Tool: agent_reach [IDLE]\n\u2022 Newbie Agent (General Assistant) -> Tool: web_search [IDLE]\n\u2022 Restricted Attempt Agent (Autonomous Specialist) -> Tool: opencode_run [IDLE]",
+            "tool_name": "agents_control",
+            "tool_args": "{\"action\": \"list_agents\"}",
+            "tool_result": "Active Agents (13):\n\u2022 MICHAEL (Lead Software Architect & Tech Lead) -> Tool: antigravity_run [IDLE]\n\u2022 Verve (Frontend & UI Design Specialist) -> Tool: opencode_run [IDLE]\n\u2022 Flux (Frontend Specialist & Overflow Developer) -> Tool: opencode_run [IDLE]\n\u2022 Nexus (Full-Stack & Backend Specialist) -> Tool: opencode_run [IDLE]\n\u2022 Dwight (Senior Refactoring & QA Specialist) -> Tool: kilo_run [IDLE]\n\u2022 Pam Beesly (Design System & Token Architect) -> Tool: antigravity_run [IDLE]\n\u2022 Kelly Kapoor (Social & Deep Web Researcher) -> Tool: agent_reach [IDLE]\n\u2022 Quantum (Detailed Web Researcher) -> Tool: antigravity_run [IDLE]\n\u2022 DevDynamo (Full-Stack Developer & Autonomous Engineer) -> Tool: opencode_run [IDLE]\n\u2022 InsightAI (Data Scientist & AI Specialist) -> Tool: antigravity_run [IDLE]\n\u2022 Recon (Autonomous Deep Researcher & Intelligence Agent) -> Tool: agent_reach [IDLE]\n\u2022 Newbie Agent (General Assistant) -> Tool: web_search [IDLE]\n\u2022 Restricted Attempt Agent (Autonomous Specialist) -> Tool: opencode_run [IDLE]",
+            "timestamp": "2026-11-04 19:54:18",
+            "rank": -1.570652154911923,
+            "score": 1.5707
+          }
+        ]
+      },
+      "latency_ms": 4.1,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "GET /api/agents/agent - Default behavior when id param is omitted",
+      "endpoint": "/api/agents/agent",
+      "method": "GET",
+      "payload": null,
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "3882",
+        "Date": "Wed, 04 Nov 2026 15:25:45 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "agent": {
+          "id": "MICHAEL",
+          "name": "MICHAEL",
+          "role": "Lead Software Architect & Tech Lead",
+          "specialty": "High-level architecture design, code review, and structural planning",
+          "color": "#a855f7",
+          "avatar_pixel": "michael_pixel.png",
+          "default_tool": "antigravity_run",
+          "risk_tier": "L1_MUTATION",
+          "prompt_prefix": "You are MICHAEL, Lead Software Architect & Tech Lead.",
+          "model_id": "gemini-3.8-flash-low",
+          "status": "idle",
+          "current_task_id": null,
+          "active_worktree": "repo_active",
+          "desk_x": 180,
+          "desk_y": 160,
+          "logs": [
+            "[READY] Agent 'MICHAEL' registered into autonomous agents",
+            "[MODEL] Engine: antigravity_run | Model: gemini-3.8-flash-low",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "recent_logs": [
+            "[READY] Agent 'MICHAEL' registered into autonomous agents",
+            "[MODEL] Engine: antigravity_run | Model: gemini-3.8-flash-low",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "allowed_tools": [
+            "antigravity_run",
+            "groq",
+            "kilo_run",
+            "opencode_run",
+            "web_search",
+            "file_processor",
+            "file_controller"
+          ],
+          "allowed_skills": [
+            "multi_agent_collaboration",
+            "make_plan"
+          ],
+          "capabilities": [
+            "task_decomposition",
+            "agent_orchestration",
+            "multi_agent_delegation"
+          ],
+          "is_core": true,
+          "engine": "antigravity",
+          "soul_markdown": "You are MICHAEL, Lead Software Architect & Tech Lead.",
+          "chat_history": []
+        },
+        "soul_md": "You are MICHAEL, Lead Software Architect & Tech Lead.",
+        "task_info": null,
+        "memories": [
+          {
+            "id": 508,
+            "session_id": "sess_20261104_195217",
+            "role": "tool",
+            "content": "Active Agents (13):\n\u2022 MICHAEL (Lead Software Architect & Tech Lead) -> Tool: antigravity_run [IDLE]\n\u2022 Verve (Frontend & UI Design Specialist) -> Tool: opencode_run [IDLE]\n\u2022 Flux (Frontend Specialist & Overflow Developer) -> Tool: opencode_run [IDLE]\n\u2022 Nexus (Full-Stack & Backend Specialist) -> Tool: opencode_run [IDLE]\n\u2022 Dwight (Senior Refactoring & QA Specialist) -> Tool: kilo_run [IDLE]\n\u2022 Pam Beesly (Design System & Token Architect) -> Tool: antigravity_run [IDLE]\n\u2022 Kelly Kapoor (Social & Deep Web Researcher) -> Tool: agent_reach [IDLE]\n\u2022 Quantum (Detailed Web Researcher) -> Tool: antigravity_run [IDLE]\n\u2022 DevDynamo (Full-Stack Developer & Autonomous Engineer) -> Tool: opencode_run [IDLE]\n\u2022 InsightAI (Data Scientist & AI Specialist) -> Tool: antigravity_run [IDLE]\n\u2022 Recon (Autonomous Deep Researcher & Intelligence Agent) -> Tool: agent_reach [IDLE]\n\u2022 Newbie Agent (General Assistant) -> Tool: web_search [IDLE]\n\u2022 Restricted Attempt Agent (Autonomous Specialist) -> Tool: opencode_run [IDLE]",
+            "tool_name": "agents_control",
+            "tool_args": "{\"action\": \"list_agents\"}",
+            "tool_result": "Active Agents (13):\n\u2022 MICHAEL (Lead Software Architect & Tech Lead) -> Tool: antigravity_run [IDLE]\n\u2022 Verve (Frontend & UI Design Specialist) -> Tool: opencode_run [IDLE]\n\u2022 Flux (Frontend Specialist & Overflow Developer) -> Tool: opencode_run [IDLE]\n\u2022 Nexus (Full-Stack & Backend Specialist) -> Tool: opencode_run [IDLE]\n\u2022 Dwight (Senior Refactoring & QA Specialist) -> Tool: kilo_run [IDLE]\n\u2022 Pam Beesly (Design System & Token Architect) -> Tool: antigravity_run [IDLE]\n\u2022 Kelly Kapoor (Social & Deep Web Researcher) -> Tool: agent_reach [IDLE]\n\u2022 Quantum (Detailed Web Researcher) -> Tool: antigravity_run [IDLE]\n\u2022 DevDynamo (Full-Stack Developer & Autonomous Engineer) -> Tool: opencode_run [IDLE]\n\u2022 InsightAI (Data Scientist & AI Specialist) -> Tool: antigravity_run [IDLE]\n\u2022 Recon (Autonomous Deep Researcher & Intelligence Agent) -> Tool: agent_reach [IDLE]\n\u2022 Newbie Agent (General Assistant) -> Tool: web_search [IDLE]\n\u2022 Restricted Attempt Agent (Autonomous Specialist) -> Tool: opencode_run [IDLE]",
+            "timestamp": "2026-11-04 19:54:18",
+            "rank": -1.570652154911923,
+            "score": 1.5707
+          }
+        ]
+      },
+      "latency_ms": 4.7,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "GET /api/agents/agent - Validation non-existent id",
+      "endpoint": "/api/agents/agent",
+      "method": "GET",
+      "payload": null,
+      "params": {
+        "id": "NON_EXISTENT_AGENT_XYZ"
+      },
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "72",
+        "Date": "Wed, 04 Nov 2026 15:25:45 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": false,
+        "error": "Agent 'NON_EXISTENT_AGENT_XYZ' not found."
+      },
+      "latency_ms": 1.23,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/save_agent - Create new test agent",
+      "endpoint": "/api/agents/save_agent",
+      "method": "POST",
+      "payload": {
+        "id": "QA_TEST_AGENT_16",
+        "name": "QA Specialist 16",
+        "role": "Autonomous QA Engineer",
+        "specialty": "Integration testing and system validation",
+        "color": "#10b981",
+        "model_id": "gemini-3.8-flash-low",
+        "engine": "antigravity",
+        "soul_markdown": "You are QA Specialist 16, testing UI Server APIs."
+      },
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "1372",
+        "Date": "Wed, 04 Nov 2026 15:25:51 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "agent": {
+          "id": "QA_TEST_AGENT_16",
+          "name": "QA Specialist 16",
+          "role": "Autonomous QA Engineer",
+          "specialty": "Integration testing and system validation",
+          "color": "#10b981",
+          "avatar_pixel": "qa_test_agent_16_pixel.png",
+          "default_tool": "task_status",
+          "risk_tier": "L0_READ_ONLY",
+          "prompt_prefix": "You are QA Specialist 16, an autonomous agents specialist focusing on Integration testing and system validation.",
+          "model_id": "gemini-3.8-flash-low",
+          "status": "idle",
+          "current_task_id": null,
+          "active_worktree": null,
+          "desk_x": 320,
+          "desk_y": 160,
+          "logs": [
+            "[READY] Agent 'QA Specialist 16' registered into autonomous agents",
+            "[MODEL] Engine: task_status | Model: gemini-3.8-flash-low",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "recent_logs": [
+            "[READY] Agent 'QA Specialist 16' registered into autonomous agents",
+            "[MODEL] Engine: task_status | Model: gemini-3.8-flash-low",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "allowed_tools": [
+            "web_search",
+            "web_read_page",
+            "task_status"
+          ],
+          "allowed_skills": [
+            "kilo_code",
+            "multi_agent_collaboration",
+            "make_plan",
+            "git_workflow"
+          ],
+          "capabilities": [
+            "code_refactor",
+            "qa_testing",
+            "security_audit",
+            "complexity_reduction"
+          ],
+          "is_core": false,
+          "engine": "antigravity",
+          "soul_markdown": "You are QA Specialist 16, testing UI Server APIs.",
+          "chat_history": []
+        }
+      },
+      "latency_ms": 5860.79,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/save_agent - Validation empty body",
+      "endpoint": "/api/agents/save_agent",
+      "method": "POST",
+      "payload": {},
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "64",
+        "Date": "Wed, 04 Nov 2026 15:25:51 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": false,
+        "error": "Agent name or ID cannot be empty."
+      },
+      "latency_ms": 3.82,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "GET /api/agents/agent - Verify newly saved QA_TEST_AGENT_16",
+      "endpoint": "/api/agents/agent",
+      "method": "GET",
+      "payload": null,
+      "params": {
+        "id": "QA_TEST_AGENT_16"
+      },
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "5444",
+        "Date": "Wed, 04 Nov 2026 15:25:51 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "agent": {
+          "id": "QA_TEST_AGENT_16",
+          "name": "QA Specialist 16",
+          "role": "Autonomous QA Engineer",
+          "specialty": "Integration testing and system validation",
+          "color": "#10b981",
+          "avatar_pixel": "qa_test_agent_16_pixel.png",
+          "default_tool": "task_status",
+          "risk_tier": "L0_READ_ONLY",
+          "prompt_prefix": "You are QA Specialist 16, an autonomous agents specialist focusing on Integration testing and system validation.",
+          "model_id": "gemini-3.8-flash-low",
+          "status": "idle",
+          "current_task_id": null,
+          "active_worktree": null,
+          "desk_x": 320,
+          "desk_y": 160,
+          "logs": [
+            "[READY] Agent 'QA Specialist 16' registered into autonomous agents",
+            "[MODEL] Engine: task_status | Model: gemini-3.8-flash-low",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "recent_logs": [
+            "[READY] Agent 'QA Specialist 16' registered into autonomous agents",
+            "[MODEL] Engine: task_status | Model: gemini-3.8-flash-low",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "allowed_tools": [
+            "web_search",
+            "web_read_page",
+            "task_status"
+          ],
+          "allowed_skills": [
+            "kilo_code",
+            "multi_agent_collaboration",
+            "make_plan",
+            "git_workflow"
+          ],
+          "capabilities": [
+            "code_refactor",
+            "qa_testing",
+            "security_audit",
+            "complexity_reduction"
+          ],
+          "is_core": false,
+          "engine": "antigravity",
+          "soul_markdown": "You are QA Specialist 16, testing UI Server APIs.",
+          "chat_history": []
+        },
+        "soul_md": "You are QA Specialist 16, testing UI Server APIs.",
+        "task_info": null,
+        "memories": [
+          {
+            "id": 508,
+            "session_id": "sess_20261104_195217",
+            "role": "tool",
+            "content": "Active Agents (13):\n\u2022 MICHAEL (Lead Software Architect & Tech Lead) -> Tool: antigravity_run [IDLE]\n\u2022 Verve (Frontend & UI Design Specialist) -> Tool: opencode_run [IDLE]\n\u2022 Flux (Frontend Specialist & Overflow Developer) -> Tool: opencode_run [IDLE]\n\u2022 Nexus (Full-Stack & Backend Specialist) -> Tool: opencode_run [IDLE]\n\u2022 Dwight (Senior Refactoring & QA Specialist) -> Tool: kilo_run [IDLE]\n\u2022 Pam Beesly (Design System & Token Architect) -> Tool: antigravity_run [IDLE]\n\u2022 Kelly Kapoor (Social & Deep Web Researcher) -> Tool: agent_reach [IDLE]\n\u2022 Quantum (Detailed Web Researcher) -> Tool: antigravity_run [IDLE]\n\u2022 DevDynamo (Full-Stack Developer & Autonomous Engineer) -> Tool: opencode_run [IDLE]\n\u2022 InsightAI (Data Scientist & AI Specialist) -> Tool: antigravity_run [IDLE]\n\u2022 Recon (Autonomous Deep Researcher & Intelligence Agent) -> Tool: agent_reach [IDLE]\n\u2022 Newbie Agent (General Assistant) -> Tool: web_search [IDLE]\n\u2022 Restricted Attempt Agent (Autonomous Specialist) -> Tool: opencode_run [IDLE]",
+            "tool_name": "agents_control",
+            "tool_args": "{\"action\": \"list_agents\"}",
+            "tool_result": "Active Agents (13):\n\u2022 MICHAEL (Lead Software Architect & Tech Lead) -> Tool: antigravity_run [IDLE]\n\u2022 Verve (Frontend & UI Design Specialist) -> Tool: opencode_run [IDLE]\n\u2022 Flux (Frontend Specialist & Overflow Developer) -> Tool: opencode_run [IDLE]\n\u2022 Nexus (Full-Stack & Backend Specialist) -> Tool: opencode_run [IDLE]\n\u2022 Dwight (Senior Refactoring & QA Specialist) -> Tool: kilo_run [IDLE]\n\u2022 Pam Beesly (Design System & Token Architect) -> Tool: antigravity_run [IDLE]\n\u2022 Kelly Kapoor (Social & Deep Web Researcher) -> Tool: agent_reach [IDLE]\n\u2022 Quantum (Detailed Web Researcher) -> Tool: antigravity_run [IDLE]\n\u2022 DevDynamo (Full-Stack Developer & Autonomous Engineer) -> Tool: opencode_run [IDLE]\n\u2022 InsightAI (Data Scientist & AI Specialist) -> Tool: antigravity_run [IDLE]\n\u2022 Recon (Autonomous Deep Researcher & Intelligence Agent) -> Tool: agent_reach [IDLE]\n\u2022 Newbie Agent (General Assistant) -> Tool: web_search [IDLE]\n\u2022 Restricted Attempt Agent (Autonomous Specialist) -> Tool: opencode_run [IDLE]",
+            "timestamp": "2026-11-04 19:54:18",
+            "rank": -7.203224348708336,
+            "score": 7.2032
+          },
+          {
+            "id": 534,
+            "session_id": "rapid_chat_83d0601b",
+            "role": "user",
+            "content": "Rapid turn sequence #16 with cryptographic payload cb211059-f32c-4ea8-b96f-09fa02691b41",
+            "tool_name": "benchmark_runner",
+            "tool_args": "{\"step\": 16, \"load\": \"high\"}",
+            "tool_result": "Benchmark step 16 passed OK",
+            "timestamp": "2026-11-04 20:20:40",
+            "rank": -4.515980855150422,
+            "score": 4.516
+          },
+          {
+            "id": 717,
+            "session_id": "concurrent_stress_37263922",
+            "role": "user",
+            "content": "Concurrent thread 6 turn 16 token 5704c79f1baa4a368b912e6d7186c9c9",
+            "tool_name": null,
+            "tool_args": null,
+            "tool_result": null,
+            "timestamp": "2026-11-04 20:20:41",
+            "rank": -4.479391370983985,
+            "score": 4.4794
+          },
+          {
+            "id": 711,
+            "session_id": "concurrent_stress_37263922",
+            "role": "user",
+            "content": "Concurrent thread 7 turn 16 token 20b7c48bd10c4f47bf2e8b00eeab8f21",
+            "tool_name": null,
+            "tool_args": null,
+            "tool_result": null,
+            "timestamp": "2026-11-04 20:20:41",
+            "rank": -4.479391370983985,
+            "score": 4.4794
+          },
+          {
+            "id": 710,
+            "session_id": "concurrent_stress_37263922",
+            "role": "user",
+            "content": "Concurrent thread 5 turn 24 token 16a831822a5846a99f2aa7aa780a5e80",
+            "tool_name": null,
+            "tool_args": null,
+            "tool_result": null,
+            "timestamp": "2026-11-04 20:20:41",
+            "rank": -4.479391370983985,
+            "score": 4.4794
+          },
+          {
+            "id": 702,
+            "session_id": "concurrent_stress_37263922",
+            "role": "user",
+            "content": "Concurrent thread 5 turn 16 token a2efa98964ef43cc924a85ef98ee7f5d",
+            "tool_name": null,
+            "tool_args": null,
+            "tool_result": null,
+            "timestamp": "2026-11-04 20:20:41",
+            "rank": -4.479391370983985,
+            "score": 4.4794
+          }
+        ]
+      },
+      "latency_ms": 19.29,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/save_soul - Update agent soul prompt",
+      "endpoint": "/api/agents/save_soul",
+      "method": "POST",
+      "payload": {
+        "agent_id": "QA_TEST_AGENT_16",
+        "soul_prompt": "You are QA Specialist 16 updated soul prompt for integration tests."
+      },
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "128",
+        "Date": "Wed, 04 Nov 2026 15:25:51 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "agent_id": "QA_TEST_AGENT_16",
+        "soul": "You are QA Specialist 16 updated soul prompt for integration tests."
+      },
+      "latency_ms": 6.18,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/save_soul - Validation non-existent agent",
+      "endpoint": "/api/agents/save_soul",
+      "method": "POST",
+      "payload": {
+        "agent_id": "GHOST_AGENT_XYZ",
+        "soul_prompt": "Ghost prompt"
+      },
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "65",
+        "Date": "Wed, 04 Nov 2026 15:25:51 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": false,
+        "error": "Agent 'GHOST_AGENT_XYZ' not found."
+      },
+      "latency_ms": 1.54,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/save_soul - Payload validation observation (missing agent_id)",
+      "endpoint": "/api/agents/save_soul",
+      "method": "POST",
+      "payload": {
+        "soul_prompt": "No agent target"
+      },
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "67",
+        "Date": "Wed, 04 Nov 2026 15:25:51 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "agent_id": "MICHAEL",
+        "soul": "No agent target"
+      },
+      "latency_ms": 10.13,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/conversations - Create new conversation thread",
+      "endpoint": "/api/agents/conversations",
+      "method": "POST",
+      "payload": {
+        "agent_id": "MICHAEL",
+        "title": "QA Test Architecture Discussion"
+      },
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "124",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "conversation_id": "conv_12c60e5446c3",
+        "title": "QA Test Architecture Discussion",
+        "agent_id": "MICHAEL"
+      },
+      "latency_ms": 485.24,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/conversations - Validation missing agent_id (HTTP 400)",
+      "endpoint": "/api/agents/conversations",
+      "method": "POST",
+      "payload": {
+        "title": "Missing Agent"
+      },
+      "params": null,
+      "expected_status": 400,
+      "passed": true,
+      "status_code": 400,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "52",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": false,
+        "error": "agent_id is required."
+      },
+      "latency_ms": 1.03,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "GET /api/agents/conversations - List all active conversations",
+      "endpoint": "/api/agents/conversations",
+      "method": "GET",
+      "payload": null,
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "26341",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "conversations": [
+          {
+            "id": "conv_12c60e5446c3",
+            "agent_id": "MICHAEL",
+            "title": "QA Test Architecture Discussion",
+            "created_at": "2026-11-04T15:25:52.244030+00:00",
+            "updated_at": "2026-11-04T15:25:52.244030+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_c7e8fc1767ea",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:25:50.313789+00:00",
+            "updated_at": "2026-11-04T15:25:50.314559+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_c270f53afa2e",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:25:28.090919+00:00",
+            "updated_at": "2026-11-04T15:25:28.091533+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_d862b076c0f2",
+            "agent_id": "MICHAEL",
+            "title": "Suite J Long Req",
+            "created_at": "2026-11-04T15:25:16.332270+00:00",
+            "updated_at": "2026-11-04T15:25:28.074593+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_2c4b9afb8ea2",
+            "agent_id": "DWIGHT",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:25:18.189208+00:00",
+            "updated_at": "2026-11-04T15:25:18.189208+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_2c3301b11f15",
+            "agent_id": "MICHAEL",
+            "title": "Michael Confidential",
+            "created_at": "2026-11-04T15:25:18.171750+00:00",
+            "updated_at": "2026-11-04T15:25:18.171750+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_e66c5fb88cc7",
+            "agent_id": "MICHAEL",
+            "title": "E13 Sync Stream Context",
+            "created_at": "2026-11-04T15:25:18.042673+00:00",
+            "updated_at": "2026-11-04T15:25:18.137323+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9ac1a5836822",
+            "agent_id": "MICHAEL",
+            "title": "E12 Unknown Info",
+            "created_at": "2026-11-04T15:25:18.024745+00:00",
+            "updated_at": "2026-11-04T15:25:18.040317+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_bdb94b039949",
+            "agent_id": "MICHAEL",
+            "title": "E11 Facts vs Assumptions",
+            "created_at": "2026-11-04T15:25:18.008457+00:00",
+            "updated_at": "2026-11-04T15:25:18.021189+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_935737d4890f",
+            "agent_id": "DWIGHT",
+            "title": "Dwight Solo",
+            "created_at": "2026-11-04T15:25:17.987998+00:00",
+            "updated_at": "2026-11-04T15:25:17.989288+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_acfca266b9dc",
+            "agent_id": "MICHAEL",
+            "title": "Michael Solo",
+            "created_at": "2026-11-04T15:25:17.987651+00:00",
+            "updated_at": "2026-11-04T15:25:17.988343+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_6b45656921c7",
+            "agent_id": "MICHAEL",
+            "title": "Conv Alpha",
+            "created_at": "2026-11-04T15:25:17.959150+00:00",
+            "updated_at": "2026-11-04T15:25:17.973682+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9b24f06eba6b",
+            "agent_id": "MICHAEL",
+            "title": "E08 Workspace Check",
+            "created_at": "2026-11-04T15:25:17.945600+00:00",
+            "updated_at": "2026-11-04T15:25:17.957951+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_89e55919c4d2",
+            "agent_id": "MICHAEL",
+            "title": "E07 Prompt Check",
+            "created_at": "2026-11-04T15:25:17.929778+00:00",
+            "updated_at": "2026-11-04T15:25:17.930193+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8464e3184322",
+            "agent_id": "MICHAEL",
+            "title": "E05 Long Convo",
+            "created_at": "2026-11-04T15:25:17.802557+00:00",
+            "updated_at": "2026-11-04T15:25:17.903830+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_fb12a74997e9",
+            "agent_id": "MICHAEL",
+            "title": "E04 Ordering",
+            "created_at": "2026-11-04T15:25:17.727397+00:00",
+            "updated_at": "2026-11-04T15:25:17.776334+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9e6d4209c4e8",
+            "agent_id": "MICHAEL",
+            "title": "E03 Persistence",
+            "created_at": "2026-11-04T15:25:17.705690+00:00",
+            "updated_at": "2026-11-04T15:25:17.712854+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ef9dc0eaff09",
+            "agent_id": "MICHAEL",
+            "title": "E02 History",
+            "created_at": "2026-11-04T15:25:17.637456+00:00",
+            "updated_at": "2026-11-04T15:25:17.704611+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_53c4cf46faff",
+            "agent_id": "MICHAEL",
+            "title": "E01 Conv",
+            "created_at": "2026-11-04T15:25:17.618394+00:00",
+            "updated_at": "2026-11-04T15:25:17.620014+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_c1f21f36afb5",
+            "agent_id": "MICHAEL",
+            "title": "Alex Dental SaaS Project",
+            "created_at": "2026-11-04T15:25:17.543400+00:00",
+            "updated_at": "2026-11-04T15:25:17.616152+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_deaa3ba2ff84",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:24:48.133496+00:00",
+            "updated_at": "2026-11-04T15:24:55.573643+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_f100a8a95f53",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:23:28.475039+00:00",
+            "updated_at": "2026-11-04T15:24:49.861100+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8975b3f52585",
+            "agent_id": "MICHAEL",
+            "title": "Suite J Persistence Test",
+            "created_at": "2026-11-04T15:24:35.563356+00:00",
+            "updated_at": "2026-11-04T15:24:43.916579+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_a01f41305952",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:24:37.752996+00:00",
+            "updated_at": "2026-11-04T15:24:37.767611+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_371817d9d8b4",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:24:13.556243+00:00",
+            "updated_at": "2026-11-04T15:24:19.415478+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_e8e8b76dbca0",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:23:26.370094+00:00",
+            "updated_at": "2026-11-04T15:23:58.849723+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_3c2cffbe01bd",
+            "agent_id": "MICHAEL",
+            "title": "Stream Context Check",
+            "created_at": "2026-11-04T15:23:56.718580+00:00",
+            "updated_at": "2026-11-04T15:23:56.783142+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_038c43650509",
+            "agent_id": "QA_SUITE_B_BOT",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:23:46.836174+00:00",
+            "updated_at": "2026-11-04T15:23:52.659767+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ba00848aa697",
+            "agent_id": "QA_SUITE_G_BOUNDS",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:23:30.075310+00:00",
+            "updated_at": "2026-11-04T15:23:49.418869+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_31e11892ac0d",
+            "agent_id": "ZEZO",
+            "title": "Integrity Verification Test",
+            "created_at": "2026-11-04T15:23:44.162582+00:00",
+            "updated_at": "2026-11-04T15:23:44.232495+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_c7cb6b22951a",
+            "agent_id": "ZEZO",
+            "title": "Rapid Messages Test",
+            "created_at": "2026-11-04T15:23:43.933629+00:00",
+            "updated_at": "2026-11-04T15:23:43.958957+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_a97f81784c97",
+            "agent_id": "ZEZO",
+            "title": "Stream Interrupt Test",
+            "created_at": "2026-11-04T15:23:43.896932+00:00",
+            "updated_at": "2026-11-04T15:23:43.898945+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_184e03f5bcdc",
+            "agent_id": "MICHAEL",
+            "title": "Test Conv",
+            "created_at": "2026-11-04T15:23:42.579766+00:00",
+            "updated_at": "2026-11-04T15:23:42.587957+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_eb251bdc6a90",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:23:29.887940+00:00",
+            "updated_at": "2026-11-04T15:23:29.950416+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_36f7019d759e",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:37.408316+00:00",
+            "updated_at": "2026-11-04T15:22:56.144285+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_2b7db47169b6",
+            "agent_id": "QA_SUITE_G_DENIED",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:50.544055+00:00",
+            "updated_at": "2026-11-04T15:22:50.548678+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9a459f0d2a13",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:25.113773+00:00",
+            "updated_at": "2026-11-04T15:22:40.458275+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_89ab9257ca66",
+            "agent_id": "QA_SUITE_G_TEST2",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:26.513963+00:00",
+            "updated_at": "2026-11-04T15:22:35.023461+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_71ff2c0253f4",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:10.595324+00:00",
+            "updated_at": "2026-11-04T15:22:27.432155+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_4e95a63ebea8",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:03.613488+00:00",
+            "updated_at": "2026-11-04T15:22:11.924169+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_fbbebc933905",
+            "agent_id": "MICHAEL",
+            "title": "Stream test",
+            "created_at": "2026-11-04T15:22:08.849480+00:00",
+            "updated_at": "2026-11-04T15:22:08.934159+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8816b61b269a",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:21:33.738754+00:00",
+            "updated_at": "2026-11-04T15:22:03.263479+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_0bd655c919e6",
+            "agent_id": "QA_SUITE_G_TEST",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:21:40.291173+00:00",
+            "updated_at": "2026-11-04T15:22:00.063915+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_0e2304acc1af",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:21:44.300947+00:00",
+            "updated_at": "2026-11-04T15:21:57.628837+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_763a48169354",
+            "agent_id": "MICHAEL",
+            "title": "Alex SaaS Test",
+            "created_at": "2026-11-04T15:21:46.197180+00:00",
+            "updated_at": "2026-11-04T15:21:46.247406+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_b9f264e5cb46",
+            "agent_id": "MICHAEL",
+            "title": "Alex SaaS Test",
+            "created_at": "2026-11-04T15:21:33.997786+00:00",
+            "updated_at": "2026-11-04T15:21:34.025853+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_916112379771",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:21:25.830808+00:00",
+            "updated_at": "2026-11-04T15:21:25.830808+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_1a0dcb306eb3",
+            "agent_id": "QA_SUITE_B_BOT",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:21:14.856063+00:00",
+            "updated_at": "2026-11-04T15:21:23.783906+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_efbe62bc766a",
+            "agent_id": "QA_SUITE_G",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:20:39.912699+00:00",
+            "updated_at": "2026-11-04T15:20:49.976076+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_57b364cde5e3",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:20:32.387724+00:00",
+            "updated_at": "2026-11-04T15:20:40.655917+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_6782b944b176",
+            "agent_id": "ZEZO_QA_AGENT",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:19:40.043152+00:00",
+            "updated_at": "2026-11-04T15:20:09.112989+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_a06b802a0d89",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:18:57.816355+00:00",
+            "updated_at": "2026-11-04T15:19:06.176580+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_239587943eba",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:18:09.065096+00:00",
+            "updated_at": "2026-11-04T15:18:20.299911+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8ee62d9946de",
+            "agent_id": "MICHAEL",
+            "title": "Stream Test 2",
+            "created_at": "2026-11-04T15:14:32.412018+00:00",
+            "updated_at": "2026-11-04T15:14:32.435300+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ed61d88ae65a",
+            "agent_id": "MICHAEL",
+            "title": "Stream Test",
+            "created_at": "2026-11-04T15:13:24.565888+00:00",
+            "updated_at": "2026-11-04T15:13:24.599120+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_bd038bc6f7f7",
+            "agent_id": "MICHAEL",
+            "title": "Test Conversation",
+            "created_at": "2026-11-04T15:13:08.710657+00:00",
+            "updated_at": "2026-11-04T15:13:20.143299+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_151f20fea6aa",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:02:26.812445+00:00",
+            "updated_at": "2026-11-04T15:02:38.498278+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_99c5964ccd02",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:01:44.495848+00:00",
+            "updated_at": "2026-11-04T15:02:13.471784+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_855a789de13e",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T14:57:53.239396+00:00",
+            "updated_at": "2026-11-04T14:57:59.845366+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_acde7eb29ac6",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T14:57:15.176520+00:00",
+            "updated_at": "2026-11-04T14:57:21.191778+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ec33c98878fb",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T14:55:26.843115+00:00",
+            "updated_at": "2026-11-04T14:55:58.112684+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_fa28813f08c4",
+            "agent_id": "QUANTUM",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:37:09.689697+00:00",
+            "updated_at": "2026-11-03T22:37:31.235750+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_611618c468ac",
+            "agent_id": "QUANTUM",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:36:44.377822+00:00",
+            "updated_at": "2026-11-03T22:36:53.469084+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_3ca80f2bd7db",
+            "agent_id": "QUANTUM",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:36:13.528047+00:00",
+            "updated_at": "2026-11-03T22:36:19.467744+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9372f79cdbf5",
+            "agent_id": "dwight",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:27:17.296693+00:00",
+            "updated_at": "2026-11-03T22:27:30.978769+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8107c179b569",
+            "agent_id": "DWIGHT",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:25:52.460380+00:00",
+            "updated_at": "2026-11-03T22:25:56.728378+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_2d431be84f7c",
+            "agent_id": "DWIGHT",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:25:37.777250+00:00",
+            "updated_at": "2026-11-03T22:25:41.586872+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8743e3380df8",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:12:30.642194+00:00",
+            "updated_at": "2026-11-03T22:12:38.171835+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_daf154269df2",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:11:42.775218+00:00",
+            "updated_at": "2026-11-03T22:11:55.274183+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_84b931615236",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:10:53.086730+00:00",
+            "updated_at": "2026-11-03T22:11:04.475178+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_cb6c12847cab",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:10:23.855239+00:00",
+            "updated_at": "2026-11-03T22:10:30.298938+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_e86c3fd08a8e",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:03:30.282771+00:00",
+            "updated_at": "2026-11-03T22:03:40.699979+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_d500dcc41958",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:02:58.249216+00:00",
+            "updated_at": "2026-11-03T22:03:14.768425+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ae74286d1b72",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:01:55.792460+00:00",
+            "updated_at": "2026-11-03T22:02:27.970144+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_a3d80a15d28a",
+            "agent_id": "flux",
+            "title": "Final Check Thread",
+            "created_at": "2026-11-03T21:35:15.506104+00:00",
+            "updated_at": "2026-11-03T21:35:22.393105+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_f2ff2debadef",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T21:14:32.528122+00:00",
+            "updated_at": "2026-11-03T21:14:45.102850+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_c1fe43098044",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T21:13:47.214904+00:00",
+            "updated_at": "2026-11-03T21:14:02.017405+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_eb8f49827b5e",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T21:13:07.119941+00:00",
+            "updated_at": "2026-11-03T21:13:21.243640+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_2fd8585c92bf",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T21:12:15.513541+00:00",
+            "updated_at": "2026-11-03T21:12:28.023416+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_1d1b2882ae62",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:51:59.426594+00:00",
+            "updated_at": "2026-11-03T20:52:03.479387+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_80304708a0a7",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:51:16.544492+00:00",
+            "updated_at": "2026-11-03T20:51:20.342840+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_308afc3dd0c3",
+            "agent_id": "flux",
+            "title": "Test Persistence Thread",
+            "created_at": "2026-11-03T20:44:38.669729+00:00",
+            "updated_at": "2026-11-03T20:44:50.372463+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_f2311216007e",
+            "agent_id": "flux",
+            "title": "Debug Thread",
+            "created_at": "2026-11-03T20:43:47.283391+00:00",
+            "updated_at": "2026-11-03T20:44:05.272335+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_fb51c9c32a26",
+            "agent_id": "flux",
+            "title": "Test Persistence Thread",
+            "created_at": "2026-11-03T20:43:01.327166+00:00",
+            "updated_at": "2026-11-03T20:43:29.392785+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_223629b1de25",
+            "agent_id": "flux",
+            "title": "Test Persistence Thread",
+            "created_at": "2026-11-03T20:42:23.917021+00:00",
+            "updated_at": "2026-11-03T20:42:39.895627+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_023b61e33657",
+            "agent_id": "dwight",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:41:43.682808+00:00",
+            "updated_at": "2026-11-03T20:41:47.941117+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_b8b1a7061dc2",
+            "agent_id": "ahmad",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:41:39.762922+00:00",
+            "updated_at": "2026-11-03T20:41:43.681746+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_3a24fbbcffa6",
+            "agent_id": "flux",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:41:34.094999+00:00",
+            "updated_at": "2026-11-03T20:41:39.761728+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_6331dff69d45",
+            "agent_id": "flux",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:37:13.242663+00:00",
+            "updated_at": "2026-11-03T20:37:22.335651+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_d86ea7a085bb",
+            "agent_id": "flux",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:36:42.629531+00:00",
+            "updated_at": "2026-11-03T20:36:42.640664+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_01454a273a7d",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:13:33.161600+00:00",
+            "updated_at": "2026-11-03T20:13:37.878234+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ce112cd7caa3",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:13:00.663150+00:00",
+            "updated_at": "2026-11-03T20:13:05.301155+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_292014066e8c",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:12:40.296749+00:00",
+            "updated_at": "2026-11-03T20:12:45.090119+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8fb53837cd01",
+            "agent_id": "flux",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:02:43.208476+00:00",
+            "updated_at": "2026-11-03T20:02:55.571107+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_52731aa6955b",
+            "agent_id": "flux",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:02:18.969563+00:00",
+            "updated_at": "2026-11-03T20:02:37.414853+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_87ff670a433e",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:01:32.084857+00:00",
+            "updated_at": "2026-11-03T20:01:50.586516+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_f81c4467a303",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:00:41.738178+00:00",
+            "updated_at": "2026-11-03T20:01:07.967789+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_813ec017dec8",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:00:12.570805+00:00",
+            "updated_at": "2026-11-03T20:00:28.166026+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8544febcc86a",
+            "agent_id": "DWIGHT",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:59:51.388221+00:00",
+            "updated_at": "2026-11-03T19:59:56.044770+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_f2110c64db5d",
+            "agent_id": "AHMAD",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:59:46.895465+00:00",
+            "updated_at": "2026-11-03T19:59:51.386891+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_b65259de0d87",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:59:39.976707+00:00",
+            "updated_at": "2026-11-03T19:59:46.894547+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_7f9765e1755e",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:59:19.927902+00:00",
+            "updated_at": "2026-11-03T19:59:27.181029+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_aebfcde47b10",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:58:21.243185+00:00",
+            "updated_at": "2026-11-03T19:58:21.272421+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_2343c4c3fbd3",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:56:41.220404+00:00",
+            "updated_at": "2026-11-03T19:56:41.220864+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9d0c09f5d04e",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:56:26.652360+00:00",
+            "updated_at": "2026-11-03T19:56:26.656124+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_1365ed9cbabb",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T18:01:18.856574+00:00",
+            "updated_at": "2026-11-03T18:01:18.857317+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_aaef67fcfa81",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T16:56:56.743941+00:00",
+            "updated_at": "2026-11-03T16:56:56.744831+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          }
+        ]
+      },
+      "latency_ms": 20.79,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "GET /api/agents/conversations?agent_id=MICHAEL - Filtered conversations",
+      "endpoint": "/api/agents/conversations",
+      "method": "GET",
+      "payload": null,
+      "params": {
+        "agent_id": "MICHAEL"
+      },
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "11356",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "conversations": [
+          {
+            "id": "conv_12c60e5446c3",
+            "agent_id": "MICHAEL",
+            "title": "QA Test Architecture Discussion",
+            "created_at": "2026-11-04T15:25:52.244030+00:00",
+            "updated_at": "2026-11-04T15:25:52.244030+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_c270f53afa2e",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:25:28.090919+00:00",
+            "updated_at": "2026-11-04T15:25:28.091533+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_d862b076c0f2",
+            "agent_id": "MICHAEL",
+            "title": "Suite J Long Req",
+            "created_at": "2026-11-04T15:25:16.332270+00:00",
+            "updated_at": "2026-11-04T15:25:28.074593+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_2c3301b11f15",
+            "agent_id": "MICHAEL",
+            "title": "Michael Confidential",
+            "created_at": "2026-11-04T15:25:18.171750+00:00",
+            "updated_at": "2026-11-04T15:25:18.171750+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_e66c5fb88cc7",
+            "agent_id": "MICHAEL",
+            "title": "E13 Sync Stream Context",
+            "created_at": "2026-11-04T15:25:18.042673+00:00",
+            "updated_at": "2026-11-04T15:25:18.137323+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9ac1a5836822",
+            "agent_id": "MICHAEL",
+            "title": "E12 Unknown Info",
+            "created_at": "2026-11-04T15:25:18.024745+00:00",
+            "updated_at": "2026-11-04T15:25:18.040317+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_bdb94b039949",
+            "agent_id": "MICHAEL",
+            "title": "E11 Facts vs Assumptions",
+            "created_at": "2026-11-04T15:25:18.008457+00:00",
+            "updated_at": "2026-11-04T15:25:18.021189+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_acfca266b9dc",
+            "agent_id": "MICHAEL",
+            "title": "Michael Solo",
+            "created_at": "2026-11-04T15:25:17.987651+00:00",
+            "updated_at": "2026-11-04T15:25:17.988343+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_6b45656921c7",
+            "agent_id": "MICHAEL",
+            "title": "Conv Alpha",
+            "created_at": "2026-11-04T15:25:17.959150+00:00",
+            "updated_at": "2026-11-04T15:25:17.973682+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9b24f06eba6b",
+            "agent_id": "MICHAEL",
+            "title": "E08 Workspace Check",
+            "created_at": "2026-11-04T15:25:17.945600+00:00",
+            "updated_at": "2026-11-04T15:25:17.957951+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_89e55919c4d2",
+            "agent_id": "MICHAEL",
+            "title": "E07 Prompt Check",
+            "created_at": "2026-11-04T15:25:17.929778+00:00",
+            "updated_at": "2026-11-04T15:25:17.930193+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8464e3184322",
+            "agent_id": "MICHAEL",
+            "title": "E05 Long Convo",
+            "created_at": "2026-11-04T15:25:17.802557+00:00",
+            "updated_at": "2026-11-04T15:25:17.903830+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_fb12a74997e9",
+            "agent_id": "MICHAEL",
+            "title": "E04 Ordering",
+            "created_at": "2026-11-04T15:25:17.727397+00:00",
+            "updated_at": "2026-11-04T15:25:17.776334+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9e6d4209c4e8",
+            "agent_id": "MICHAEL",
+            "title": "E03 Persistence",
+            "created_at": "2026-11-04T15:25:17.705690+00:00",
+            "updated_at": "2026-11-04T15:25:17.712854+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ef9dc0eaff09",
+            "agent_id": "MICHAEL",
+            "title": "E02 History",
+            "created_at": "2026-11-04T15:25:17.637456+00:00",
+            "updated_at": "2026-11-04T15:25:17.704611+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_53c4cf46faff",
+            "agent_id": "MICHAEL",
+            "title": "E01 Conv",
+            "created_at": "2026-11-04T15:25:17.618394+00:00",
+            "updated_at": "2026-11-04T15:25:17.620014+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_c1f21f36afb5",
+            "agent_id": "MICHAEL",
+            "title": "Alex Dental SaaS Project",
+            "created_at": "2026-11-04T15:25:17.543400+00:00",
+            "updated_at": "2026-11-04T15:25:17.616152+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_f100a8a95f53",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:23:28.475039+00:00",
+            "updated_at": "2026-11-04T15:24:49.861100+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8975b3f52585",
+            "agent_id": "MICHAEL",
+            "title": "Suite J Persistence Test",
+            "created_at": "2026-11-04T15:24:35.563356+00:00",
+            "updated_at": "2026-11-04T15:24:43.916579+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_e8e8b76dbca0",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:23:26.370094+00:00",
+            "updated_at": "2026-11-04T15:23:58.849723+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_3c2cffbe01bd",
+            "agent_id": "MICHAEL",
+            "title": "Stream Context Check",
+            "created_at": "2026-11-04T15:23:56.718580+00:00",
+            "updated_at": "2026-11-04T15:23:56.783142+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_184e03f5bcdc",
+            "agent_id": "MICHAEL",
+            "title": "Test Conv",
+            "created_at": "2026-11-04T15:23:42.579766+00:00",
+            "updated_at": "2026-11-04T15:23:42.587957+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_eb251bdc6a90",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:23:29.887940+00:00",
+            "updated_at": "2026-11-04T15:23:29.950416+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_36f7019d759e",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:37.408316+00:00",
+            "updated_at": "2026-11-04T15:22:56.144285+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9a459f0d2a13",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:25.113773+00:00",
+            "updated_at": "2026-11-04T15:22:40.458275+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_71ff2c0253f4",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:10.595324+00:00",
+            "updated_at": "2026-11-04T15:22:27.432155+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_4e95a63ebea8",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:03.613488+00:00",
+            "updated_at": "2026-11-04T15:22:11.924169+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_fbbebc933905",
+            "agent_id": "MICHAEL",
+            "title": "Stream test",
+            "created_at": "2026-11-04T15:22:08.849480+00:00",
+            "updated_at": "2026-11-04T15:22:08.934159+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8816b61b269a",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:21:33.738754+00:00",
+            "updated_at": "2026-11-04T15:22:03.263479+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_0e2304acc1af",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:21:44.300947+00:00",
+            "updated_at": "2026-11-04T15:21:57.628837+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_763a48169354",
+            "agent_id": "MICHAEL",
+            "title": "Alex SaaS Test",
+            "created_at": "2026-11-04T15:21:46.197180+00:00",
+            "updated_at": "2026-11-04T15:21:46.247406+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_b9f264e5cb46",
+            "agent_id": "MICHAEL",
+            "title": "Alex SaaS Test",
+            "created_at": "2026-11-04T15:21:33.997786+00:00",
+            "updated_at": "2026-11-04T15:21:34.025853+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_916112379771",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:21:25.830808+00:00",
+            "updated_at": "2026-11-04T15:21:25.830808+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_57b364cde5e3",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:20:32.387724+00:00",
+            "updated_at": "2026-11-04T15:20:40.655917+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_a06b802a0d89",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:18:57.816355+00:00",
+            "updated_at": "2026-11-04T15:19:06.176580+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_239587943eba",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:18:09.065096+00:00",
+            "updated_at": "2026-11-04T15:18:20.299911+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8ee62d9946de",
+            "agent_id": "MICHAEL",
+            "title": "Stream Test 2",
+            "created_at": "2026-11-04T15:14:32.412018+00:00",
+            "updated_at": "2026-11-04T15:14:32.435300+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ed61d88ae65a",
+            "agent_id": "MICHAEL",
+            "title": "Stream Test",
+            "created_at": "2026-11-04T15:13:24.565888+00:00",
+            "updated_at": "2026-11-04T15:13:24.599120+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_bd038bc6f7f7",
+            "agent_id": "MICHAEL",
+            "title": "Test Conversation",
+            "created_at": "2026-11-04T15:13:08.710657+00:00",
+            "updated_at": "2026-11-04T15:13:20.143299+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_855a789de13e",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T14:57:53.239396+00:00",
+            "updated_at": "2026-11-04T14:57:59.845366+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_acde7eb29ac6",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T14:57:15.176520+00:00",
+            "updated_at": "2026-11-04T14:57:21.191778+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ec33c98878fb",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T14:55:26.843115+00:00",
+            "updated_at": "2026-11-04T14:55:58.112684+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_80304708a0a7",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:51:16.544492+00:00",
+            "updated_at": "2026-11-03T20:51:20.342840+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9d0c09f5d04e",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:56:26.652360+00:00",
+            "updated_at": "2026-11-03T19:56:26.656124+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_1365ed9cbabb",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T18:01:18.856574+00:00",
+            "updated_at": "2026-11-03T18:01:18.857317+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_aaef67fcfa81",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T16:56:56.743941+00:00",
+            "updated_at": "2026-11-03T16:56:56.744831+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          }
+        ]
+      },
+      "latency_ms": 5.2,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "GET /api/agents/messages - Get messages for created conversation",
+      "endpoint": "/api/agents/messages",
+      "method": "GET",
+      "payload": null,
+      "params": {
+        "conversation_id": "conv_12c60e5446c3"
+      },
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "73",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "conversation_id": "conv_12c60e5446c3",
+        "messages": []
+      },
+      "latency_ms": 5.69,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "GET /api/agents/messages - Validation missing conversation_id (HTTP 400)",
+      "endpoint": "/api/agents/messages",
+      "method": "GET",
+      "payload": null,
+      "params": null,
+      "expected_status": 400,
+      "passed": true,
+      "status_code": 400,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "59",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": false,
+        "error": "conversation_id is required."
+      },
+      "latency_ms": 1.37,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/chat - Validation empty prompt (HTTP 400)",
+      "endpoint": "/api/agents/chat",
+      "method": "POST",
+      "payload": {
+        "agent_id": "MICHAEL",
+        "prompt": ""
+      },
+      "params": null,
+      "expected_status": 400,
+      "passed": true,
+      "status_code": 400,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "54",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": false,
+        "error": "Prompt cannot be empty."
+      },
+      "latency_ms": 1.4,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/chat - Validation non-existent agent (HTTP 404)",
+      "endpoint": "/api/agents/chat",
+      "method": "POST",
+      "payload": {
+        "agent_id": "UNKNOWN_AGENT_999",
+        "prompt": "Hello"
+      },
+      "params": null,
+      "expected_status": 404,
+      "passed": true,
+      "status_code": 404,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "67",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": false,
+        "error": "Agent 'UNKNOWN_AGENT_999' not found."
+      },
+      "latency_ms": 2.97,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/chat - Explicit task dispatch (/task command)",
+      "endpoint": "/api/agents/chat",
+      "method": "POST",
+      "payload": {
+        "agent_id": "MICHAEL",
+        "prompt": "/task inspect system architecture integrity",
+        "conversation_id": "conv_12c60e5446c3"
+      },
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "360",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "agent_id": "MICHAEL",
+        "agent_name": "MICHAEL",
+        "reply": "I have started working on your task using antigravity_run! (Task ID: c853539f). You can follow my live progress on my desk monitor or ask for status.",
+        "task_id": "c853539f",
+        "conversation_id": null,
+        "tool_executions": [],
+        "engine": "antigravity_run",
+        "model": "gemini-3.8-flash-low"
+      },
+      "latency_ms": 52.63,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/chat/stream - Validation empty prompt (SSE error)",
+      "endpoint": "/api/agents/chat/stream",
+      "method": "POST",
+      "payload": {
+        "agent_id": "MICHAEL",
+        "prompt": ""
+      },
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+        "Transfer-Encoding": "chunked",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "events_received": [
+        {
+          "event": "error",
+          "data": {
+            "error": "Prompt cannot be empty."
+          }
+        },
+        {
+          "event": "done",
+          "data": {}
+        }
+      ],
+      "latency_ms": 1.25,
+      "notes": "Received SSE stream with events: ['error', 'done']"
+    },
+    {
+      "test_name": "POST /api/agents/chat/stream - Validation non-existent agent (SSE error)",
+      "endpoint": "/api/agents/chat/stream",
+      "method": "POST",
+      "payload": {
+        "agent_id": "NON_EXISTENT_AGENT",
+        "prompt": "Test streaming"
+      },
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+        "Transfer-Encoding": "chunked",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "events_received": [
+        {
+          "event": "error",
+          "data": {
+            "error": "Agent 'NON_EXISTENT_AGENT' not found."
+          }
+        },
+        {
+          "event": "done",
+          "data": {}
+        }
+      ],
+      "latency_ms": 1.05,
+      "notes": "Received SSE stream with events: ['error', 'done']"
+    },
+    {
+      "test_name": "POST /api/agents/chat/stream - Explicit task dispatch stream",
+      "endpoint": "/api/agents/chat/stream",
+      "method": "POST",
+      "payload": {
+        "agent_id": "MICHAEL",
+        "prompt": "/task run performance benchmark"
+      },
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+        "Transfer-Encoding": "chunked",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "events_received": [
+        {
+          "event": "status",
+          "data": {
+            "message": "Dispatching background task using antigravity_run..."
+          }
+        },
+        {
+          "event": "task_dispatched",
+          "data": {
+            "task_id": "0b3cfa35",
+            "engine": "antigravity_run",
+            "agent_id": "MICHAEL",
+            "message": "Task dispatched: 0b3cfa35"
+          }
+        },
+        {
+          "event": "chunk",
+          "data": {
+            "text": "I have started working on your task using antigravity_run! (Task ID: 0b3cfa35). You can follow my live progress on my desk monitor or ask for status."
+          }
+        },
+        {
+          "event": "done",
+          "data": {
+            "reply": "I have started working on your task using antigravity_run! (Task ID: 0b3cfa35). You can follow my live progress on my desk monitor or ask for status.",
+            "task_id": "0b3cfa35"
+          }
+        }
+      ],
+      "latency_ms": 1.07,
+      "notes": "Received SSE stream with events: ['status', 'task_dispatched', 'chunk', 'done']"
+    },
+    {
+      "test_name": "GET /api/agents/tasks/interrupted - Fetch interrupted tasks list",
+      "endpoint": "/api/agents/tasks/interrupted",
+      "method": "GET",
+      "payload": null,
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "2055",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "interrupted_tasks": [
+          {
+            "id": "task_0f020466",
+            "agent_id": "ZEZO",
+            "conversation_id": "conv_qa",
+            "title": "[Restart] Refactor Core Component",
+            "prompt": "Simulated prompt 1",
+            "status": "INTERRUPTED",
+            "risk_tier": "L1_MUTATION",
+            "touched_files": "[\"core/a.py\"]",
+            "error": null,
+            "created_at": "2026-11-04T15:22:57.865097+00:00",
+            "updated_at": "2026-11-04T15:24:23.656561+00:00",
+            "interrupted_at": "2026-11-04T15:24:23.656561+00:00"
+          },
+          {
+            "id": "sim_crash_4bf479",
+            "agent_id": "ZEZO",
+            "conversation_id": "conv_qa",
+            "title": "Generate Documentation",
+            "prompt": "Simulated prompt 2",
+            "status": "INTERRUPTED",
+            "risk_tier": "L0_READ_ONLY",
+            "touched_files": "[\"docs/x.md\"]",
+            "error": null,
+            "created_at": "2026-11-04T15:24:23.655979+00:00",
+            "updated_at": "2026-11-04T15:24:23.656561+00:00",
+            "interrupted_at": "2026-11-04T15:24:23.656561+00:00"
+          },
+          {
+            "id": "sim_crash_8fe711",
+            "agent_id": "ZEZO",
+            "conversation_id": "conv_qa",
+            "title": "Execute Migration",
+            "prompt": "Simulated prompt 3",
+            "status": "INTERRUPTED",
+            "risk_tier": "L2_DESTRUCTIVE",
+            "touched_files": "[\"db.sql\"]",
+            "error": null,
+            "created_at": "2026-11-04T15:24:23.655979+00:00",
+            "updated_at": "2026-11-04T15:24:23.656561+00:00",
+            "interrupted_at": "2026-11-04T15:24:23.656561+00:00"
+          },
+          {
+            "id": "sim_crash_63e19c",
+            "agent_id": "ZEZO",
+            "conversation_id": "conv_qa",
+            "title": "Generate Documentation",
+            "prompt": "Simulated prompt 2",
+            "status": "INTERRUPTED",
+            "risk_tier": "L0_READ_ONLY",
+            "touched_files": "[\"docs/x.md\"]",
+            "error": null,
+            "created_at": "2026-11-04T15:22:57.758328+00:00",
+            "updated_at": "2026-11-04T15:22:57.759094+00:00",
+            "interrupted_at": "2026-11-04T15:22:57.759094+00:00"
+          },
+          {
+            "id": "sim_crash_8aa5b6",
+            "agent_id": "ZEZO",
+            "conversation_id": "conv_qa",
+            "title": "Execute Migration",
+            "prompt": "Simulated prompt 3",
+            "status": "INTERRUPTED",
+            "risk_tier": "L2_DESTRUCTIVE",
+            "touched_files": "[\"db.sql\"]",
+            "error": null,
+            "created_at": "2026-11-04T15:22:57.758328+00:00",
+            "updated_at": "2026-11-04T15:22:57.759094+00:00",
+            "interrupted_at": "2026-11-04T15:22:57.759094+00:00"
+          }
+        ]
+      },
+      "latency_ms": 5.57,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/tasks/restart - Validation missing task_id (HTTP 400)",
+      "endpoint": "/api/agents/tasks/restart",
+      "method": "POST",
+      "payload": {
+        "confirmed": false
+      },
+      "params": null,
+      "expected_status": 400,
+      "passed": true,
+      "status_code": 400,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "51",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": false,
+        "error": "task_id is required."
+      },
+      "latency_ms": 3.28,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/tasks/restart - Unconfirmed restart check on test task",
+      "endpoint": "/api/agents/tasks/restart",
+      "method": "POST",
+      "payload": {
+        "task_id": "task_qa_test_999",
+        "confirmed": false
+      },
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "75",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": false,
+        "error": "Task 'task_qa_test_999' not found in ledger."
+      },
+      "latency_ms": 5.0,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "DELETE /api/agents/conversations - Validation missing conversation_id (HTTP 400)",
+      "endpoint": "/api/agents/conversations",
+      "method": "DELETE",
+      "payload": null,
+      "params": null,
+      "expected_status": 400,
+      "passed": true,
+      "status_code": 400,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "59",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": false,
+        "error": "conversation_id is required."
+      },
+      "latency_ms": 1.61,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "DELETE /api/agents/conversations - Delete created test thread",
+      "endpoint": "/api/agents/conversations",
+      "method": "DELETE",
+      "payload": null,
+      "params": {
+        "conversation_id": "conv_12c60e5446c3"
+      },
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "57",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "conversation_id": "conv_12c60e5446c3"
+      },
+      "latency_ms": 3.5,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "GET /api/agents/conversations - Verify deleted conversation no longer returned",
+      "endpoint": "/api/agents/conversations",
+      "method": "GET",
+      "payload": null,
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "26080",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "conversations": [
+          {
+            "id": "conv_c7e8fc1767ea",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:25:50.313789+00:00",
+            "updated_at": "2026-11-04T15:25:50.314559+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_c270f53afa2e",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:25:28.090919+00:00",
+            "updated_at": "2026-11-04T15:25:28.091533+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_d862b076c0f2",
+            "agent_id": "MICHAEL",
+            "title": "Suite J Long Req",
+            "created_at": "2026-11-04T15:25:16.332270+00:00",
+            "updated_at": "2026-11-04T15:25:28.074593+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_2c4b9afb8ea2",
+            "agent_id": "DWIGHT",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:25:18.189208+00:00",
+            "updated_at": "2026-11-04T15:25:18.189208+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_2c3301b11f15",
+            "agent_id": "MICHAEL",
+            "title": "Michael Confidential",
+            "created_at": "2026-11-04T15:25:18.171750+00:00",
+            "updated_at": "2026-11-04T15:25:18.171750+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_e66c5fb88cc7",
+            "agent_id": "MICHAEL",
+            "title": "E13 Sync Stream Context",
+            "created_at": "2026-11-04T15:25:18.042673+00:00",
+            "updated_at": "2026-11-04T15:25:18.137323+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9ac1a5836822",
+            "agent_id": "MICHAEL",
+            "title": "E12 Unknown Info",
+            "created_at": "2026-11-04T15:25:18.024745+00:00",
+            "updated_at": "2026-11-04T15:25:18.040317+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_bdb94b039949",
+            "agent_id": "MICHAEL",
+            "title": "E11 Facts vs Assumptions",
+            "created_at": "2026-11-04T15:25:18.008457+00:00",
+            "updated_at": "2026-11-04T15:25:18.021189+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_935737d4890f",
+            "agent_id": "DWIGHT",
+            "title": "Dwight Solo",
+            "created_at": "2026-11-04T15:25:17.987998+00:00",
+            "updated_at": "2026-11-04T15:25:17.989288+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_acfca266b9dc",
+            "agent_id": "MICHAEL",
+            "title": "Michael Solo",
+            "created_at": "2026-11-04T15:25:17.987651+00:00",
+            "updated_at": "2026-11-04T15:25:17.988343+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_6b45656921c7",
+            "agent_id": "MICHAEL",
+            "title": "Conv Alpha",
+            "created_at": "2026-11-04T15:25:17.959150+00:00",
+            "updated_at": "2026-11-04T15:25:17.973682+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9b24f06eba6b",
+            "agent_id": "MICHAEL",
+            "title": "E08 Workspace Check",
+            "created_at": "2026-11-04T15:25:17.945600+00:00",
+            "updated_at": "2026-11-04T15:25:17.957951+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_89e55919c4d2",
+            "agent_id": "MICHAEL",
+            "title": "E07 Prompt Check",
+            "created_at": "2026-11-04T15:25:17.929778+00:00",
+            "updated_at": "2026-11-04T15:25:17.930193+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8464e3184322",
+            "agent_id": "MICHAEL",
+            "title": "E05 Long Convo",
+            "created_at": "2026-11-04T15:25:17.802557+00:00",
+            "updated_at": "2026-11-04T15:25:17.903830+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_fb12a74997e9",
+            "agent_id": "MICHAEL",
+            "title": "E04 Ordering",
+            "created_at": "2026-11-04T15:25:17.727397+00:00",
+            "updated_at": "2026-11-04T15:25:17.776334+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9e6d4209c4e8",
+            "agent_id": "MICHAEL",
+            "title": "E03 Persistence",
+            "created_at": "2026-11-04T15:25:17.705690+00:00",
+            "updated_at": "2026-11-04T15:25:17.712854+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ef9dc0eaff09",
+            "agent_id": "MICHAEL",
+            "title": "E02 History",
+            "created_at": "2026-11-04T15:25:17.637456+00:00",
+            "updated_at": "2026-11-04T15:25:17.704611+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_53c4cf46faff",
+            "agent_id": "MICHAEL",
+            "title": "E01 Conv",
+            "created_at": "2026-11-04T15:25:17.618394+00:00",
+            "updated_at": "2026-11-04T15:25:17.620014+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_c1f21f36afb5",
+            "agent_id": "MICHAEL",
+            "title": "Alex Dental SaaS Project",
+            "created_at": "2026-11-04T15:25:17.543400+00:00",
+            "updated_at": "2026-11-04T15:25:17.616152+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_deaa3ba2ff84",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:24:48.133496+00:00",
+            "updated_at": "2026-11-04T15:24:55.573643+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_f100a8a95f53",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:23:28.475039+00:00",
+            "updated_at": "2026-11-04T15:24:49.861100+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8975b3f52585",
+            "agent_id": "MICHAEL",
+            "title": "Suite J Persistence Test",
+            "created_at": "2026-11-04T15:24:35.563356+00:00",
+            "updated_at": "2026-11-04T15:24:43.916579+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_a01f41305952",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:24:37.752996+00:00",
+            "updated_at": "2026-11-04T15:24:37.767611+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_371817d9d8b4",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:24:13.556243+00:00",
+            "updated_at": "2026-11-04T15:24:19.415478+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_e8e8b76dbca0",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:23:26.370094+00:00",
+            "updated_at": "2026-11-04T15:23:58.849723+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_3c2cffbe01bd",
+            "agent_id": "MICHAEL",
+            "title": "Stream Context Check",
+            "created_at": "2026-11-04T15:23:56.718580+00:00",
+            "updated_at": "2026-11-04T15:23:56.783142+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_038c43650509",
+            "agent_id": "QA_SUITE_B_BOT",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:23:46.836174+00:00",
+            "updated_at": "2026-11-04T15:23:52.659767+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ba00848aa697",
+            "agent_id": "QA_SUITE_G_BOUNDS",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:23:30.075310+00:00",
+            "updated_at": "2026-11-04T15:23:49.418869+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_31e11892ac0d",
+            "agent_id": "ZEZO",
+            "title": "Integrity Verification Test",
+            "created_at": "2026-11-04T15:23:44.162582+00:00",
+            "updated_at": "2026-11-04T15:23:44.232495+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_c7cb6b22951a",
+            "agent_id": "ZEZO",
+            "title": "Rapid Messages Test",
+            "created_at": "2026-11-04T15:23:43.933629+00:00",
+            "updated_at": "2026-11-04T15:23:43.958957+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_a97f81784c97",
+            "agent_id": "ZEZO",
+            "title": "Stream Interrupt Test",
+            "created_at": "2026-11-04T15:23:43.896932+00:00",
+            "updated_at": "2026-11-04T15:23:43.898945+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_184e03f5bcdc",
+            "agent_id": "MICHAEL",
+            "title": "Test Conv",
+            "created_at": "2026-11-04T15:23:42.579766+00:00",
+            "updated_at": "2026-11-04T15:23:42.587957+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_eb251bdc6a90",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:23:29.887940+00:00",
+            "updated_at": "2026-11-04T15:23:29.950416+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_36f7019d759e",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:37.408316+00:00",
+            "updated_at": "2026-11-04T15:22:56.144285+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_2b7db47169b6",
+            "agent_id": "QA_SUITE_G_DENIED",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:50.544055+00:00",
+            "updated_at": "2026-11-04T15:22:50.548678+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9a459f0d2a13",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:25.113773+00:00",
+            "updated_at": "2026-11-04T15:22:40.458275+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_89ab9257ca66",
+            "agent_id": "QA_SUITE_G_TEST2",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:26.513963+00:00",
+            "updated_at": "2026-11-04T15:22:35.023461+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_71ff2c0253f4",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:10.595324+00:00",
+            "updated_at": "2026-11-04T15:22:27.432155+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_4e95a63ebea8",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:22:03.613488+00:00",
+            "updated_at": "2026-11-04T15:22:11.924169+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_fbbebc933905",
+            "agent_id": "MICHAEL",
+            "title": "Stream test",
+            "created_at": "2026-11-04T15:22:08.849480+00:00",
+            "updated_at": "2026-11-04T15:22:08.934159+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8816b61b269a",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:21:33.738754+00:00",
+            "updated_at": "2026-11-04T15:22:03.263479+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_0bd655c919e6",
+            "agent_id": "QA_SUITE_G_TEST",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:21:40.291173+00:00",
+            "updated_at": "2026-11-04T15:22:00.063915+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_0e2304acc1af",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:21:44.300947+00:00",
+            "updated_at": "2026-11-04T15:21:57.628837+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_763a48169354",
+            "agent_id": "MICHAEL",
+            "title": "Alex SaaS Test",
+            "created_at": "2026-11-04T15:21:46.197180+00:00",
+            "updated_at": "2026-11-04T15:21:46.247406+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_b9f264e5cb46",
+            "agent_id": "MICHAEL",
+            "title": "Alex SaaS Test",
+            "created_at": "2026-11-04T15:21:33.997786+00:00",
+            "updated_at": "2026-11-04T15:21:34.025853+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_916112379771",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:21:25.830808+00:00",
+            "updated_at": "2026-11-04T15:21:25.830808+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_1a0dcb306eb3",
+            "agent_id": "QA_SUITE_B_BOT",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:21:14.856063+00:00",
+            "updated_at": "2026-11-04T15:21:23.783906+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_efbe62bc766a",
+            "agent_id": "QA_SUITE_G",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:20:39.912699+00:00",
+            "updated_at": "2026-11-04T15:20:49.976076+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_57b364cde5e3",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:20:32.387724+00:00",
+            "updated_at": "2026-11-04T15:20:40.655917+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_6782b944b176",
+            "agent_id": "ZEZO_QA_AGENT",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:19:40.043152+00:00",
+            "updated_at": "2026-11-04T15:20:09.112989+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_a06b802a0d89",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:18:57.816355+00:00",
+            "updated_at": "2026-11-04T15:19:06.176580+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_239587943eba",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:18:09.065096+00:00",
+            "updated_at": "2026-11-04T15:18:20.299911+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8ee62d9946de",
+            "agent_id": "MICHAEL",
+            "title": "Stream Test 2",
+            "created_at": "2026-11-04T15:14:32.412018+00:00",
+            "updated_at": "2026-11-04T15:14:32.435300+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ed61d88ae65a",
+            "agent_id": "MICHAEL",
+            "title": "Stream Test",
+            "created_at": "2026-11-04T15:13:24.565888+00:00",
+            "updated_at": "2026-11-04T15:13:24.599120+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_bd038bc6f7f7",
+            "agent_id": "MICHAEL",
+            "title": "Test Conversation",
+            "created_at": "2026-11-04T15:13:08.710657+00:00",
+            "updated_at": "2026-11-04T15:13:20.143299+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_151f20fea6aa",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:02:26.812445+00:00",
+            "updated_at": "2026-11-04T15:02:38.498278+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_99c5964ccd02",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T15:01:44.495848+00:00",
+            "updated_at": "2026-11-04T15:02:13.471784+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_855a789de13e",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T14:57:53.239396+00:00",
+            "updated_at": "2026-11-04T14:57:59.845366+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_acde7eb29ac6",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T14:57:15.176520+00:00",
+            "updated_at": "2026-11-04T14:57:21.191778+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ec33c98878fb",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-04T14:55:26.843115+00:00",
+            "updated_at": "2026-11-04T14:55:58.112684+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_fa28813f08c4",
+            "agent_id": "QUANTUM",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:37:09.689697+00:00",
+            "updated_at": "2026-11-03T22:37:31.235750+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_611618c468ac",
+            "agent_id": "QUANTUM",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:36:44.377822+00:00",
+            "updated_at": "2026-11-03T22:36:53.469084+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_3ca80f2bd7db",
+            "agent_id": "QUANTUM",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:36:13.528047+00:00",
+            "updated_at": "2026-11-03T22:36:19.467744+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9372f79cdbf5",
+            "agent_id": "dwight",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:27:17.296693+00:00",
+            "updated_at": "2026-11-03T22:27:30.978769+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8107c179b569",
+            "agent_id": "DWIGHT",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:25:52.460380+00:00",
+            "updated_at": "2026-11-03T22:25:56.728378+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_2d431be84f7c",
+            "agent_id": "DWIGHT",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:25:37.777250+00:00",
+            "updated_at": "2026-11-03T22:25:41.586872+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8743e3380df8",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:12:30.642194+00:00",
+            "updated_at": "2026-11-03T22:12:38.171835+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_daf154269df2",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:11:42.775218+00:00",
+            "updated_at": "2026-11-03T22:11:55.274183+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_84b931615236",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:10:53.086730+00:00",
+            "updated_at": "2026-11-03T22:11:04.475178+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_cb6c12847cab",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:10:23.855239+00:00",
+            "updated_at": "2026-11-03T22:10:30.298938+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_e86c3fd08a8e",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:03:30.282771+00:00",
+            "updated_at": "2026-11-03T22:03:40.699979+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_d500dcc41958",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:02:58.249216+00:00",
+            "updated_at": "2026-11-03T22:03:14.768425+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ae74286d1b72",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T22:01:55.792460+00:00",
+            "updated_at": "2026-11-03T22:02:27.970144+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_a3d80a15d28a",
+            "agent_id": "flux",
+            "title": "Final Check Thread",
+            "created_at": "2026-11-03T21:35:15.506104+00:00",
+            "updated_at": "2026-11-03T21:35:22.393105+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_f2ff2debadef",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T21:14:32.528122+00:00",
+            "updated_at": "2026-11-03T21:14:45.102850+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_c1fe43098044",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T21:13:47.214904+00:00",
+            "updated_at": "2026-11-03T21:14:02.017405+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_eb8f49827b5e",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T21:13:07.119941+00:00",
+            "updated_at": "2026-11-03T21:13:21.243640+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_2fd8585c92bf",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T21:12:15.513541+00:00",
+            "updated_at": "2026-11-03T21:12:28.023416+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_1d1b2882ae62",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:51:59.426594+00:00",
+            "updated_at": "2026-11-03T20:52:03.479387+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_80304708a0a7",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:51:16.544492+00:00",
+            "updated_at": "2026-11-03T20:51:20.342840+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_308afc3dd0c3",
+            "agent_id": "flux",
+            "title": "Test Persistence Thread",
+            "created_at": "2026-11-03T20:44:38.669729+00:00",
+            "updated_at": "2026-11-03T20:44:50.372463+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_f2311216007e",
+            "agent_id": "flux",
+            "title": "Debug Thread",
+            "created_at": "2026-11-03T20:43:47.283391+00:00",
+            "updated_at": "2026-11-03T20:44:05.272335+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_fb51c9c32a26",
+            "agent_id": "flux",
+            "title": "Test Persistence Thread",
+            "created_at": "2026-11-03T20:43:01.327166+00:00",
+            "updated_at": "2026-11-03T20:43:29.392785+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_223629b1de25",
+            "agent_id": "flux",
+            "title": "Test Persistence Thread",
+            "created_at": "2026-11-03T20:42:23.917021+00:00",
+            "updated_at": "2026-11-03T20:42:39.895627+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_023b61e33657",
+            "agent_id": "dwight",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:41:43.682808+00:00",
+            "updated_at": "2026-11-03T20:41:47.941117+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_b8b1a7061dc2",
+            "agent_id": "ahmad",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:41:39.762922+00:00",
+            "updated_at": "2026-11-03T20:41:43.681746+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_3a24fbbcffa6",
+            "agent_id": "flux",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:41:34.094999+00:00",
+            "updated_at": "2026-11-03T20:41:39.761728+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_6331dff69d45",
+            "agent_id": "flux",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:37:13.242663+00:00",
+            "updated_at": "2026-11-03T20:37:22.335651+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_d86ea7a085bb",
+            "agent_id": "flux",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:36:42.629531+00:00",
+            "updated_at": "2026-11-03T20:36:42.640664+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_01454a273a7d",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:13:33.161600+00:00",
+            "updated_at": "2026-11-03T20:13:37.878234+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_ce112cd7caa3",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:13:00.663150+00:00",
+            "updated_at": "2026-11-03T20:13:05.301155+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_292014066e8c",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:12:40.296749+00:00",
+            "updated_at": "2026-11-03T20:12:45.090119+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8fb53837cd01",
+            "agent_id": "flux",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:02:43.208476+00:00",
+            "updated_at": "2026-11-03T20:02:55.571107+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_52731aa6955b",
+            "agent_id": "flux",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:02:18.969563+00:00",
+            "updated_at": "2026-11-03T20:02:37.414853+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_87ff670a433e",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:01:32.084857+00:00",
+            "updated_at": "2026-11-03T20:01:50.586516+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_f81c4467a303",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:00:41.738178+00:00",
+            "updated_at": "2026-11-03T20:01:07.967789+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_813ec017dec8",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T20:00:12.570805+00:00",
+            "updated_at": "2026-11-03T20:00:28.166026+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_8544febcc86a",
+            "agent_id": "DWIGHT",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:59:51.388221+00:00",
+            "updated_at": "2026-11-03T19:59:56.044770+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_f2110c64db5d",
+            "agent_id": "AHMAD",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:59:46.895465+00:00",
+            "updated_at": "2026-11-03T19:59:51.386891+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_b65259de0d87",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:59:39.976707+00:00",
+            "updated_at": "2026-11-03T19:59:46.894547+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_7f9765e1755e",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:59:19.927902+00:00",
+            "updated_at": "2026-11-03T19:59:27.181029+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_aebfcde47b10",
+            "agent_id": "VERVE",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:58:21.243185+00:00",
+            "updated_at": "2026-11-03T19:58:21.272421+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_2343c4c3fbd3",
+            "agent_id": "FLUX",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:56:41.220404+00:00",
+            "updated_at": "2026-11-03T19:56:41.220864+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_9d0c09f5d04e",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T19:56:26.652360+00:00",
+            "updated_at": "2026-11-03T19:56:26.656124+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_1365ed9cbabb",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T18:01:18.856574+00:00",
+            "updated_at": "2026-11-03T18:01:18.857317+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          },
+          {
+            "id": "conv_aaef67fcfa81",
+            "agent_id": "MICHAEL",
+            "title": "New Conversation",
+            "created_at": "2026-11-03T16:56:56.743941+00:00",
+            "updated_at": "2026-11-03T16:56:56.744831+00:00",
+            "is_archived": 0,
+            "metadata": "{\"creator\": \"AgentRuntime\"}"
+          }
+        ]
+      },
+      "latency_ms": 27.32,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/delete_agent - Protection against deleting core agent",
+      "endpoint": "/api/agents/delete_agent",
+      "method": "POST",
+      "payload": {
+        "agent_id": "MICHAEL"
+      },
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "80",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": false,
+        "error": "Cannot decommission core builtin agent 'MICHAEL'."
+      },
+      "latency_ms": 2.3,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/delete_agent - Validation non-existent agent",
+      "endpoint": "/api/agents/delete_agent",
+      "method": "POST",
+      "payload": {
+        "agent_id": "NON_EXISTENT_AGENT_XYZ"
+      },
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "72",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": false,
+        "error": "Agent 'NON_EXISTENT_AGENT_XYZ' not found."
+      },
+      "latency_ms": 1.55,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "POST /api/agents/delete_agent - Decommission QA_TEST_AGENT_16",
+      "endpoint": "/api/agents/delete_agent",
+      "method": "POST",
+      "payload": {
+        "agent_id": "QA_TEST_AGENT_16"
+      },
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "51",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": true,
+        "deleted_id": "QA_TEST_AGENT_16"
+      },
+      "latency_ms": 7.09,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "GET /api/agents/agent - Verify QA_TEST_AGENT_16 removed",
+      "endpoint": "/api/agents/agent",
+      "method": "GET",
+      "payload": null,
+      "params": {
+        "id": "QA_TEST_AGENT_16"
+      },
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": "66",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": {
+        "success": false,
+        "error": "Agent 'QA_TEST_AGENT_16' not found."
+      },
+      "latency_ms": 15.35,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "GET /office - Office view HTML route",
+      "endpoint": "/office",
+      "method": "GET",
+      "payload": null,
+      "params": null,
+      "expected_status": 200,
+      "passed": true,
+      "status_code": 200,
+      "response_headers": {
+        "Content-Type": "text/html",
+        "Etag": "\"18e4e0a19d26d03c-426\"",
+        "Last-Modified": "Wed, 04 Nov 2026 15:18:57 GMT",
+        "Content-Length": "1062",
+        "Accept-Ranges": "bytes",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": "<!doctype html>\r\n<html lang=\"en\">\r\n  <head>\r\n    <meta charset=\"UTF-8\" />\r\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/favicon.svg\" />\r\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\r\n    <title>ZEZO OS \u00b7 Autonomous Desktop Operating System</title>\r\n    <!-- Fonts -->\r\n    <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\r\n    <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\r\n    <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap\" rel=\"stylesheet\">\r\n    <script src=\"https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js\"></script>\r\n    <script src=\"/neural_orb.js\"></script>\r\n    <script type=\"module\" crossorigin src=\"/assets/index-DxO3euJA.js\"></script>\n    <link rel=\"stylesheet\" crossorigin href=\"/assets/index-Bei9-TNo.css\">\n  </head>\r\n  <body>\r\n    <div id=\"root\"></div>\r\r\n    <!-- Test hooks for legacy test suite: btn-copy-task-logs copyTaskLogsFromDetail -->\r\n  </body>\r\n</html>\r\n",
+      "latency_ms": 17.49,
+      "notes": "All assertions passed."
+    },
+    {
+      "test_name": "OPTIONS /api/agents/state - CORS preflight check (Observational 405)",
+      "endpoint": "/api/agents/state",
+      "method": "OPTIONS",
+      "payload": null,
+      "params": null,
+      "expected_status": 405,
+      "passed": true,
+      "status_code": 405,
+      "response_headers": {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Allow": "GET,HEAD",
+        "Content-Length": "23",
+        "Date": "Wed, 04 Nov 2026 15:25:52 GMT",
+        "Server": "Python/3.14 aiohttp/3.13.5"
+      },
+      "response_data": "405: Method Not Allowed",
+      "latency_ms": 9.12,
+      "notes": "All assertions passed."
+    }
+  ]
+}

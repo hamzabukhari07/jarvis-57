@@ -1,0 +1,21 @@
+{
+  "platform": "Windows-11-10.0.26100-SP0",
+  "python_version": "3.14.0",
+  "executable": "C:\\Python314\\python.exe",
+  "sqlite_version": "3.50.4",
+  "sqlite_source_id": [
+    3,
+    50,
+    4
+  ],
+  "cli_engines": {
+    "agy": "C:\\Users\\Hamza Bukhari\\AppData\\Local\\agy\\bin\\agy.EXE",
+    "antigravity": null,
+    "opencode": "C:\\Users\\Hamza Bukhari\\AppData\\Roaming\\npm\\opencode.CMD",
+    "kilo": "C:\\Users\\Hamza Bukhari\\AppData\\Roaming\\npm\\kilo.CMD",
+    "kilocode": "C:\\Users\\Hamza Bukhari\\AppData\\Roaming\\npm\\kilocode.CMD"
+  },
+  "frontend_build_exists": true,
+  "database_path": "C:\\Users\\Hamza Bukhari\\Documents\\antigravity\\jarvis-57\\memory\\zezo_brain.db",
+  "database_exists": true
+}

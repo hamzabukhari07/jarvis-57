@@ -88,6 +88,9 @@ export const AgentDirectChatView: React.FC<AgentDirectChatViewProps> = ({
  const [activeThreadId, setActiveThreadId] = useState<string>(() => {
  return threads[0]?.id || `thread-${agent.id}-${Date.now()}`
  })
+ const [runtimeSessionKey, setRuntimeSessionKey] = useState<string>(() => {
+ return threads[0]?.id || `thread-${agent.id}-${Date.now()}`
+ })
  const [searchQuery, setSearchQuery] = useState<string>('')
  const [workspaceFiles, setWorkspaceFiles] = useState<Array<{ name: string; path?: string; type?: string }>>([])
  const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; size: string; type: string; path?: string }>>([])
@@ -106,6 +109,7 @@ export const AgentDirectChatView: React.FC<AgentDirectChatViewProps> = ({
  const handleCreateNewThread = () => {
  const newId = `thread-${agent.id}-${Date.now()}`
  setActiveThreadId(newId)
+ setRuntimeSessionKey(newId)
  }
 
  // Filter threads by search query
@@ -181,12 +185,27 @@ export const AgentDirectChatView: React.FC<AgentDirectChatViewProps> = ({
  }
 
  const activeThread = threads.find((thread) => thread.id === activeThreadId)
- const handleConversationComplete = (userText: string, replyText: string, savedMessages: ThreadMessageLike[]) => {
+ const handleConversationComplete = (
+  userText: string,
+  replyText: string,
+  savedMessages: ThreadMessageLike[],
+  _toolExecutions?: any[],
+  persistentConversationId?: string,
+ ) => {
   const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const targetThreadId =
+   persistentConversationId && persistentConversationId.startsWith('conv_')
+    ? persistentConversationId
+    : activeThreadId
+
+  if (targetThreadId !== activeThreadId) {
+   setActiveThreadId(targetThreadId)
+  }
+
   setThreads((prev) => {
-   const existing = prev.find((thread) => thread.id === activeThreadId)
+   const existing = prev.find((thread) => thread.id === activeThreadId || thread.id === targetThreadId)
    const next: ChatThreadItem = {
-    id: activeThreadId,
+    id: targetThreadId,
     title: existing?.title || userText.slice(0, 32) + (userText.length > 32 ? '...' : ''),
     preview: replyText.slice(0, 60) + (replyText.length > 60 ? '...' : ''),
     updatedAt: now,
@@ -194,7 +213,7 @@ export const AgentDirectChatView: React.FC<AgentDirectChatViewProps> = ({
     tag: (agent.engine || 'opencode').split('_')[0].toUpperCase(),
     messages: [...(existing?.messages || []), ...savedMessages],
    }
-   return [next, ...prev.filter((thread) => thread.id !== activeThreadId)]
+   return [next, ...prev.filter((thread) => thread.id !== activeThreadId && thread.id !== targetThreadId)]
   })
  }
 
@@ -214,10 +233,10 @@ export const AgentDirectChatView: React.FC<AgentDirectChatViewProps> = ({
      <div className="px-3 py-8 text-center text-xs text-[var(--muted-foreground)]">Your chats with {agent.name} will appear here.</div>
     ) : filteredThreads.map((thread) => {
      const isActive = thread.id === activeThreadId
-     return <div key={thread.id} role="button" tabIndex={0} onClick={() => setActiveThreadId(thread.id)} onKeyDown={(event) => (event.key === 'Enter' || event.key === ' ') && setActiveThreadId(thread.id)} className={cn('group flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2.5 text-left', isActive ? 'bg-[var(--secondary)] text-[var(--foreground)]' : 'text-[var(--muted-foreground)] hover:bg-[var(--secondary)]/60 hover:text-[var(--foreground)]')}>
+     return <div key={thread.id} role="button" tabIndex={0} onClick={() => { setActiveThreadId(thread.id); setRuntimeSessionKey(thread.id); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { setActiveThreadId(thread.id); setRuntimeSessionKey(thread.id); } }} className={cn('group flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2.5 text-left', isActive ? 'bg-[var(--secondary)] text-[var(--foreground)]' : 'text-[var(--muted-foreground)] hover:bg-[var(--secondary)]/60 hover:text-[var(--foreground)]')}>
       <MessageSquare className="h-4 w-4 shrink-0" />
       <span className="min-w-0 flex-1 truncate text-xs">{thread.title}</span>
-      <button type="button" aria-label={`Delete ${thread.title}`} onClick={(event) => { event.stopPropagation(); const remaining = threads.filter((item) => item.id !== thread.id); setThreads(remaining); if (activeThreadId === thread.id) setActiveThreadId(remaining[0]?.id || `thread-${agent.id}-${Date.now()}`) }} className="rounded p-1 opacity-0 hover:bg-[var(--destructive)]/15 hover:text-[var(--destructive)] group-hover:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button>
+      <button type="button" aria-label={`Delete ${thread.title}`} onClick={(event) => { event.stopPropagation(); const remaining = threads.filter((item) => item.id !== thread.id); setThreads(remaining); if (activeThreadId === thread.id) { const nextId = remaining[0]?.id || `thread-${agent.id}-${Date.now()}`; setActiveThreadId(nextId); setRuntimeSessionKey(nextId); } }} className="rounded p-1 opacity-0 hover:bg-[var(--destructive)]/15 hover:text-[var(--destructive)] group-hover:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button>
      </div>
     })}
    </div>
@@ -257,7 +276,7 @@ export const AgentDirectChatView: React.FC<AgentDirectChatViewProps> = ({
    </header>
    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
     <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(event) => void handleFileUpload(event.target.files)} aria-label="Attach files to agent chat" />
-    <AgentChatRuntime key={`${agent.id}-${activeThreadId}`} agent={agent} workspace={currentWorkspace} conversationId={activeThreadId.startsWith('conv_') ? activeThreadId : undefined} threadMessages={activeThread?.messages || []} uploadedFiles={uploadedFiles} onAttachFile={() => fileInputRef.current?.click()} onRemoveFile={(index) => setUploadedFiles((previous) => previous.filter((_, itemIndex) => itemIndex !== index))} onUpdateAgentStatus={onUpdateAgentStatus} onConversationComplete={handleConversationComplete} />
+    <AgentChatRuntime key={`${agent.id}-${runtimeSessionKey}`} agent={agent} workspace={currentWorkspace} conversationId={activeThreadId.startsWith('conv_') ? activeThreadId : undefined} threadMessages={activeThread?.messages || []} uploadedFiles={uploadedFiles} onAttachFile={() => fileInputRef.current?.click()} onRemoveFile={(index) => setUploadedFiles((previous) => previous.filter((_, itemIndex) => itemIndex !== index))} onUpdateAgentStatus={onUpdateAgentStatus} onConversationComplete={handleConversationComplete} />
    </div>
   </main>
 
@@ -288,7 +307,7 @@ interface AgentChatRuntimeProps {
  onAttachFile: () => void
  onRemoveFile: (index: number) => void
  onUpdateAgentStatus?: AgentDirectChatViewProps['onUpdateAgentStatus']
- onConversationComplete: (userText: string, replyText: string, messages: ThreadMessageLike[], toolExecutions?: any[]) => void
+ onConversationComplete: (userText: string, replyText: string, messages: ThreadMessageLike[], toolExecutions?: any[], persistentConversationId?: string) => void
 }
 
 function AgentChatRuntime({ agent, workspace, conversationId, threadMessages, uploadedFiles, onAttachFile, onRemoveFile, onUpdateAgentStatus, onConversationComplete }: AgentChatRuntimeProps) {
@@ -299,12 +318,16 @@ function AgentChatRuntime({ agent, workspace, conversationId, threadMessages, up
       onUpdateAgentStatus?.(agent.id, 'WORKING', `Thinking: "${userText.slice(0, 24)}..."`)
       let currentText = ''
       let finalTaskDispatched: string | undefined
+      let finalConversationId: string | undefined = conversationId
 
       try {
         // Real Server-Sent Events (SSE) streaming from backend
         for await (const chunk of api.streamAgentChat(agent.id, userText, agent.engine, agent.model, workspace, conversationId, abortSignal)) {
           if (abortSignal?.aborted) {
             break
+          }
+          if (chunk.conversation_id) {
+            finalConversationId = chunk.conversation_id
           }
           if (chunk.type === 'status') {
             if (chunk.message) {
@@ -338,10 +361,16 @@ function AgentChatRuntime({ agent, workspace, conversationId, threadMessages, up
           { id: `user-${Date.now()}`, role: 'user', content: [{ type: 'text', text: userText }] },
           { id: `assistant-${Date.now()}`, role: 'assistant', content: [{ type: 'text', text: replyText }], status: { type: 'complete', reason: 'stop' } },
         ]
-        onConversationComplete(userText, replyText, savedMessages)
+        onConversationComplete(userText, replyText, savedMessages, undefined, finalConversationId)
       } catch (error: any) {
         if (abortSignal?.aborted) {
           console.info('Agent chat stream aborted by user.')
+          const savedReply = currentText ? `${currentText}\n\n*[Stopped by user]*` : '[Generation stopped by user]'
+          const savedMessages: ThreadMessageLike[] = [
+            { id: `user-${Date.now()}`, role: 'user', content: [{ type: 'text', text: userText }] },
+            { id: `assistant-${Date.now()}`, role: 'assistant', content: [{ type: 'text', text: savedReply }], status: { type: 'complete', reason: 'stop' } },
+          ]
+          onConversationComplete(userText, savedReply, savedMessages, undefined, finalConversationId)
           return
         }
         console.error('Agent chat stream error:', error)

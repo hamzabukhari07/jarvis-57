@@ -1,0 +1,82 @@
+{
+  "suite": "Suite I: External Execution Engines - OpenCode Engine",
+  "timestamp": "2026-11-04T15:33:36Z",
+  "cli_version": "opencode v2.2.5",
+  "binary_path": "C:\\Users\\Hamza Bukhari\\AppData\\Roaming\\npm\\opencode.cmd",
+  "results": {
+    "I06_cli_availability": {
+      "status": "PASS",
+      "binary_path": "C:\\Users\\Hamza Bukhari\\AppData\\Roaming\\npm\\opencode.cmd",
+      "version": "opencode v2.2.5",
+      "exit_code": 0,
+      "evidence": "Resolved OpenCode CLI binary successfully and verified version execution."
+    },
+    "I07_I08_task_dispatch_and_process_start": {
+      "status": "PASS",
+      "workspace": "C:\\Users\\HAMZAB~1\\AppData\\Local\\Temp\\tmpmfr21ghw",
+      "command": [
+        "C:\\Users\\Hamza Bukhari\\AppData\\Roaming\\npm\\opencode.cmd",
+        "run",
+        "inspect workspace and list files",
+        "--dir",
+        "C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\tmpmfr21ghw",
+        "--format",
+        "json",
+        "--model",
+        "opencode/glm-5.3-flash-free"
+      ],
+      "spawned_pid": 29228,
+      "evidence": "Dispatched inspection task to OpenCode. ProcessSupervisor spawned ContainedProcess with Win32 PID 29228."
+    },
+    "I09_output_capture_and_stream_parsing": {
+      "status": "PASS",
+      "sample_captured_lines": [
+        "cloudflare-workers-ai/@cf/aisingapore/gemma-sea-lion-v4-27b-it",
+        "cloudflare-workers-ai/@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+        "cloudflare-workers-ai/@cf/deepseek-ai/deepseek-v4-flash-0731",
+        "cloudflare-workers-ai/@cf/deepseek-ai/deepseek-v4-pro-0813",
+        "cloudflare-workers-ai/@cf/deepseek-ai/deepseek-v4.1-flash-1017"
+      ],
+      "parsed_event_type": "tool_use",
+      "thought_suppressed": true,
+      "evidence": "Verified live stdout capture through ProcessSupervisor pipe and strict thought suppression via parse_stream_event."
+    },
+    "I10_agent_configuration_respected": {
+      "status": "PASS",
+      "l1_agent": {
+        "id": "MICHAEL",
+        "tier": "L1_MUTATION",
+        "opencode_allowed": true
+      },
+      "l0_agent": {
+        "id": "RECON",
+        "tier": "L0_READ_ONLY",
+        "opencode_allowed": false,
+        "reason": "Tool 'opencode_run' is not in allowed_tools for agent 'Recon' (RECON)."
+      },
+      "evidence": "Verified agent configuration contracts: L1/L2 agents have opencode_run permitted while L0 read-only agents strictly deny external execution engines."
+    },
+    "I16_I18_routing_and_path_jail_safety": {
+      "status": "PASS",
+      "root_rejection_verified": true,
+      "evidence": "Verified PathJail safety in actions/opencode_agent.py, immediately blocking root path attempts."
+    },
+    "I19_I20_cancellation_and_tree_termination": {
+      "status": "PASS",
+      "terminated_pid": 28112,
+      "cleanly_terminated_on_os": true,
+      "evidence": "Verified Win32 Job Object lifecycle. Calling terminate_tree() immediately wipes out the entire process tree with zero orphaned workers."
+    },
+    "I21_I22_exit_codes_and_failure_propagation": {
+      "status": "PASS",
+      "observed_exit_code": 1,
+      "adapter_failure_status": "failed",
+      "evidence": "Verified exit code capture: non-zero exit codes (1) propagate cleanly to adapter failure status."
+    }
+  },
+  "summary": {
+    "total": 7,
+    "passed": 7,
+    "failed": 0
+  }
+}

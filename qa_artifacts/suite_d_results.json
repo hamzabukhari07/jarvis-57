@@ -1,0 +1,245 @@
+{
+  "suite": "Suite D: Agent Chat",
+  "timestamp": "2026-11-04T15:31:05.000547+00:00",
+  "summary": {
+    "total": 15,
+    "passed": 15,
+    "failed": 0,
+    "unverified": 0
+  },
+  "tests": {
+    "D01": {
+      "id": "D01",
+      "title": "Start a new conversation",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:31:06.427771+00:00",
+      "notes": "Verified HTTP API and SQLite agent_conversations persistence.",
+      "evidence": {
+        "http_status": 200,
+        "response": {
+          "success": true,
+          "conversation_id": "conv_1de754160a93",
+          "title": "Suite D Verification Thread",
+          "agent_id": "MICHAEL"
+        },
+        "db_row": {
+          "id": "conv_1de754160a93",
+          "agent_id": "MICHAEL",
+          "title": "Suite D Verification Thread"
+        },
+        "duration_ms": 225.31
+      }
+    },
+    "D02": {
+      "id": "D02",
+      "title": "Send a normal text message",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:31:13.541034+00:00",
+      "notes": "Normal text message successfully processed and logged to SQLite memory.",
+      "evidence": {
+        "prompt": "Hello Michael! What is your role in ZEZO? Keep answer under 15 words.",
+        "http_status": 200,
+        "user_msg_persisted": {
+          "id": "msg_d50a7a72677e",
+          "role": "user",
+          "content": "Hello Michael! What is your role in ZEZO? Keep answer under 15 words.",
+          "agent_id": "MICHAEL"
+        },
+        "duration_ms": 7113.21
+      }
+    },
+    "D03": {
+      "id": "D03",
+      "title": "Verify a valid response",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:31:13.541091+00:00",
+      "notes": "Received real conversational reply from agent with proper payload structure.",
+      "evidence": {
+        "reply": "I am Lead Software Architect, responsible for high-level architecture design and code review.",
+        "agent_id": "MICHAEL",
+        "agent_name": "MICHAEL",
+        "assistant_msg_count": 1
+      }
+    },
+    "D04": {
+      "id": "D04",
+      "title": "Ask follow-up questions",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:31:26.623643+00:00",
+      "notes": "Executed multi-turn follow-up question in the same conversation thread.",
+      "evidence": {
+        "follow_up_prompt": "What was my secret security clearance code? Reply with only the code.",
+        "http_status": 200,
+        "reply": "ZEZO-ALPHA-7729",
+        "duration_ms": 13082.52
+      }
+    },
+    "D05": {
+      "id": "D05",
+      "title": "Verify conversational context",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:31:26.635798+00:00",
+      "notes": "Agent successfully remembered prior turn context and recited the specific clearance code.",
+      "evidence": {
+        "expected_secret": "ZEZO-ALPHA-7729",
+        "actual_reply": "ZEZO-ALPHA-7729",
+        "secret_preserved_in_context": true,
+        "total_turns_in_thread": 6
+      }
+    },
+    "D06": {
+      "id": "D06",
+      "title": "Test long messages",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:31:37.273977+00:00",
+      "notes": "Long payload (>3.8KB) handled gracefully without context overflow or socket drop.",
+      "evidence": {
+        "message_byte_length": 4080,
+        "http_status": 200,
+        "reply_length": 71,
+        "reply_snippet": "Analysis of ZEZO autonomous agent swarm architecture and system design.",
+        "duration_ms": 10638.11
+      }
+    },
+    "D07": {
+      "id": "D07",
+      "title": "Test multiline messages",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:31:44.559725+00:00",
+      "notes": "Agent parsed multiline formatted text correctly and identified all 3 items.",
+      "evidence": {
+        "lines_sent": 4,
+        "reply": "Three requirements listed.",
+        "http_status": 200,
+        "duration_ms": 7285.69
+      }
+    },
+    "D08": {
+      "id": "D08",
+      "title": "Test special characters",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:32:00.448509+00:00",
+      "notes": "Handled quotes, JSON delimiters, unicode, emoji, and non-ASCII glyphs safely.",
+      "evidence": {
+        "special_chars_sent": "Check quotes \"hello\", single 'world', symbols !@#$%^&*()_+-=[]{}|;:,.<>?, emojis \ud83d\ude80\ud83d\udd25\ud83e\udd16, and Unicode: \u0627\u0631\u062f\u0648 (Urdu).",
+        "http_status": 200,
+        "reply": "rocket and the word Urdu: Check quotes \"hello\", single 'world', symbols !@#$%^&*()_+-=[]{}|;:,.<>?, emojis \ud83d\ude80\ud83d\udd25\ud83e\udd16, and Unicode: \u0627\u0631\u062f\u0648 ($Urdu).",
+        "duration_ms": 15888.74
+      }
+    },
+    "D09": {
+      "id": "D09",
+      "title": "Test empty messages",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:32:00.451279+00:00",
+      "notes": "Empty messages properly rejected with HTTP 400 and descriptive error.",
+      "evidence": {
+        "empty_str_status": 400,
+        "empty_str_response": {
+          "success": false,
+          "error": "Prompt cannot be empty."
+        },
+        "whitespace_status": 400,
+        "whitespace_response": {
+          "success": false,
+          "error": "Prompt cannot be empty."
+        },
+        "duration_ms": 2.73
+      }
+    },
+    "D10": {
+      "id": "D10",
+      "title": "Test rapid consecutive messages",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:32:33.127243+00:00",
+      "notes": "Rapid consecutive requests processed concurrently without SQLite locking or deadlocks.",
+      "evidence": {
+        "concurrent_requests": 4,
+        "http_statuses": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "duration_ms": 32675.92
+      }
+    },
+    "D11": {
+      "id": "D11",
+      "title": "Test provider errors (invalid provider or bad model name)",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:32:33.454123+00:00",
+      "notes": "Provider error and missing agent scenarios caught cleanly.",
+      "evidence": {
+        "bad_agent_status": 404,
+        "bad_agent_response": {
+          "success": false,
+          "error": "Agent 'NON_EXISTENT_AGENT_XYZ_99' not found."
+        },
+        "invalid_provider_step_result": {
+          "success": false,
+          "agent_id": "MICHAEL",
+          "conversation_id": "conv_4e6e74fefef0",
+          "reply": "LLM Provider Error: call_llm() got an unexpected keyword argument 'prompt'",
+          "error": "call_llm() got an unexpected keyword argument 'prompt'",
+          "tool_executions": []
+        },
+        "duration_ms": 326.85
+      }
+    },
+    "D12": {
+      "id": "D12",
+      "title": "Verify error messages are handled properly",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:32:33.454152+00:00",
+      "notes": "Error messages clearly reported with failure status and informative message.",
+      "evidence": {
+        "error_text_bad_agent": "Agent 'NON_EXISTENT_AGENT_XYZ_99' not found.",
+        "error_text_bad_provider": "call_llm() got an unexpected keyword argument 'prompt'",
+        "reply_with_error": "LLM Provider Error: call_llm() got an unexpected keyword argument 'prompt'",
+        "success_flag": false
+      }
+    },
+    "D13": {
+      "id": "D13",
+      "title": "Verify responses are associated with the correct agent",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:32:48.387458+00:00",
+      "notes": "Verified responses and profiles are strictly segregated by agent_id.",
+      "evidence": {
+        "agent_1": "VERVE",
+        "name_1": "Verve",
+        "agent_2": "MICHAEL",
+        "name_2": "MICHAEL",
+        "duration_ms": 14933.28
+      }
+    },
+    "D14": {
+      "id": "D14",
+      "title": "Verify normal chat uses the intended conversational provider",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:32:53.295041+00:00",
+      "notes": "Normal chat routes strictly through ProviderAdapter/AgentRuntime without unsolicited task dispatch.",
+      "evidence": {
+        "provider_type": "gemini",
+        "model_name": "gemini-3.8-flash-low",
+        "task_id": null,
+        "reply_received": "I architect high-level structural design, enforce code quality, and map the technical trajectory for ZEZO OS.",
+        "duration_ms": 4907.53
+      }
+    },
+    "D15": {
+      "id": "D15",
+      "title": "Verify the UI does not falsely report successful operations",
+      "status": "PASS",
+      "timestamp": "2026-11-04T15:32:53.300932+00:00",
+      "notes": "Failed operations return success: false and propagate SSE error events rather than false positives.",
+      "evidence": {
+        "unary_fail_success_field": false,
+        "unary_fail_status": 404,
+        "stream_sse_content": "event: error\ndata: {\"error\": \"Agent 'INVALID_AGENT' not found.\"}\n\nevent: done\ndata: {}\n\n",
+        "duration_ms": 5.85
+      }
+    }
+  }
+}

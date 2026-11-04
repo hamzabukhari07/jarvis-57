@@ -1,0 +1,130 @@
+{
+  "subagent": "Subagent 17 (Frontend TypeScript & Build Verification QA)",
+  "timestamp": "2026-11-04T20:24:00+05:00",
+  "status": "PASS",
+  "build_results": {
+    "command": "npm run build (tsc -b && vite build)",
+    "exit_code": 0,
+    "tsc_noEmit_exit_code": 0,
+    "dist_assets": {
+      "index_html": "1.06 kB",
+      "index_css": "131.54 kB",
+      "index_js": "2,954.27 kB"
+    },
+    "duration_seconds": 13.13,
+    "typescript_clean": true
+  },
+  "component_inspections": [
+    {
+      "file": "frontend/src/components/office/AgentDirectChatView.tsx",
+      "status": "VERIFIED",
+      "details": "Direct conversational interface with AssistantRuntimeProvider (@assistant-ui/react). Connects to SSE streaming endpoint api.streamAgentChat, handles file attachments via api.getAttachments/api.uploadFiles, and directory picker via api.pickAgentFolder."
+    },
+    {
+      "file": "frontend/src/components/office/AutonomousOfficeScreen.tsx",
+      "status": "VERIFIED",
+      "details": "Central Agent Office screen orchestrating roster matrix, war room lanes, agent environment controls, direct chat, and task dispatching. Properly types AgentOfficeMember and matches backend state endpoints."
+    },
+    {
+      "file": "frontend/src/components/office/AgentChatThread.tsx",
+      "status": "VERIFIED",
+      "details": "Thread rendering component integrating Assistant UI primitives, prompt-kit message cards, and Blobatar avatars. Types and bindings strictly compliant."
+    },
+    {
+      "file": "frontend/src/components/office/AgentConfigModal.tsx",
+      "status": "VERIFIED",
+      "details": "Agent configuration modal for editing skills, risk tiers, model, engine, desk coordinates, and personality. Correctly posts AgentProfile payload via api.saveAgent."
+    },
+    {
+      "file": "frontend/src/components/office/AgentWorkspaceView.tsx",
+      "status": "VERIFIED",
+      "details": "Sub-view component for editing individual agent files and configuration."
+    },
+    {
+      "file": "frontend/src/components/office/AgentRosterTable.tsx",
+      "status": "VERIFIED",
+      "details": "Agent table list view with actions for chat, edit, delete, and folder navigation."
+    }
+  ],
+  "contract_payload_matrix": [
+    {
+      "frontend_call": "api.getAgentsState()",
+      "backend_endpoint": "GET /api/agents/state",
+      "contract_match": true,
+      "notes": "Returns { status: 'success', agents: [...] }"
+    },
+    {
+      "frontend_call": "api.saveAgent(agent)",
+      "backend_endpoint": "POST /api/agents (and POST /api/agents/save_agent)",
+      "contract_match": true,
+      "notes": "Payload AgentProfile matches AgentRegistry.save_agent_profile structure"
+    },
+    {
+      "frontend_call": "api.deleteAgent(agentId)",
+      "backend_endpoint": "POST /api/agents/delete_agent",
+      "contract_match": true,
+      "notes": "Payload { agent_id: string } matches _delete_agent_handler"
+    },
+    {
+      "frontend_call": "api.streamAgentChat(agentId, message, engine, model, workspace, conversationId, signal)",
+      "backend_endpoint": "POST /api/agents/chat/stream",
+      "contract_match": true,
+      "notes": "SSE stream with chunk, status, task_dispatched, done, error events matching _agent_chat_stream_handler"
+    },
+    {
+      "frontend_call": "api.chatWithAgent(agentId, message, engine, model, workspace, conversationId)",
+      "backend_endpoint": "POST /api/agents/chat",
+      "contract_match": true,
+      "notes": "JSON non-streaming fallback matching _agent_chat_handler"
+    },
+    {
+      "frontend_call": "api.pickAgentFolder(initialDir)",
+      "backend_endpoint": "POST /api/agents/pick_folder",
+      "contract_match": true,
+      "notes": "Payload { initial_dir?: string }, returns { success: bool, path?: string, cancelled?: bool }"
+    },
+    {
+      "frontend_call": "api.openAgentFolder(worktreePath)",
+      "backend_endpoint": "POST /api/agents/open_folder",
+      "contract_match": true,
+      "notes": "Payload { path: string }, returns { success: bool, path: string }"
+    },
+    {
+      "frontend_call": "api.getAgentConversations(agentId)",
+      "backend_endpoint": "GET /api/agents/conversations?agent_id=...",
+      "contract_match": true,
+      "notes": "Returns { success: true, conversations: [...] } from SQLite"
+    },
+    {
+      "frontend_call": "api.createAgentConversation(agentId, title)",
+      "backend_endpoint": "POST /api/agents/conversations",
+      "contract_match": true,
+      "notes": "Payload { agent_id: string, title?: string }, returns { success: true, conversation_id: string }"
+    },
+    {
+      "frontend_call": "api.deleteAgentConversation(conversationId)",
+      "backend_endpoint": "DELETE /api/agents/conversations?conversation_id=...",
+      "contract_match": true,
+      "notes": "Deletes thread from SQLite agent_conversations"
+    },
+    {
+      "frontend_call": "api.getAgentMessages(conversationId)",
+      "backend_endpoint": "GET /api/agents/messages?conversation_id=...",
+      "contract_match": true,
+      "notes": "Returns { success: true, conversation_id: string, messages: [...] }"
+    },
+    {
+      "frontend_call": "api.getInterruptedTasks()",
+      "backend_endpoint": "GET /api/agents/tasks/interrupted",
+      "contract_match": true,
+      "notes": "Returns { success: true, interrupted_tasks: [...] }"
+    },
+    {
+      "frontend_call": "api.restartInterruptedTask(taskId, confirmed)",
+      "backend_endpoint": "POST /api/agents/tasks/restart",
+      "contract_match": true,
+      "notes": "Payload { task_id: string, confirmed: bool }"
+    }
+  ],
+  "summary": "TypeScript compilation check (npx tsc --noEmit) and Vite production build (npm run build) completed with exit code 0 and zero type or build errors. All agent office components strictly adhere to TypeScript interfaces and their backend endpoint schemas."
+}

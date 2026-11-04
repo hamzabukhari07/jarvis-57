@@ -1,0 +1,104 @@
+{
+  "timestamp": "2026-11-04T15:20:40Z",
+  "subagent": "Subagent 19 - SQLite Concurrency & Memory Vault Stress QA",
+  "database_info": {
+    "db_path": "C:\\Users\\Hamza Bukhari\\Documents\\antigravity\\jarvis-57\\memory\\zezo_brain.db",
+    "journal_mode": "wal",
+    "busy_timeout_ms": 10000,
+    "synchronous": 1,
+    "integrity_check": "ok"
+  },
+  "tests": {
+    "test_1_memory_conflicts": {
+      "status": "PASS",
+      "duration_ms": 106.25,
+      "conflict_ids_created": [
+        1,
+        2
+      ],
+      "resolutions": {
+        "1": [
+          "RESOLVED_OVERWRITE",
+          "Updated to Python 3.12 spaces per explicit user prompt"
+        ],
+        "2": [
+          "RESOLVED_KEEP_OLD",
+          "User explicitly cancelled theme change"
+        ]
+      }
+    },
+    "test_2_session_condensations": {
+      "status": "PASS",
+      "duration_ms": 44.32,
+      "session_id": "stress_test_cond_7089fcf6",
+      "condensed_up_to_turn_id": 515,
+      "summary_snippet": "Summary of conversation: user and assistant discus"
+    },
+    "test_3_tombstones_anti_resurrection": {
+      "status": "PASS",
+      "duration_ms": 97.39,
+      "category": "qa_stress_pref",
+      "key": "theme_828874",
+      "anti_resurrection_verified": true,
+      "tombstone_cleared_on_relearn": true
+    },
+    "test_4_fts5_indexing": {
+      "status": "PASS",
+      "duration_ms": 79.36,
+      "fts_search_latency_ms": 4.42,
+      "sub_millisecond_capable": true,
+      "triggers_verified": [
+        "trg_turns_ai (insert)",
+        "trg_turns_au (update)",
+        "trg_turns_ad (delete)"
+      ],
+      "bm25_ranking_verified": true
+    },
+    "test_5_rapid_multi_turn_insertions": {
+      "status": "PASS",
+      "duration_ms": 134.79,
+      "total_turns_logged": 100,
+      "turns_found_in_db": 100,
+      "turns_found_in_fts": 100,
+      "integrity_check": "ok",
+      "insert_errors": []
+    },
+    "test_6_concurrent_reads_writes": {
+      "status": "PASS",
+      "duration_ms": 1764.47,
+      "threads": {
+        "writers": 8,
+        "readers": 12
+      },
+      "total_writes_executed": 200,
+      "total_reads_executed": 480,
+      "avg_write_latency_ms": 1.6,
+      "avg_read_latency_ms": 36.15,
+      "concurrency_errors": [],
+      "database_integrity": "ok"
+    },
+    "test_7_wal_busy_timeout": {
+      "status": "PASS",
+      "duration_ms": 367.52,
+      "log": {
+        "concurrent_read_during_exclusive_write": "SUCCESS",
+        "read_latency_ms": 2.83,
+        "busy_timeout_operational_error": "database is locked",
+        "busy_timeout_elapsed_ms": 255.22
+      }
+    }
+  },
+  "summary": {
+    "total_tests": 7,
+    "passed": 7,
+    "failed": 0,
+    "final_database_integrity": "ok",
+    "final_counts": {
+      "turns": 427,
+      "facts": 0,
+      "memory_conflicts": 2,
+      "session_condensations": 1
+    },
+    "verdict": "ALL_PASS"
+  }
+}

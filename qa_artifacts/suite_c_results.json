@@ -1,0 +1,581 @@
+{
+  "suite": "Suite C: Agent Configuration",
+  "timestamp": "2026-11-04T20:36:02.673970",
+  "test_agent_id": "QA_TEMP_AGENT_C",
+  "tests": {
+    "C01": {
+      "title": "Create & Edit existing agent without mutating core agents",
+      "passed": true,
+      "evidence": {
+        "initial_creation": {
+          "success": true,
+          "agent": {
+            "id": "QA_TEMP_AGENT_C",
+            "name": "Suite C Alpha",
+            "role": "QA Initial Specialist",
+            "specialty": "Integration Verification",
+            "color": "#10b981",
+            "avatar_pixel": "qa_temp_agent_c_pixel.png",
+            "default_tool": "web_search",
+            "risk_tier": "L0_READ_ONLY",
+            "prompt_prefix": "Initial QA prompt",
+            "model_id": "gemini-3.8-flash-low",
+            "status": "idle",
+            "current_task_id": null,
+            "active_worktree": null,
+            "desk_x": 320,
+            "desk_y": 160,
+            "logs": [
+              "[READY] Agent 'Suite C Alpha' registered into autonomous agents",
+              "[MODEL] Engine: web_search | Model: gemini-3.8-flash-low",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Suite C Alpha' registered into autonomous agents",
+              "[MODEL] Engine: web_search | Model: gemini-3.8-flash-low",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "web_search",
+              "web_read_page",
+              "task_status"
+            ],
+            "allowed_skills": [
+              "kilo_code",
+              "multi_agent_collaboration",
+              "make_plan",
+              "git_workflow"
+            ],
+            "capabilities": [
+              "code_refactor",
+              "qa_testing",
+              "security_audit",
+              "complexity_reduction"
+            ],
+            "is_core": false,
+            "engine": "",
+            "soul_markdown": "Initial QA prompt",
+            "chat_history": []
+          }
+        },
+        "edited_result": {
+          "success": true,
+          "agent": {
+            "id": "QA_TEMP_AGENT_C",
+            "name": "Suite C Alpha (Edited)",
+            "role": "QA Senior Specialist",
+            "specialty": "Deep Automated Diagnostics",
+            "color": "#6366f1",
+            "avatar_pixel": "qa_temp_agent_c_pixel.png",
+            "default_tool": "web_search",
+            "risk_tier": "L0_READ_ONLY",
+            "prompt_prefix": "Initial QA prompt",
+            "model_id": "gemini-3.8-flash-low",
+            "status": "idle",
+            "current_task_id": null,
+            "active_worktree": "None",
+            "desk_x": 320,
+            "desk_y": 160,
+            "logs": [
+              "[READY] Agent 'Suite C Alpha (Edited)' registered into autonomous agents",
+              "[MODEL] Engine: web_search | Model: gemini-3.8-flash-low",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Suite C Alpha (Edited)' registered into autonomous agents",
+              "[MODEL] Engine: web_search | Model: gemini-3.8-flash-low",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "web_search",
+              "web_read_page",
+              "task_status"
+            ],
+            "allowed_skills": [
+              "kilo_code",
+              "multi_agent_collaboration",
+              "make_plan",
+              "git_workflow"
+            ],
+            "capabilities": [
+              "code_refactor",
+              "qa_testing",
+              "security_audit",
+              "complexity_reduction"
+            ],
+            "is_core": false,
+            "engine": "",
+            "soul_markdown": "Initial QA prompt",
+            "chat_history": []
+          }
+        },
+        "profile_role": "QA Senior Specialist",
+        "core_agents_intact": true
+      },
+      "notes": "Successfully created temp test agent and verified in-place update.",
+      "timestamp": "2026-11-04T20:36:09.550219"
+    },
+    "C02": {
+      "title": "Change agent name",
+      "passed": true,
+      "evidence": {
+        "name_after_save": "Suite C Renamed Agent",
+        "id_retained": "QA_TEMP_AGENT_C"
+      },
+      "notes": "",
+      "timestamp": "2026-11-04T20:36:09.558265"
+    },
+    "C03": {
+      "title": "Change role and specialty",
+      "passed": true,
+      "evidence": {
+        "role": "Lead Architecture Inspector",
+        "specialty": "High-scale distributed systems and resiliency"
+      },
+      "notes": "",
+      "timestamp": "2026-11-04T20:36:09.563608"
+    },
+    "C04": {
+      "title": "Change personality and soul markdown",
+      "passed": true,
+      "evidence": {
+        "save_agent_soul_result": {
+          "success": true,
+          "agent_id": "QA_TEMP_AGENT_C",
+          "soul": "You are an elite QA Automation Operative with extreme precision and uncompromising quality standards."
+        },
+        "prompt_prefix": "You are an elite QA Automation Operative with extreme precision and uncompromising quality standards.",
+        "soul_markdown": "You are an elite QA Automation Operative with extreme precision and uncompromising quality standards."
+      },
+      "notes": "",
+      "timestamp": "2026-11-04T20:36:09.568996"
+    },
+    "C05": {
+      "title": "Change conversational model",
+      "passed": true,
+      "evidence": {
+        "model_id": "claude-sonnet-4-6"
+      },
+      "notes": "",
+      "timestamp": "2026-11-04T20:36:09.576019"
+    },
+    "C06": {
+      "title": "Change task execution engine",
+      "passed": true,
+      "evidence": {
+        "engine": "opencode",
+        "default_tool": "opencode_run"
+      },
+      "notes": "",
+      "timestamp": "2026-11-04T20:36:09.584031"
+    },
+    "C07": {
+      "title": "Change permissions and enforce risk tiers",
+      "passed": true,
+      "evidence": {
+        "L0_risk_tier": "L0_READ_ONLY",
+        "L0_allowed_tools": [
+          "web_search",
+          "web_read_page"
+        ],
+        "L0_mutation_blocked_reason": "Tool 'opencode_run' is not in allowed_tools for agent 'Qa_Temp_Agent_C' (QA_TEMP_AGENT_C).",
+        "L1_risk_tier": "L1_MUTATION",
+        "L1_mutation_allowed": true,
+        "L2_risk_tier": "L2_DESTRUCTIVE"
+      },
+      "notes": "",
+      "timestamp": "2026-11-04T20:36:09.602022"
+    },
+    "C08": {
+      "title": "Change allowed_tools and default_tool",
+      "passed": true,
+      "evidence": {
+        "default_tool": "web_read_page",
+        "allowed_tools": [
+          "web_search",
+          "web_read_page",
+          "task_status"
+        ]
+      },
+      "notes": "",
+      "timestamp": "2026-11-04T20:36:09.609185"
+    },
+    "C09": {
+      "title": "Verify UI REST endpoints match backend registry state",
+      "passed": true,
+      "evidence": {
+        "ui_state_agent": {
+          "id": "QA_TEMP_AGENT_C",
+          "name": "Qa_Temp_Agent_C",
+          "role": "Autonomous Specialist",
+          "specialty": "Autonomous Specialist",
+          "color": "#6366f1",
+          "avatar_pixel": "qa_temp_agent_c_pixel.png",
+          "default_tool": "web_read_page",
+          "risk_tier": "L0_READ_ONLY",
+          "model_id": "claude-sonnet-4-6",
+          "status": "idle",
+          "task_id": null,
+          "task_title": null,
+          "task_progress": 0,
+          "worktree": "None",
+          "desk_x": 320,
+          "desk_y": 160,
+          "logs": [
+            "[READY] Agent 'Qa_Temp_Agent_C' registered into autonomous agents",
+            "[MODEL] Engine: web_read_page | Model: claude-sonnet-4-6",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "recent_logs": [
+            "[READY] Agent 'Qa_Temp_Agent_C' registered into autonomous agents",
+            "[MODEL] Engine: web_read_page | Model: claude-sonnet-4-6",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "allowed_tools": [
+            "web_search",
+            "web_read_page",
+            "task_status"
+          ],
+          "allowed_skills": [
+            "kilo_code",
+            "multi_agent_collaboration",
+            "make_plan",
+            "git_workflow"
+          ],
+          "capabilities": [
+            "code_refactor",
+            "qa_testing",
+            "security_audit",
+            "complexity_reduction"
+          ],
+          "is_core": false,
+          "engine": "opencode",
+          "soul_markdown": "You are an elite QA Automation Operative with extreme precision and uncompromising quality standards.",
+          "chat_history": []
+        },
+        "ui_profile_agent": {
+          "id": "QA_TEMP_AGENT_C",
+          "name": "Qa_Temp_Agent_C",
+          "role": "Autonomous Specialist",
+          "specialty": "Autonomous Specialist",
+          "color": "#6366f1",
+          "avatar_pixel": "qa_temp_agent_c_pixel.png",
+          "default_tool": "web_read_page",
+          "risk_tier": "L0_READ_ONLY",
+          "prompt_prefix": "You are an elite QA Automation Operative with extreme precision and uncompromising quality standards.",
+          "model_id": "claude-sonnet-4-6",
+          "status": "idle",
+          "current_task_id": null,
+          "active_worktree": "None",
+          "desk_x": 320,
+          "desk_y": 160,
+          "logs": [
+            "[READY] Agent 'Qa_Temp_Agent_C' registered into autonomous agents",
+            "[MODEL] Engine: web_read_page | Model: claude-sonnet-4-6",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "recent_logs": [
+            "[READY] Agent 'Qa_Temp_Agent_C' registered into autonomous agents",
+            "[MODEL] Engine: web_read_page | Model: claude-sonnet-4-6",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "allowed_tools": [
+            "web_search",
+            "web_read_page",
+            "task_status"
+          ],
+          "allowed_skills": [
+            "kilo_code",
+            "multi_agent_collaboration",
+            "make_plan",
+            "git_workflow"
+          ],
+          "capabilities": [
+            "code_refactor",
+            "qa_testing",
+            "security_audit",
+            "complexity_reduction"
+          ],
+          "is_core": false,
+          "engine": "opencode",
+          "soul_markdown": "You are an elite QA Automation Operative with extreme precision and uncompromising quality standards.",
+          "chat_history": []
+        },
+        "backend_agent": {
+          "id": "QA_TEMP_AGENT_C",
+          "name": "Qa_Temp_Agent_C",
+          "role": "Autonomous Specialist",
+          "specialty": "Autonomous Specialist",
+          "color": "#6366f1",
+          "avatar_pixel": "qa_temp_agent_c_pixel.png",
+          "default_tool": "web_read_page",
+          "risk_tier": "L0_READ_ONLY",
+          "prompt_prefix": "You are an elite QA Automation Operative with extreme precision and uncompromising quality standards.",
+          "model_id": "claude-sonnet-4-6",
+          "status": "idle",
+          "current_task_id": null,
+          "active_worktree": "None",
+          "desk_x": 320,
+          "desk_y": 160,
+          "logs": [
+            "[READY] Agent 'Qa_Temp_Agent_C' registered into autonomous agents",
+            "[MODEL] Engine: web_read_page | Model: claude-sonnet-4-6",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "recent_logs": [
+            "[READY] Agent 'Qa_Temp_Agent_C' registered into autonomous agents",
+            "[MODEL] Engine: web_read_page | Model: claude-sonnet-4-6",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "allowed_tools": [
+            "web_search",
+            "web_read_page",
+            "task_status"
+          ],
+          "allowed_skills": [
+            "kilo_code",
+            "multi_agent_collaboration",
+            "make_plan",
+            "git_workflow"
+          ],
+          "capabilities": [
+            "code_refactor",
+            "qa_testing",
+            "security_audit",
+            "complexity_reduction"
+          ],
+          "is_core": false,
+          "engine": "opencode",
+          "soul_markdown": "You are an elite QA Automation Operative with extreme precision and uncompromising quality standards.",
+          "chat_history": []
+        },
+        "matches": {
+          "name": true,
+          "role": true,
+          "default_tool": true,
+          "risk_tier": true
+        }
+      },
+      "notes": "",
+      "timestamp": "2026-11-04T20:36:09.807219"
+    },
+    "C10": {
+      "title": "Verify engine and default_tool two-way consistency",
+      "passed": true,
+      "evidence": {
+        "engine_antigravity_aligned_tool": "antigravity_run",
+        "engine_kilo_aligned_tool": "kilo_run",
+        "tool_opencode_run_aligned_engine": "opencode"
+      },
+      "notes": "",
+      "timestamp": "2026-11-04T20:36:09.830244"
+    },
+    "C11": {
+      "title": "Verify invalid engine/model/risk combinations are sanitized safely",
+      "passed": true,
+      "evidence": {
+        "save_result": {
+          "success": true,
+          "agent": {
+            "id": "QA_TEMP_AGENT_C",
+            "name": "Qa_Temp_Agent_C",
+            "role": "Autonomous Specialist",
+            "specialty": "Autonomous Specialist",
+            "color": "#6366f1",
+            "avatar_pixel": "qa_temp_agent_c_pixel.png",
+            "default_tool": "kilo_run",
+            "risk_tier": "L1_MUTATION",
+            "prompt_prefix": "You are an elite QA Automation Operative with extreme precision and uncompromising quality standards.",
+            "model_id": "invalid/non-existent-model-9999",
+            "status": "idle",
+            "current_task_id": null,
+            "active_worktree": "None",
+            "desk_x": 320,
+            "desk_y": 160,
+            "logs": [
+              "[READY] Agent 'Qa_Temp_Agent_C' registered into autonomous agents",
+              "[MODEL] Engine: kilo_run | Model: invalid/non-existent-model-9999",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "recent_logs": [
+              "[READY] Agent 'Qa_Temp_Agent_C' registered into autonomous agents",
+              "[MODEL] Engine: kilo_run | Model: invalid/non-existent-model-9999",
+              "[STATUS] Standby on office deck \u2014 ready for task assignment"
+            ],
+            "allowed_tools": [
+              "kilo_run",
+              "antigravity_run",
+              "web_search",
+              "web_read_page",
+              "task_status"
+            ],
+            "allowed_skills": [
+              "kilo_code",
+              "multi_agent_collaboration",
+              "make_plan",
+              "git_workflow"
+            ],
+            "capabilities": [
+              "code_refactor",
+              "qa_testing",
+              "security_audit",
+              "complexity_reduction"
+            ],
+            "is_core": false,
+            "engine": "non_existent_engine_xyz",
+            "soul_markdown": "You are an elite QA Automation Operative with extreme precision and uncompromising quality standards.",
+            "chat_history": []
+          }
+        },
+        "sanitized_risk_tier": "L1_MUTATION",
+        "sanitized_default_tool": "kilo_run",
+        "model_id_recorded": "invalid/non-existent-model-9999"
+      },
+      "notes": "",
+      "timestamp": "2026-11-04T20:36:09.836859"
+    },
+    "C12": {
+      "title": "Registry reload simulates restart and verifies persistence",
+      "passed": true,
+      "evidence": {
+        "reloaded_agent_id": "QA_TEMP_AGENT_C",
+        "reloaded_name": "Suite C Reload Verifier",
+        "reloaded_role": "Cold Restart Specialist",
+        "reloaded_engine": "opencode",
+        "reloaded_model_id": "opencode/deepseek-coder"
+      },
+      "notes": "",
+      "timestamp": "2026-11-04T20:36:09.863117"
+    },
+    "C13": {
+      "title": "Verify editing one agent does not modify another agent",
+      "passed": true,
+      "evidence": {
+        "benchmark_before": {
+          "id": "QA_BENCHMARK_AGENT",
+          "name": "Benchmark Agent",
+          "role": "Isolation Sentinel",
+          "specialty": "Purity Check",
+          "color": "#3b82f6",
+          "avatar_pixel": "qa_benchmark_agent_pixel.png",
+          "default_tool": "web_search",
+          "risk_tier": "L0_READ_ONLY",
+          "prompt_prefix": "You are Benchmark Agent, an autonomous agents specialist focusing on Purity Check.",
+          "model_id": "gemini-3.8-flash-low",
+          "status": "idle",
+          "current_task_id": null,
+          "active_worktree": null,
+          "desk_x": 180,
+          "desk_y": 880,
+          "logs": [
+            "[READY] Agent 'Benchmark Agent' registered into autonomous agents",
+            "[MODEL] Engine: web_search | Model: gemini-3.8-flash-low",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "recent_logs": [
+            "[READY] Agent 'Benchmark Agent' registered into autonomous agents",
+            "[MODEL] Engine: web_search | Model: gemini-3.8-flash-low",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "allowed_tools": [
+            "web_search",
+            "web_read_page",
+            "task_status"
+          ],
+          "allowed_skills": [
+            "opencode",
+            "multi_agent_collaboration",
+            "make_plan",
+            "git_workflow"
+          ],
+          "capabilities": [
+            "backend_architecture",
+            "api_development",
+            "database_design"
+          ],
+          "is_core": false,
+          "engine": "",
+          "soul_markdown": "You are Benchmark Agent, an autonomous agents specialist focusing on Purity Check.",
+          "chat_history": []
+        },
+        "benchmark_after": {
+          "id": "QA_BENCHMARK_AGENT",
+          "name": "Benchmark Agent",
+          "role": "Isolation Sentinel",
+          "specialty": "Purity Check",
+          "color": "#3b82f6",
+          "avatar_pixel": "qa_benchmark_agent_pixel.png",
+          "default_tool": "web_search",
+          "risk_tier": "L0_READ_ONLY",
+          "prompt_prefix": "You are Benchmark Agent, an autonomous agents specialist focusing on Purity Check.",
+          "model_id": "gemini-3.8-flash-low",
+          "status": "idle",
+          "current_task_id": null,
+          "active_worktree": null,
+          "desk_x": 180,
+          "desk_y": 880,
+          "logs": [
+            "[READY] Agent 'Benchmark Agent' registered into autonomous agents",
+            "[MODEL] Engine: web_search | Model: gemini-3.8-flash-low",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "recent_logs": [
+            "[READY] Agent 'Benchmark Agent' registered into autonomous agents",
+            "[MODEL] Engine: web_search | Model: gemini-3.8-flash-low",
+            "[STATUS] Standby on office deck \u2014 ready for task assignment"
+          ],
+          "allowed_tools": [
+            "web_search",
+            "web_read_page",
+            "task_status"
+          ],
+          "allowed_skills": [
+            "opencode",
+            "multi_agent_collaboration",
+            "make_plan",
+            "git_workflow"
+          ],
+          "capabilities": [
+            "backend_architecture",
+            "api_development",
+            "database_design"
+          ],
+          "is_core": false,
+          "engine": "",
+          "soul_markdown": "You are Benchmark Agent, an autonomous agents specialist focusing on Purity Check.",
+          "chat_history": []
+        },
+        "is_identical": true
+      },
+      "notes": "",
+      "timestamp": "2026-11-04T20:36:09.874897"
+    },
+    "C14": {
+      "title": "Verify configuration reset behavior without deleting real user data",
+      "passed": true,
+      "evidence": {
+        "test_agent_deleted": {
+          "success": true,
+          "deleted_id": "QA_TEMP_AGENT_C"
+        },
+        "other_agent_deleted": {
+          "success": true,
+          "deleted_id": "QA_BENCHMARK_AGENT"
+        },
+        "test_agent_gone": true,
+        "other_agent_gone": true,
+        "all_original_agents_preserved": true,
+        "original_count": 15,
+        "current_count": 15
+      },
+      "notes": "",
+      "timestamp": "2026-11-04T20:36:09.884193"
+    }
+  },
+  "summary": {
+    "total": 14,
+    "passed": 14,
+    "failed": 0,
+    "status": "PASSED"
+  }
+}

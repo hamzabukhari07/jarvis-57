@@ -242,11 +242,23 @@ class AntigravityEngineAdapter(EngineAdapter):
             raise FileNotFoundError("Antigravity CLI binary (agy) not found.")
 
         # Determine effective prompt string
+        # Antigravity CLI print mode (-p) supports inlining prompt text up to safe command line bounds (~24KB).
+        # When prompt_file is provided by SafePromptManager for large prompts, read its full contents
+        # so Antigravity receives the complete instruction rather than an unread file reference.
+        # If the file exceeds safe limits (24,000 chars), pass an explicit instruction referencing the file.
         if prompt_file and prompt_file.exists():
-            effective_prompt = (
-                f"Execute all directives and requirements in {prompt_file.as_posix()} "
-                f"to complete the requested task."
-            )
+            try:
+                file_content = prompt_file.read_text(encoding="utf-8").strip()
+                if file_content and len(file_content) <= 24000:
+                    effective_prompt = file_content
+                else:
+                    effective_prompt = (
+                        f"Read and execute all directives and requirements in {prompt_file.as_posix()} "
+                        f"to complete the requested task."
+                    )
+            except Exception as e:
+                logger.warning("[Antigravity] Failed to read prompt_file %s: %s", prompt_file, e)
+                effective_prompt = config.prompt
         else:
             effective_prompt = config.prompt
 

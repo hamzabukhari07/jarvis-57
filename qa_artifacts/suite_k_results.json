@@ -1,0 +1,138 @@
+{
+  "suite": "Suite K: Cancellation",
+  "timestamp": "2026-11-04T15:22:59Z",
+  "summary": {
+    "total": 12,
+    "passed": 12,
+    "failed": 0
+  },
+  "tests": {
+    "K01_start_long_running_conversational_request": {
+      "status": "PASS",
+      "evidence": {
+        "chunks_pre_cancel": 3
+      }
+    },
+    "K02_cancel_while_generation_active": {
+      "status": "PASS",
+      "evidence": {
+        "task_abort": "asyncio.CancelledError caught and handled"
+      }
+    },
+    "K03_verify_ui_stops_response": {
+      "status": "PASS",
+      "evidence": {
+        "final_ui_state": "resting",
+        "logs": [
+          "SYS: Interrupted \u2014 listening..."
+        ]
+      }
+    },
+    "K04_verify_backend_processing_stops": {
+      "status": "PASS",
+      "evidence": {
+        "generator_aborted_early": true
+      }
+    },
+    "K05_verify_cancellation_state_recorded": {
+      "status": "PASS",
+      "evidence": {
+        "cancellation_event_set": true
+      }
+    },
+    "K06_verify_no_further_response_chunks_arrive": {
+      "status": "PASS",
+      "evidence": {
+        "post_cancel_chunks_delivered": 0
+      }
+    },
+    "K07_start_external_engine_task": {
+      "status": "PASS",
+      "evidence": {
+        "root_pid": 21040,
+        "spawn_type": "Win32 Job Object CREATE_SUSPENDED"
+      }
+    },
+    "K08_cancel_external_task": {
+      "status": "PASS",
+      "evidence": {
+        "cancel_method": "terminate_tree()",
+        "duration_sec": 0.0002
+      }
+    },
+    "K09_verify_actual_process_terminates": {
+      "status": "PASS",
+      "evidence": {
+        "root_pid": 21040,
+        "pid_exists_after": false
+      }
+    },
+    "K10_verify_child_processes_terminated": {
+      "status": "PASS",
+      "evidence": {
+        "child_pid": 27864,
+        "grandchild_pid": 27864,
+        "child_running_after": false,
+        "grandchild_running_after": false
+      }
+    },
+    "K11_verify_no_orphan_process_remains": {
+      "status": "PASS",
+      "evidence": {
+        "all_pids_dead": true,
+        "job_object_cleanup": "KILL_ON_JOB_CLOSE invoked"
+      }
+    },
+    "K12_verify_application_remains_responsive": {
+      "status": "PASS",
+      "evidence": {
+        "avg_query_latency_ms": 0.866,
+        "max_query_latency_ms": 1.631,
+        "task_status_after_cancel": "cancelled"
+      }
+    }
+  },
+  "raw_evidence": {
+    "conversational": {
+      "k01_started": true,
+      "k02_cancelled": true,
+      "k03_ui_stopped": true,
+      "k04_backend_processing_stopped": true,
+      "k05_cancellation_recorded": true,
+      "k06_no_chunks_post_cancel": true,
+      "pre_cancel_chunks_count": 3,
+      "post_cancel_chunks_count": 0,
+      "ui_final_state": "resting",
+      "ui_logs": [
+        "SYS: Interrupted \u2014 listening..."
+      ]
+    },
+    "process_supervisor": {
+      "root_pid": 21040,
+      "child_pid": 27864,
+      "grandchild_pid": 27864,
+      "root_running_before": true,
+      "child_running_before": true,
+      "grandchild_running_before": true,
+      "root_running_after": false,
+      "child_running_after": false,
+      "grandchild_running_after": false,
+      "cancel_duration_sec": 0.0002,
+      "no_orphans_remain": true,
+      "k07_started": true,
+      "k08_cancelled": true,
+      "k09_root_terminated": true,
+      "k10_child_tree_terminated": true,
+      "k11_no_orphans": true
+    },
+    "task_manager_responsiveness": {
+      "task_id": "17ed3f8f",
+      "cancelled_successfully": true,
+      "final_status": "cancelled",
+      "final_message": "Cancelled by user",
+      "avg_query_latency_ms": 0.866,
+      "max_query_latency_ms": 1.631,
+      "k12_application_responsive": true
+    }
+  }
+}

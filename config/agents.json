@@ -6,10 +6,10 @@
       "specialty": "High-level architecture design, code review, and structural planning",
       "color": "#a855f7",
       "avatar_pixel": "michael_pixel.png",
-      "default_tool": "antigravity_run",
+      "default_tool": "kilo_run",
       "risk_tier": "L1_MUTATION",
       "prompt_prefix": "You are MICHAEL, Lead Software Architect & Tech Lead.",
-      "model_id": "gemini-3.8-flash-low",
+      "model_id": "kilo/kilo-auto/free",
       "desk_x": 180,
       "desk_y": 160,
       "worktree": "repo_active",
@@ -33,23 +33,23 @@
         "multi_agent_delegation"
       ],
       "is_core": true,
-      "engine": "antigravity",
+      "engine": "kilo",
       "soul_markdown": "You are MICHAEL, Lead Software Architect & Tech Lead."
     },
     "VERVE": {
       "name": "Verve",
       "role": "Frontend & UI Design Specialist",
-      "specialty": "antigravity_run, website_build",
+      "specialty": "opencode_run, website_build",
       "color": "#ec4899",
       "avatar_pixel": "pam_pixel.png",
-      "default_tool": "opencode_run",
+      "default_tool": "antigravity_run",
       "risk_tier": "L1_MUTATION",
       "prompt_prefix": "You are Verve, Frontend & UI Design Specialist.",
-      "model_id": "opencode/nemotron-3-ultra-free",
-      "desk_x": 320,
-      "desk_y": 160,
-      "worktree": "repo_active",
-      "active_worktree": "repo_active",
+      "model_id": "gemini-3.8-flash-low",
+      "desk_x": 60,
+      "desk_y": 36,
+      "worktree": "c:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57",
+      "active_worktree": "c:/Users/Hamza Bukhari/Documents/antigravity/jarvis-57",
       "allowed_tools": [
         "opencode_run",
         "kilo_run",
@@ -68,7 +68,7 @@
         "animations"
       ],
       "is_core": false,
-      "engine": "opencode",
+      "engine": "antigravity",
       "soul_markdown": "You are Verve, Frontend & UI Design Specialist."
     },
     "FLUX": {
@@ -460,6 +460,61 @@
       "is_core": false,
       "engine": "opencode",
       "soul_markdown": "You are Restricted Attempt Agent, an autonomous agents specialist focusing on Autonomous Specialist."
+    },
+    "SECURITY_AUDIT_L0": {
+      "name": "Security Audit L0",
+      "role": "Researcher",
+      "specialty": "research",
+      "color": "#3b82f6",
+      "avatar_pixel": "test.png",
+      "default_tool": "web_search",
+      "risk_tier": "L0_READ_ONLY",
+      "prompt_prefix": "L0 test",
+      "model_id": "",
+      "desk_x": 0,
+      "desk_y": 0,
+      "worktree": null,
+      "active_worktree": null,
+      "allowed_tools": [
+        "web_search",
+        "task_status"
+      ],
+      "allowed_skills": [],
+      "capabilities": [],
+      "is_core": false,
+      "engine": "",
+      "soul_markdown": "L0 test"
+    },
+    "SNEAKYL0AGENT": {
+      "name": "Sneaky L0 Agent",
+      "role": "Spy",
+      "specialty": "web research",
+      "color": "#3b82f6",
+      "avatar_pixel": "sneakyl0agent_pixel.png",
+      "default_tool": "web_search",
+      "risk_tier": "L0_READ_ONLY",
+      "prompt_prefix": "You are Sneaky L0 Agent, an autonomous agents specialist focusing on web research.",
+      "model_id": "",
+      "desk_x": 180,
+      "desk_y": 880,
+      "worktree": null,
+      "active_worktree": null,
+      "allowed_tools": [
+        "web_search"
+      ],
+      "allowed_skills": [
+        "web_scraper",
+        "social_research",
+        "web_research_pipeline"
+      ],
+      "capabilities": [
+        "web_research",
+        "media_extraction",
+        "content_analysis"
+      ],
+      "is_core": false,
+      "engine": "",
+      "soul_markdown": "You are Sneaky L0 Agent, an autonomous agents specialist focusing on web research."
     }
   }
 }

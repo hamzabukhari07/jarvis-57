@@ -13,7 +13,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 17:29:44** (2 total turns).",
       "size": 337,
-      "_mtime": 1793743677.9450192
+      "_mtime": 1793817044.4388583
     },
     "conv_score.md": {
       "id": "conv_score",
@@ -27,7 +27,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 20:47:17** (7 total turns).",
       "size": 796,
-      "_mtime": 1793743677.940904
+      "_mtime": 1793817044.4377646
     },
     "conv_20261102_205443.md": {
       "id": "conv_20261102_205443",
@@ -41,7 +41,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 20:55:42** (3 total turns).",
       "size": 466,
-      "_mtime": 1793743677.9366434
+      "_mtime": 1793817044.435549
     },
     "conv_20261102_205838.md": {
       "id": "conv_20261102_205838",
@@ -55,7 +55,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 20:58:55** (4 total turns).",
       "size": 287,
-      "_mtime": 1793743677.9344184
+      "_mtime": 1793817044.435549
     },
     "conv_20261102_215500.md": {
       "id": "conv_20261102_215500",
@@ -69,7 +69,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 21:55:18** (7 total turns).",
       "size": 580,
-      "_mtime": 1793743677.9322124
+      "_mtime": 1793817044.4344435
     },
     "conv_20261102_220753.md": {
       "id": "conv_20261102_220753",
@@ -83,7 +83,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 22:09:22** (16 total turns).",
       "size": 883,
-      "_mtime": 1793743677.9291894
+      "_mtime": 1793817044.4289093
     },
     "conv_20261102_221740.md": {
       "id": "conv_20261102_221740",
@@ -97,7 +97,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 22:18:42** (6 total turns).",
       "size": 625,
-      "_mtime": 1793743677.925675
+      "_mtime": 1793817044.4289093
     },
     "conv_20261102_223645.md": {
       "id": "conv_20261102_223645",
@@ -111,7 +111,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 22:37:24** (4 total turns).",
       "size": 782,
-      "_mtime": 1793743677.922676
+      "_mtime": 1793817044.4289093
     },
     "conv_20261102_225110.md": {
       "id": "conv_20261102_225110",
@@ -125,7 +125,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 22:51:34** (2 total turns).",
       "size": 337,
-      "_mtime": 1793743677.9198625
+      "_mtime": 1793817044.4289093
     },
     "conv_20261102_232303.md": {
       "id": "conv_20261102_232303",
@@ -139,7 +139,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 23:23:21** (14 total turns).",
       "size": 936,
-      "_mtime": 1793743677.9173396
+      "_mtime": 1793817044.4269013
     },
     "conv_20261102_234928.md": {
       "id": "conv_20261102_234928",
@@ -153,7 +153,7 @@
       "updated": "2026-11-02",
       "snippet": "Live interaction recorded on **2026-11-02 23:50:03** (23 total turns).",
       "size": 1275,
-      "_mtime": 1793743677.9138339
+      "_mtime": 1793817044.4269013
     },
     "conv_20261103_033450.md": {
       "id": "conv_20261103_033450",
@@ -167,7 +167,7 @@
       "updated": "2026-11-03",
       "snippet": "Live interaction recorded on **2026-11-03 03:35:10** (5 total turns).",
       "size": 649,
-      "_mtime": 1793743677.9108362
+      "_mtime": 1793817044.4247305
     },
     "conv_20261103_034148.md": {
       "id": "conv_20261103_034148",
@@ -181,7 +181,7 @@
       "updated": "2026-11-03",
       "snippet": "Live interaction recorded on **2026-11-03 03:44:03** (12 total turns).",
       "size": 1106,
-      "_mtime": 1793743677.908306
+      "_mtime": 1793817044.422971
     },
     "conv_20261103_215459.md": {
       "id": "conv_20261103_215459",
@@ -195,7 +195,7 @@
       "updated": "2026-11-03",
       "snippet": "Live interaction recorded on **2026-11-03 21:56:09** (34 total turns).",
       "size": 1458,
-      "_mtime": 1793743677.895329
+      "_mtime": 1793817044.4210436
     },
     "conv_20261104_005607.md": {
       "id": "conv_20261104_005607",
@@ -209,7 +209,7 @@
       "updated": "2026-11-04",
       "snippet": "Live interaction recorded on **2026-11-04 00:57:32** (49 total turns).",
       "size": 986,
-      "_mtime": 1793743677.8913288
+      "_mtime": 1793817044.4205346
     },
     "conv_20261104_010815.md": {
       "id": "conv_20261104_010815",
@@ -223,7 +223,217 @@
       "updated": "2026-11-04",
       "snippet": "Live interaction recorded on **2026-11-04 01:08:51** (7 total turns).",
       "size": 889,
-      "_mtime": 1793743677.8887596
+      "_mtime": 1793817044.417511
+    },
+    "conv_20261104_195217.md": {
+      "id": "conv_20261104_195217",
+      "file": "conv_20261104_195217.md",
+      "title": "What Are You Doing Maam",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 15,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 19:53:28** (15 total turns).",
+      "size": 1193,
+      "_mtime": 1793817044.417511
+    },
+    "conv_20261104_224127.md": {
+      "id": "conv_20261104_224127",
+      "file": "conv_20261104_224127.md",
+      "title": "What Are You Doing",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 28,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 22:41:44** (28 total turns).",
+      "size": 837,
+      "_mtime": 1793817044.399817
+    },
+    "conv_concurrency_0.md": {
+      "id": "conv_concurrency_0",
+      "file": "conv_concurrency_0.md",
+      "title": "Concurrent Message 0 From Writer 0",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 10,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 20:28:32** (10 total turns).",
+      "size": 815,
+      "_mtime": 1793817044.4121673
+    },
+    "conv_concurrency_1.md": {
+      "id": "conv_concurrency_1",
+      "file": "conv_concurrency_1.md",
+      "title": "Concurrent Message 0 From Writer 1",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 10,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 20:28:32** (10 total turns).",
+      "size": 815,
+      "_mtime": 1793817044.4073744
+    },
+    "conv_concurrency_2.md": {
+      "id": "conv_concurrency_2",
+      "file": "conv_concurrency_2.md",
+      "title": "Concurrent Message 0 From Writer 2",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 10,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 20:28:32** (10 total turns).",
+      "size": 815,
+      "_mtime": 1793817044.4073744
+    },
+    "conv_concurrency_3.md": {
+      "id": "conv_concurrency_3",
+      "file": "conv_concurrency_3.md",
+      "title": "Concurrent Message 0 From Writer 3",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 10,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 20:28:32** (10 total turns).",
+      "size": 815,
+      "_mtime": 1793817044.4073744
+    },
+    "conv_concurrency_4.md": {
+      "id": "conv_concurrency_4",
+      "file": "conv_concurrency_4.md",
+      "title": "Concurrent Message 0 From Writer 4",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 10,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 20:28:32** (10 total turns).",
+      "size": 815,
+      "_mtime": 1793817044.4073744
+    },
+    "conv_concurrency_5.md": {
+      "id": "conv_concurrency_5",
+      "file": "conv_concurrency_5.md",
+      "title": "Concurrent Message 0 From Writer 5",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 10,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 20:28:32** (10 total turns).",
+      "size": 815,
+      "_mtime": 1793817044.4053664
+    },
+    "conv_concurrency_6.md": {
+      "id": "conv_concurrency_6",
+      "file": "conv_concurrency_6.md",
+      "title": "Concurrent Message 0 From Writer 6",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 10,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 20:28:32** (10 total turns).",
+      "size": 815,
+      "_mtime": 1793817044.4053664
+    },
+    "conv_concurrency_7.md": {
+      "id": "conv_concurrency_7",
+      "file": "conv_concurrency_7.md",
+      "title": "Concurrent Message 0 From Writer 7",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 10,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 20:28:32** (10 total turns).",
+      "size": 815,
+      "_mtime": 1793817044.4033587
+    },
+    "conv_concurrency_8.md": {
+      "id": "conv_concurrency_8",
+      "file": "conv_concurrency_8.md",
+      "title": "Concurrent Message 0 From Writer 8",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 10,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 20:28:33** (10 total turns).",
+      "size": 815,
+      "_mtime": 1793817044.4033587
+    },
+    "conv_concurrency_9.md": {
+      "id": "conv_concurrency_9",
+      "file": "conv_concurrency_9.md",
+      "title": "Concurrent Message 0 From Writer 9",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 10,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 20:28:33** (10 total turns).",
+      "size": 815,
+      "_mtime": 1793817044.401324
+    },
+    "conv_concurrent_stress_37263922.md": {
+      "id": "conv_concurrent_stress_37263922",
+      "file": "conv_concurrent_stress_37263922.md",
+      "title": "Concurrent Thread 0 Turn 0 Token",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 104,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 20:20:40** (104 total turns).",
+      "size": 1166,
+      "_mtime": 1793817044.413224
+    },
+    "conv_rapid_chat_83d0601b.md": {
+      "id": "conv_rapid_chat_83d0601b",
+      "file": "conv_rapid_chat_83d0601b.md",
+      "title": "Rapid Turn Sequence 0 With Cryptographic",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 100,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 20:20:40** (100 total turns).",
+      "size": 1458,
+      "_mtime": 1793817044.413224
+    },
+    "conv_stress_test_cond_7089fcf6.md": {
+      "id": "conv_stress_test_cond_7089fcf6",
+      "file": "conv_stress_test_cond_7089fcf6.md",
+      "title": "Condensation Test Turn Message 0 For",
+      "category": "knowledge",
+      "tags": [
+        "conversation"
+      ],
+      "turn_count": 5,
+      "updated": "2026-11-04",
+      "snippet": "Live interaction recorded on **2026-11-04 20:20:40** (5 total turns).",
+      "size": 784,
+      "_mtime": 1793817044.416129
     }
   }
 }

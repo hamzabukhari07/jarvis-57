@@ -8,6 +8,28 @@
 
 # LEARNING JOURNAL (active — last 25 entries)
 
+## [2026-11-05] - UI & Task Engine Target Bug Fixes (P0)
+- **Creator & Lead Architect:** Hamza Bukhari
+- **Issues Addressed:**
+  1. Antigravity Task Engine Context: SafePromptManager wrote prompts >800 characters to disk, but Antigravity CLI does not support Kilo Code's --file argument and was only passed a textual pointer without prompt contents.
+  2. Thinking / Loading Indicator: UI did not render the ThinkingTool indicator while waiting for the first chunk during prefill.
+  3. React Runtime Remount / Streaming Loss: In AgentDirectChatView.tsx, promoting activeThreadId from temporary thread-* to conv_* caused React to remount AgentChatRuntime mid-stream, breaking chunk accumulation.
+  4. Stop Button Cancellation: AbortSignal cancellation exited early without preserving partial text or saving cancelled message state to SQLite/localStorage, and the underlying Gemini generator was not cleanly closed.
+- **Fixes Implemented:**
+  1. In core/engines/antigravity.py: build_cli_command now reads prompt_file content and safely passes it into -p <content> up to 24,000 characters, falling back to an explicit read-and-execute directive for extreme sizes.
+  2. In frontend/src/components/office/AgentChatThread.tsx: rendered <ThinkingTool state="thinking" /> when isRunning && !hasContent.
+  3. In frontend/src/components/office/AgentDirectChatView.tsx: introduced runtimeSessionKey to decouple component mounting from thread ID promotion.
+  4. In frontend/src/components/office/AgentDirectChatView.tsx: preserved partial response (*[Stopped by user]*) on abort, completed message status as 'stop', and called onConversationComplete. In core/gemini.py: wrapped stream iteration in try...finally: response_stream.close().
+- **Key Files Touched:**
+  - core/engines/antigravity.py
+  - frontend/src/components/office/AgentChatThread.tsx
+  - frontend/src/components/office/AgentDirectChatView.tsx
+  - core/gemini.py
+- **Verification:**
+  - Layer 1 (Static): python -m py_compile core/engines/antigravity.py core/gemini.py (0 errors); tsc -b && vite build in frontend (0 errors, 7,446 modules).
+  - Layer 2 (Runtime): pytest tests/test_ui_bugfixes.py -v (3 passed).
+  - Layer 3 (Regression): pytest tests/test_fix1_continuity.py tests/test_fix2_prompt_isolation.py tests/test_fix3_genuine_streaming.py tests/test_fix4_live_cancellation.py -v (6 passed).
+
 ## [2026-11-04] — Phase 2: Agent Task Engine & Model Awareness Alignment
 - **Creator & Lead Architect:** Hamza Bukhari
 - **Issue Addressed:**

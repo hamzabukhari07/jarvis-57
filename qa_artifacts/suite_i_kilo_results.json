@@ -1,0 +1,78 @@
+{
+  "I11": {
+    "requirement": "Verify CLI availability (kilo / kilocode resolution)",
+    "passed": true,
+    "resolved_path": "C:\\Users\\Hamza Bukhari\\AppData\\Roaming\\npm\\kilo.cmd",
+    "probe_state": "ready",
+    "version": "7.8.18",
+    "auth_reason": "Authenticated (2 credential profile)."
+  },
+  "I12_I13": {
+    "requirement": "Dispatch read-only workspace inspection & verify actual Kilo process starts",
+    "passed": true,
+    "spawned_pid": 28088,
+    "captured_output": "7.8.18",
+    "exit_code": 0,
+    "workspace": "C:\\Users\\HAMZAB~1\\AppData\\Local\\Temp\\qa_kilo_workspace_kyx6iqd0"
+  },
+  "I14": {
+    "requirement": "Verify correct output is captured and thought privacy enforced",
+    "passed": true,
+    "parsed_events_count": 3,
+    "events_sample": [
+      {
+        "type": "step_start",
+        "message": "Reading workspace tree",
+        "payload": {
+          "type": "step_start",
+          "title": "Reading workspace tree"
+        }
+      },
+      {
+        "type": "tool_use",
+        "message": "Tool: read_file",
+        "payload": {
+          "type": "tool_use",
+          "name": "read_file"
+        }
+      },
+      {
+        "type": "output",
+        "message": "Completed inspection of files.",
+        "payload": {
+          "type": "content",
+          "content": "Completed inspection of files."
+        }
+      }
+    ]
+  },
+  "I15": {
+    "requirement": "Verify selected agent & model configuration is respected",
+    "passed": true,
+    "built_command": [
+      "C:\\Users\\Hamza Bukhari\\AppData\\Roaming\\npm\\kilo.cmd",
+      "run",
+      "Analyze structure",
+      "--dir",
+      "C:\\Users\\Hamza Bukhari\\AppData\\Local\\Temp\\qa_kilo_workspace_kyx6iqd0",
+      "--format",
+      "json",
+      "--model",
+      "kilo/default",
+      "--auto"
+    ]
+  },
+  "I16_I22": {
+    "requirement": "Shared engine checks (routing, cancellation, exit codes)",
+    "cancellation_status": "cancelled",
+    "cancellation_passed": true,
+    "error_exit_code": 1,
+    "error_exit_passed": true,
+    "passed": true
+  },
+  "summary": {
+    "suite": "Suite I - External Execution Engines (Kilo Code Engine)",
+    "all_passed": true,
+    "total_tests": 4
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "audit_name": "Audit Subagent 4 - Engine Execution & Cleanup / Isolation Audit",
+  "auditor": "Audit Subagent 4",
+  "timestamp": "2026-11-04T15:58:45Z",
+  "engines_audit": {
+    "antigravity": {
+      "cli_availability": {
+        "status": "AVAILABLE",
+        "resolved_binary": "C:\\Users\\Hamza Bukhari\\AppData\\Local\\agy\\bin\\agy.exe",
+        "version": "1.4.12",
+        "auth_state": "ready",
+        "auth_reason": "Installed and authenticated. Accepts model prompts and generates multi-file diffs."
+      },
+      "process_launch_vs_task_execution": {
+        "process_launch": "VERIFIED_LIVE - ProcessSupervisor spawns ContainedProcess inside Win32 Job Object with non-window flags (CREATE_NO_WINDOW), capturing live PID.",
+        "task_execution": "VERIFIED_LIVE - Executes via AntigravityEngineAdapter using CLI stream mode (-p, --add-dir, --output-format stream-json, --mode accept-edits). Never uses dangerous skip permissions. Verified end-to-end task run in Suite I (test I02: duration 7.53s, exit code 0, deliverable detection)."
+      },
+      "routing_and_isolation": "Actions route through actions/antigravity_agent.py with PathJail validation (rejects filesystem drive root 'C:\\' and system directories). Enforces auto-project subfolders and repo snapshots for undo.",
+      "output_capture": "Real-time NDJSON stream parsing with recursive thought/reasoning suppression (ALLOWED_EVENT_TYPES allowlist and DISALLOWED_PAYLOAD_KEYS purge). Live milestones detected on disk.",
+      "exit_codes_and_cancellation": "Propagates non-zero exit codes. Cancelling task triggers ProcessSupervisor.terminate_tree() terminating root, child, and grandchild processes with zero orphaned processes."
+    },
+    "opencode": {
+      "cli_availability": {
+        "status": "AVAILABLE",
+        "resolved_binary": "C:\\Users\\Hamza Bukhari\\AppData\\Roaming\\npm\\opencode.cmd",
+        "version": "opencode v2.2.5",
+        "auth_state": "ready",
+        "auth_reason": "Authenticated with 3 stored provider key(s)."
+      },
+      "process_launch_vs_task_execution": {
+        "process_launch": "VERIFIED_LIVE - ProcessSupervisor spawns ContainedProcess inside Win32 Job Object (PID verified in test I07_I08: PID 29228).",
+        "task_execution": "VERIFIED_LIVE - Executes via OpenCodeEngineAdapter with arguments [run, prompt, --dir, --format json, --auto]. Avoids dangerous permission flags. Tested in Suite I with real workspace execution."
+      },
+      "routing_and_isolation": "Actions route through actions/opencode_agent.py with pre-flight PathJail validation blocking system/drive roots and URL prefetch asset staging.",
+      "output_capture": "Live stdout capture via piped streaming; parse_stream_event strips internal monologue and thoughts, mapping tool_use, step_start, output, and error.",
+      "exit_codes_and_cancellation": "Non-zero exit codes (observed code 1 in test I21_I22) correctly propagate to adapter failure state. Tree cancellation terminates entire process tree cleanly."
+    },
+    "kilo": {
+      "cli_availability": {
+        "status": "AVAILABLE",
+        "resolved_binary": "C:\\Users\\Hamza Bukhari\\AppData\\Roaming\\npm\\kilo.cmd",
+        "version": "7.8.18",
+        "auth_state": "ready",
+        "auth_reason": "Authenticated (2 credential profile)."
+      },
+      "process_launch_vs_task_execution": {
+        "process_launch": "VERIFIED_LIVE - ProcessSupervisor spawns ContainedProcess inside Win32 Job Object (PID verified in test I12_I13: PID 28088).",
+        "task_execution": "VERIFIED_LIVE - Mode A Headless CLI streaming via KiloEngineAdapter [run, prompt, --dir, --format json, --auto]. Tested in Suite I (test I12_I13) with full output verification."
+      },
+      "routing_and_isolation": "Actions route through actions/kilo_agent.py with PathJail validation and URL prefetch fallback.",
+      "output_capture": "JSON event stream parsed into step_start, tool_use, and content events with strict Event Allowlist thought suppression.",
+      "exit_codes_and_cancellation": "Cancellation propagates via terminate_tree(). Exit codes properly signal success/failure."
+    }
+  },
+  "cleanup_and_isolation_audit": {
+    "temporary_test_agents_in_agents_json": {
+      "status": "UNPROCESSED_LEAK_IDENTIFIED",
+      "findings": [
+        "Test agent 'TEST_RESTRICTED_ATTE' created during automated tests was left in config/agents.json.",
+        "Test agent 'SECURITY_AUDIT_L0' created during run_security_depth_suite.py was left in config/agents.json.",
+        "Test agent 'SNEAKYL0AGENT' created during run_security_depth_suite.py was left in config/agents.json.",
+        "Root cause: run_security_depth_suite.py calls registry.save_agent_profile() which permanently commits to disk (config/agents.json), but its finally block only pruned in-memory registry._lock without calling registry.delete_agent() or sm/file delete."
+      ]
+    },
+    "temporary_conversations_in_zezo_brain_db": {
+      "status": "UNPROCESSED_LEAK_IDENTIFIED",
+      "findings": [
+        "Suite D created conversation 'conv_1de754160a93' ('Suite D Verification Thread') which remains persisted in agent_conversations and agent_messages.",
+        "Suite D created 12 uncleaned conversations for MICHAEL and VERVE with title 'New Conversation'.",
+        "Suite L created conversations for AGENT_ALPHA and AGENT_BETA ('conv_agent1_34ebbdc9', 'conv_agent2_43a19ae5', 'conv_8e3504998650') which remain persisted.",
+        "SQLite stress testing (Subagent 19) inserted 100 rapid turns and session condensation 'stress_test_cond_7089fcf6', and left 2 memory_conflicts rows.",
+        "Root cause: Test harnesses executed against the production database 'memory/zezo_brain.db' directly instead of an isolated temporary SQLite database or test transaction rollback."
+      ]
+    },
+    "user_data_integrity": {
+      "status": "INTACT_NO_CORRUPTION",
+      "findings": [
+        "Production agents ('MICHAEL', 'VERVE', 'FLUX', 'AHMAD', 'DWIGHT', 'PAM', 'KELLY', 'QUANTUM', 'DEVDYNAMO', 'DATAEINSTEIN', 'RECON', 'NEWBIEAGENT') remain intact with valid schema.",
+        "SQLite database integrity check ('PRAGMA integrity_check;') returns 'ok'.",
+        "WAL journal mode and triggers remain fully functional.",
+        "Git tracked core files show no corruption; untracked test artifacts are isolated in qa_artifacts/."
+      ]
+    }
+  },
+  "recommendations": [
+    "Run an explicit cleanup pass to delete leftover test agents ('TEST_RESTRICTED_ATTE', 'SECURITY_AUDIT_L0', 'SNEAKYL0AGENT') from config/agents.json.",
+    "Purge test conversations and stress-test turns (session_ids with test prefixes, AGENT_ALPHA, AGENT_BETA) from memory/zezo_brain.db.",
+    "For future QA test suites, mandate temporary isolated database fixtures (e.g. tempfile SQLite paths or in-memory clones) rather than pointing tests directly to memory/zezo_brain.db and config/agents.json."
+  ]
+}

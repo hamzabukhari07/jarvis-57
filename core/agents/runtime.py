@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
 import uuid
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -220,19 +221,26 @@ class AgentRuntime:
 
         prompt = (
             f"You are {display_name}, {role} in the autonomous ZEZO OS fleet.\n"
-            f"Your specialty: {specialty}.\n"
+            f"Role & Specialty: {role}, {specialty}.\n"
+            f"Creator Context: Built on ZEZO OS platform created by Hamza Bukhari.\n"
             f"Security Tier: {risk_tier}.\n"
+            f"Interaction Context: You are conversing with the user in a direct 1-on-1 session.\n"
         )
         if soul:
             prompt += f"\nPersona & Soul:\n{soul}\n"
 
         prompt += (
             "\nOperating Rules:\n"
-            "- You are in a direct 1-on-1 interaction with Hamza Bukhari (Creator & Lead Architect of ZEZO).\n"
             "- Speak directly in first-person, professional, concise, sharp.\n"
             "- When tools are available and required, call them explicitly.\n"
             "- When tool results are returned, synthesize a helpful, precise response.\n"
             "- If a tool call is denied by security policy, explain the limitation clearly and suggest safe alternatives.\n"
+            "\nImportant Grounding Rules:\n"
+            "- Do not assume the current user is Hamza Bukhari or any specific individual unless they introduce themselves.\n"
+            "- Clearly distinguish known verified facts supplied by the user in this conversation from assumptions.\n"
+            "- If the user has not provided their name, profession, or project details in this conversation, acknowledge that you do not have that information instead of inventing or assuming it.\n"
+            "- Do not treat system platform metadata or active workspace files as personal facts about the user.\n"
+            "- Only answer based on context provided in this conversation.\n"
         )
         if self.workspace_root:
             prompt += f"- Active Workspace: {self.workspace_root}\n"
@@ -257,7 +265,7 @@ class AgentRuntime:
             f"- Assigned Task Execution Engine: {engine_label}\n"
             f"- Assigned Task Model: {model_label}\n"
             f"- Communication Channel: ZEZO Conversational Runtime\n"
-            f"- Important: Answer naturally and conversantly according to the user's message. Do NOT dump your engine, model, security tier, workspace path, or architectural specs into your reply unless Hamza specifically asks about them. ONLY recite these details when explicitly asked 'what engine are you using', 'what model', or during system verification.\n"
+            f"- Important: Answer naturally and conversantly according to the user's message. Do NOT dump your engine, model, security tier, workspace path, or architectural specs into your reply unless the user specifically asks about them. ONLY recite these details when explicitly asked 'what engine are you using', 'what model', or during system verification.\n"
         )
 
         return prompt
@@ -455,16 +463,39 @@ class AgentRuntime:
         from core import gemini
         accumulated_chunks = []
         loop = asyncio.get_running_loop()
+        q: asyncio.Queue = asyncio.Queue()
+        stop_event = threading.Event()
 
-        def _do_stream():
-            return list(gemini.stream_text(query_text, tier="fast", timeout_ms=30000))
+        def _producer():
+            try:
+                for chunk in gemini.stream_text(query_text, tier="fast", timeout_ms=30000):
+                    if stop_event.is_set():
+                        break
+                    if loop.is_closed():
+                        break
+                    loop.call_soon_threadsafe(q.put_nowait, ("chunk", chunk))
+                if not loop.is_closed():
+                    loop.call_soon_threadsafe(q.put_nowait, ("done", None))
+            except Exception as exc:
+                if not loop.is_closed():
+                    try:
+                        loop.call_soon_threadsafe(q.put_nowait, ("error", exc))
+                    except Exception:
+                        pass
+
+        producer_thread = threading.Thread(target=_producer, name="AgentStreamProducer", daemon=True)
+        producer_thread.start()
 
         try:
-            chunks = await loop.run_in_executor(None, _do_stream)
-            for ch in chunks:
-                accumulated_chunks.append(ch)
-                yield {"event": "chunk", "text": ch, "conversation_id": cid}
-                await asyncio.sleep(0.01)
+            while True:
+                msg_type, payload = await q.get()
+                if msg_type == "chunk":
+                    accumulated_chunks.append(payload)
+                    yield {"event": "chunk", "text": payload, "conversation_id": cid}
+                elif msg_type == "error":
+                    raise payload
+                elif msg_type == "done":
+                    break
 
             final_text = "".join(accumulated_chunks).strip()
             if not final_text:
@@ -473,8 +504,15 @@ class AgentRuntime:
 
             self.append_message(role="assistant", content=final_text, conversation_id=cid)
             yield {"event": "done", "reply": final_text, "conversation_id": cid}
+        except asyncio.CancelledError:
+            stop_event.set()
+            logger.info("[AgentRuntime] step_stream_async cancelled for cid=%s", cid)
+            raise
         except Exception as e:
+            stop_event.set()
             err = f"Streaming error: {str(e)}"
             logger.exception("[AgentRuntime] step_stream_async error: %s", err)
             self.append_message(role="assistant", content=err, status="failed", conversation_id=cid)
             yield {"event": "error", "error": err, "conversation_id": cid}
+        finally:
+            stop_event.set()

@@ -1,0 +1,247 @@
+{
+  "suite": "Suite L: Persistence and Restart Recovery",
+  "timestamp": "2026-11-04T15:27:46.022762+00:00",
+  "run_id": "1189bf",
+  "test_agent_id": "QA_L_1189BF",
+  "other_agent_id": "QA_OTH_1189BF",
+  "tests": {
+    "L01": {
+      "status": "PASS",
+      "description": "Create a test agent",
+      "evidence": {
+        "agent_id": "QA_L_1189BF",
+        "name": "PersistBot_1189bf",
+        "role": "Persistence Test Agent",
+        "risk_tier": "L0_READ_ONLY",
+        "default_tool": "web_search",
+        "config_path": "C:\\Users\\Hamza Bukhari\\Documents\\antigravity\\jarvis-57\\config\\agents.json"
+      }
+    },
+    "L02": {
+      "status": "PASS",
+      "description": "Create a conversation",
+      "evidence": {
+        "conversation_id": "conv_7446b69309cd",
+        "agent_id": "QA_L_1189BF",
+        "title": "Suite L Verification 1189bf"
+      }
+    },
+    "L03": {
+      "status": "PASS",
+      "description": "Send multiple messages",
+      "evidence": {
+        "message_count": 3,
+        "message_ids": [
+          "msg_19f59347b184",
+          "msg_d67936734d44",
+          "msg_4dcb5f2e244a"
+        ],
+        "roles": [
+          "user",
+          "assistant",
+          "user"
+        ]
+      }
+    },
+    "L04": {
+      "status": "PASS",
+      "description": "Execute a tool call",
+      "evidence": {
+        "tool_name": "web_search",
+        "tool_args": {
+          "query": "persistence verification 1189bf"
+        },
+        "success": true,
+        "output": "Results for query: persistence verification 1189bf -> 100% OK",
+        "final_reply": "Search completed. System state verified successfully."
+      }
+    },
+    "L05": {
+      "status": "PASS",
+      "description": "Verify database persistence (agent_conversations, agent_messages, turns)",
+      "evidence": {
+        "agent_conversations_row": {
+          "id": "conv_7446b69309cd",
+          "agent_id": "QA_L_1189BF",
+          "title": "Suite L Verification 1189bf",
+          "created_at": "2026-11-04T15:27:50.217091+00:00",
+          "updated_at": "2026-11-04T15:27:50.355783+00:00",
+          "is_archived": 0,
+          "metadata": "{\"creator\": \"AgentRuntime\"}"
+        },
+        "agent_messages_count": 6,
+        "agent_messages_sample": [
+          {
+            "id": "msg_19f59347b184",
+            "conversation_id": "conv_7446b69309cd",
+            "agent_id": "QA_L_1189BF",
+            "role": "user",
+            "content": "Hello test agent! Please verify storage.",
+            "tool_name": null,
+            "tool_args": null,
+            "tool_result": null,
+            "status": "completed",
+            "created_at": "2026-11-04T15:27:50.221041+00:00"
+          },
+          {
+            "id": "msg_d67936734d44",
+            "conversation_id": "conv_7446b69309cd",
+            "agent_id": "QA_L_1189BF",
+            "role": "assistant",
+            "content": "Understood. Storage pipeline active.",
+            "tool_name": null,
+            "tool_args": null,
+            "tool_result": null,
+            "status": "completed",
+            "created_at": "2026-11-04T15:27:50.271998+00:00"
+          }
+        ],
+        "turns_count": 1,
+        "turns_sample": {
+          "id": 723,
+          "session_id": "QA_L_1189BF:sess_1189bf",
+          "role": "user",
+          "content": "Verbatim turn test for 1189bf",
+          "tool_name": "web_search",
+          "tool_args": "{\"query\": \"turn_query_1189bf\"}",
+          "tool_result": "verbatim_success",
+          "timestamp": "2026-11-04 20:27:50"
+        }
+      }
+    },
+    "L06": {
+      "status": "PASS",
+      "description": "Simulate closing ZEZO normally (flush DB / reload state)",
+      "evidence": {
+        "queue_flushed": true,
+        "queue_size_before_shutdown": 0,
+        "writer_alive_after_shutdown": false
+      }
+    },
+    "L07": {
+      "status": "PASS",
+      "description": "Restart ZEZO (reinitialize registry, reload DB connection)",
+      "evidence": {
+        "writer_restarted": true,
+        "writer_thread_name": "SQLiteMemoryWriter",
+        "registry_agents_count": 16
+      }
+    },
+    "L08": {
+      "status": "PASS",
+      "description": "Verify the agent remains available",
+      "evidence": {
+        "agent_id": "QA_L_1189BF",
+        "name": "PersistBot_1189bf",
+        "role": "Persistence Test Agent",
+        "specialty": "Automated QA Verification",
+        "risk_tier": "L0_READ_ONLY",
+        "default_tool": "web_search"
+      }
+    },
+    "L09": {
+      "status": "PASS",
+      "description": "Verify conversation history remains available",
+      "evidence": {
+        "conversation_id": "conv_7446b69309cd",
+        "persisted_message_count": 6,
+        "first_message": "Hello test agent! Please verify storage.",
+        "last_message": "Search completed. System state verified successfully."
+      }
+    },
+    "L10": {
+      "status": "PASS",
+      "description": "Verify message ordering (chronological)",
+      "evidence": {
+        "timestamps": [
+          "2026-11-04T15:27:50.221041+00:00",
+          "2026-11-04T15:27:50.271998+00:00",
+          "2026-11-04T15:27:50.323152+00:00",
+          "2026-11-04T15:27:50.342020+00:00",
+          "2026-11-04T15:27:50.355003+00:00",
+          "2026-11-04T15:27:50.355783+00:00"
+        ],
+        "is_chronologically_sorted": true
+      }
+    },
+    "L11": {
+      "status": "PASS",
+      "description": "Verify the agent can recall the test conversation",
+      "evidence": {
+        "conversation_id": "conv_7446b69309cd",
+        "agent_id": "QA_L_1189BF",
+        "title": "Suite L Verification 1189bf",
+        "created_at": "2026-11-04T15:27:50.217091+00:00",
+        "updated_at": "2026-11-04T15:27:50.355783+00:00"
+      }
+    },
+    "L12": {
+      "status": "PASS",
+      "description": "Verify another agent cannot access that conversation (conversation ownership)",
+      "evidence": {
+        "original_agent": "QA_L_1189BF",
+        "intruder_agent": "QA_OTH_1189BF",
+        "target_conversation_id": "conv_7446b69309cd",
+        "scoped_query_found": 0,
+        "intruder_runtime_assigned_new_conversation": "conv_b36199a17376",
+        "intruder_can_claim_ownership": false
+      }
+    },
+    "L13": {
+      "status": "PASS",
+      "description": "Verify no duplicate messages were created",
+      "evidence": {
+        "total_messages": 6,
+        "unique_ids": 6,
+        "content_counts": {
+          "Hello test agent! Please verify storage.": 1,
+          "Understood. Storage pipeline active.": 1,
+          "Proceed with step verification.": 1
+        },
+        "duplicates_detected": false
+      }
+    },
+    "L14": {
+      "status": "PASS",
+      "description": "Verify interrupted operations are handled safely (interrupted task ledger)",
+      "evidence": {
+        "reconciled_count": 2,
+        "task_id": "task_crash_1189bf",
+        "status": "INTERRUPTED",
+        "interrupted_at": "2026-11-04T15:27:50.478041+00:00",
+        "risk_tier": "L1_MUTATION"
+      }
+    },
+    "L15": {
+      "status": "PASS",
+      "description": "Verify task statuses remain consistent",
+      "evidence": {
+        "unconfirmed_restart_blocked": {
+          "success": false,
+          "requires_confirmation": true,
+          "task_id": "task_crash_1189bf",
+          "title": "Critical File Sync",
+          "risk_tier": "L1_MUTATION",
+          "message": "Restarting task 'Critical File Sync' may duplicate side effects (L1_MUTATION). Please confirm restart."
+        },
+        "confirmed_restart": {
+          "success": true,
+          "old_task_id": "task_crash_1189bf",
+          "new_task_id": "task_a93e0aae",
+          "agent_id": "QA_L_1189BF",
+          "conversation_id": "conv_7446b69309cd",
+          "prompt": "Run sync script",
+          "message": "Task task_crash_1189bf marked as RESTARTED. New task task_a93e0aae enqueued."
+        },
+        "old_task_status": "RESTARTED",
+        "new_task_status": "WORKING"
+      }
+    }
+  },
+  "summary": {
+    "total": 15,
+    "passed": 15,
+    "failed": 0,
+    "errors": []
+  }
+}

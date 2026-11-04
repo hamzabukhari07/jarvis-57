@@ -1,0 +1,80 @@
+{
+  "audit_subagent": 1,
+  "audit_scope": "Test Counts Reconciliation & OpenCode Discrepancy Analysis",
+  "summary": {
+    "status": "AUDIT_COMPLETE",
+    "key_finding": "The 6-test discrepancy between QA_REPORT.md table sum (227) and QA_TEST_RESULTS.json (221) is caused by a key-mismatch bug in consolidate_qa.py line 199 where io_data.get('tests', {}).items() was evaluated instead of io_data.get('results', {}).items(). In suite_i_opencode_results.json, test records are stored under 'results', so consolidate_qa.py skipped all OpenCode tests.",
+    "total_claimed_in_json": 221,
+    "total_sum_in_markdown_table_rows": 227,
+    "total_claimed_in_markdown_footer_and_text": 221,
+    "discrepancy_delta": 6,
+    "omitted_subsystem": "Suite I: OpenCode Engine (6 tests in table)",
+    "breakdown": {
+      "total_in_json": 221,
+      "passed": 219,
+      "failed": 2,
+      "partial": 0,
+      "not_tested": 0,
+      "blocked": 0,
+      "pass_percentage": 99.1
+    },
+    "uniqueness_check": {
+      "total_records": 221,
+      "unique_test_ids": 221,
+      "duplicate_test_ids": 0,
+      "all_ids_valid": true
+    }
+  },
+  "root_cause_analysis": {
+    "bug_file": "qa_artifacts/consolidate_qa.py",
+    "bug_line": 199,
+    "faulty_code": "for t_id, t_info in io_data.get('tests', {}).items():",
+    "actual_json_key": "suite_i_opencode_results.json stores tests under key 'results' rather than 'tests'",
+    "consequence": "io_data.get('tests', {}) returned an empty dictionary, completely omitting Suite I OpenCode tests from QA_TEST_RESULTS.json. The QA_REPORT.md markdown table rows manually or statically enumerated Suite I OpenCode Engine (6 tests, 6 pass, 0 fail), producing a row sum of 227, while the text narrative and the bottom TOTAL row echoed 221."
+  },
+  "reconciliation_table": [
+    {"subsystem": "Suite A: Agent Creation", "markdown_table_count": 15, "json_count": 15, "delta": 0, "status": "MATCH"},
+    {"subsystem": "Suite B: Identity & Personality", "markdown_table_count": 10, "json_count": 10, "delta": 0, "status": "MATCH"},
+    {"subsystem": "Suite C: Agent Configuration", "markdown_table_count": 14, "json_count": 14, "delta": 0, "status": "MATCH"},
+    {"subsystem": "Suite D: Agent Chat", "markdown_table_count": 15, "json_count": 15, "delta": 0, "status": "MATCH"},
+    {"subsystem": "Suite E: Memory & Context Accuracy", "markdown_table_count": 15, "json_count": 15, "delta": 0, "status": "MATCH"},
+    {"subsystem": "Suite F: Conversation Isolation", "markdown_table_count": 13, "json_count": 13, "delta": 0, "status": "MATCH"},
+    {"subsystem": "Suite G: Tools and Capabilities", "markdown_table_count": 13, "json_count": 13, "delta": 0, "status": "MATCH"},
+    {"subsystem": "Suite H: Permissions and Security", "markdown_table_count": 12, "json_count": 12, "delta": 0, "status": "MATCH"},
+    {"subsystem": "Suite I: Antigravity Engine", "markdown_table_count": 6, "json_count": 6, "delta": 0, "status": "MATCH"},
+    {"subsystem": "Suite I: OpenCode Engine", "markdown_table_count": 6, "json_count": 0, "delta": 6, "status": "OMITTED_IN_JSON_KEY_MISMATCH"},
+    {"subsystem": "Suite I: Kilo Code Engine", "markdown_table_count": 6, "json_count": 6, "delta": 0, "status": "MATCH"},
+    {"subsystem": "Suite J: Streaming Pipeline", "markdown_table_count": 10, "json_count": 10, "delta": 0, "status": "MATCH_2_FAILED"},
+    {"subsystem": "Suite K: Cancellation", "markdown_table_count": 12, "json_count": 12, "delta": 0, "status": "MATCH"},
+    {"subsystem": "Suite L: Persistence & Recovery", "markdown_table_count": 15, "json_count": 15, "delta": 0, "status": "MATCH"},
+    {"subsystem": "Suite M: Error Handling & Reliability", "markdown_table_count": 15, "json_count": 15, "delta": 0, "status": "MATCH"},
+    {"subsystem": "UI Server & Office View API", "markdown_table_count": 34, "json_count": 34, "delta": 0, "status": "MATCH"},
+    {"subsystem": "Frontend Build & TypeScript", "markdown_table_count": 2, "json_count": 2, "delta": 0, "status": "MATCH"},
+    {"subsystem": "SQLite Concurrency & Stress", "markdown_table_count": 7, "json_count": 7, "delta": 0, "status": "MATCH"},
+    {"subsystem": "Task Ledger & Process Recovery", "markdown_table_count": 7, "json_count": 7, "delta": 0, "status": "MATCH"}
+  ],
+  "exact_breakdown": {
+    "total_claimed_json": 221,
+    "total_table_sum": 227,
+    "passed": 219,
+    "failed": 2,
+    "partial": 0,
+    "not_tested": 0,
+    "blocked": 0,
+    "pass_percentage": 99.1
+  },
+  "failed_tests_detail": [
+    {
+      "test_id": "J05_no_fake_timer_streaming",
+      "category": "Streaming",
+      "status": "FAIL",
+      "reason": "Synthetic token interval detected rather than native server-sent chunking"
+    },
+    {
+      "test_id": "J02_first_chunk_timing",
+      "category": "Streaming",
+      "status": "FAIL",
+      "reason": "TTFT exceeded threshold due to buffering / timer delay"
+    }
+  ]
+}

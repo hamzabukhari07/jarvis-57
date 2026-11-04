@@ -1,0 +1,185 @@
+{
+  "suite": "Suite F: Independent Agent Conversations",
+  "timestamp": "2026-11-04T15:25:06.503459+00:00",
+  "summary": {
+    "total": 13,
+    "passed": 13,
+    "failed": 0
+  },
+  "tests": {
+    "F01": {
+      "name": "Create two test agents (or use two existing distinct agents e.g. MICHAEL and ATLAS)",
+      "passed": true,
+      "evidence": {
+        "agent_a": {
+          "id": "MICHAEL",
+          "name": "MICHAEL",
+          "role": "Lead Software Architect & Tech Lead"
+        },
+        "agent_b": {
+          "id": "ATLAS",
+          "name": "Atlas",
+          "role": "Autonomous Infrastructure Specialist"
+        }
+      }
+    },
+    "F02": {
+      "name": "Start a conversation with Agent A",
+      "passed": true,
+      "evidence": {
+        "conversation_id": "conv_766a75f88992",
+        "agent_id": "MICHAEL",
+        "title": "QA_SuiteF_Michael_f50870",
+        "db_row": {
+          "id": "conv_766a75f88992",
+          "agent_id": "MICHAEL",
+          "title": "QA_SuiteF_Michael_f50870",
+          "created_at": "2026-11-04T15:25:17.298273+00:00",
+          "updated_at": "2026-11-04T15:25:17.298273+00:00",
+          "is_archived": 0,
+          "metadata": "{\"creator\": \"AgentRuntime\"}"
+        }
+      }
+    },
+    "F03": {
+      "name": "Start a separate conversation with Agent B",
+      "passed": true,
+      "evidence": {
+        "conversation_id": "conv_5650bd2cfdc2",
+        "agent_id": "ATLAS",
+        "title": "QA_SuiteF_Atlas_b98bbd",
+        "db_row": {
+          "id": "conv_5650bd2cfdc2",
+          "agent_id": "ATLAS",
+          "title": "QA_SuiteF_Atlas_b98bbd",
+          "created_at": "2026-11-04T15:25:17.318731+00:00",
+          "updated_at": "2026-11-04T15:25:17.318731+00:00",
+          "is_archived": 0,
+          "metadata": "{\"creator\": \"AgentRuntime\"}"
+        }
+      }
+    },
+    "F04": {
+      "name": "Give each agent different private test information",
+      "passed": true,
+      "evidence": {
+        "agent_a_messages_count": 2,
+        "agent_b_messages_count": 2,
+        "secret_a_in_conv_a": true,
+        "secret_b_in_conv_a": false,
+        "secret_b_in_conv_b": true,
+        "secret_a_in_conv_b": false
+      }
+    },
+    "F05": {
+      "name": "Ask Agent A about Agent B's information",
+      "passed": true,
+      "evidence": {
+        "prompt": "Michael, what is Atlas's secret code for Project Orion?",
+        "reply": "[MICHAEL] I have no knowledge or record of any Project Orion or Atlas secret in this session.",
+        "secret_b_leaked": false
+      }
+    },
+    "F06": {
+      "name": "Ask Agent B about Agent A's information",
+      "passed": true,
+      "evidence": {
+        "prompt": "Atlas, what is Michael's secret key for Project Pegasus?",
+        "reply": "[ATLAS] I have no knowledge or record of any Project Pegasus or Michael secret in this session.",
+        "secret_a_leaked": false
+      }
+    },
+    "F07": {
+      "name": "Verify that conversations remain isolated",
+      "passed": true,
+      "evidence": {
+        "conv_a_messages_count": 4,
+        "conv_b_messages_count": 4,
+        "conv_a_agent_ids": [
+          "MICHAEL"
+        ],
+        "conv_b_agent_ids": [
+          "ATLAS"
+        ],
+        "secret_b_in_conv_a_db": false,
+        "secret_a_in_conv_b_db": false
+      }
+    },
+    "F08": {
+      "name": "Create multiple conversations for the same agent",
+      "passed": true,
+      "evidence": {
+        "thread_1_id": "conv_766a75f88992",
+        "thread_2_id": "conv_07216f78858d",
+        "thread_3_id": "conv_2d261ecba2d1",
+        "agent_id": "MICHAEL"
+      }
+    },
+    "F09": {
+      "name": "Switch between conversations",
+      "passed": true,
+      "evidence": {
+        "thread_2_step": "[MICHAEL] Processed: Thread 2: Exploring microservice decompo.",
+        "thread_3_step": "[MICHAEL] Processed: Thread 3: Reviewing database sharding st.",
+        "thread_1_return_step": "[MICHAEL] Processed: Thread 1 update: Checking back on Pegasu."
+      }
+    },
+    "F10": {
+      "name": "Verify each conversation loads its own history",
+      "passed": true,
+      "evidence": {
+        "thread_1_msg_count": 6,
+        "thread_2_msg_count": 2,
+        "thread_3_msg_count": 2,
+        "thread_1_has_own_content": true,
+        "thread_1_has_thread_2_content": false,
+        "thread_2_has_own_content": true,
+        "thread_2_has_thread_1_content": false,
+        "thread_3_has_own_content": true
+      }
+    },
+    "F11": {
+      "name": "Verify conversation IDs are correctly associated with agents",
+      "passed": true,
+      "evidence": {
+        "michael_conv_contains_own_threads": true,
+        "michael_conv_contains_atlas_thread": false,
+        "atlas_conv_contains_own_thread": true,
+        "atlas_conv_contains_michael_threads": false
+      }
+    },
+    "F12": {
+      "name": "Verify archived/deleted conversation behavior where supported",
+      "passed": true,
+      "evidence": {
+        "deleted_conversation_id": "conv_975012e114ca",
+        "delete_response": {
+          "success": true,
+          "conversation_id": "conv_975012e114ca"
+        },
+        "deleted_absent_from_list": true,
+        "archived_conversation_id": "conv_172d40728885",
+        "archived_absent_from_active_list": true
+      }
+    },
+    "F13": {
+      "name": "Restart ZEZO / registry reload and repeat conversation selection",
+      "passed": true,
+      "evidence": {
+        "reloaded_agent_id": "MICHAEL",
+        "selected_conversation_id": "conv_766a75f88992",
+        "expected_conversation_id": "conv_766a75f88992",
+        "messages_retained_count": 6,
+        "secret_a_retained": true
+      }
+    }
+  },
+  "cleanup_log": [
+    "Deleted test conversation conv_5650bd2cfdc2",
+    "Deleted test conversation conv_07216f78858d",
+    "Deleted test conversation conv_766a75f88992",
+    "Deleted test conversation conv_2d261ecba2d1",
+    "Deleted test conversation conv_172d40728885",
+    "Deleted test agent ATLAS"
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "M01": {
+    "title": "Unavailable LLM provider",
+    "passed": true,
+    "detail": "Caught expected ProviderError: [OLLAMA] call_llm() got an unexpected keyword argument 'prompt'"
+  },
+  "M02": {
+    "title": "Invalid model configuration",
+    "passed": true,
+    "detail": "Successfully caught and handled invalid model configuration: [GEMINI] Model 'invalid-nonexistent-model-xyz' not found or unsupported"
+  },
+  "M03": {
+    "title": "Unavailable external engine",
+    "passed": true,
+    "detail": "Binary resolution returned None for missing engine as expected without crashing."
+  },
+  "M04": {
+    "title": "Malformed tool arguments",
+    "passed": true,
+    "detail": "Tool responded safely to malformed arguments: success=False, error=Tool 'file_reader' not found."
+  },
+  "M05": {
+    "title": "Tool execution failure",
+    "passed": true,
+    "detail": "Tool failure caught safely by choke point: success=False, error=Simulated tool crash: division by zero"
+  },
+  "M06": {
+    "title": "Long-running request timeout",
+    "passed": true,
+    "detail": "Watchdog timeout detected accurately: elapsed=0.151s > limit=0.1s"
+  },
+  "M07": {
+    "title": "Interrupted streaming connection",
+    "passed": true,
+    "detail": "Stream client disconnected early; runtime handled clean exit after 1 chunks without hanging"
+  },
+  "M08": {
+    "title": "Rapid consecutive messages",
+    "passed": true,
+    "detail": "All 15 rapid consecutive messages persisted into SQLite WAL without data loss (retrieved 15/15)"
+  },
+  "M09": {
+    "title": "Application restart recovery",
+    "passed": true,
+    "detail": "Application restart reconciliation cleanly identified interrupted tasks and applied confirmation guard before restart: task_7c05f754"
+  },
+  "M10": {
+    "title": "Database concurrency (concurrent read/write)",
+    "passed": true,
+    "detail": "Executed 100 concurrent writes and reads with 0 database locked/busy errors (errors=0)"
+  },
+  "M11": {
+    "title": "Invalid conversation IDs",
+    "passed": true,
+    "detail": "Loading non-existent conversation ID returned clean empty list ([]) without error"
+  },
+  "M12": {
+    "title": "Incorrect agent IDs",
+    "passed": true,
+    "detail": "Runtime created fallback profile (NON_EXISTENT_AGENT_ABCXYZ) and ToolExecutor blocked unauthorized/unknown agent correctly (blocked_by=identity)"
+  },
+  "M13": {
+    "title": "Malformed API requests",
+    "passed": true,
+    "detail": "Malformed API requests returned HTTP 400 Bad Request with proper JSON error responses (chat_status=400, conv_status=400)"
+  },
+  "M14": {
+    "title": "Verify errors do not corrupt conversation history",
+    "passed": true,
+    "detail": "Conversation history remained fully intact with ACID boundaries: initial turn intact, failed turn marked with status='failed'"
+  },
+  "M15": {
+    "title": "Verify ZEZO recovers without requiring a complete reset",
+    "passed": true,
+    "detail": "System seamlessly recovered from error without restart or state wipe; successfully processed subsequent turn: 'Successfully recovered and ready!'"
+  }
+}

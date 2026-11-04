@@ -7,6 +7,7 @@ import {
   useAuiState,
 } from "@assistant-ui/react";
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
+import { ThinkingTool } from "@/components/assistant-ui/elements/thinking-indicator";
 import {
   Message as PKMessage,
   MessageContent as PKMessageContent,
@@ -75,6 +76,14 @@ const TextPart: FC = () => <MarkdownTextPrimitive />;
 /* ── 2. Agent Assistant Message (Agent Response with its own Blobatar & Persona) ── */
 export const AgentAssistantMessage: FC<{ agent: AgentOfficeMember }> = ({ agent }) => {
   const createdAt = useAuiState((s) => s.message.createdAt);
+  const isRunning = useAuiState((s) => s.message.status?.type === "running");
+  const hasContent = useAuiState((s) => {
+    const parts = s.message.parts;
+    if (!parts || parts.length === 0) return false;
+    return parts.some((p: any) =>
+      p.type === "text" && Boolean(p.text && p.text.trim().length > 0)
+    );
+  });
   const timeStr = formatMessageTime(createdAt);
 
   return (
@@ -98,7 +107,14 @@ export const AgentAssistantMessage: FC<{ agent: AgentOfficeMember }> = ({ agent 
             <span className="text-[10px] text-[var(--muted-foreground)] font-mono">({agent.role})</span>
           </div>
 
-          <PKMessageContent markdown className="flex-1 min-w-0 bg-transparent p-0 text-xs text-[var(--foreground)] leading-relaxed">
+          <PKMessageContent markdown className="flex-1 min-w-0 bg-transparent p-0 text-xs text-[var(--foreground)] leading-relaxed space-y-1.5">
+            {/* Thinking / Loading indicator when assistant message is running but no text has arrived yet */}
+            {isRunning && !hasContent && (
+              <div className="flex items-center py-1 text-xs text-[var(--muted-foreground)]">
+                <ThinkingTool state="thinking" />
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <MessagePrimitive.Parts
                 components={{

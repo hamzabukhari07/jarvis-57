@@ -1,0 +1,88 @@
+{
+  "subagent": "Subagent 20 (Task Ledger, Process Supervisor & Interrupted Task Recovery QA)",
+  "timestamp": "2026-11-04T15:24:23.777213+00:00",
+  "all_passed": true,
+  "total_tests": 7,
+  "passed_tests": 7,
+  "failed_tests": 0,
+  "test_results": [
+    {
+      "test_name": "TaskState Monotonic Transitions",
+      "status": "PASSED",
+      "details": {
+        "created_to_queued": true,
+        "queued_to_running": true,
+        "running_to_done": true,
+        "done_to_running_rejected": true,
+        "running_to_failed": true,
+        "failed_to_done_rejected": true,
+        "running_to_cancelled": true,
+        "cancelled_to_queued_rejected": true
+      }
+    },
+    {
+      "test_name": "TaskManager Success Lifecycle",
+      "status": "PASSED",
+      "details": {
+        "task_id": "dc665e64",
+        "intermediate_running": true,
+        "final_status": "done",
+        "progress": 100,
+        "logs_count": 2
+      }
+    },
+    {
+      "test_name": "TaskManager Failure Lifecycle",
+      "status": "PASSED",
+      "details": {
+        "task_id": "ee64bd6b",
+        "final_status": "failed",
+        "error": "ValueError: Simulated task exception",
+        "logs_count": 1
+      }
+    },
+    {
+      "test_name": "TaskManager Cancellation",
+      "status": "PASSED",
+      "details": {
+        "task_id": "76981e44",
+        "cancel_returned": true,
+        "status_after_cancel": "cancelled",
+        "message": "Cancelled by user"
+      }
+    },
+    {
+      "test_name": "Coding Queue Concurrency Fencing",
+      "status": "PASSED",
+      "details": {
+        "task_1_status": "running",
+        "task_2_status": "running",
+        "task_3_status": "queued",
+        "task_3_message": "queued (position #1)"
+      }
+    },
+    {
+      "test_name": "ProcessSupervisor Tree Vaporization",
+      "status": "PASSED",
+      "details": {
+        "root_pid": 25964,
+        "child_pid": 27044,
+        "alive_before_kill": true,
+        "root_alive_after_kill": false,
+        "child_alive_after_kill": false
+      }
+    },
+    {
+      "test_name": "Interrupted Task Ledger Recovery & Restart Reconciliation",
+      "status": "PASSED",
+      "details": {
+        "reconciled_count": 4,
+        "reconcile_status_transition_passed": true,
+        "risk_tier_confirmation_gate_passed": true,
+        "restart_flow_passed": true,
+        "old_task_id": "sim_crash_c2486f",
+        "new_restarted_task_id": "task_be03be95"
+      }
+    }
+  ]
+}

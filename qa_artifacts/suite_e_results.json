@@ -1,0 +1,234 @@
+{
+  "suite": "Suite E: Conversation Memory and Context Accuracy",
+  "timestamp": "2026-11-04T15:26:16.978023+00:00",
+  "total_tests": 15,
+  "passed": 15,
+  "failed": 0,
+  "test_cases": [
+    {
+      "id": "E00_CORE_ALEX_DENTAL_SAAS",
+      "title": "Alex Dental SaaS Context Recall & Anti-Hallucination",
+      "status": "PASSED",
+      "duration_ms": 415.41,
+      "evidence": {
+        "step1_input": "My name is Alex. I am building a SaaS product for dentists. Remember this project context. Tell me what you understood.",
+        "step1_reply": "Understood, Alex. I have recorded that you are building a SaaS product specifically tailored for dentists.",
+        "step2_input": "What type of product am I building? Who is my target audience? What project context did I give you?",
+        "step2_reply": "1. Product type: You are building a SaaS product.\n2. Target audience: Your target audience is dentists.\n3. Project context: Your name is Alex, and you are creating software for dental practices."
+      }
+    },
+    {
+      "id": "E01_PREVIOUS_MESSAGES_AVAILABLE",
+      "title": "Previous Messages Available in Same Conversation",
+      "status": "PASSED",
+      "duration_ms": 20.42,
+      "evidence": {
+        "database_rows_count": 3,
+        "loaded_messages_count": 3,
+        "messages": [
+          {
+            "id": "msg_960be4f4fcbe",
+            "conversation_id": "conv_85b8347cee0e",
+            "agent_id": "MICHAEL",
+            "role": "user",
+            "content": "Step Alpha",
+            "tool_name": null,
+            "tool_args": null,
+            "tool_result": null,
+            "status": "completed",
+            "created_at": "2026-11-04T15:26:17.395507+00:00"
+          },
+          {
+            "id": "msg_1aaa0b95430f",
+            "conversation_id": "conv_85b8347cee0e",
+            "agent_id": "MICHAEL",
+            "role": "assistant",
+            "content": "Step Alpha Confirmed",
+            "tool_name": null,
+            "tool_args": null,
+            "tool_result": null,
+            "status": "completed",
+            "created_at": "2026-11-04T15:26:17.396052+00:00"
+          },
+          {
+            "id": "msg_b792dfedfd8b",
+            "conversation_id": "conv_85b8347cee0e",
+            "agent_id": "MICHAEL",
+            "role": "user",
+            "content": "Step Beta",
+            "tool_name": null,
+            "tool_args": null,
+            "tool_result": null,
+            "status": "completed",
+            "created_at": "2026-11-04T15:26:17.396521+00:00"
+          }
+        ]
+      }
+    },
+    {
+      "id": "E02_FOLLOW_UP_USES_CORRECT_HISTORY",
+      "title": "Follow-Up Questions Use Correct History Chain",
+      "status": "PASSED",
+      "duration_ms": 29.89,
+      "evidence": {
+        "second_call_contents": [
+          "User Fact: The code is 9876.",
+          "Response generated with history.",
+          "What was the code I just gave you?"
+        ]
+      }
+    },
+    {
+      "id": "E03_RECENT_MESSAGES_NOT_LOST",
+      "title": "Recent Messages Are Not Lost",
+      "status": "PASSED",
+      "duration_ms": 20.78,
+      "evidence": {
+        "sent_count": 10,
+        "retrieved_count": 10,
+        "last_retrieved": "Message sequence 9"
+      }
+    },
+    {
+      "id": "E04_CHRONOLOGICAL_HISTORY_ORDERING",
+      "title": "Chronological Ordering of Conversation History",
+      "status": "PASSED",
+      "duration_ms": 68.21,
+      "evidence": {
+        "timestamps": [
+          "2026-11-04T15:26:17.465140+00:00",
+          "2026-11-04T15:26:17.476167+00:00",
+          "2026-11-04T15:26:17.487183+00:00",
+          "2026-11-04T15:26:17.498237+00:00",
+          "2026-11-04T15:26:17.509242+00:00"
+        ],
+        "contents": [
+          "Turn 0",
+          "Turn 1",
+          "Turn 2",
+          "Turn 3",
+          "Turn 4"
+        ]
+      }
+    },
+    {
+      "id": "E05_LONG_CONVERSATION_CONTEXT_RETENTION",
+      "title": "Long Conversation Context Retention & Pagination",
+      "status": "PASSED",
+      "duration_ms": 46.67,
+      "evidence": {
+        "total_inserted": 60,
+        "limit_loaded": 50,
+        "oldest_in_window": "Historical event #0",
+        "newest_in_window": "Historical event #49"
+      }
+    },
+    {
+      "id": "E06_SUMMARIES_ANTI_FABRICATION",
+      "title": "Conversation Summaries Anti-Fabrication & Contradiction Guard",
+      "status": "PASSED",
+      "duration_ms": 4.36,
+      "evidence": {
+        "accurate_summary": "Alex is creating a SaaS for dental clinics using Python.",
+        "fabricated_summary": "Alex is launching a crypto exchange for real estate agents with Solidity.",
+        "contradiction_heuristic_caught": true
+      }
+    },
+    {
+      "id": "E07_SYSTEM_PROMPTS_DO_NOT_CONTAMINATE",
+      "title": "System Prompt Isolation from User Facts",
+      "status": "PASSED",
+      "duration_ms": 10.49,
+      "evidence": {
+        "system_prompt_header": "You are MICHAEL, Lead Software Architect & Tech Lead in the autonomous ZEZO OS fleet.",
+        "stored_user_turn": "My favorite color is emerald green."
+      }
+    },
+    {
+      "id": "E08_WORKSPACE_INFO_NOT_CONFUSED_WITH_USER_FACTS",
+      "title": "Workspace Isolation from User-Provided Facts",
+      "status": "PASSED",
+      "duration_ms": 16.4,
+      "evidence": {
+        "workspace_root": "C:\\VirtualFakePath\\Workspace\\ProjectX",
+        "model_reply": "You have not provided your personal work address in this conversation."
+      }
+    },
+    {
+      "id": "E09_CONVERSATION_CROSS_LEAK_PREVENTION",
+      "title": "Cross-Conversation Message Leakage Isolation",
+      "status": "PASSED",
+      "duration_ms": 17.73,
+      "evidence": {
+        "cid_a": "conv_b7b766b5032a",
+        "cid_b": "conv_177f32c73de1",
+        "conv_a_contents": [
+          "Alpha secret: CONFIDENTIAL_ALPHA_a5922d"
+        ],
+        "conv_b_contents": [
+          "Beta secret: CONFIDENTIAL_BETA_645bd2"
+        ]
+      }
+    },
+    {
+      "id": "E10_AGENT_CROSS_LEAK_PREVENTION",
+      "title": "Cross-Agent Conversation Leakage Isolation",
+      "status": "PASSED",
+      "duration_ms": 15.28,
+      "evidence": {
+        "michael_history": [
+          "Michael private strategy doc"
+        ],
+        "dwight_history": [
+          "Dwight beet farming plans"
+        ]
+      }
+    },
+    {
+      "id": "E11_DISTINGUISH_FACTS_FROM_ASSUMPTIONS",
+      "title": "Distinguish Known Facts from Assumptions",
+      "status": "PASSED",
+      "duration_ms": 31.57,
+      "evidence": {
+        "reply": "Known Fact: Alex is building a SaaS product for dentists.\nAssumption: Because it is a SaaS, it may require Stripe for billing, but you have not specified a payment provider yet."
+      }
+    },
+    {
+      "id": "E12_ADMIT_UNKNOWN_INFORMATION",
+      "title": "Agent Admits When Information Is Unknown",
+      "status": "PASSED",
+      "duration_ms": 14.91,
+      "evidence": {
+        "reply": "I do not have that information. You have not mentioned your pricing tier or rates."
+      }
+    },
+    {
+      "id": "E13_COMPARE_SYNC_AND_STREAM_CONTEXT",
+      "title": "Compare Synchronous and Streaming Context Consistency",
+      "status": "PASSED",
+      "duration_ms": 124.32,
+      "evidence": {
+        "sync_reply": "Synchronous verified response.",
+        "stream_events_count": 4,
+        "stream_reply": "Streaming verified response.",
+        "final_conversation_contents": [
+          "Sync input test",
+          "Synchronous verified response.",
+          "Stream input test",
+          "Streaming verified response."
+        ]
+      }
+    },
+    {
+      "id": "E14_CONVERSATION_OWNERSHIP_VALIDATION",
+      "title": "Conversation Ownership Validation & Hijacking Protection",
+      "status": "PASSED",
+      "duration_ms": 26.61,
+      "evidence": {
+        "michael_cid": "conv_9b03bea3483b",
+        "dwight_assigned_cid": "conv_28988d61a183",
+        "dwight_isolated": true
+      }
+    }
+  ]
+}
