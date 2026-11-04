@@ -47,14 +47,128 @@ export const api = {
     message: string,
     engine?: string,
     model?: string,
-    workspace?: string
-  ): Promise<{ response?: string; reply?: string; status?: string; task_id?: string; engine?: string; model?: string }> {
+    workspace?: string,
+    conversationId?: string
+  ): Promise<{ response?: string; reply?: string; status?: string; task_id?: string; conversation_id?: string; tool_executions?: any[]; engine?: string; model?: string }> {
     const res = await fetch(`${API_BASE}/api/agents/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agent_id: agentId, message, engine, model, path: workspace }),
+      body: JSON.stringify({ agent_id: agentId, message, engine, model, path: workspace, conversation_id: conversationId }),
     })
     if (!res.ok) throw new Error(`Agent chat failed: ${res.statusText}`)
+    return res.json()
+  },
+
+  async *streamAgentChat(
+    agentId: string,
+    message: string,
+    engine?: string,
+    model?: string,
+    workspace?: string,
+    conversationId?: string,
+    signal?: AbortSignal
+  ): AsyncGenerator<{ type: 'chunk' | 'status' | 'task_dispatched' | 'done' | 'error'; text?: string; message?: string; task_id?: string; reply?: string; conversation_id?: string; error?: string }> {
+    const res = await fetch(`${API_BASE}/api/agents/chat/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_id: agentId, message, engine, model, path: workspace, conversation_id: conversationId }),
+      signal,
+    })
+
+    if (!res.ok) {
+      throw new Error(`Agent stream failed: ${res.statusText}`)
+    }
+
+    if (!res.body) {
+      throw new Error('ReadableStream not supported by response.')
+    }
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder('utf-8')
+    let buffer = ''
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        const lines = buffer.split('\n\n')
+        buffer = lines.pop() || ''
+
+        for (const block of lines) {
+          if (!block.trim()) continue
+          let eventName = 'message'
+          let dataStr = ''
+
+          const blockLines = block.split('\n')
+          for (const line of blockLines) {
+            if (line.startsWith('event: ')) {
+              eventName = line.slice(7).trim()
+            } else if (line.startsWith('data: ')) {
+              dataStr = line.slice(6).trim()
+            }
+          }
+
+          if (dataStr) {
+            try {
+              const parsed = JSON.parse(dataStr)
+              yield { type: eventName as any, ...parsed }
+            } catch {
+              yield { type: 'chunk', text: dataStr }
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
+  },
+
+  async getAgentConversations(agentId?: string): Promise<{ success: boolean; conversations: any[] }> {
+    const query = agentId ? `?agent_id=${encodeURIComponent(agentId)}` : ''
+    const res = await fetch(`${API_BASE}/api/agents/conversations${query}`)
+    if (!res.ok) throw new Error(`Failed to fetch conversations: ${res.statusText}`)
+    return res.json()
+  },
+
+  async createAgentConversation(agentId: string, title?: string): Promise<{ success: boolean; conversation_id: string; title: string }> {
+    const res = await fetch(`${API_BASE}/api/agents/conversations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_id: agentId, title }),
+    })
+    if (!res.ok) throw new Error(`Failed to create conversation: ${res.statusText}`)
+    return res.json()
+  },
+
+  async deleteAgentConversation(conversationId: string): Promise<{ success: boolean }> {
+    const res = await fetch(`${API_BASE}/api/agents/conversations?conversation_id=${encodeURIComponent(conversationId)}`, {
+      method: 'DELETE',
+    })
+    if (!res.ok) throw new Error(`Failed to delete conversation: ${res.statusText}`)
+    return res.json()
+  },
+
+  async getAgentMessages(conversationId: string): Promise<{ success: boolean; messages: any[] }> {
+    const res = await fetch(`${API_BASE}/api/agents/messages?conversation_id=${encodeURIComponent(conversationId)}`)
+    if (!res.ok) throw new Error(`Failed to fetch messages: ${res.statusText}`)
+    return res.json()
+  },
+
+  async getInterruptedTasks(): Promise<{ success: boolean; interrupted_tasks: any[] }> {
+    const res = await fetch(`${API_BASE}/api/agents/tasks/interrupted`)
+    if (!res.ok) throw new Error(`Failed to fetch interrupted tasks: ${res.statusText}`)
+    return res.json()
+  },
+
+  async restartTask(taskId: string, confirmed: boolean = false): Promise<any> {
+    const res = await fetch(`${API_BASE}/api/agents/tasks/restart`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_id: taskId, confirmed }),
+    })
+    if (!res.ok) throw new Error(`Failed to restart task: ${res.statusText}`)
     return res.json()
   },
 

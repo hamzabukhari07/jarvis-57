@@ -15,6 +15,9 @@
       "worktree": "repo_active",
       "active_worktree": "repo_active",
       "allowed_tools": [
+        "antigravity_run",
+        "groq",
+        "kilo_run",
         "opencode_run",
         "web_search",
         "file_processor",
@@ -30,7 +33,7 @@
         "multi_agent_delegation"
       ],
       "is_core": true,
-      "engine": "kilo",
+      "engine": "antigravity",
       "soul_markdown": "You are MICHAEL, Lead Software Architect & Tech Lead."
     },
     "VERVE": {
@@ -39,15 +42,17 @@
       "specialty": "antigravity_run, website_build",
       "color": "#ec4899",
       "avatar_pixel": "pam_pixel.png",
-      "default_tool": "antigravity_run",
+      "default_tool": "opencode_run",
       "risk_tier": "L1_MUTATION",
       "prompt_prefix": "You are Verve, Frontend & UI Design Specialist.",
-      "model_id": "gemini-3.8-flash-medium",
+      "model_id": "opencode/nemotron-3-ultra-free",
       "desk_x": 320,
       "desk_y": 160,
-      "worktree": null,
-      "active_worktree": null,
+      "worktree": "repo_active",
+      "active_worktree": "repo_active",
       "allowed_tools": [
+        "opencode_run",
+        "kilo_run",
         "antigravity_run",
         "browser_control",
         "agents_control",
@@ -63,24 +68,26 @@
         "animations"
       ],
       "is_core": false,
-      "engine": "antigravity",
+      "engine": "opencode",
       "soul_markdown": "You are Verve, Frontend & UI Design Specialist."
     },
     "FLUX": {
       "name": "Flux",
       "role": "Frontend Specialist & Overflow Developer",
-      "specialty": "Modern web applications, component architecture, responsive styling, and fast UI synthesis",
+      "specialty": "Frontend Specialist & Overflow Developer",
       "color": "#f43f5e",
       "avatar_pixel": "jim_pixel.png",
-      "default_tool": "antigravity_run",
+      "default_tool": "opencode_run",
       "risk_tier": "L1_MUTATION",
-      "prompt_prefix": "You are Flux, Frontend Specialist and UI Developer. You work closely with Verve and the frontend team to build clean, responsive, aesthetic user interfaces and handle frontend workloads with Antigravity.",
-      "model_id": "gemini-3.8-flash-low",
+      "prompt_prefix": "You are Flux, Frontend Specialist & Overflow Developer.",
+      "model_id": "opencode/big-pickle",
       "desk_x": 320,
       "desk_y": 280,
-      "worktree": null,
-      "active_worktree": null,
+      "worktree": "None",
+      "active_worktree": "None",
       "allowed_tools": [
+        "kilo_run",
+        "opencode_run",
         "antigravity_run",
         "file_processor",
         "file_controller",
@@ -100,8 +107,8 @@
         "overflow_balancer"
       ],
       "is_core": false,
-      "engine": "antigravity",
-      "soul_markdown": "You are Flux, Frontend Specialist and UI Developer. You work closely with Verve and the frontend team to build clean, responsive, aesthetic user interfaces and handle frontend workloads with Antigravity."
+      "engine": "opencode",
+      "soul_markdown": "You are Flux, Frontend Specialist & Overflow Developer."
     },
     "AHMAD": {
       "name": "Nexus",
@@ -109,10 +116,10 @@
       "specialty": "FastAPI, PostgreSQL, microservices, complex business logic, and database schemas",
       "color": "#06b6d4",
       "avatar_pixel": "ryan_pixel.png",
-      "default_tool": "antigravity_run",
+      "default_tool": "opencode_run",
       "risk_tier": "L2_DESTRUCTIVE",
       "prompt_prefix": "You are Nexus, Full-Stack & Backend Specialist.",
-      "model_id": "gemini-3.7-flash-high",
+      "model_id": "opencode/nemotron-3-ultra-free",
       "desk_x": 460,
       "desk_y": 160,
       "worktree": "repo_active",
@@ -147,10 +154,10 @@
       "specialty": "Multi-file refactoring, test suites, edge-case audit, and clean architecture",
       "color": "#eab308",
       "avatar_pixel": "dwight_pixel.png",
-      "default_tool": "antigravity_run",
+      "default_tool": "kilo_run",
       "risk_tier": "L1_MUTATION",
       "prompt_prefix": "You are Dwight, Senior Refactoring & QA Specialist.",
-      "model_id": "gemini-3.8-flash-low",
+      "model_id": "kilo/kilo-auto/free",
       "desk_x": 460,
       "desk_y": 280,
       "worktree": "repo_active",
@@ -255,15 +262,16 @@
       "specialty": "deep web research and analysis",
       "color": "#3b82f6",
       "avatar_pixel": "quantum_pixel.png",
-      "default_tool": "kilo_run",
+      "default_tool": "antigravity_run",
       "risk_tier": "L1_MUTATION",
-      "prompt_prefix": "You are Quantum, an autonomous agents specialist focusing on deep web research and analysis.",
-      "model_id": "",
+      "prompt_prefix": "You are Quantum, Detailed Web Researcher.",
+      "model_id": "gemini-3.8-flash-low",
       "desk_x": 600,
       "desk_y": 280,
-      "worktree": null,
-      "active_worktree": null,
+      "worktree": "repo_active",
+      "active_worktree": "repo_active",
       "allowed_tools": [
+        "antigravity_run",
         "kilo_run",
         "web_search",
         "agent_reach",
@@ -280,8 +288,8 @@
         "content_analysis"
       ],
       "is_core": false,
-      "engine": "",
-      "soul_markdown": "You are Quantum, an autonomous agents specialist focusing on deep web research and analysis."
+      "engine": "antigravity",
+      "soul_markdown": "You are Quantum, Detailed Web Researcher."
     },
     "DEVDYNAMO": {
       "name": "DevDynamo",
@@ -292,7 +300,7 @@
       "default_tool": "opencode_run",
       "risk_tier": "L1_MUTATION",
       "prompt_prefix": "You are DevDynamo, an autonomous agents specialist focusing on Full-stack development, modern web engineering, and autonomous task execution.",
-      "model_id": "",
+      "model_id": "opencode/nemotron-3-ultra-free",
       "desk_x": 180,
       "desk_y": 280,
       "worktree": null,
@@ -386,6 +394,72 @@
       "is_core": false,
       "engine": "",
       "soul_markdown": "You are Recon, Autonomous Deep Researcher & Intelligence Agent."
+    },
+    "NEWBIEAGENT": {
+      "name": "Newbie Agent",
+      "role": "General Assistant",
+      "specialty": "Tasks",
+      "color": "#3b82f6",
+      "avatar_pixel": "newbieagent_pixel.png",
+      "default_tool": "web_search",
+      "risk_tier": "L0_READ_ONLY",
+      "prompt_prefix": "You are Newbie Agent, an autonomous agents specialist focusing on Tasks.",
+      "model_id": "",
+      "desk_x": 320,
+      "desk_y": 400,
+      "worktree": null,
+      "active_worktree": null,
+      "allowed_tools": [
+        "web_search",
+        "web_read_page",
+        "task_status"
+      ],
+      "allowed_skills": [
+        "opencode",
+        "multi_agent_collaboration",
+        "make_plan",
+        "git_workflow"
+      ],
+      "capabilities": [
+        "backend_architecture",
+        "api_development",
+        "database_design"
+      ],
+      "is_core": false,
+      "engine": "",
+      "soul_markdown": "You are Newbie Agent, an autonomous agents specialist focusing on Tasks."
+    },
+    "TEST_RESTRICTED_ATTE": {
+      "name": "Restricted Attempt Agent",
+      "role": "Autonomous Specialist",
+      "specialty": "Autonomous Specialist",
+      "color": "#3b82f6",
+      "avatar_pixel": "test_restricted_atte_pixel.png",
+      "default_tool": "opencode_run",
+      "risk_tier": "L0_READ_ONLY",
+      "prompt_prefix": "You are Restricted Attempt Agent, an autonomous agents specialist focusing on Autonomous Specialist.",
+      "model_id": "opencode/nemotron-3-ultra-free",
+      "desk_x": 460,
+      "desk_y": 400,
+      "worktree": null,
+      "active_worktree": null,
+      "allowed_tools": [
+        "web_search"
+      ],
+      "allowed_skills": [
+        "opencode",
+        "multi_agent_collaboration",
+        "make_plan",
+        "git_workflow"
+      ],
+      "capabilities": [
+        "backend_architecture",
+        "api_development",
+        "database_design"
+      ],
+      "is_core": false,
+      "engine": "opencode",
+      "soul_markdown": "You are Restricted Attempt Agent, an autonomous agents specialist focusing on Autonomous Specialist."
     }
   }
 }

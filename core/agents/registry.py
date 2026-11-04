@@ -28,39 +28,75 @@ VALID_TOOLS: set[str] = {
     "file_processor", "file_controller", "agents_control", "task_status",
 }
 
+DEFAULT_READ_ONLY_TOOLS: list[str] = ["web_search", "web_read_page", "task_status"]
 
-def _infer_agent_defaults(role: str, specialty: str) -> Dict[str, Any]:
+AGENT_TIER_ALLOWED_RISKS: dict[str, set[str]] = {
+    "L0_READ_ONLY": {"read_only"},
+    "L1_MUTATION": {"read_only", "local_mutation", "code_execution"},
+    "L2_DESTRUCTIVE": {"read_only", "local_mutation", "external_mutation", "code_execution", "privileged_os"},
+}
+
+RESTRICTED_MUTATION_TOOLS: set[str] = {
+    "file_controller",
+    "computer_control",
+    "desktop_control",
+    "antigravity_run",
+    "opencode_run",
+    "kilo_run",
+}
+
+
+def _is_restricted_mutation_tool(tool_name: str) -> bool:
+    """Returns True if the tool performs mutations, OS commands, or code execution."""
+    if not tool_name:
+        return False
+    t = tool_name.strip()
+    if t in RESTRICTED_MUTATION_TOOLS or t.endswith("_run"):
+        return True
+    try:
+        from core.action_loader import get_action_registry
+        ar = get_action_registry()
+        risk = ar.get_risk(t)
+        if risk and str(risk).lower().strip() != "read_only":
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _infer_agent_defaults(role: str, specialty: str, risk_tier: Optional[str] = None) -> Dict[str, Any]:
     """Smartly infers default tool, permissions, and skills from persona keywords."""
     text = f"{role} {specialty}".lower()
+    default_read_tools = list(DEFAULT_READ_ONLY_TOOLS)
 
     if any(k in text for k in ("research", "web", "scrape", "transcript", "video", "youtube", "media", "search")):
         return {
             "engine": "",
-            "default_tool": "agent_reach",
-            "allowed_tools": ["agent_reach", "web_search", "web_read_page", "file_processor"],
+            "default_tool": "web_search",
+            "allowed_tools": list(default_read_tools),
             "allowed_skills": ["web_scraper", "social_research", "web_research_pipeline"],
             "capabilities": ["web_research", "media_extraction", "content_analysis"],
         }
     if any(k in text for k in ("frontend", "ui", "design", "css", "tailwind", "layout", "animation", "react", "html")):
         return {
             "engine": "antigravity",
-            "default_tool": "antigravity_run",
-            "allowed_tools": ["antigravity_run", "browser_control", "file_processor", "file_controller"],
+            "default_tool": "antigravity_run" if risk_tier in ("L1_MUTATION", "L2_DESTRUCTIVE") else "web_search",
+            "allowed_tools": list(default_read_tools),
             "allowed_skills": ["website_build", "multi_agent_collaboration", "make_plan"],
             "capabilities": ["web_design", "frontend_coding", "ui_refactor", "animations"],
         }
     if any(k in text for k in ("refactor", "qa", "test", "audit", "clean code", "bug hunt")):
         return {
             "engine": "kilo",
-            "default_tool": "kilo_run",
-            "allowed_tools": ["kilo_run", "quick_snippet", "file_processor", "file_controller"],
+            "default_tool": "kilo_run" if risk_tier in ("L1_MUTATION", "L2_DESTRUCTIVE") else "task_status",
+            "allowed_tools": list(default_read_tools),
             "allowed_skills": ["kilo_code", "multi_agent_collaboration", "make_plan", "git_workflow"],
             "capabilities": ["code_refactor", "qa_testing", "security_audit", "complexity_reduction"],
         }
     return {
         "engine": "opencode",
-        "default_tool": "opencode_run",
-        "allowed_tools": ["opencode_run", "quick_snippet", "file_processor", "file_controller"],
+        "default_tool": "opencode_run" if risk_tier in ("L1_MUTATION", "L2_DESTRUCTIVE") else "web_search",
+        "allowed_tools": list(default_read_tools),
         "allowed_skills": ["opencode", "multi_agent_collaboration", "make_plan", "git_workflow"],
         "capabilities": ["backend_architecture", "api_development", "database_design"],
     }
@@ -411,27 +447,51 @@ class AgentRegistry:
 
         with self._lock:
             existing = self.agents.get(clean_id)
+
+            # 1. Determine risk_tier:
+            # Newly created agents without explicit risk_tier MUST strictly default to "L0_READ_ONLY".
+            raw_risk = data.get("risk_tier")
+            if raw_risk is not None and str(raw_risk).upper().strip() in VALID_RISK_TIERS:
+                risk_tier = str(raw_risk).upper().strip()
+            elif existing and existing.risk_tier in VALID_RISK_TIERS:
+                risk_tier = existing.risk_tier
+            else:
+                risk_tier = "L0_READ_ONLY"
+
+            inferred = _infer_agent_defaults(role_str, specialty_str, risk_tier=risk_tier)
+
             engine = raw_engine
             if not engine:
-                engine = inferred.get("engine", "")
-                if not engine and tool in tool_to_engine:
-                    engine = tool_to_engine[tool]
-                elif existing and existing.engine:
+                if existing and existing.engine:
                     engine = existing.engine
+                elif tool in tool_to_engine:
+                    engine = tool_to_engine[tool]
+                elif risk_tier in ("L1_MUTATION", "L2_DESTRUCTIVE"):
+                    engine = inferred.get("engine", "")
                 else:
                     engine = ""
 
             if not tool:
-                if engine and engine in engine_to_tool:
-                    tool = engine_to_tool[engine]
-                elif existing and existing.default_tool:
+                if existing and existing.default_tool:
                     tool = existing.default_tool
+                elif engine and engine in engine_to_tool and risk_tier in ("L1_MUTATION", "L2_DESTRUCTIVE"):
+                    tool = engine_to_tool[engine]
                 else:
                     tool = inferred["default_tool"]
 
-            risk_tier = str(data.get("risk_tier") or (existing.risk_tier if existing else "")).upper().strip()
-            if risk_tier not in VALID_RISK_TIERS:
-                risk_tier = "L1_MUTATION" if tool in ("kilo_run", "opencode_run", "antigravity_run") else "L0_READ_ONLY"
+            # Align engine and default_tool to avoid cross-engine inconsistency
+            if engine in ("antigravity", "opencode", "kilo") and risk_tier in ("L1_MUTATION", "L2_DESTRUCTIVE"):
+                tool = engine_to_tool[engine]
+            elif tool in tool_to_engine and not engine:
+                engine = tool_to_engine[tool]
+
+            # Restricted mutation tools cannot be assigned as default_tool unless L1_MUTATION or L2_DESTRUCTIVE
+            if risk_tier == "L0_READ_ONLY" and _is_restricted_mutation_tool(tool):
+                logger.warning(
+                    "[AgentRegistry] Agent '%s' is L0_READ_ONLY; cannot assign restricted default_tool '%s'. Defaulting to '%s'.",
+                    clean_id, tool, DEFAULT_READ_ONLY_TOOLS[0]
+                )
+                tool = DEFAULT_READ_ONLY_TOOLS[0]
 
             color_str = str(data.get("color") or (existing.color if existing else "")).strip()
             if not re.match(r"^#[0-9a-fA-F]{6}$", color_str):
@@ -454,7 +514,20 @@ class AgentRegistry:
             elif existing and existing.allowed_tools:
                 allowed_tools = list(existing.allowed_tools)
             else:
-                allowed_tools = list(inferred["allowed_tools"])
+                # Newly created agents without explicit allowed_tools MUST strictly default to DEFAULT_READ_ONLY_TOOLS
+                allowed_tools = list(DEFAULT_READ_ONLY_TOOLS)
+
+            # Restricted mutation tools (file_controller, computer_control, antigravity_run, opencode_run, kilo_run, etc.)
+            # CANNOT be executed or assigned unless the agent's risk tier is explicitly configured to L1_MUTATION or L2_DESTRUCTIVE.
+            if risk_tier == "L0_READ_ONLY":
+                sanitized_tools = [t for t in allowed_tools if not _is_restricted_mutation_tool(t)]
+                if not sanitized_tools:
+                    sanitized_tools = list(DEFAULT_READ_ONLY_TOOLS)
+                allowed_tools = sanitized_tools
+
+            # Ensure default_tool is present in allowed_tools
+            if tool and tool not in allowed_tools and not (risk_tier == "L0_READ_ONLY" and _is_restricted_mutation_tool(tool)):
+                allowed_tools.insert(0, tool)
 
             raw_allowed_skills = data.get("allowed_skills")
             if raw_allowed_skills is not None and len(raw_allowed_skills) > 0:
@@ -654,6 +727,47 @@ class AgentRegistry:
                 })
             return state
 
+    def check_agent_tool_permission(self, agent_id: str, tool_name: str, tool_risk: Optional[str] = None) -> Tuple[bool, str]:
+        """
+        Verifies:
+        1. agent_id exists in registry.
+        2. tool_name is explicitly present in agent.allowed_tools.
+        3. If tool_risk is provided (or fetched from ActionRegistry): verify that tool_risk.lower()
+           is in AGENT_TIER_ALLOWED_RISKS[agent.risk_tier].
+        4. Returns (True, "") on pass, or (False, "<reason>") on failure.
+        """
+        agent = self.get_agent(agent_id)
+        if not agent:
+            return False, f"Agent '{agent_id}' does not exist in registry."
+
+        allowed_tools = agent.allowed_tools or []
+        if tool_name not in allowed_tools:
+            return False, f"Tool '{tool_name}' is not in allowed_tools for agent '{agent.name}' ({agent.id})."
+
+        risk = tool_risk
+        if not risk:
+            try:
+                from core.action_loader import get_action_registry
+                ar = get_action_registry()
+                risk = ar.get_risk(tool_name)
+            except Exception as e:
+                logger.debug("[check_agent_tool_permission] Failed resolving risk from ActionRegistry for '%s': %s", tool_name, e)
+                risk = None
+
+        if not risk and (_is_restricted_mutation_tool(tool_name) or tool_name.endswith("_run")):
+            risk = "code_execution" if tool_name.endswith("_run") else "local_mutation"
+
+        if risk:
+            risk_norm = getattr(risk, "value", str(risk)).lower().strip()
+            tier_risks = AGENT_TIER_ALLOWED_RISKS.get(agent.risk_tier, set())
+            if risk_norm not in tier_risks:
+                return False, (
+                    f"Tool '{tool_name}' risk '{risk_norm}' is not allowed for agent '{agent.name}' "
+                    f"under risk tier '{agent.risk_tier}'."
+                )
+
+        return True, ""
+
     def _agent_to_dict(self, a: AgentProfile) -> Dict[str, Any]:
         logs = list(a.recent_logs)
         if not logs:
@@ -704,3 +818,14 @@ class AgentRegistry:
 
 
 agent_registry = AgentRegistry()
+
+
+def get_agent_registry() -> AgentRegistry:
+    """Returns the singleton instance of AgentRegistry."""
+    return agent_registry
+
+
+def check_agent_tool_permission(agent_id: str, tool_name: str, tool_risk: Optional[str] = None) -> Tuple[bool, str]:
+    """Module-level entry point to check an agent's permission to run a tool."""
+    return agent_registry.check_agent_tool_permission(agent_id, tool_name, tool_risk)
+

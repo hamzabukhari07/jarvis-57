@@ -98,6 +98,9 @@ To prevent recency bias from starving critical relationship facts in favor of da
    - `user_explicit_rules`: Standing user directives and behavioral constraints.
    - `memory_conflicts`: Contradiction resolution ledger comparing new user inputs against stored facts.
    - `session_condensations`: Summarized session rollups preserving high-level context.
+   - `agent_conversations`: Dedicated agent chat threads (`id`, `agent_id`, `title`, `created_at`, `updated_at`, `is_archived`, `metadata`).
+   - `agent_messages`: Turn-by-turn agent message ledger with cascade delete (`id`, `conversation_id`, `agent_id`, `role`, `content`, `tool_name`, `tool_args`, `tool_result`, `status`, `created_at`).
+   - `internal_task_ledger`: Autonomous task tracking ledger (`id`, `agent_id`, `conversation_id`, `title`, `prompt`, `status`, `risk_tier`, `touched_files`, `error`, `created_at`, `updated_at`, `interrupted_at`).
 
 ### Search Engine Note (Lexical vs. Semantic):
 `sqlite_memory.py` uses SQLite FTS5 BM25 with recency decay scoring (`memory_manager._score()` also employs lexical keyword overlap). These are high-speed, local **lexical** search mechanisms with zero external dependencies and zero GPU overhead, not embedding-based semantic vector search.

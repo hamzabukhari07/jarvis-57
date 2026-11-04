@@ -142,12 +142,32 @@ def _infer_agent_defaults(role: str, specialty: str) -> Dict[str, Any]:
 
 To ensure absolute codebase integrity, agents operate under strict permissions:
 
-### 1. Risk Tiers
-- **`L0_READ_ONLY`**: Agent may inspect code, search the web, analyze ASTs, and extract design tokens. File write/delete operations are permanently blocked.
-- **`L1_MUTATION`**: Agent may write, edit, and create code files, but only within an isolated Git worktree.
-- **`L2_DESTRUCTIVE`**: Agent may perform database migrations, system dependency installations, or file deletions. Requires explicit confirmation gates.
+### 1. Risk Tiers & Governance Alignment
+- **`L0_READ_ONLY`**: Curated read-only inspection. Allowed tools strictly default to `DEFAULT_READ_ONLY_TOOLS = ["web_search", "web_read_page", "task_status"]`. Restricted mutation tools (`file_controller`, `computer_control`, `desktop_control`, `antigravity_run`, `opencode_run`, `kilo_run`) are stripped and prohibited.
+- **`L1_MUTATION`**: Agent may write, edit, and create code files, but only within an isolated Git worktree or workspace. Allowed risks: `read_only`, `local_mutation`, `code_execution`.
+- **`L2_DESTRUCTIVE`**: Agent may perform database migrations, system dependency installations, external mutations, or privileged actions. Allowed risks: `read_only`, `local_mutation`, `external_mutation`, `code_execution`, `privileged_os`.
 
-### 2. Git Worktree Sandbox (`core/git_sandbox.py`)
+```python
+AGENT_TIER_ALLOWED_RISKS = {
+    "L0_READ_ONLY": {"read_only"},
+    "L1_MUTATION": {"read_only", "local_mutation", "code_execution"},
+    "L2_DESTRUCTIVE": {"read_only", "local_mutation", "external_mutation", "code_execution", "privileged_os"},
+}
+```
+
+### 2. Runtime Permission Enforcement (`check_agent_tool_permission`)
+Every tool invocation by an agent is pre-flight verified via `check_agent_tool_permission(agent_id, tool_name, tool_risk=None)`:
+1. Verifies `agent_id` exists in registry.
+2. Verifies `tool_name` is explicitly present in `agent.allowed_tools`.
+3. Verifies that `tool_risk` (passed or queried dynamically from `ActionRegistry`) is allowed under `AGENT_TIER_ALLOWED_RISKS[agent.risk_tier]`.
+4. Returns `(True, "")` on pass, or `(False, "<reason>")` on failure.
+
+### 3. Safe Agent Creation Defaults
+- Newly created agents without an explicit `risk_tier` strictly default to `"L0_READ_ONLY"`.
+- Newly created agents without explicit `allowed_tools` strictly default to `DEFAULT_READ_ONLY_TOOLS`.
+- Restricted mutation tools cannot be assigned or executed unless the agent's risk tier is explicitly configured to `L1_MUTATION` or `L2_DESTRUCTIVE`.
+
+### 4. Git Worktree Sandbox (`core/git_sandbox.py`)
 When a mutation task is dispatched:
 1. ZEZO creates an isolated Git worktree under `.agent_worktrees/<task_id>/` on a dedicated branch (`agent/<clean_task_id>`). Paths containing `.agent_worktrees` are explicitly exempted from `core/repo_context.py:is_zezo_source_dir` isolation rules to allow safe execution without throwing false Zezo source tree collision errors.
 2. The agent executes all edits, builds, and tests inside this quarantined directory.
@@ -209,11 +229,15 @@ flowchart TD
 
 ---
 
-## 💬 Direct 1-on-1 Chat Channels (`AgentDirectChatView.tsx`)
+## 💬 Direct 1-on-1 Chat Channels & AgentRuntime (`AgentDirectChatView.tsx`, `core/agents/runtime.py`)
 
 Users can open a dedicated, isolated conversational channel for any agent:
-- **Independent Conversation Context:** Chats do not pollute the primary voice session memory.
+- **Independent Conversation Context & SQLite Persistence:** Chats do not pollute the primary voice session memory. Conversation threads and messages are persistently stored in SQLite tables (`agent_conversations`, `agent_messages`).
+- **Real Server-Sent Events (SSE) Streaming:** `/api/agents/chat/stream` streams live incremental response tokens, status notifications, and task dispatch telemetry directly to the frontend Assistant-UI without simulated word-by-word timers.
+- **Stateful Internal AgentRuntime:** Multi-turn conversation reasoning executes via `AgentRuntime` (`core/agents/runtime.py`) backed by the unified `ProviderAdapter` and `ContextBudget` token management.
+- **Strict ToolExecutor Choke Point:** Any tool calls emitted by the agent are routed strictly through `ToolExecutor` (`core/tool_executor.py`) under `CallerContext.AGENT` and immutable `agent_id`, preventing security privilege bypasses and enforcing default `L0_READ_ONLY` permission gates.
 - **Actionable Task Dispatch Bridge:** Direct chat messages to agents in `/api/agents/chat` are classified by `_is_actionable_task()`. When a user requests code creation or web building (e.g. "Build a landing page for my crypto app"), the chat engine bridges directly to `agent_manager.dispatch_task()`, triggers real background execution, and replies with honest live Task ID telemetry, completely eliminating single-turn chat hallucinations.
+- **Crash Recovery & Task Reconciliation:** The ledger (`internal_task_ledger`) automatically reconciles `WORKING` tasks to `INTERRUPTED` across app restarts. Interrupted tasks require explicit user confirmation before rerun if they carry mutation side effects (`L1_MUTATION` or `L2_DESTRUCTIVE`).
 - **Assistant-UI Thread:** Full markdown rendering, code block copy buttons, and turn-by-turn reasoning pills for conceptual explanations.
-- **Dynamic Model Switching:** Allows overriding the agent's default LLM on the fly (e.g., switching between Gemini 3.7 Flash and Claude Sonnet 4.6).
+- **Dynamic Model Switching:** Allows overriding the agent's default LLM on the fly (e.g., switching between Gemini 2.5 Flash and Groq).
 - **Live Soul Editing:** The side panel allows editing the agent's `prompt_prefix`, allowed tools, and capabilities directly from the UI.

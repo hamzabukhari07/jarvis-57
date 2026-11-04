@@ -1,27 +1,47 @@
 """Antigravity Agent Action Tool.
 
 Transparent, pure human-like CLI bridge for Google Antigravity (agy).
-Delegates execution to the background engine in core.antigravity_runner.
+Delegates execution to the background engine in core.engines.antigravity.
 """
 from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from core.antigravity_runner import (
-    _find_antigravity_bin,
-    _is_root_dir,
+from core.engines.antigravity import (
+    AntigravityEngineAdapter,
     _resolve_model,
-    run_antigravity_worker,
+    run_antigravity_task,
 )
 from core.repo_context import get_unique_project_dir, guard_domain_workspace, remember_repo, resolve
 from core.task_manager import get_task_manager
 
-# Re-export background worker for backwards compatibility
-_run_worker = run_antigravity_worker
+# Direct worker alias
+_run_worker = run_antigravity_task
+run_antigravity_worker = run_antigravity_task
+
+
+def _find_antigravity_bin() -> Optional[str]:
+    """Discovers the absolute path to the agy binary via AntigravityEngineAdapter."""
+    p = AntigravityEngineAdapter().resolve_binary()
+    return str(p) if p else None
+
+
+def _is_root_dir(path: Path) -> bool:
+    """Check if the path is Desktop root, Home root, or Drive root."""
+    try:
+        resolved = path.resolve()
+        desktop = (Path.home() / "Desktop").resolve()
+        home = Path.home().resolve()
+        if resolved in (desktop, home) or len(resolved.parts) <= 1 or resolved.parent == resolved:
+            return True
+        return False
+    except Exception:
+        return False
 
 logger = logging.getLogger("zezo.antigravity_agent")
 
@@ -46,6 +66,20 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
                 explicit_path = cand
 
     run_in_place = bool(parameters.get("run_in_place", False))
+
+    # PathJail Pre-flight Validation: If explicit path provided, reject root / system paths
+    if explicit_path:
+        from core.path_jail import SecurityAccessDenied as PathSecurityAccessDenied
+        p_obj = Path(explicit_path).resolve()
+        # Disallow filesystem drive roots (e.g. C:\) or system directories
+        if len(p_obj.parts) <= 1 or p_obj.parent == p_obj:
+            raise PathSecurityAccessDenied(f"Access to filesystem root '{explicit_path}' is strictly denied.")
+        sys_root = Path(os.environ.get("SystemRoot", r"C:\Windows")).resolve()
+        try:
+            p_obj.relative_to(sys_root)
+            raise PathSecurityAccessDenied(f"Access to system directory '{explicit_path}' is strictly denied.")
+        except ValueError:
+            pass
 
     # Smart Guard: Detect domain mismatch / context hallucination for new URLs
     domain_guarded_dir = guard_domain_workspace(prompt, explicit_path) if not run_in_place else None
@@ -96,13 +130,13 @@ def antigravity_action(parameters: dict, player=None, speak=None, session_memory
     }
 
     if run_in_place:
-        res = run_antigravity_worker(worker_params, ctx=task_ctx)
+        res = run_antigravity_task(worker_params, ctx=task_ctx)
         return json.dumps(res) if isinstance(res, dict) else str(res)
 
     tm = get_task_manager()
     task_id = tm.submit(
         "antigravity_agent",
-        run_antigravity_worker,
+        run_antigravity_task,
         worker_params,
     )
 
@@ -150,7 +184,7 @@ TOOL = {
         "inside a specific project folder via the native 'agy' CLI. "
         "Runs asynchronously in background and returns immediately with a task_id."
     ),
-    "risk": "code_execution",
+    "risk": "local_mutation",
     "enabled": True,
     "behavior": "NON_BLOCKING",
     "scheduling": "WHEN_IDLE",

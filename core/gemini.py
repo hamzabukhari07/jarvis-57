@@ -507,3 +507,42 @@ def as_json(contents, tier: str = FAST, config=None,
         print(f"[Gemini] reply was not JSON: {e}")
         return default
 
+
+
+def stream_text(contents, tier: str = FAST, config=None, timeout_ms: int = DEFAULT_TIMEOUT_MS, key: str = ''):
+    ladder = _LADDERS.get(tier)
+    if ladder is None:
+        ladder = (tier,) + tuple(m for m in _LADDERS[SMART] if m != tier)
+    ladder = tuple(m for m in ladder if m != LIVE)
+
+    resolved_key = key or api_key()
+    if not resolved_key:
+        print('[Gemini] no Gemini API key configured for stream_text')
+        return
+
+    cl = client(timeout_ms=timeout_ms, key=resolved_key)
+    tried = [m for m in ladder if not _cooling(m)]
+    for model in tried:
+        try:
+            kwargs = {'model': model, 'contents': contents}
+            if config is not None:
+                kwargs['config'] = config
+            response_stream = cl.models.generate_content_stream(**kwargs)
+            has_yielded = False
+            for chunk in response_stream:
+                txt = getattr(chunk, 'text', '') or ''
+                if txt:
+                    has_yielded = True
+                    yield txt
+            if has_yielded:
+                return
+        except Exception as e:
+            msg = str(e)
+            if '429' in msg or 'RESOURCE_EXHAUSTED' in msg:
+                _cool(model)
+                print(f'[Gemini Stream] {model}: quota exhausted')
+            elif '404' in msg or 'NOT_FOUND' in msg or 'not found' in msg.lower():
+                _cool(model)
+                print(f'[Gemini Stream] {model}: model not found')
+            else:
+                print(f'[Gemini Stream] {model}: {type(e).__name__}: {msg[:140]}')

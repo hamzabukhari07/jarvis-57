@@ -8,7 +8,7 @@ import tempfile
 import shutil
 
 from core.url_prefetch import _clean_html_dom
-from core.antigravity_runner import _tree_snapshot
+from core.engines.antigravity import _tree_snapshot
 from core.undo import capture_repo_snapshot
 
 

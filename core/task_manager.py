@@ -793,6 +793,142 @@ class TaskContext:
 
 
 
+# ── Task Persistence & Interrupted Task Recovery ─────────────────────
+
+def reconcile_interrupted_tasks() -> int:
+    """
+    Scans internal_task_ledger for tasks that were left in WORKING/running state
+    across an application crash/restart, and transitions them to INTERRUPTED.
+    Returns the number of reconciled tasks.
+    """
+    try:
+        from datetime import datetime, timezone
+        from memory.sqlite_memory import execute_write, query_db
+
+        now = datetime.now(timezone.utc).isoformat()
+        pending = query_db(
+            "SELECT id FROM internal_task_ledger WHERE status IN ('WORKING', 'running', 'queued')"
+        )
+        if not pending:
+            return 0
+
+        count = len(pending)
+        execute_write(
+            """
+            UPDATE internal_task_ledger
+            SET status = 'INTERRUPTED',
+                interrupted_at = ?,
+                updated_at = ?
+            WHERE status IN ('WORKING', 'running', 'queued')
+            """,
+            (now, now),
+        )
+        logger.info("[TaskManager] Reconciled %d interrupted tasks to INTERRUPTED state.", count)
+        return count
+    except Exception as e:
+        logger.warning("[TaskManager] Failed to reconcile interrupted tasks: %s", e)
+        return 0
+
+
+def get_interrupted_tasks() -> list[dict]:
+    """Retrieve list of interrupted tasks from internal_task_ledger."""
+    try:
+        from memory.sqlite_memory import query_db
+        rows = query_db(
+            """
+            SELECT id, agent_id, conversation_id, title, prompt, status, risk_tier,
+                   touched_files, error, created_at, updated_at, interrupted_at
+            FROM internal_task_ledger
+            WHERE status = 'INTERRUPTED'
+            ORDER BY interrupted_at DESC
+            """
+        )
+        return [dict(r) for r in rows]
+    except Exception as e:
+        logger.warning("[TaskManager] Failed to fetch interrupted tasks: %s", e)
+        return []
+
+
+def restart_interrupted_task(task_id: str, confirmed: bool = False) -> dict:
+    """
+    Restarts an interrupted task.
+    If confirmed is False, returns a confirmation requirement to prevent accidental rerun
+    of tasks with repeated side effects.
+    If confirmed is True, marks the interrupted task record as RESTARTED and creates a new task.
+    """
+    from datetime import datetime, timezone
+    from memory.sqlite_memory import execute_write, query_db
+
+    rows = query_db("SELECT * FROM internal_task_ledger WHERE id = ?", (task_id,))
+    if not rows:
+        return {"success": False, "error": f"Task '{task_id}' not found in ledger."}
+
+    task_data = dict(rows[0])
+    if task_data.get("status") != "INTERRUPTED":
+        return {
+            "success": False,
+            "error": f"Task '{task_id}' has status '{task_data.get('status')}', not INTERRUPTED.",
+        }
+
+    risk_tier = task_data.get("risk_tier", "L0_READ_ONLY")
+    has_side_effects = risk_tier in ("L1_MUTATION", "L2_DESTRUCTIVE")
+
+    if not confirmed:
+        return {
+            "success": False,
+            "requires_confirmation": True,
+            "task_id": task_id,
+            "title": task_data.get("title"),
+            "risk_tier": risk_tier,
+            "message": (
+                f"Restarting task '{task_data.get('title')}' may duplicate side effects "
+                f"({risk_tier}). Please confirm restart."
+                if has_side_effects
+                else f"Restart task '{task_data.get('title')}' from the beginning?"
+            ),
+        }
+
+    now = datetime.now(timezone.utc).isoformat()
+    new_task_id = f"task_{uuid.uuid4().hex[:8]}"
+
+    # Mark old task as restarted
+    execute_write(
+        "UPDATE internal_task_ledger SET status = 'RESTARTED', updated_at = ? WHERE id = ?",
+        (now, task_id),
+    )
+
+    # Insert new ledger row
+    execute_write(
+        """
+        INSERT INTO internal_task_ledger (
+            id, agent_id, conversation_id, title, prompt, status, risk_tier,
+            touched_files, error, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 'WORKING', ?, ?, NULL, ?, ?)
+        """,
+        (
+            new_task_id,
+            task_data.get("agent_id"),
+            task_data.get("conversation_id"),
+            f"[Restart] {task_data.get('title')}",
+            task_data.get("prompt"),
+            risk_tier,
+            task_data.get("touched_files"),
+            now,
+            now,
+        ),
+    )
+
+    return {
+        "success": True,
+        "old_task_id": task_id,
+        "new_task_id": new_task_id,
+        "agent_id": task_data.get("agent_id"),
+        "conversation_id": task_data.get("conversation_id"),
+        "prompt": task_data.get("prompt"),
+        "message": f"Task {task_id} marked as RESTARTED. New task {new_task_id} enqueued.",
+    }
+
+
 # ── singleton (Process-Level Persistent) ───────────────────────
 
 import sys

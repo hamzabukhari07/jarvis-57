@@ -1,7 +1,7 @@
 """actions/kilo_agent.py — Transparent Kilo Code Engine Bridge (async).
 
 Standardized pure human-like CLI bridge for Kilo Code.
-Delegates coding tasks directly to Kilo Code CLI via core.kilo_runner.
+Delegates coding tasks directly to Kilo Code CLI via core.engines.kilo.
 Returns immediately with a task_id; runs the CLI in a background thread.
 Query progress with the task_status tool.
 """
@@ -13,9 +13,9 @@ import re
 from pathlib import Path
 from typing import Any, Optional
 
-from core.kilo_runner import (
-    _find_kilo_bin,
-    run_kilo_worker,
+from core.engines.kilo import (
+    KiloEngineAdapter,
+    run_kilo_task,
 )
 from core.repo_context import guard_domain_workspace, remember_repo, resolve
 from core.task_manager import get_task_manager, TaskContext
@@ -23,8 +23,15 @@ from memory.config_manager import get_kilo_model
 
 logger = logging.getLogger("zezo.kilo")
 
-# Re-export worker for backwards compatibility
-_run_worker = run_kilo_worker
+# Direct worker alias
+_run_worker = run_kilo_task
+run_kilo_worker = run_kilo_task
+
+
+def _find_kilo_bin() -> Optional[str]:
+    """Finds the native Kilo Code CLI binary via KiloEngineAdapter."""
+    p = KiloEngineAdapter().resolve_binary()
+    return str(p) if p else None
 
 
 def _resolve_model(model: Optional[str]) -> str:
@@ -57,6 +64,20 @@ def kilo_agent(parameters: dict, player=None, speak=None) -> str:
         parameters.get("project_path") or parameters.get("path") or ""
     )
     run_in_place = bool(parameters.get("run_in_place", False))
+
+    # PathJail Pre-flight Validation: If explicit path provided, reject root / system paths
+    if explicit_path:
+        import os
+        from core.path_jail import SecurityAccessDenied as PathSecurityAccessDenied
+        p_obj = Path(explicit_path).resolve()
+        if len(p_obj.parts) <= 1 or p_obj.parent == p_obj:
+            raise PathSecurityAccessDenied(f"Access to filesystem root '{explicit_path}' is strictly denied.")
+        sys_root = Path(os.environ.get("SystemRoot", r"C:\Windows")).resolve()
+        try:
+            p_obj.relative_to(sys_root)
+            raise PathSecurityAccessDenied(f"Access to system directory '{explicit_path}' is strictly denied.")
+        except ValueError:
+            pass
 
     # Smart Guard: Detect domain mismatch / context hallucination for new URLs
     domain_guarded_dir = guard_domain_workspace(prompt, explicit_path) if not run_in_place else None
@@ -110,13 +131,13 @@ def kilo_agent(parameters: dict, player=None, speak=None) -> str:
     }
 
     if run_in_place:
-        res = _run_worker(worker_params, ctx=task_ctx)
+        res = run_kilo_task(worker_params, ctx=task_ctx)
         return json.dumps(res) if isinstance(res, dict) else str(res)
 
     tm = get_task_manager()
     task_id = tm.submit(
         "kilo_agent",
-        _run_worker,
+        run_kilo_task,
         worker_params,
     )
 
@@ -159,7 +180,7 @@ TOOL = {
         "inside a specific project directory via the native 'kilo' binary. "
         "Returns a task_id immediately."
     ),
-    "risk": "code_execution",
+    "risk": "local_mutation",
     "enabled": True,
     "behavior": "NON_BLOCKING",
     "scheduling": "WHEN_IDLE",

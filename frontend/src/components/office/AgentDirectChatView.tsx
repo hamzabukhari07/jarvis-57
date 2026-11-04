@@ -233,7 +233,7 @@ export const AgentDirectChatView: React.FC<AgentDirectChatViewProps> = ({
      <SelectContent>{agents.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent>
     </Select>
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[var(--muted-foreground)]">
-     <span className="flex shrink-0 items-center gap-2"><span className="text-[var(--foreground)]">Engine</span>
+     <span className="flex shrink-0 items-center gap-2"><span className="text-[var(--foreground)]">Task Engine</span>
       <Select value={agent.engine} onValueChange={handleEngineChange}>
        <SelectTrigger aria-label="Select engine" className="h-8 w-[132px] bg-[var(--card)] text-xs"><SelectValue placeholder={engineLabel} /></SelectTrigger>
        <SelectContent>
@@ -244,7 +244,7 @@ export const AgentDirectChatView: React.FC<AgentDirectChatViewProps> = ({
        </SelectContent>
       </Select>
      </span>
-     <span className="flex min-w-0 flex-wrap items-center gap-2"><span className="shrink-0 text-[var(--foreground)]">Model</span>
+     <span className="flex min-w-0 flex-wrap items-center gap-2"><span className="shrink-0 text-[var(--foreground)]">Engine Model</span>
       <Select value={agent.model || modelOptions[0]?.id || ''} onValueChange={(model) => onUpdateAgent?.({ model })}>
        <SelectTrigger aria-label="Select model" className="h-8 w-[clamp(9rem,22vw,13.75rem)] max-w-full bg-[var(--card)] text-xs"><SelectValue placeholder={modelLabel} /></SelectTrigger>
        <SelectContent>
@@ -257,7 +257,7 @@ export const AgentDirectChatView: React.FC<AgentDirectChatViewProps> = ({
    </header>
    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
     <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(event) => void handleFileUpload(event.target.files)} aria-label="Attach files to agent chat" />
-    <AgentChatRuntime key={`${agent.id}-${activeThreadId}`} agent={agent} workspace={currentWorkspace} threadMessages={activeThread?.messages || []} uploadedFiles={uploadedFiles} onAttachFile={() => fileInputRef.current?.click()} onRemoveFile={(index) => setUploadedFiles((previous) => previous.filter((_, itemIndex) => itemIndex !== index))} onUpdateAgentStatus={onUpdateAgentStatus} onConversationComplete={handleConversationComplete} />
+    <AgentChatRuntime key={`${agent.id}-${activeThreadId}`} agent={agent} workspace={currentWorkspace} conversationId={activeThreadId.startsWith('conv_') ? activeThreadId : undefined} threadMessages={activeThread?.messages || []} uploadedFiles={uploadedFiles} onAttachFile={() => fileInputRef.current?.click()} onRemoveFile={(index) => setUploadedFiles((previous) => previous.filter((_, itemIndex) => itemIndex !== index))} onUpdateAgentStatus={onUpdateAgentStatus} onConversationComplete={handleConversationComplete} />
    </div>
   </main>
 
@@ -282,46 +282,75 @@ export const AgentDirectChatView: React.FC<AgentDirectChatViewProps> = ({
 interface AgentChatRuntimeProps {
  agent: AgentOfficeMember
  workspace: string
+ conversationId?: string
  threadMessages: ThreadMessageLike[]
  uploadedFiles: { name: string; size: string; type: string }[]
  onAttachFile: () => void
  onRemoveFile: (index: number) => void
  onUpdateAgentStatus?: AgentDirectChatViewProps['onUpdateAgentStatus']
- onConversationComplete: (userText: string, replyText: string, messages: ThreadMessageLike[]) => void
+ onConversationComplete: (userText: string, replyText: string, messages: ThreadMessageLike[], toolExecutions?: any[]) => void
 }
 
-function AgentChatRuntime({ agent, workspace, threadMessages, uploadedFiles, onAttachFile, onRemoveFile, onUpdateAgentStatus, onConversationComplete }: AgentChatRuntimeProps) {
- const runtime = useLocalRuntime({
-  async *run({ messages, abortSignal }) {
-   const userText = messages[messages.length - 1]?.content?.map((part) => part.type === 'text' ? part.text : '').join('').trim() || ''
-   if (!userText) return
-   onUpdateAgentStatus?.(agent.id, 'WORKING', `Thinking: "${userText.slice(0, 24)}..."`)
-   try {
-    const response = await api.sendAgentChat(agent.id, userText, agent.engine, agent.model, workspace)
-    const rawReply = response.reply || response.response || `Hello Hamza! I am ${agent.name}. Directive received: "${userText}". Ready to assist on ${agent.role}.`
-    const reasoning = rawReply.match(/<think>([\s\S]*?)<\/think>/i)?.[1].trim() || ''
-    const replyText = rawReply.replace(/<think>[\s\S]*?<\/think>/i, '').trim()
-    const words = replyText.split(' ')
-    let currentText = ''
-    for (let i = 0; i < words.length; i += 3) {
-     if (abortSignal?.aborted) break
-     currentText += `${currentText ? ' ' : ''}${words.slice(i, i + 3).join(' ')}`
-     yield { content: [...(reasoning ? [{ type: 'reasoning' as const, text: reasoning }] : []), { type: 'text' as const, text: currentText }] }
-     if (words.length > 10) await new Promise((resolve) => setTimeout(resolve, 24))
-    }
-    const savedMessages: ThreadMessageLike[] = [
-     { id: `user-${Date.now()}`, role: 'user', content: [{ type: 'text', text: userText }] },
-     { id: `assistant-${Date.now()}`, role: 'assistant', content: [{ type: 'text', text: replyText }], status: { type: 'complete', reason: 'stop' } },
-    ]
-    onConversationComplete(userText, replyText, savedMessages)
-   } catch (error: any) {
-    console.error('Agent chat error:', error)
-    yield { content: [{ type: 'text', text: `⚠️ **Agent Execution Error**: ${error?.message || 'Failed to communicate with agent backend.'}` }] }
-   } finally {
-    onUpdateAgentStatus?.(agent.id, 'IDLE')
-   }
-  },
- }, { initialMessages: threadMessages })
+function AgentChatRuntime({ agent, workspace, conversationId, threadMessages, uploadedFiles, onAttachFile, onRemoveFile, onUpdateAgentStatus, onConversationComplete }: AgentChatRuntimeProps) {
+  const runtime = useLocalRuntime({
+    async *run({ messages, abortSignal }) {
+      const userText = messages[messages.length - 1]?.content?.map((part) => part.type === 'text' ? part.text : '').join('').trim() || ''
+      if (!userText) return
+      onUpdateAgentStatus?.(agent.id, 'WORKING', `Thinking: "${userText.slice(0, 24)}..."`)
+      let currentText = ''
+      let finalTaskDispatched: string | undefined
 
- return <AssistantRuntimeProvider runtime={runtime}><AgentChatThread agent={agent} className="h-full min-h-0" onAttachFile={onAttachFile} uploadedFiles={uploadedFiles} onRemoveFile={onRemoveFile} /></AssistantRuntimeProvider>
+      try {
+        // Real Server-Sent Events (SSE) streaming from backend
+        for await (const chunk of api.streamAgentChat(agent.id, userText, agent.engine, agent.model, workspace, conversationId, abortSignal)) {
+          if (abortSignal?.aborted) {
+            break
+          }
+          if (chunk.type === 'status') {
+            if (chunk.message) {
+              onUpdateAgentStatus?.(agent.id, 'WORKING', chunk.message)
+            }
+          } else if (chunk.type === 'task_dispatched') {
+            finalTaskDispatched = chunk.task_id
+            onUpdateAgentStatus?.(agent.id, 'WORKING', `Executing task ${chunk.task_id}...`)
+          } else if (chunk.type === 'chunk' && chunk.text) {
+            currentText += chunk.text
+            yield {
+              content: [{ type: 'text' as const, text: currentText }],
+            }
+          } else if (chunk.type === 'done') {
+            if (chunk.reply && !currentText) {
+              currentText = chunk.reply
+              yield {
+                content: [{ type: 'text' as const, text: currentText }],
+              }
+            }
+          } else if (chunk.type === 'error') {
+            currentText += `\n\n⚠️ **Error**: ${chunk.error || 'Stream error'}`
+            yield {
+              content: [{ type: 'text' as const, text: currentText }],
+            }
+          }
+        }
+
+        const replyText = currentText || `Task started with ${agent.engine}. (ID: ${finalTaskDispatched || 'active'})`
+        const savedMessages: ThreadMessageLike[] = [
+          { id: `user-${Date.now()}`, role: 'user', content: [{ type: 'text', text: userText }] },
+          { id: `assistant-${Date.now()}`, role: 'assistant', content: [{ type: 'text', text: replyText }], status: { type: 'complete', reason: 'stop' } },
+        ]
+        onConversationComplete(userText, replyText, savedMessages)
+      } catch (error: any) {
+        if (abortSignal?.aborted) {
+          console.info('Agent chat stream aborted by user.')
+          return
+        }
+        console.error('Agent chat stream error:', error)
+        yield { content: [{ type: 'text', text: `⚠️ **Agent Stream Error**: ${error?.message || 'Failed to communicate with agent backend.'}` }] }
+      } finally {
+        onUpdateAgentStatus?.(agent.id, 'IDLE')
+      }
+    },
+  }, { initialMessages: threadMessages })
+
+  return <AssistantRuntimeProvider runtime={runtime}><AgentChatThread agent={agent} className="h-full min-h-0" onAttachFile={onAttachFile} uploadedFiles={uploadedFiles} onRemoveFile={onRemoveFile} /></AssistantRuntimeProvider>
 }

@@ -1,2929 +1,3177 @@
-"""
-Local UI WebSocket & Static HTTP Server for ZEZO.
-Bridges the Python agent engine (main.py, task_manager, log_bus) with the
-modern HTML5 / ES Modules desktop web frontend.
-"""
-from __future__ import annotations
-
-import asyncio
-import json
-import logging
-import os
-import re
-import threading
-import platform
-import subprocess
-import time
-from pathlib import Path
-from typing import Any, Callable
-
-from aiohttp import web, WSMsgType
-
-logger = logging.getLogger("zezo.ui_server")
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-FRONTEND_DIR = BASE_DIR / "frontend"
-
-
-def _norm_token(s: str) -> str:
-    """Normalized match key: lowercased, spaces/underscores/hyphens removed."""
-    return re.sub(r"[\s_\-]+", "", (s or "").lower())
-
-
-_IGNORE_DIRS = {
-    "node_modules", ".git", ".venv", "venv", ".next", "dist", "build",
-    "__pycache__", ".cache", ".idea", ".vscode", "coverage", ".turbo",
-}
-
-
-def _scan_folder(root: Path, cap: int = 5000) -> tuple[list[str], int, bool]:
-    """Bounded recursive scan with directory pruning so huge folders never freeze the process.
-
-    Returns (relative_paths, total_size_bytes_of_scanned_files, truncated).
-    """
-    rel_paths: list[str] = []
-    total = 0
-    truncated = False
-    try:
-        for dirpath, dirs, files in os.walk(root):
-            dirs[:] = [d for d in dirs if d not in _IGNORE_DIRS and not d.startswith(".")]
-            for fn in files:
-                if len(rel_paths) >= cap:
-                    truncated = True
-                    return rel_paths, total, truncated
-                fp = Path(dirpath) / fn
-                try:
-                    total += fp.stat().st_size
-                except Exception:
-                    pass
-                try:
-                    rel_paths.append(str(fp.relative_to(root)))
-                except Exception:
-                    rel_paths.append(fn)
-    except Exception:
-        pass
-    return rel_paths, total, truncated
-
-
-
-_USER_FACING_TOOLS: list[dict[str, Any]] = [
-    {
-        "id": "agent_reach",
-        "name": "agent_reach",
-        "label": "Deep Social Research",
-        "category": "Research & Intelligence",
-        "description": "Deep extraction: YouTube transcripts, Reddit threads, Twitter/X, GitHub repos, TikTok/Instagram audio, and cross-platform reports",
-    },
-    {
-        "id": "browser_control",
-        "name": "browser_control",
-        "label": "Browser Control",
-        "category": "Web & Automation",
-        "description": "Playwright automated browser (clicks, typing, forms)",
-    },
-    {
-        "id": "web_search",
-        "name": "web_search",
-        "label": "Web Search",
-        "category": "Web & Intelligence",
-        "description": "DuckDuckGo live internet search",
-    },
-    {
-        "id": "web_read_page",
-        "name": "web_read_page",
-        "label": "Web Page Reader",
-        "category": "Web & Intelligence",
-        "description": "Web page DOM scraping and reading",
-    },
-    {
-        "id": "computer_control",
-        "name": "computer_control",
-        "label": "Desktop Automation",
-        "category": "Desktop & OS",
-        "description": "Native mouse clicks, typing, screen coordinates",
-    },
-    {
-        "id": "desktop_control",
-        "name": "desktop_control",
-        "label": "Window Manager",
-        "category": "Desktop & OS",
-        "description": "Window focus, minimize, maximize, resize",
-    },
-    {
-        "id": "computer_settings",
-        "name": "computer_settings",
-        "label": "System Settings",
-        "category": "Desktop & OS",
-        "description": "OS volume, brightness, Wi-Fi, bluetooth control",
-    },
-    {
-        "id": "open_app",
-        "name": "open_app",
-        "label": "App Launcher",
-        "category": "Desktop & OS",
-        "description": "Launch local applications (Chrome, VS Code, etc.)",
-    },
-    {
-        "id": "file_controller",
-        "name": "file_controller",
-        "label": "File Controller",
-        "category": "Files & Code",
-        "description": "Read, write, create, list local directory files",
-    },
-    {
-        "id": "file_processor",
-        "name": "file_processor",
-        "label": "Batch File Processor",
-        "category": "Files & Code",
-        "description": "Bulk file analysis, transforms, batch updates",
-    },
-    {
-        "id": "quick_snippet",
-        "name": "quick_snippet",
-        "label": "Quick Snippets",
-        "category": "Files & Code",
-        "description": "Save, recall, and search code snippets",
-    },
-    {
-        "id": "reminder",
-        "name": "reminder",
-        "label": "Smart Reminders",
-        "category": "Daily Utilities",
-        "description": "Set alarms, countdowns, and system reminders",
-    },
-    {
-        "id": "weather_report",
-        "name": "weather_report",
-        "label": "Weather Forecast",
-        "category": "Daily Utilities",
-        "description": "Live atmospheric metrics and forecasts",
-    },
-    {
-        "id": "flight_finder",
-        "name": "flight_finder",
-        "label": "Flight Finder",
-        "category": "Daily Utilities",
-        "description": "Search flight availability and airline schedules",
-    },
-    {
-        "id": "youtube_video",
-        "name": "youtube_video",
-        "label": "YouTube Player",
-        "category": "Daily Utilities",
-        "description": "Search and stream YouTube audio/video",
-    },
-]
-
-
-class ZezoUIServer:
-    """Thread-safe local WebSocket & Static file server for the desktop Web UI."""
-
-    def __init__(self, host: str = "127.0.0.1", port: int = 8765):
-        self.host = host
-        self.port = port
-        self.frontend_dir = FRONTEND_DIR
-        self._clients: set[web.WebSocketResponse] = set()
-        self.tunnel_manager = None
-        self._loop: asyncio.AbstractEventLoop | None = None
-        self._thread: threading.Thread | None = None
-        self._runner: web.AppRunner | None = None
-        self._site = None
-        self._stopped = threading.Event()
-        self._ready_event = threading.Event()
-
-        # Lazy attachment registry: dropped/uploaded files are registered by
-        # path only and NOT read until the user explicitly asks (file_processor
-        # resolves them from here). Keeps the drop path instant and silent.
-        self._attached: list[dict[str, Any]] = []
-        self._attached_lock = threading.Lock()
-
-        # Filesystem modification tracking for dynamic reload
-        self._skills_dir_mtime: float = 0.0
-        self._agents_config_mtime: float = 0.0
-
-        # Callbacks from main.py / engine
-        self.on_text_command: Callable[[str], None] | None = None
-        self.on_interrupt: Callable[[], None] | None = None
-        self.on_mute_toggle: Callable[[bool], None] | None = None
-        self.on_speaker_mute_toggle: Callable[[bool], None] | None = None
-        self.on_sleep_toggle: Callable[[bool], None] | None = None
-        self.on_remote_clicked: Callable[[], tuple[str, str] | None] | None = None
-        self.on_file_uploaded: Callable[[dict[str, Any]], None] | None = None
-        self.on_assistant_settings_changed: Callable[..., None] | None = None
-        self.on_accent_change: Callable[[str], None] | None = None
-        self.on_pipeline_settings_changed: Callable[[], None] | None = None
-        self.on_audio_devices_changed: Callable[[str, str], None] | None = None
-        self.on_operational_mode_changed: Callable[[str], None] | None = None
-        self._operational_mode: str = "chat"
-        self.get_initial_state: Callable[[], dict[str, Any]] | None = None
-
-    def start(self) -> None:
-        """Start the server in a background daemon thread."""
-        if self._thread and self._thread.is_alive():
-            return
-        self._stopped.clear()
-        self._thread = threading.Thread(target=self._run_thread, daemon=True, name="ZezoUIServer")
-        self._thread.start()
-
-    def _run_thread(self) -> None:
-        self._loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self._loop)
-        self._loop.run_until_complete(self._start_server())
-        try:
-            self._loop.run_forever()
-        finally:
-            self._loop.run_until_complete(self._cleanup())
-            self._loop.close()
-
-    async def _start_server(self) -> None:
-        app = web.Application()
-        app.router.add_get("/", self._index_handler)
-        app.router.add_get("/index.html", self._index_handler)
-        app.router.add_get("/office", self._office_view_handler)
-        app.router.add_get("/ws", self._ws_handler)
-        app.router.add_get("/api/health", self._health_handler)
-        app.router.add_get("/api/tools", self._tools_inspection_handler)
-        app.router.add_post("/api/tools/{name}/toggle", self._tool_toggle_handler)
-        app.router.add_post("/api/engines/{engine}/test", self._engine_test_handler)
-        app.router.add_get("/api/engines/{engine}/test", self._engine_test_handler)
-        app.router.add_get("/api/tasks", self._tasks_list_handler)
-        app.router.add_get("/api/agents/state", self._agents_state_handler)
-        app.router.add_get("/api/agents/agent", self._agent_profile_handler)
-        app.router.add_post("/api/agents/save_agent", self._save_agent_handler)
-        app.router.add_post("/api/agents", self._save_agent_handler)
-        app.router.add_post("/api/agents/save_soul", self._save_soul_handler)
-        app.router.add_post("/api/agents/dispatch_task", self._dispatch_agent_task_handler)
-        app.router.add_post("/api/agents/chat", self._agent_chat_handler)
-        app.router.add_post("/api/agents/delete_agent", self._delete_agent_handler)
-        app.router.add_post("/api/agents/open_folder", self._open_agent_folder_handler)
-        app.router.add_post("/api/agents/pick_folder", self._pick_agent_folder_handler)
-        app.router.add_post("/api/upload", self._upload_handler)
-        app.router.add_get("/api/config", self._get_config_handler)
-        app.router.add_post("/api/config", self._save_config_handler)
-        app.router.add_get("/api/settings/assistant", self._get_config_handler)
-        app.router.add_post("/api/settings/assistant", self._save_assistant_settings_handler)
-        app.router.add_get("/api/settings/agents", self._get_config_handler)
-        app.router.add_post("/api/settings/agents", self._save_agents_settings_handler)
-        app.router.add_get("/api/settings/pipeline", self._get_config_handler)
-        app.router.add_post("/api/settings/pipeline", self._save_pipeline_settings_handler)
-        app.router.add_get("/api/settings/keys", self._get_config_handler)
-        app.router.add_post("/api/settings/keys", self._save_keys_settings_handler)
-        app.router.add_get("/api/preview_voice", self._preview_voice_handler)
-        app.router.add_get("/api/models", self._models_list_handler)
-        app.router.add_get("/api/audio_devices", self._audio_devices_handler)
-        app.router.add_get("/api/skills", self._skills_list_handler)
-        app.router.add_post("/api/skills/mode", self._skills_mode_handler)
-        app.router.add_post("/api/skills/install", self._skills_install_handler)
-        app.router.add_post("/api/skills/save", self._skills_save_handler)
-        app.router.add_post("/api/skills/delete", self._skills_delete_handler)
-        app.router.add_get("/api/attachments", self._attachments_list_handler)
-        app.router.add_get("/api/memory/stats", self._memory_stats_handler)
-        app.router.add_get("/api/memory/graph", self._memory_graph_handler)
-        app.router.add_get("/api/memory/notes", self._memory_notes_list_handler)
-        app.router.add_get("/api/memory/note", self._memory_note_detail_handler)
-        app.router.add_post("/api/memory/note", self._memory_save_note_handler)
-        app.router.add_post("/api/memory/add", self._memory_create_note_handler)
-        app.router.add_post("/api/memory/delete", self._memory_delete_note_handler)
-        app.router.add_post("/api/memory/clear", self._memory_clear_handler)
-        app.router.add_post("/api/memory/wipe_all", self._memory_wipe_all_handler)
-        app.router.add_post("/api/memory/optimize", self._memory_optimize_handler)
-        app.router.add_post("/api/memory/fact/delete", self._memory_fact_delete_handler)
-        app.router.add_post("/api/memory/fact/retry", self._memory_fact_retry_handler)
-        app.router.add_get("/api/memory/pause", self._memory_pause_get_handler)
-        app.router.add_post("/api/memory/pause", self._memory_pause_set_handler)
-        app.router.add_post("/api/workspace/set", self._workspace_set_handler)
-        app.router.add_post("/api/workspace/pick", self._workspace_pick_handler)
-        app.router.add_get("/api/remote", self._remote_gateway_handler)
-        app.router.add_post("/api/remote/new_key", self._remote_new_key_handler)
-        app.router.add_get("/api/backend_logs", self._get_backend_logs_handler)
-        app.router.add_post("/api/backend_logs/clear", self._clear_backend_logs_handler)
-        app.router.add_get("/api/system/status", self._system_status_handler)
-        app.router.add_get("/api/code_engines", self._code_engines_handler)
-        app.router.add_post("/api/code_engines/probe", self._code_engines_probe_handler)
-        app.router.add_post("/api/code_engines/default", self._code_engines_default_handler)
-        app.router.add_get("/zezo-avatar.png", self._avatar_handler)
-        app.router.add_get("/favicon.ico", self._favicon_handler)
-        app.router.add_get("/favicon.svg", self._dist_file_handler)
-        app.router.add_get("/neural_orb.js", self._dist_file_handler)
-        app.router.add_get("/api/audio/test_mic", self._test_mic_handler)
-
-        # Serve compiled React SPA (frontend/dist) static assets
-        frontend_dist = self.frontend_dir / "dist"
-        if (frontend_dist / "assets").exists():
-            app.router.add_static("/assets", path=str(frontend_dist / "assets"), show_index=False)
-
-        # Serve frontend public static assets (avatar, icons, audio)
-        frontend_public = self.frontend_dir / "public"
-        if frontend_public.exists():
-            app.router.add_static("/public", path=str(frontend_public), show_index=False)
-
-        self._runner = web.AppRunner(app)
-        await self._runner.setup()
-
-        # Attempt to bind to requested port, with fallback retry
-        for attempt in range(5):
-            try:
-                self._site = web.TCPSite(self._runner, self.host, self.port)
-                await self._site.start()
-                self._ready_event.set()
-                logger.info("Zezo UI Server running at http://%s:%d", self.host, self.port)
-                from core.clipboard_watcher import ClipboardWatcher
-                self.clipboard_watcher = ClipboardWatcher(
-                    callback=lambda payload: self.broadcast("clipboard_update", payload)
-                )
-                self.clipboard_watcher.start()
-                self._log_bus_task = asyncio.create_task(self._poll_log_bus_loop())
-
-                # Subscribe to memory outbox activity updates for WebSocket broadcast
-                try:
-                    from memory.memory_manager import register_memory_activity_callback
-
-                    def _on_mem_activity(payload: dict) -> None:
-                        if self._loop and self._loop.is_running() and not self._stopped.is_set():
-                            self._loop.call_soon_threadsafe(self.broadcast, "memory_activity", payload)
-
-                    register_memory_activity_callback(_on_mem_activity)
-                except Exception as ex:
-                    logger.warning("[UI Server] Failed to register memory activity callback: %s", ex)
-                break
-            except OSError:
-                if attempt == 4:
-                    raise
-                self.port += 1
-
-    async def _poll_log_bus_loop(self) -> None:
-        cursor = 0
-        while not self._stopped.is_set():
-            try:
-                await asyncio.sleep(0.25)
-                if not self._clients:
-                    continue
-                try:
-                    from core import log_bus
-                    new_lines, cursor = log_bus.since(cursor, min_level="DEBUG")
-                    if new_lines:
-                        self.broadcast("backend_logs", {
-                            "lines": new_lines,
-                            "stats": log_bus.stats(),
-                            "sources": log_bus.sources()
-                        })
-                except Exception as e:
-                    logger.debug("log_bus polling error: %s", e)
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.debug("Error in log bus polling task: %s", e)
-
-    async def _health_handler(self, request: web.Request) -> web.Response:
-        return web.json_response({"status": "ok", "app": "ZEZO", "port": self.port})
-
-    async def _tools_inspection_handler(self, request: web.Request) -> web.Response:
-        """Returns the list of 15 user-facing tools, their categories, descriptions, and active enabled/disabled states."""
-        agent_id = request.query.get("agent_id") or request.query.get("agent")
-        mode = request.query.get("mode")
-        try:
-            from core.action_loader import get_action_registry
-            reg = get_action_registry()
-
-            filter_diag = None
-            if agent_id or mode:
-                filter_diag = reg.filter_tools(agent_id=agent_id, mode=mode)
-
-            tools_status = reg.get_tools_status(as_dict=True) if hasattr(reg, "get_tools_status") else {}
-
-            tools_list = []
-            for t in _USER_FACING_TOOLS:
-                tool_id = t["id"]
-                rec = reg.get(tool_id) if hasattr(reg, "get") else None
-                status_info = tools_status.get(tool_id, {}) if isinstance(tools_status, dict) else {}
-
-                is_enabled = True
-                if rec is not None:
-                    is_enabled = bool(getattr(rec, "enabled", True))
-                elif "enabled" in status_info:
-                    is_enabled = bool(status_info["enabled"])
-                elif hasattr(reg, "_disabled_tools"):
-                    is_enabled = tool_id not in reg._disabled_tools
-
-                tools_list.append({
-                    "id": tool_id,
-                    "name": tool_id,
-                    "label": t.get("label", tool_id),
-                    "category": t.get("category", getattr(rec, "category", "General")),
-                    "description": t.get("description", getattr(rec, "description", "")),
-                    "enabled": is_enabled,
-                    "risk": getattr(rec, "risk", "local_mutation"),
-                })
-
-            resp_payload = {
-                "status": "success",
-                "tools": tools_list,
-                "data": {
-                    "allowed_tools": [t for t in tools_list if t["enabled"]],
-                    "filtered_tools": [{"tool": t["id"], "reason": "tool_disabled"} for t in tools_list if not t["enabled"]],
-                    **(filter_diag or {}),
-                },
-            }
-            return web.json_response(resp_payload)
-        except Exception as e:
-            logger.exception("Error in /api/tools handler: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _tool_toggle_handler(self, request: web.Request) -> web.Response:
-        """Expects {enabled: bool} or toggles current state. Calls ActionRegistry.toggle_tool(name, enabled)."""
-        name = request.match_info.get("name", "").strip()
-        if not name:
-            return web.json_response({"success": False, "error": "Tool name required."}, status=400)
-        try:
-            data = {}
-            if request.can_read_body:
-                try:
-                    data = await request.json()
-                except Exception:
-                    data = {}
-
-            from core.action_loader import get_action_registry
-            reg = get_action_registry()
-
-            if "enabled" in data and isinstance(data["enabled"], bool):
-                enabled = data["enabled"]
-            else:
-                rec = reg.get(name) if hasattr(reg, "get") else None
-                current = getattr(rec, "enabled", True) if rec else (name not in getattr(reg, "_disabled_tools", set()))
-                enabled = not current
-
-            if hasattr(reg, "toggle_tool"):
-                reg.toggle_tool(name, enabled)
-            else:
-                rec = reg.get(name)
-                if rec:
-                    rec.enabled = enabled
-
-            self.broadcast("tools_updated", {"tool": name, "enabled": enabled})
-            return web.json_response({"success": True, "tool": name, "enabled": enabled})
-        except Exception as e:
-            logger.exception("Error in /api/tools/{name}/toggle handler: %s", e)
-            return web.json_response({"success": False, "error": str(e)}, status=500)
-
-    async def _engine_test_handler(self, request: web.Request) -> web.Response:
-        """Performs a non-blocking 2-second connectivity ping to verify binary path exists and executes cleanly."""
-        engine = request.match_info.get("engine", "").strip().lower()
-        if not engine and request.can_read_body:
-            try:
-                body = await request.json()
-                engine = str(body.get("engine", "")).strip().lower()
-            except Exception:
-                pass
-
-        if not engine:
-            return web.json_response({"success": False, "error": "Engine name required."}, status=400)
-
-        norm_engine = engine.replace("_run", "").replace("_agent", "")
-
-        def _ping() -> dict[str, Any]:
-            from core.code_engines import resolve_binary, ENGINES
-            bin_path = resolve_binary(norm_engine)
-            if not bin_path or not Path(bin_path).exists():
-                return {
-                    "success": False,
-                    "engine": norm_engine,
-                    "latency_ms": 0,
-                    "binary": bin_path or "",
-                    "error": f"Binary for engine '{norm_engine}' not found on system.",
-                }
-
-            engine_def = ENGINES.get(norm_engine)
-            version_args = list(engine_def.version_argv) if engine_def else ["--version"]
-            cmd = [bin_path] + version_args
-
-            t0 = time.perf_counter()
-            try:
-                res = subprocess.run(
-                    cmd,
-                    stdin=subprocess.DEVNULL,
-                    capture_output=True,
-                    text=True,
-                    timeout=2.0,
-                    creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0,
-                )
-                latency_ms = int(round((time.perf_counter() - t0) * 1000))
-                if res.returncode == 0:
-                    return {
-                        "success": True,
-                        "engine": norm_engine,
-                        "latency_ms": latency_ms,
-                        "binary": bin_path,
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "engine": norm_engine,
-                        "latency_ms": latency_ms,
-                        "binary": bin_path,
-                        "error": f"Process exited with code {res.returncode}: {res.stderr or res.stdout}",
-                    }
-            except subprocess.TimeoutExpired:
-                latency_ms = int(round((time.perf_counter() - t0) * 1000))
-                return {
-                    "success": False,
-                    "engine": norm_engine,
-                    "latency_ms": latency_ms,
-                    "binary": bin_path,
-                    "error": "Engine connectivity ping timed out after 2 seconds.",
-                }
-            except Exception as ex:
-                latency_ms = int(round((time.perf_counter() - t0) * 1000))
-                return {
-                    "success": False,
-                    "engine": norm_engine,
-                    "latency_ms": latency_ms,
-                    "binary": bin_path,
-                    "error": str(ex),
-                }
-
-        try:
-            result = await asyncio.to_thread(_ping)
-            return web.json_response(result)
-        except Exception as e:
-            logger.exception("Error in /api/engines/{engine}/test handler: %s", e)
-            return web.json_response({"success": False, "engine": norm_engine, "error": str(e)}, status=500)
-
-    async def _tasks_list_handler(self, request: web.Request) -> web.Response:
-        """Fetch all background tasks categorized for Kanban boards and monitoring."""
-        try:
-            from core.task_manager import get_task_manager
-            tm = get_task_manager()
-            tasks = tm.all_tasks()
-            # Filter out child tasks (subtasks) from the main task list
-            parent_tasks = [t for t in tasks if not t.get('parent_id')]
-            logger.debug(f"[UI_SERVER] Tasks list: {len(tasks)} total, {len(parent_tasks)} parent tasks")
-            return web.json_response({"status": "success", "tasks": parent_tasks})
-        except Exception as e:
-            logger.exception("Error in /api/tasks handler: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    # ── Lazy attachment registry ──────────────────────────────────────────
-    def register_attachment(self, info: dict[str, Any]) -> None:
-        """Register a dropped/uploaded file by path only. Content is read later,
-        on demand, when the user asks (file_processor pulls from here)."""
-        with self._attached_lock:
-            self._attached = [a for a in self._attached if a.get("path") != info.get("path")]
-            self._attached.insert(0, info)
-            del self._attached[50:]  # keep the 50 most recent
-
-    def list_attachments(self) -> list[dict[str, Any]]:
-        with self._attached_lock:
-            return list(self._attached)
-
-    def latest_attachment(self) -> dict[str, Any] | None:
-        with self._attached_lock:
-            return dict(self._attached[0]) if self._attached else None
-
-    def find_attachment(self, name: str) -> dict[str, Any] | None:
-        """Match an attachment by name (normalized, then substring) for multi-file drops."""
-        target = _norm_token(name)
-        if not target:
-            return None
-        with self._attached_lock:
-            items = list(self._attached)
-        for a in items:
-            if _norm_token(a.get("name", "")) == target:
-                return dict(a)
-        for a in items:
-            key = _norm_token(a.get("name", ""))
-            if target in key or key in target:
-                return dict(a)
-        return None
-
-    def remove_attachment(self, path: str) -> None:
-        with self._attached_lock:
-            self._attached = [a for a in self._attached if a.get("path") != path]
-
-    def clear_attachments(self) -> None:
-        with self._attached_lock:
-            self._attached = []
-
-    async def _upload_handler(self, request: web.Request) -> web.Response:
-        try:
-            reader = await request.multipart()
-            uploads_dir = BASE_DIR / "uploads"
-            uploads_dir.mkdir(parents=True, exist_ok=True)
-
-            saved_files = []
-            has_folder = False
-            root_folder_name = ""
-
-            while True:
-                part = await reader.next()
-                if part is None:
-                    break
-                if part.filename:
-                    # Sanitize relative path to prevent path traversal
-                    raw_rel = part.filename.replace("\\", "/").strip("/")
-                    parts = [p for p in raw_rel.split("/") if p and p not in ("..", ".")]
-                    if not parts:
-                        continue
-
-                    if len(parts) > 1:
-                        has_folder = True
-                        if not root_folder_name:
-                            root_folder_name = parts[0]
-                        dest_file = uploads_dir.joinpath(*parts)
-                    else:
-                        dest_file = uploads_dir / parts[0]
-
-                    dest_file.parent.mkdir(parents=True, exist_ok=True)
-                    with open(dest_file, "wb") as f:
-                        while True:
-                            chunk = await part.read_chunk()
-                            if not chunk:
-                                break
-                            f.write(chunk)
-                    saved_files.append(dest_file)
-
-            if not saved_files:
-                return web.json_response({"status": "error", "message": "No files received"}, status=400)
-
-            # Folder drop: register as the active workspace (cheap metadata, so
-            # coding commands keep their target) but DO NOT read its contents.
-            # A bounded scan keeps a huge folder from blocking the request.
-            if has_folder and root_folder_name:
-                root_folder_dir = uploads_dir / root_folder_name
-                from core.repo_context import remember_repo
-                remember_repo(str(root_folder_dir))
-                try:
-                    from memory.memory_manager import remember
-                    remember("active_project", str(root_folder_dir), category="projects")
-                except Exception:
-                    pass
-
-                rel_paths, total_size, truncated = _scan_folder(root_folder_dir, cap=5000)
-
-                folder_info = {
-                    "name": root_folder_name,
-                    "path": str(root_folder_dir),
-                    "size": total_size,
-                    "file_type": "folder",
-                    "is_folder": True,
-                    "files_count": len(rel_paths),
-                    "text": "",
-                    "engine": "attached",
-                    "is_truncated": truncated,
-                }
-
-                self.register_attachment(folder_info)
-                self.broadcast("file_ingested", folder_info)
-                self.broadcast("log", {
-                    "text": f"[Payload] Attached workspace folder '{root_folder_name}' ({len(rel_paths)} files). Read on request."
-                })
-
-                if self.on_file_uploaded:
-                    try:
-                        self.on_file_uploaded(folder_info)
-                    except Exception as e:
-                        logger.warning("on_file_uploaded callback error: %s", e)
-
-                return web.json_response({
-                    "status": "success",
-                    "folder": folder_info,
-                    "files": [folder_info],
-                })
-
-            # Lazy: register each file by path only. Content is read later, on
-            # demand, via file_processor — nothing is extracted on the drop path.
-            results = []
-            for sf in saved_files:
-                file_info = {
-                    "name": sf.name,
-                    "path": str(sf),
-                    "size": sf.stat().st_size,
-                    "file_type": sf.suffix.lower().lstrip(".") or "file",
-                    "engine": "attached",
-                    "text": "",
-                    "is_truncated": False,
-                    "is_folder": False,
-                }
-                results.append(file_info)
-
-                self.register_attachment(file_info)
-                self.broadcast("file_ingested", file_info)
-                self.broadcast("log", {
-                    "text": f"[Payload] Attached '{sf.name}' ({sf.stat().st_size:,} bytes). Read on request."
-                })
-
-                if self.on_file_uploaded:
-                    try:
-                        self.on_file_uploaded(file_info)
-                    except Exception as e:
-                        logger.warning("on_file_uploaded callback error: %s", e)
-
-            return web.json_response({
-                "status": "success",
-                "files": results
-            })
-        except Exception as e:
-            logger.exception("Upload handler error: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _save_keys_settings_handler(self, request: web.Request) -> web.Response:
-        try:
-            data = await request.json()
-            from memory.config_manager import (
-                save_api_keys_transactional, is_configured, get_masked_gemini_key,
-                get_masked_groq_key, get_masked_elevenlabs_key, get_masked_tavily_key,
-                get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
-            )
-
-            gemini_key = data.get("gemini_api_key")
-            groq_key = data.get("groq_api_key")
-            elevenlabs_key = data.get("elevenlabs_api_key")
-            tavily_key = data.get("tavily_api_key")
-
-            ok, err = save_api_keys_transactional(
-                gemini_api_key=gemini_key,
-                groq_api_key=groq_key,
-                elevenlabs_api_key=elevenlabs_key,
-                tavily_api_key=tavily_key,
-                validate=True,
-            )
-            if not ok:
-                return web.json_response({"status": "error", "message": err}, status=400)
-
-            res_payload = {
-                "has_gemini_key": is_configured(),
-                "gemini_api_key_masked": get_masked_gemini_key(),
-                "has_groq_key": bool(get_groq_api_key()),
-                "groq_api_key_masked": get_masked_groq_key(),
-                "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
-                "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
-                "has_tavily_key": bool(get_tavily_api_key()),
-                "tavily_api_key_masked": get_masked_tavily_key(),
-            }
-            self.broadcast("api_keys_updated", res_payload)
-            return web.json_response({"status": "success", "data": res_payload})
-        except Exception as e:
-            logger.exception("Save API keys error: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _save_assistant_settings_handler(self, request: web.Request) -> web.Response:
-        try:
-            data = await request.json()
-            voice = str(data.get("voice_name", "Charon")).strip() or "Charon"
-            lang = str(data.get("response_language", "auto")).strip() or "auto"
-            fallback_voice = data.get("fallback_voice")
-            voice_accent = data.get("voice_accent")
-
-            from memory.config_manager import (
-                save_assistant_config, save_voice, save_response_language, get_assistant_name,
-                save_api_keys_transactional, is_configured, get_masked_gemini_key, get_masked_groq_key,
-                get_masked_elevenlabs_key, get_masked_tavily_key, save_fallback_voice, get_fallback_voice,
-                save_voice_fallback_mode, get_voice_fallback_mode, get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
-                save_voice_accent, get_voice_accent, AVAILABLE_VOICE_ACCENTS,
-            )
-            name = str(data.get("assistant_name") or "").strip() or get_assistant_name()
-
-            if voice_accent is not None:
-                v_acc = str(voice_accent).strip().lower()
-                if v_acc not in AVAILABLE_VOICE_ACCENTS:
-                    return web.json_response({"status": "error", "message": f"Invalid voice accent: {voice_accent}"}, status=400)
-                save_voice_accent(v_acc)
-
-            gemini_key = data.get("gemini_api_key")
-            groq_key = data.get("groq_api_key")
-            elevenlabs_key = data.get("elevenlabs_api_key")
-            tavily_key = data.get("tavily_api_key")
-            if gemini_key is not None or groq_key is not None or elevenlabs_key is not None or tavily_key is not None:
-                ok, err = save_api_keys_transactional(
-                    gemini_api_key=gemini_key,
-                    groq_api_key=groq_key,
-                    elevenlabs_api_key=elevenlabs_key,
-                    tavily_api_key=tavily_key,
-                    validate=True,
-                )
-                if not ok:
-                    return web.json_response({"status": "error", "message": err}, status=400)
-
-            save_assistant_config(name, "")
-            save_voice(voice)
-            save_response_language(lang)
-            if fallback_voice is not None:
-                save_fallback_voice(str(fallback_voice))
-
-            voice_fallback = data.get("voice_fallback")
-            if voice_fallback is not None:
-                if isinstance(voice_fallback, bool):
-                    save_voice_fallback_mode("auto" if voice_fallback else "off")
-                else:
-                    save_voice_fallback_mode(str(voice_fallback))
-
-            current_accent = get_voice_accent()
-            if self.on_assistant_settings_changed:
-                try:
-                    self.on_assistant_settings_changed(name, voice, lang, current_accent)
-                except TypeError:
-                    try:
-                        self.on_assistant_settings_changed(name, voice, lang)
-                    except Exception as e:
-                        logger.warning("on_assistant_settings_changed error: %s", e)
-                except Exception as e:
-                    logger.warning("on_assistant_settings_changed error: %s", e)
-
-            if getattr(self, "on_accent_change", None) and voice_accent is not None:
-                try:
-                    self.on_accent_change(current_accent)
-                except Exception as e:
-                    logger.warning("on_accent_change error: %s", e)
-
-            res_payload = {
-                "assistant_name": name,
-                "voice_name": voice,
-                "response_language": lang,
-                "voice_accent": current_accent,
-                "available_accents": list(AVAILABLE_VOICE_ACCENTS),
-                "fallback_voice": get_fallback_voice(),
-                "voice_fallback": get_voice_fallback_mode(),
-                "voice_fallback_enabled": get_voice_fallback_mode() == "auto",
-                "has_gemini_key": is_configured(),
-                "gemini_api_key_masked": get_masked_gemini_key(),
-                "has_groq_key": bool(get_groq_api_key()),
-                "groq_api_key_masked": get_masked_groq_key(),
-                "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
-                "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
-            }
-            self.broadcast("assistant_settings_updated", res_payload)
-
-            return web.json_response({
-                "status": "success",
-                "data": res_payload
-            })
-        except Exception as e:
-            logger.exception("Save assistant settings error: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _save_agents_settings_handler(self, request: web.Request) -> web.Response:
-        try:
-            data = await request.json()
-            from memory.config_manager import (
-                save_preferred_creation_agent, get_preferred_creation_agent,
-                save_preferred_edit_agent, get_preferred_edit_agent,
-                CREATION_AGENTS, EDIT_AGENTS,
-            )
-
-            creation_agent = data.get("preferred_creation_agent")
-            if creation_agent is not None:
-                save_preferred_creation_agent(str(creation_agent))
-
-            edit_agent = data.get("preferred_edit_agent")
-            if edit_agent is not None:
-                save_preferred_edit_agent(str(edit_agent))
-
-            res_payload = {
-                "preferred_creation_agent": get_preferred_creation_agent(),
-                "preferred_edit_agent": get_preferred_edit_agent(),
-                "creation_agents": list(CREATION_AGENTS),
-                "edit_agents": list(EDIT_AGENTS),
-            }
-            self.broadcast("agent_settings_updated", res_payload)
-
-            return web.json_response({
-                "status": "success",
-                "data": res_payload
-            })
-        except Exception as e:
-            logger.exception("Save agent settings error: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _save_pipeline_settings_handler(self, request: web.Request) -> web.Response:
-        try:
-            data = await request.json()
-            mode = str(data.get("pipeline_mode", "live")).strip().lower() or "live"
-
-            from memory.config_manager import (
-                save_pipeline_mode, save_stt_engine, save_llm_engine,
-                save_tts_engine, save_tts_voice, save_voice_fallback_mode,
-                get_pipeline_mode, get_stt_engine, get_llm_engine, get_tts_engine, get_tts_voice,
-                get_voice_fallback_mode, get_groq_api_key, get_masked_groq_key, save_api_keys_transactional,
-                is_configured, get_masked_gemini_key, get_elevenlabs_api_key, get_masked_elevenlabs_key,
-            )
-
-            groq_key = data.get("groq_api_key")
-            if groq_key is not None and str(groq_key).strip() and "••••" not in str(groq_key):
-                ok, err = save_api_keys_transactional(
-                    groq_api_key=str(groq_key).strip(),
-                    validate=True,
-                )
-                if not ok:
-                    return web.json_response({"status": "error", "message": err}, status=400)
-
-            save_pipeline_mode(mode)
-
-            voice_fallback = data.get("voice_fallback")
-            if voice_fallback is not None:
-                if isinstance(voice_fallback, bool):
-                    save_voice_fallback_mode("auto" if voice_fallback else "off")
-                else:
-                    save_voice_fallback_mode(str(voice_fallback))
-
-            # Always persist engine selections — they are only used in cascade
-            # mode, but saving them regardless means switching to cascade later
-            # works without re-entering the settings, and avoids the reset-to-Live
-            # bug when the mode was briefly ambiguous.
-            stt = str(data.get("stt_engine", get_stt_engine())).strip().lower() or get_stt_engine()
-            llm = str(data.get("llm_engine", get_llm_engine())).strip().lower() or get_llm_engine()
-            tts = str(data.get("tts_engine", get_tts_engine())).strip().lower() or get_tts_engine()
-            voice = str(data.get("tts_voice", "")).strip()
-
-            save_stt_engine(stt)
-            save_llm_engine(llm)
-            save_tts_engine(tts)
-            if voice:
-                save_tts_voice(voice)
-
-            res_payload = {
-                "pipeline_mode": get_pipeline_mode(),
-                "stt_engine": get_stt_engine(),
-                "llm_engine": get_llm_engine(),
-                "tts_engine": get_tts_engine(),
-                "tts_voice": get_tts_voice(),
-                "voice_fallback": get_voice_fallback_mode(),
-                "voice_fallback_enabled": get_voice_fallback_mode() == "auto",
-                "has_gemini_key": is_configured(),
-                "gemini_api_key_masked": get_masked_gemini_key(),
-                "has_groq_key": bool(get_groq_api_key()),
-                "groq_api_key_masked": get_masked_groq_key(),
-                "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
-                "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
-            }
-
-            if self.on_pipeline_settings_changed:
-                try:
-                    self.on_pipeline_settings_changed()
-                except Exception as e:
-                    logger.warning("on_pipeline_settings_changed error: %s", e)
-
-            self.broadcast("pipeline_settings_updated", res_payload)
-
-            return web.json_response({
-                "status": "success",
-                "data": res_payload
-            })
-        except Exception as e:
-            logger.exception("Save pipeline settings error: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _get_config_handler(self, request: web.Request) -> web.Response:
-        try:
-            from memory.config_manager import (
-                get_assistant_name, get_voice, get_response_language,
-                get_voice_accent, AVAILABLE_VOICE_ACCENTS,
-                get_autostart_enabled, get_brief_enabled,
-                get_wake_word_enabled, get_push_to_talk_enabled,
-                get_masked_gemini_key, get_masked_groq_key, get_masked_elevenlabs_key, get_masked_tavily_key,
-                is_configured, get_opencode_model, get_kilo_model, get_antigravity_model,
-                get_fallback_voice, FALLBACK_VOICES, get_voice_fallback_mode,
-                get_preferred_creation_agent, get_preferred_edit_agent,
-                CREATION_AGENTS, EDIT_AGENTS,
-                get_pipeline_mode, get_stt_engine, get_llm_engine, get_tts_engine, get_tts_voice,
-                PIPELINE_MODES, STT_ENGINES, LLM_ENGINES, TTS_ENGINES,
-                get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
-                AVAILABLE_LANGUAGES, AVAILABLE_VOICES,
-                get_thinking_enabled, get_proactive_audio_enabled,
-                get_theme, get_accent,
-                get_avatar_settings, save_avatar_settings,
-            )
-            try:
-                from core.wake_word import list_wake_presets
-                _assistant_names = [p["name"] for p in list_wake_presets()]
-            except Exception:
-                _assistant_names = []
-            data = {
-                "status": "success",
-                "assistant_name": get_assistant_name(),
-                "available_assistant_names": _assistant_names,
-                "wake_phrase": f"Hey {get_assistant_name()}",
-                "voice_name": get_voice(),
-                "response_language": get_response_language(),
-                "voice_accent": get_voice_accent(),
-                "available_accents": list(AVAILABLE_VOICE_ACCENTS),
-                "theme": get_theme(),
-                "accent": get_accent(),
-                **get_avatar_settings(),
-                "fallback_voice": get_fallback_voice(),
-                "fallback_voices": list(FALLBACK_VOICES),
-                "voice_fallback": get_voice_fallback_mode(),
-                "voice_fallback_enabled": get_voice_fallback_mode() == "auto",
-                "autostart_enabled": get_autostart_enabled(),
-                "morning_brief_enabled": get_brief_enabled(),
-                "wake_word_enabled": get_wake_word_enabled(),
-                "push_to_talk_enabled": get_push_to_talk_enabled(),
-                "thinking_enabled": get_thinking_enabled(),
-                "proactive_audio_enabled": get_proactive_audio_enabled(),
-                "has_gemini_key": is_configured(),
-                "gemini_api_key_masked": get_masked_gemini_key(),
-                "has_groq_key": bool(get_groq_api_key()),
-                "groq_api_key_masked": get_masked_groq_key(),
-                "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
-                "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
-                "has_tavily_key": bool(get_tavily_api_key()),
-                "tavily_api_key_masked": get_masked_tavily_key(),
-                "opencode_model": get_opencode_model(),
-                "kilo_model": get_kilo_model(),
-                "antigravity_model": get_antigravity_model(),
-                "preferred_creation_agent": get_preferred_creation_agent(),
-                "preferred_edit_agent": get_preferred_edit_agent(),
-                "pipeline_mode": get_pipeline_mode(),
-                "stt_engine": get_stt_engine(),
-                "llm_engine": get_llm_engine(),
-                "tts_engine": get_tts_engine(),
-                "tts_voice": get_tts_voice(),
-                "available_languages": list(AVAILABLE_LANGUAGES),
-                "available_voices": list(AVAILABLE_VOICES),
-                **self._collect_audio_state(),
-            }
-            return web.json_response(data)
-        except Exception as e:
-            logger.exception("Get config error: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _save_config_handler(self, request: web.Request) -> web.Response:
-        try:
-            data = await request.json()
-            from memory.config_manager import (
-                save_assistant_config, save_voice, save_response_language,
-                get_assistant_name,
-                save_voice_accent, get_voice_accent, AVAILABLE_VOICE_ACCENTS,
-                save_autostart_enabled, save_brief_enabled,
-                save_wake_word_enabled, get_wake_word_enabled,
-                save_push_to_talk_enabled,
-                save_api_keys_transactional,
-                save_pipeline_mode, save_stt_engine, save_llm_engine,
-                save_tts_engine, save_tts_voice, save_voice_fallback_mode,
-                save_fallback_voice,
-                save_preferred_creation_agent, save_preferred_edit_agent,
-                save_opencode_model, save_kilo_model, save_antigravity_model,
-                save_thinking_enabled, save_proactive_audio_enabled,
-                save_theme, save_accent,
-                save_avatar_settings,
-            )
-
-            # 1. Controls
-            if "autostart_enabled" in data or "autostart" in data:
-                save_autostart_enabled(bool(data.get("autostart_enabled", data.get("autostart"))))
-            if "morning_brief_enabled" in data or "morning_brief" in data:
-                save_brief_enabled(bool(data.get("morning_brief_enabled", data.get("morning_brief"))))
-            if "wake_word_enabled" in data or "wake_word" in data:
-                val = bool(data.get("wake_word_enabled", data.get("wake_word")))
-                changed = (val != get_wake_word_enabled())
-                save_wake_word_enabled(val)
-                # Only act on a REAL change — autosave re-sends the same value and
-                # must not cause spurious sleep/wake + session reconnects.
-                if changed and hasattr(self, "on_wake_toggle") and self.on_wake_toggle:
-                    try:
-                        self.on_wake_toggle(val)
-                    except Exception:
-                        pass
-            if "push_to_talk_enabled" in data or "push_to_talk" in data:
-                val = bool(data.get("push_to_talk_enabled", data.get("push_to_talk")))
-                save_push_to_talk_enabled(val)
-                if hasattr(self, "on_ptt_toggle") and self.on_ptt_toggle:
-                    try:
-                        self.on_ptt_toggle(val)
-                    except Exception:
-                        pass
-            if "thinking_enabled" in data:
-                save_thinking_enabled(bool(data["thinking_enabled"]))
-            if "proactive_audio_enabled" in data:
-                save_proactive_audio_enabled(bool(data["proactive_audio_enabled"]))
-            if "theme" in data and data["theme"]:
-                save_theme(str(data["theme"]))
-            if "accent" in data and data["accent"]:
-                save_accent(str(data["accent"]))
-
-            # Avatar customization persistence
-            save_avatar_settings(data)
-
-            # 2. Assistant & Language (identity is user-selectable — see Persona tab)
-            _posted_name = str(data.get("assistant_name") or "").strip()
-            save_assistant_config(_posted_name or get_assistant_name(), "")
-            voice_name = data.get("voice_name")
-            if voice_name is not None:
-                save_voice(str(voice_name).strip())
-            resp_lang = data.get("response_language")
-            if resp_lang is not None:
-                save_response_language(str(resp_lang).strip())
-            voice_accent = data.get("voice_accent")
-            if voice_accent is not None:
-                v_acc = str(voice_accent).strip().lower()
-                if v_acc not in AVAILABLE_VOICE_ACCENTS:
-                    return web.json_response({"status": "error", "message": f"Invalid voice accent: {voice_accent}"}, status=400)
-                save_voice_accent(v_acc)
-
-            # 3. Keys
-            keys_to_save = {}
-            for k in ("gemini_api_key", "groq_api_key", "elevenlabs_api_key", "tavily_api_key",
-                      "gemini_key", "groq_key", "elevenlabs_key", "tavily_key"):
-                val = str(data.get(k) or "").strip()
-                if val and "••••" not in val and "..." not in val:
-                    normalized_k = k if k.endswith("_api_key") else f"{k.replace('_key', '')}_api_key"
-                    keys_to_save[normalized_k] = val
-
-            if keys_to_save:
-                ok, err = save_api_keys_transactional(
-                    gemini_api_key=keys_to_save.get("gemini_api_key"),
-                    groq_api_key=keys_to_save.get("groq_api_key"),
-                    elevenlabs_api_key=keys_to_save.get("elevenlabs_api_key"),
-                    tavily_api_key=keys_to_save.get("tavily_api_key"),
-                    validate=True,
-                )
-                if not ok:
-                    return web.json_response({"status": "error", "message": err}, status=400)
-
-            # 4. Pipeline & Engines
-            if "pipeline_mode" in data:
-                save_pipeline_mode(str(data["pipeline_mode"]))
-            if "stt_engine" in data:
-                save_stt_engine(str(data["stt_engine"]))
-            if "llm_engine" in data:
-                save_llm_engine(str(data["llm_engine"]))
-            if "tts_engine" in data:
-                save_tts_engine(str(data["tts_engine"]))
-            if "tts_voice" in data:
-                save_tts_voice(str(data["tts_voice"]))
-            if "voice_fallback" in data:
-                save_voice_fallback_mode(str(data["voice_fallback"]))
-            if "fallback_voice" in data:
-                save_fallback_voice(str(data["fallback_voice"]))
-
-            # 5. Autonomous Coding Agents & Models
-            if "preferred_creation_agent" in data:
-                save_preferred_creation_agent(str(data["preferred_creation_agent"]))
-            if "preferred_edit_agent" in data:
-                save_preferred_edit_agent(str(data["preferred_edit_agent"]))
-            if "opencode_model" in data:
-                save_opencode_model(str(data["opencode_model"]))
-            if "kilo_model" in data:
-                save_kilo_model(str(data["kilo_model"]))
-            if "antigravity_model" in data:
-                save_antigravity_model(str(data["antigravity_model"]))
-
-            # Notify UI callbacks if relevant
-            if voice_name or resp_lang or _posted_name or voice_accent is not None:
-                current_acc = str(voice_accent).strip().lower() if voice_accent is not None else get_voice_accent()
-                if self.on_assistant_settings_changed:
-                    try:
-                        self.on_assistant_settings_changed(get_assistant_name(), voice_name or "Charon", resp_lang or "auto", current_acc)
-                    except TypeError:
-                        try:
-                            self.on_assistant_settings_changed(get_assistant_name(), voice_name or "Charon", resp_lang or "auto")
-                        except Exception:
-                            pass
-                    except Exception:
-                        pass
-                if getattr(self, "on_accent_change", None) and voice_accent is not None:
-                    try:
-                        self.on_accent_change(current_acc)
-                    except Exception:
-                        pass
-
-            if any(k in data for k in ("pipeline_mode", "stt_engine", "llm_engine", "tts_engine")):
-                if self.on_pipeline_settings_changed:
-                    try:
-                        self.on_pipeline_settings_changed()
-                    except Exception:
-                        pass
-
-            return await self._get_config_handler(request)
-        except Exception as e:
-            logger.exception("Save config error: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _preview_voice_handler(self, request: web.Request) -> web.Response:
-        voice = request.query.get("voice", "Puck").strip().lower()
-        # Check dist assets first, then public assets
-        mp3_path = self.frontend_dir / "dist" / "assets" / "voices" / f"{voice}.mp3"
-        if not mp3_path.exists():
-            mp3_path = self.frontend_dir / "public" / "assets" / "voices" / f"{voice}.mp3"
-        if mp3_path.exists():
-            return web.FileResponse(mp3_path)
-        return web.Response(status=404, text="Voice preview not found")
-
-    async def _dist_file_handler(self, request: web.Request) -> web.Response:
-        filename = request.path.lstrip("/")
-        fp = self.frontend_dir / "dist" / filename
-        if not fp.exists():
-            fp = self.frontend_dir / "public" / filename
-        if fp.exists() and fp.is_file():
-            return web.FileResponse(fp)
-        return web.Response(status=404, text=f"File {filename} not found")
-
-    async def _test_mic_handler(self, request: web.Request) -> web.Response:
-        """Hardware mic sample test: records 1.0s and returns RMS volume and scaled percentage."""
-        try:
-            import numpy as np
-            import sounddevice as sd
-            duration = 1.0
-            fs = 16000
-            rec = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype="float32")
-            sd.wait()
-            rms = float(np.sqrt(np.mean(rec**2)))
-            level = min(100, max(0, int(rms * 450)))
-            return web.json_response({"status": "success", "rms": round(rms, 4), "level": level})
-        except Exception as e:
-            logger.warning("Microphone test error: %s", e)
-            return web.json_response({"status": "error", "message": str(e), "level": 0})
-
-    async def _index_handler(self, request: web.Request) -> web.Response:
-        frontend_dist_idx = self.frontend_dir / "dist" / "index.html"
-        if frontend_dist_idx.exists():
-            return web.FileResponse(
-                frontend_dist_idx,
-                headers={
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    "Pragma": "no-cache",
-                    "Expires": "0",
-                }
-            )
-        return web.Response(
-            text="<h1>ZEZO React Workstation Initializing...</h1><p>Please compile the frontend using: <code>cd frontend && npm run build</code></p>",
-            content_type="text/html",
-            status=503
-        )
-
-    async def _attachments_list_handler(self, request: web.Request) -> web.Response:
-        """Fetch all currently registered file and folder attachments."""
-        try:
-            return web.json_response({
-                "status": "success",
-                "attachments": self.list_attachments()
-            })
-        except Exception as e:
-            logger.exception("Error in /api/attachments handler: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _system_status_handler(self, request: web.Request) -> web.Response:
-        try:
-            import psutil
-            cpu = psutil.cpu_percent(interval=None)
-            mem = psutil.virtual_memory().percent
-            return web.json_response({
-                "status": "success",
-                "cpu": cpu,
-                "mem": mem,
-                "gpu": 0,
-                "net": 0,
-            })
-        except Exception:
-            return web.json_response({"status": "success", "cpu": 0, "mem": 0, "gpu": 0, "net": 0})
-
-    async def _office_view_handler(self, request: web.Request) -> web.Response:
-        frontend_dist_idx = self.frontend_dir / "dist" / "index.html"
-        if frontend_dist_idx.exists():
-            return web.FileResponse(frontend_dist_idx)
-        return web.Response(text="<h1>Agents</h1><p>Open the Agents screen in ZEZO Desktop.</p>", content_type="text/html")
-
-    def _reload_agents_if_modified(self, agents_mgr: Any) -> None:
-        """Check file mtime of config/agents.json. If changed on disk, reload agents manager state."""
-        config_file = getattr(agents_mgr, "config_path", None)
-        if config_file and Path(config_file).exists():
-            try:
-                mtime = Path(config_file).stat().st_mtime
-                if mtime != self._agents_config_mtime:
-                    if hasattr(agents_mgr, "_load_agents"):
-                        agents_mgr._load_agents()
-                    elif hasattr(agents_mgr, "reload"):
-                        agents_mgr.reload()
-                    self._agents_config_mtime = mtime
-            except OSError:
-                pass
-
-    async def _agents_state_handler(self, request: web.Request) -> web.Response:
-        try:
-            from core.agents_manager import agent_manager
-            self._reload_agents_if_modified(agent_manager)
-            return web.json_response({
-                "status": "success",
-                "agents": agent_manager.get_agents_state()
-            })
-        except Exception as e:
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _agent_profile_handler(self, request: web.Request) -> web.Response:
-        agent_id = request.query.get("id", "").strip()
-        try:
-            from core.agents_manager import agent_manager
-            self._reload_agents_if_modified(agent_manager)
-            res = agent_manager.get_agent_full_profile(agent_id)
-            return web.json_response(res)
-        except Exception as e:
-            return web.json_response({"success": False, "error": str(e)}, status=500)
-
-    async def _save_agent_handler(self, request: web.Request) -> web.Response:
-        try:
-            data = await request.json()
-            from core.agents_manager import agent_manager
-            res = agent_manager.save_agent_profile(data)
-            self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
-            return web.json_response(res)
-        except Exception as e:
-            return web.json_response({"success": False, "error": str(e)}, status=500)
-
-    async def _save_soul_handler(self, request: web.Request) -> web.Response:
-        try:
-            data = await request.json()
-            agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
-            soul = str(data.get("soul_prompt") or data.get("soul_md") or data.get("prompt_prefix") or "").strip()
-            from core.agents_manager import agent_manager
-            res = agent_manager.save_agent_soul(agent_id, soul)
-            self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
-            return web.json_response(res)
-        except Exception as e:
-            return web.json_response({"success": False, "error": str(e)}, status=500)
-
-    async def _dispatch_agent_task_handler(self, request: web.Request) -> web.Response:
-        try:
-            data = await request.json()
-            agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
-            prompt = str(data.get("prompt") or data.get("task") or "").strip()
-            path = data.get("path")
-            from core.agents_manager import agent_manager
-            res = agent_manager.dispatch_task(agent_id, prompt, path)
-            self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
-            return web.json_response(res)
-        except Exception as e:
-            return web.json_response({"success": False, "error": str(e)}, status=500)
-
-    async def _agent_chat_handler(self, request: web.Request) -> web.Response:
-        """Interactive real-time conversational chat response from a agent.
-        Routes the prompt directly and verbatim to agent_manager.dispatch_task using the agent's configured engine.
-        """
-        try:
-            data = await request.json()
-            agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
-            prompt = str(data.get("prompt") or data.get("message") or "").strip()
-            engine_override = (data.get("engine") or "").strip() or None
-            model_override = (data.get("model") or "").strip() or None
-            path = data.get("path")
-
-            if not prompt:
-                return web.json_response({"success": False, "error": "Prompt cannot be empty."}, status=400)
-
-            from core.agents_manager import agent_manager
-            self._reload_agents_if_modified(agent_manager)
-            agent = agent_manager.get_agent(agent_id) or agent_manager.resolve_agent_by_mention_or_capability(agent_id)
-            if not agent:
-                return web.json_response({"success": False, "error": f"Agent '{agent_id}' not found."}, status=404)
-
-            # Resolve configured engine tool (antigravity_run, opencode_run, kilo_run)
-            raw_engine = engine_override or getattr(agent, "engine", None) or getattr(agent, "default_tool", None) or "antigravity_run"
-            engine_name = raw_engine.replace("_run", "").replace("_agent", "")
-            engine_tool = f"{engine_name}_run"
-
-            # Apply engine override to agent if specified
-            if engine_override:
-                agent.engine = engine_name
-                agent.default_tool = engine_tool
-
-            agent_display_name = getattr(agent, "displayName", None) or getattr(agent, "name", agent.id)
-            agent_role = getattr(agent, "role", "") or "Autonomous Agent"
-            agent_specialty = getattr(agent, "specialty", "") or ""
-            agent_soul = getattr(agent, "soul_markdown", "") or getattr(agent, "prompt_prefix", "") or ""
-
-            # Check if user explicitly requested background task execution
-            lower_prompt = prompt.lower().strip()
-            is_explicit_task_dispatch = lower_prompt.startswith(("/task", "/dispatch", "/build", "/run-task"))
-
-            task_id = None
-            if is_explicit_task_dispatch:
-                logger.info("[AgentChat] Explicit task dispatch for agent %s: %s", agent.id, prompt[:60])
-                clean_task_prompt = prompt.split(" ", 1)[1] if " " in prompt else prompt
-                dispatch_res = agent_manager.dispatch_task(
-                    agent_id=agent.id,
-                    prompt=clean_task_prompt,
-                    path=path,
-                    model_override=model_override,
-                )
-                self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
-
-                if isinstance(dispatch_res, dict) and dispatch_res.get("success") is False:
-                    err_msg = dispatch_res.get("error") or "Task dispatch failed."
-                    return web.json_response({
-                        "success": False,
-                        "error": err_msg,
-                        "reply": f"Could not start task: {err_msg}",
-                        "agent_id": agent.id,
-                    }, status=500)
-
-                task_id = dispatch_res.get("task_id") if isinstance(dispatch_res, dict) else None
-                if not task_id and isinstance(dispatch_res, dict) and dispatch_res.get("tasks"):
-                    tasks = dispatch_res.get("tasks")
-                    if isinstance(tasks, list) and len(tasks) > 0:
-                        task_id = tasks[0].get("task_id")
-
-                reply_text = f"I have started working on your task using {engine_tool}! (Task ID: {task_id}). You can follow my live progress on my desk monitor or ask for status."
-            else:
-                # Direct conversational 1-on-1 dialogue with Hamza
-                logger.info("[AgentChat] Generating direct conversational reply from %s: %s", agent.name, prompt[:60])
-                from core import gemini
-
-                persona_system = (
-                    f"You are {agent_display_name}, {agent_role} in the autonomous ZEZO OS fleet.\n"
-                    f"Your specialty: {agent_specialty}.\n"
-                    f"{agent_soul}\n"
-                    f"You are in a direct 1-on-1 chat with Hamza Bukhari (Creator & Lead Architect of ZEZO).\n"
-                    f"Style Guidelines:\n"
-                    f"- Speak directly in first-person as {agent_display_name}.\n"
-                    f"- Be professional, sharp, and concise. Talk naturally like a top-tier engineer/architect.\n"
-                    f"- If greeted or asked a question, converse directly.\n"
-                    f"- If asked for thoughts or planning, give crisp architectural guidance.\n"
-                    f"- Never output robotic canned dispatch messages."
-                )
-
-                workspace_context = f"\nCurrent Workspace: {path}" if path else ""
-                full_query = f"{persona_system}{workspace_context}\n\nHamza: {prompt}\n{agent_display_name}:"
-
-                model_tier = model_override or gemini.FAST
-                loop = asyncio.get_running_loop()
-                reply_text = await loop.run_in_executor(
-                    None,
-                    lambda: gemini.text(full_query, tier=model_tier, timeout_ms=12000, allow_live=True)
-                )
-
-                if not reply_text:
-                    reply_text = f"Hello Hamza! {agent_display_name} here. Ready to collaborate with you on {agent_role}."
-
-            return web.json_response({
-                "success": True,
-                "agent_id": agent.id,
-                "agent_name": agent_display_name,
-                "reply": reply_text,
-                "task_id": task_id,
-                "engine": engine_tool,
-                "model": model_override or getattr(agent, "model_id", ""),
-            })
-        except Exception as e:
-            logger.exception("Error in _agent_chat_handler: %s", e)
-            return web.json_response({"success": False, "error": str(e)}, status=500)
-
-    async def _delete_agent_handler(self, request: web.Request) -> web.Response:
-        try:
-            data = await request.json()
-            agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
-            from core.agents_manager import agent_manager
-            res = agent_manager.delete_agent(agent_id)
-            self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
-            return web.json_response(res)
-        except Exception as e:
-            return web.json_response({"success": False, "error": str(e)}, status=500)
-
-    async def _open_agent_folder_handler(self, request: web.Request) -> web.Response:
-        try:
-            data = await request.json()
-            raw_path = str(data.get("path") or "").strip()
-            if not raw_path or raw_path.lower() in ("direct workspace", "main"):
-                target_path = BASE_DIR
-            else:
-                p = Path(raw_path)
-                if not p.is_absolute():
-                    p = BASE_DIR / p
-                target_path = p
-
-            if not target_path.exists():
-                target_path.mkdir(parents=True, exist_ok=True)
-
-            # Open folder in native OS file explorer (Windows / macOS / Linux)
-            import platform
-            system = platform.system()
-            if system == "Windows":
-                os.startfile(str(target_path))
-            elif system == "Darwin":
-                subprocess.Popen(["open", str(target_path)])
-            else:
-                subprocess.Popen(["xdg-open", str(target_path)])
-
-            return web.json_response({"success": True, "path": str(target_path)})
-        except Exception as e:
-            logger.warning("[UI Server] Failed to open folder in explorer: %s", e)
-            return web.json_response({"success": False, "error": str(e)}, status=500)
-
-    async def _pick_agent_folder_handler(self, request: web.Request) -> web.Response:
-        """Open native OS folder selection dialog and return the chosen path."""
-        try:
-            data = await request.json() if request.can_read_body else {}
-        except Exception:
-            data = {}
-        initial_dir = str(data.get("initial_dir") or "").strip()
-        if not initial_dir or not Path(initial_dir).exists():
-            initial_dir = str(Path.home() / "Desktop" if (Path.home() / "Desktop").exists() else Path.home())
-
-        def _open_native_dialog() -> str:
-            selected_path = ""
-            try:
-                import tkinter as tk
-                from tkinter import filedialog
-                root = tk.Tk()
-                root.withdraw()
-                root.attributes("-topmost", True)
-                chosen = filedialog.askdirectory(
-                    initialdir=initial_dir,
-                    title="Select Workspace Folder for Agent"
-                )
-                root.destroy()
-                if chosen:
-                    selected_path = str(Path(chosen).resolve()).replace("\\", "/")
-            except Exception as ex:
-                logger.debug("[UI Server] Tkinter dialog fallback: %s", ex)
-
-            # PowerShell fallback if tkinter failed or returned empty
-            if not selected_path:
-                try:
-                    import platform
-                    if platform.system() == "Windows":
-                        ps_script = (
-                            "[System.Reflection.Assembly]::LoadWithPartialName('System.windows.forms') | Out-Null; "
-                            "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
-                            f"$f.SelectedPath = '{initial_dir.replace('/', chr(92))}'; "
-                            "$f.Description = 'Select Workspace Folder for Agent'; "
-                            "if ($f.ShowDialog((New-Object System.Windows.Forms.NativeWindow)) -eq [System.Windows.Forms.DialogResult]::OK) { "
-                            "Write-Output $f.SelectedPath }"
-                        )
-                        res = subprocess.run(
-                            ["powershell", "-NoProfile", "-Command", ps_script],
-                            capture_output=True,
-                            text=True,
-                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
-                            timeout=60,
-                        )
-                        out = res.stdout.strip()
-                        if out and Path(out).exists():
-                            selected_path = str(Path(out).resolve()).replace("\\", "/")
-                except Exception as ex:
-                    logger.debug("[UI Server] PowerShell folder dialog fallback error: %s", ex)
-
-            return selected_path
-
-        loop = asyncio.get_running_loop()
-        try:
-            chosen = await loop.run_in_executor(None, _open_native_dialog)
-            if chosen:
-                return web.json_response({"success": True, "path": chosen})
-            return web.json_response({"success": False, "cancelled": True})
-        except Exception as e:
-            logger.warning("[UI Server] Error in pick folder dialog: %s", e)
-            return web.json_response({"success": False, "error": str(e)}, status=500)
-
-    async def _skills_list_handler(self, request: web.Request) -> web.Response:
-        """Return list of discovered declarative skills, optionally filtered by domain."""
-        domain = request.query.get("domain")
-        try:
-            from core.skill_loader import get_skill_registry, SKILLS_DIR
-            reg = get_skill_registry()
-
-            # Check filesystem mtime of the skills/ directory. If changed since last scan, reload dynamically.
-            skills_dir = getattr(reg, "_dir", SKILLS_DIR)
-            current_mtime = reg.get_mtime() if hasattr(reg, "get_mtime") else (skills_dir.stat().st_mtime if skills_dir.exists() else 0.0)
-            if current_mtime != self._skills_dir_mtime:
-                reg.reload()
-                self._skills_dir_mtime = current_mtime
-
-            skills = reg.list_skills(domain=domain)
-            domains = reg.list_domains()
-            return web.json_response({"status": "success", "skills": skills, "domains": domains})
-        except Exception as e:
-            logger.exception("Error in /api/skills handler: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _models_list_handler(self, request: web.Request) -> web.Response:
-        """Return dynamic, categorized model lists from core.models."""
-        try:
-            from core import models
-            engine = request.query.get("engine")
-
-            opencode_models = [
-                "opencode/big-pickle",
-                "opencode/nemotron-3-ultra-free",
-                "opencode/nemotron-3.5-lightning-free",
-                "opencode/mimo-v2.6-flash-free",
-                "opencode/ling-3.1-flash-free",
-                "opencode/longcat-2.5-preview-free",
-                "opencode/space-bunny-free",
-                "opencode/fledge-alpha-free",
-                "opencode/muse-spark-1.3-contributor-free",
-                "openrouter/openrouter/free",
-                "openrouter/google/gemma-4-31b-it:free",
-                "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
-            ]
-            kilo_models = [
-                "kilo/kilo-auto/free",
-                "kilo/stepfun/step-3.7-flash:free",
-                "kilo/deepseek/deepseek-chat:free",
-                "kilo/qwen/qwen-2.5-coder-32b-instruct:free",
-                "kilo/minimax/minimax-01:free",
-                "kilo/nvidia/nemotron-3-ultra-550b-a55b:free",
-                "kilo/poolside/laguna-s-2.1:free",
-            ]
-            antigravity_models = list(models.ANTIGRAVITY_CLI_MODELS)
-            groq_models = [
-                "groq/llama-3.3-70b-versatile",
-                "groq/deepseek-r1-distill-llama-70b",
-                "groq/qwen-2.5-coder-32b",
-            ]
-            gemini_models = list(dict.fromkeys(models.GEMINI_FAST_MODELS + models.GEMINI_SMART_MODELS))
-
-            categorized = {
-                "opencode_run": opencode_models,
-                "kilo_run": kilo_models,
-                "antigravity_run": antigravity_models,
-                "groq": groq_models,
-                "gemini": gemini_models,
-                "none": gemini_models + groq_models,
-            }
-
-            all_models = list(dict.fromkeys(
-                antigravity_models + opencode_models + kilo_models + groq_models + gemini_models
-            ))
-
-            if engine and engine in categorized:
-                return web.json_response({
-                    "status": "success",
-                    "engine": engine,
-                    "models": categorized[engine],
-                    "all_models": all_models,
-                })
-
-            return web.json_response({
-                "status": "success",
-                "default_engine_models": categorized,
-                "all_models": all_models,
-            })
-        except Exception as e:
-            logger.exception("Error in /api/models handler: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _code_engines_handler(self, request: web.Request) -> web.Response:
-        """Return status for all registered coding engines."""
-        try:
-            from core.code_engines import probe_all_engines, get_default_engine
-            engines = await asyncio.to_thread(probe_all_engines, False)
-            default_engine = get_default_engine()
-            return web.json_response({
-                "status": "success",
-                "engines": engines,
-                "default_engine": default_engine,
-            })
-        except Exception as e:
-            logger.exception("Error in /api/code_engines handler: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _code_engines_probe_handler(self, request: web.Request) -> web.Response:
-        """Force re-probe of a specific engine or all engines."""
-        try:
-            data = await request.json() if request.can_read_body else {}
-            engine_id = data.get("engine_id")
-            from core.code_engines import probe_engine, probe_all_engines, get_default_engine
-            if engine_id:
-                engine = await asyncio.to_thread(probe_engine, str(engine_id), True)
-                return web.json_response({"status": "success", "engine": engine})
-            engines = await asyncio.to_thread(probe_all_engines, True)
-            return web.json_response({
-                "status": "success",
-                "engines": engines,
-                "default_engine": get_default_engine(),
-            })
-        except Exception as e:
-            logger.exception("Error in /api/code_engines/probe handler: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _code_engines_default_handler(self, request: web.Request) -> web.Response:
-        """Save default code engine."""
-        try:
-            data = await request.json() if request.can_read_body else {}
-            engine_id = data.get("engine_id")
-            from core.code_engines import set_default_engine
-            ok = set_default_engine(str(engine_id))
-            return web.json_response({"status": "success" if ok else "error"})
-        except Exception as e:
-            logger.exception("Error in /api/code_engines/default handler: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _audio_devices_handler(self, request: web.Request) -> web.Response:
-        """Return real host audio input/output devices and current configuration."""
-        try:
-            return web.json_response(self._collect_audio_state())
-        except Exception as e:
-            logger.exception("Error in /api/audio_devices handler: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _skills_mode_handler(self, request: web.Request) -> web.Response:
-        """Update toggle mode (pinned, disabled, auto_activate) for a skill."""
-        try:
-            data = await request.json()
-            name = str(data.get("name") or "").strip()
-            pinned = bool(data.get("pinned", False))
-            disabled = bool(data.get("disabled", False))
-            auto_activate = bool(data.get("auto_activate", True))
-
-            from core.skill_loader import get_skill_registry
-            reg = get_skill_registry()
-            ok = reg.set_skill_mode(name, pinned=pinned, disabled=disabled, auto_activate=auto_activate)
-            if not ok:
-                return web.json_response({"status": "error", "message": f"Skill '{name}' not found"}, status=404)
-            return web.json_response({"status": "success", "name": name, "pinned": pinned, "disabled": disabled, "auto_activate": auto_activate})
-        except Exception as e:
-            logger.exception("Error in /api/skills/mode handler: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _skills_install_handler(self, request: web.Request) -> web.Response:
-        """Install a new skill from local file path or zip archive."""
-        try:
-            data = await request.json()
-            source = str(data.get("source") or data.get("path") or "").strip()
-            domain = str(data.get("domain") or "").strip()
-            if not source:
-                return web.json_response({"status": "error", "message": "Source path or zip required"}, status=400)
-
-            from core.skill_loader import get_skill_registry
-            reg = get_skill_registry()
-            ok, msg = reg.install_skill(source, target_domain=domain)
-            if not ok:
-                return web.json_response({"status": "error", "message": msg}, status=400)
-            if hasattr(reg, "get_mtime"):
-                self._skills_dir_mtime = reg.get_mtime()
-            return web.json_response({"status": "success", "message": msg, "skills": reg.list_skills()})
-        except Exception as e:
-            logger.exception("Error in /api/skills/install handler: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _skills_save_handler(self, request: web.Request) -> web.Response:
-        """Synthesize or update a declarative skill package."""
-        try:
-            data = await request.json()
-            name = str(data.get("name") or "").strip()
-            desc = str(data.get("description") or "").strip()
-            instructions = str(data.get("instructions") or "").strip()
-            domain = str(data.get("domain") or "").strip()
-            author = str(data.get("author") or "user").strip()
-            triggers = data.get("triggers") if isinstance(data.get("triggers"), list) else None
-            tags = data.get("tags") if isinstance(data.get("tags"), list) else None
-
-            from core.skill_loader import get_skill_registry
-            reg = get_skill_registry()
-            ok, msg = reg.save_learned_skill(
-                name=name,
-                description=desc,
-                instructions=instructions,
-                domain=domain,
-                author=author,
-                triggers=triggers,
-                tags=tags,
-            )
-            if not ok:
-                return web.json_response({"status": "error", "message": msg}, status=400)
-            if hasattr(reg, "get_mtime"):
-                self._skills_dir_mtime = reg.get_mtime()
-            return web.json_response({"status": "success", "message": msg, "skills": reg.list_skills()})
-        except Exception as e:
-            logger.exception("Error in /api/skills/save handler: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _skills_delete_handler(self, request: web.Request) -> web.Response:
-        """Delete a skill package from disk."""
-        try:
-            data = await request.json()
-            name = str(data.get("name") or "").strip()
-            from core.skill_loader import get_skill_registry
-            reg = get_skill_registry()
-            ok, msg = reg.delete_skill(name)
-            if not ok:
-                return web.json_response({"status": "error", "message": msg}, status=404)
-            if hasattr(reg, "get_mtime"):
-                self._skills_dir_mtime = reg.get_mtime()
-            return web.json_response({"status": "success", "message": msg, "skills": reg.list_skills()})
-        except Exception as e:
-            logger.exception("Error in /api/skills/delete handler: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _memory_stats_handler(self, request: web.Request) -> web.Response:
-        try:
-            from memory.sqlite_memory import get_db_path
-            from core.repo_context import get_last_repo
-            db_path = get_db_path()
-            size_bytes = db_path.stat().st_size if db_path.exists() else 0
-            turns_count = 0
-            facts_count = 0
-            if db_path.exists():
-                import sqlite3
-                with sqlite3.connect(str(db_path)) as conn:
-                    try:
-                        c = conn.cursor()
-                        c.execute("SELECT COUNT(*) FROM history_turns")
-                        turns_count = c.fetchone()[0]
-                    except Exception:
-                        pass
-                    try:
-                        c.execute("SELECT COUNT(*) FROM facts")
-                        facts_count = c.fetchone()[0]
-                    except Exception:
-                        pass
-            active_ws = get_last_repo() or str(BASE_DIR)
-            return web.json_response({
-                "status": "success",
-                "db_path": str(db_path),
-                "db_size_kb": round(size_bytes / 1024, 1),
-                "turns_count": turns_count,
-                "facts_count": facts_count,
-                "active_workspace": active_ws,
-                "fts5_enabled": True,
-            })
-        except Exception as e:
-            logger.exception("Error in /api/memory/stats: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _memory_graph_handler(self, request: web.Request) -> web.Response:
-        """Fetch compiled knowledge graph topology (nodes + links) from Markdown vault."""
-        try:
-            from memory.vault_engine import vault_engine
-            graph_data = vault_engine.get_graph()
-            return web.json_response(graph_data)
-        except Exception as e:
-            logger.exception("Error in /api/memory/graph: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _memory_notes_list_handler(self, request: web.Request) -> web.Response:
-        """Fetch list of all markdown memory notes in the vault."""
-        try:
-            from memory.vault_engine import vault_engine
-            notes = vault_engine.get_all_notes()
-            return web.json_response({"status": "success", "notes": notes})
-        except Exception as e:
-            logger.exception("Error in /api/memory/notes: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _memory_note_detail_handler(self, request: web.Request) -> web.Response:
-        """Fetch full markdown content and outbound links for a specific note."""
-        try:
-            file_param = request.query.get("file") or request.query.get("id") or ""
-            if not file_param:
-                return web.json_response({"status": "error", "message": "Missing file or id parameter"}, status=400)
-            from memory.vault_engine import vault_engine
-            note = vault_engine.get_note_content(file_param)
-            if not note:
-                return web.json_response({"status": "error", "message": "Note not found"}, status=404)
-            return web.json_response({"status": "success", "note": note})
-        except Exception as e:
-            logger.exception("Error in /api/memory/note: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _memory_save_note_handler(self, request: web.Request) -> web.Response:
-        """Save or edit content of an existing markdown note."""
-        try:
-            data = await request.json()
-            file_name = str(data.get("file") or "").strip()
-            content = str(data.get("content") or "")
-            if not file_name:
-                return web.json_response({"status": "error", "message": "File name required"}, status=400)
-            from memory.vault_engine import vault_engine
-            res = vault_engine.save_note(file_name, content)
-            self.broadcast("memory_updated", {"action": "saved", "file": file_name})
-            return web.json_response(res)
-        except Exception as e:
-            logger.exception("Error in /api/memory/note save: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _memory_create_note_handler(self, request: web.Request) -> web.Response:
-        """Create a new memory note in the vault."""
-        try:
-            data = await request.json()
-            title = str(data.get("title") or "").strip()
-            category = str(data.get("category") or "knowledge").strip()
-            content = str(data.get("content") or "").strip()
-            tags = data.get("tags") if isinstance(data.get("tags"), list) else None
-            if not title:
-                return web.json_response({"status": "error", "message": "Title required"}, status=400)
-            from memory.vault_engine import vault_engine
-            res = vault_engine.create_note(title, category, content, tags)
-            self.broadcast("memory_updated", {"action": "created", "title": title})
-            return web.json_response(res)
-        except Exception as e:
-            logger.exception("Error in /api/memory/add: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _memory_delete_note_handler(self, request: web.Request) -> web.Response:
-        """Delete a memory note from the vault."""
-        try:
-            data = await request.json()
-            file_name = str(data.get("file") or "").strip()
-            if not file_name:
-                return web.json_response({"status": "error", "message": "File name required"}, status=400)
-            from memory.vault_engine import vault_engine
-            res = vault_engine.delete_note(file_name)
-            self.broadcast("memory_updated", {"action": "deleted", "file": file_name})
-            return web.json_response(res)
-        except Exception as e:
-            logger.exception("Error in /api/memory/delete: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _memory_clear_handler(self, request: web.Request) -> web.Response:
-        try:
-            from memory.memory_manager import clear_pending_outbox
-            clear_pending_outbox()
-            from memory.sqlite_memory import get_db_path
-            db_path = get_db_path()
-            if db_path.exists():
-                import sqlite3
-                with sqlite3.connect(str(db_path)) as conn:
-                    conn.execute("DELETE FROM turns")
-                    try:
-                        conn.execute("DELETE FROM turns_fts")
-                    except Exception:
-                        pass
-                    conn.commit()
-            return web.json_response({"status": "success", "message": "Conversation history cleared"})
-        except Exception as e:
-            logger.exception("Error in /api/memory/clear: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _memory_wipe_all_handler(self, request: web.Request) -> web.Response:
-        """Atomically purge all 4 memory layers: SQLite turns/facts, Vault Markdown notes, and long_term.json."""
-        try:
-            from memory.sqlite_memory import wipe_all_sqlite_memory
-            from memory.vault_engine import vault_engine
-            from memory.memory_manager import wipe_all_long_term_json, clear_pending_outbox
-
-            clear_pending_outbox()
-
-            preserve_profile = False
-            try:
-                if request.can_read_body:
-                    body = await request.json()
-                    preserve_profile = bool(body.get("preserve_profile", False))
-            except Exception:
-                preserve_profile = False
-
-            sqlite_counts = wipe_all_sqlite_memory()
-            vault_res = vault_engine.wipe_all_vault_memory(preserve_profile=preserve_profile)
-            wipe_all_long_term_json()
-
-            self.broadcast("memory_updated", {"action": "wiped", "details": sqlite_counts})
-
-            return web.json_response({
-                "status": "success",
-                "message": "All memory layers successfully wiped and reset to clean state",
-                "sqlite_deleted": sqlite_counts,
-                "vault_deleted_conv_files": vault_res.get("deleted_conv_files", 0),
-            })
-        except Exception as e:
-            logger.exception("Error in /api/memory/wipe_all: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _memory_optimize_handler(self, request: web.Request) -> web.Response:
-        try:
-            from memory.sqlite_memory import get_db_path
-            db_path = get_db_path()
-            if db_path.exists():
-                import sqlite3
-                with sqlite3.connect(str(db_path)) as conn:
-                    conn.execute("PRAGMA optimize")
-                    conn.execute("VACUUM")
-            return web.json_response({"status": "success", "message": "Memory database optimized and vacuumed"})
-        except Exception as e:
-            logger.exception("Error in /api/memory/optimize: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _memory_fact_delete_handler(self, request: web.Request) -> web.Response:
-        """Endpoint to forget or revert a specific memory fact."""
-        try:
-            data = await request.json()
-            category = str(data.get("category") or "notes").strip().lower()
-            key = str(data.get("key") or "").strip()
-            restore_value = data.get("restore_value")
-
-            if not key:
-                return web.json_response({"status": "error", "message": "Key is required"}, status=400)
-
-            from memory.memory_manager import queue_memory_forget, queue_memory_write
-            loop = asyncio.get_running_loop()
-
-            if restore_value is not None:
-                # Revert to previous value
-                res = await loop.run_in_executor(None, queue_memory_write, category, key, str(restore_value))
-            else:
-                # Forget fact
-                res = await loop.run_in_executor(None, queue_memory_forget, category, key)
-
-            return web.json_response({"status": "success", "result": res})
-        except Exception as e:
-            logger.exception("Error in /api/memory/fact/delete: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _memory_fact_retry_handler(self, request: web.Request) -> web.Response:
-        """Endpoint to retry saving a failed memory fact."""
-        try:
-            from memory.memory_state import is_memory_paused
-            if is_memory_paused():
-                return web.json_response(
-                    {"status": "error", "message": "Cannot retry save while memory is paused."},
-                    status=400,
-                )
-
-            data = await request.json()
-            category = str(data.get("category") or "notes").strip().lower()
-            key = str(data.get("key") or "").strip()
-            value = str(data.get("value") or "").strip()
-
-            canonical_categories = {"identity", "preferences", "projects", "relationships", "wishes", "notes"}
-            if category not in canonical_categories:
-                return web.json_response(
-                    {"status": "error", "message": f"Invalid category '{category}'. Must be one of {sorted(canonical_categories)}"},
-                    status=400,
-                )
-
-            if not key or not value:
-                return web.json_response({"status": "error", "message": "Key and value are required"}, status=400)
-
-            from memory.memory_manager import queue_memory_write
-            loop = asyncio.get_running_loop()
-            res = await loop.run_in_executor(None, queue_memory_write, category, key, value)
-            return web.json_response({"status": "success", "result": res})
-        except Exception as e:
-            logger.exception("Error in /api/memory/fact/retry: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _memory_pause_get_handler(self, request: web.Request) -> web.Response:
-        """Get current incognito memory pause state."""
-        try:
-            from memory.memory_state import is_memory_paused
-            return web.json_response({"paused": is_memory_paused()})
-        except Exception as e:
-            logger.exception("Error in GET /api/memory/pause: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _memory_pause_set_handler(self, request: web.Request) -> web.Response:
-        """Toggle or set incognito memory pause state."""
-        try:
-            data = await request.json()
-            paused = bool(data.get("paused", False))
-            from memory.memory_state import set_memory_paused
-            set_memory_paused(paused)
-            self.broadcast("memory_pause_changed", {"paused": paused})
-            return web.json_response({"status": "success", "paused": paused})
-        except Exception as e:
-            logger.exception("Error in POST /api/memory/pause: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _workspace_set_handler(self, request: web.Request) -> web.Response:
-        try:
-            data = await request.json()
-            ws_path = str(data.get("path") or "").strip()
-            from core.repo_context import remember_repo, forget_repo
-            if ws_path and ws_path.lower() != "reset":
-                remember_repo(ws_path)
-            else:
-                forget_repo()
-            from core.repo_context import get_last_repo
-            active_ws = get_last_repo() or str(BASE_DIR)
-            return web.json_response({"status": "success", "active_workspace": active_ws})
-        except Exception as e:
-            logger.exception("Error in /api/workspace/set: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _workspace_pick_handler(self, request: web.Request) -> web.Response:
-        """Open native OS folder dialog, attach folder as active workspace, and notify live session."""
-        try:
-            data = await request.json() if request.can_read_body else {}
-        except Exception:
-            data = {}
-        initial_dir = str(data.get("initial_dir") or "").strip()
-        if not initial_dir or not Path(initial_dir).exists():
-            from core.repo_context import get_last_repo
-            initial_dir = get_last_repo() or str(Path.home() / "Desktop" if (Path.home() / "Desktop").exists() else Path.home())
-
-        def _open_native_dialog() -> str:
-            selected_path = ""
-            try:
-                import tkinter as tk
-                from tkinter import filedialog
-                root = tk.Tk()
-                root.withdraw()
-                root.attributes("-topmost", True)
-                chosen = filedialog.askdirectory(
-                    initialdir=initial_dir,
-                    title="Select Workspace Folder for ZEZO"
-                )
-                root.destroy()
-                if chosen:
-                    selected_path = str(Path(chosen).resolve()).replace("\\", "/")
-            except Exception as ex:
-                logger.debug("[UI Server] Tkinter dialog fallback: %s", ex)
-
-            if not selected_path:
-                try:
-                    import platform
-                    if platform.system() == "Windows":
-                        ps_script = (
-                            "[System.Reflection.Assembly]::LoadWithPartialName('System.windows.forms') | Out-Null; "
-                            "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
-                            f"$f.SelectedPath = '{initial_dir.replace('/', chr(92))}'; "
-                            "$f.Description = 'Select Workspace Folder for ZEZO'; "
-                            "if ($f.ShowDialog((New-Object System.Windows.Forms.NativeWindow)) -eq [System.Windows.Forms.DialogResult]::OK) { "
-                            "Write-Output $f.SelectedPath }"
-                        )
-                        res = subprocess.run(
-                            ["powershell", "-NoProfile", "-Command", ps_script],
-                            capture_output=True,
-                            text=True,
-                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
-                            timeout=60,
-                        )
-                        out = res.stdout.strip()
-                        if out and Path(out).exists():
-                            selected_path = str(Path(out).resolve()).replace("\\", "/")
-                except Exception as ex:
-                    logger.debug("[UI Server] PowerShell folder dialog fallback error: %s", ex)
-
-            return selected_path
-
-        loop = asyncio.get_running_loop()
-        try:
-            chosen = await loop.run_in_executor(None, _open_native_dialog)
-            if not chosen:
-                return web.json_response({"status": "canceled", "cancelled": True})
-
-            folder_path = Path(chosen).resolve()
-            if not folder_path.exists() or not folder_path.is_dir():
-                return web.json_response({"status": "error", "message": "Invalid directory selected"}, status=400)
-
-            folder_name = folder_path.name
-            from core.repo_context import remember_repo
-            remember_repo(str(folder_path))
-            try:
-                from memory.memory_manager import remember
-                remember("active_project", str(folder_path), category="projects")
-            except Exception:
-                pass
-
-            rel_paths, total_size, truncated = _scan_folder(folder_path, cap=5000)
-
-            folder_info = {
-                "name": folder_name,
-                "path": str(folder_path).replace("\\", "/"),
-                "size": total_size,
-                "file_type": "folder",
-                "is_folder": True,
-                "files_count": len(rel_paths),
-                "text": "",
-                "engine": "attached",
-                "is_truncated": truncated,
-            }
-
-            self.register_attachment(folder_info)
-            self.broadcast("file_ingested", folder_info)
-            self.broadcast("log", {
-                "text": f"[Workspace] Attached local folder '{folder_name}' ({len(rel_paths)} files). Path: {folder_path}"
-            })
-
-            if self.on_file_uploaded:
-                try:
-                    self.on_file_uploaded(folder_info)
-                except Exception as e:
-                    logger.warning("on_file_uploaded callback error: %s", e)
-
-            return web.json_response({
-                "status": "success",
-                "folder": folder_info,
-                "files": [folder_info],
-            })
-        except Exception as e:
-            logger.exception("Error in /api/workspace/pick: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _get_backend_logs_handler(self, request: web.Request) -> web.Response:
-        try:
-            from core import log_bus
-            min_lvl = request.query.get("min_level", "DEBUG")
-            snapshot = log_bus.snapshot(min_level=min_lvl)
-            return web.json_response({
-                "status": "success",
-                "lines": snapshot[-1200:] if len(snapshot) > 1200 else snapshot,
-                "stats": log_bus.stats(),
-                "sources": log_bus.sources(),
-            })
-        except Exception as e:
-            logger.exception("Error in /api/backend_logs handler: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _clear_backend_logs_handler(self, request: web.Request) -> web.Response:
-        try:
-            from core import log_bus
-            log_bus.clear()
-            self.broadcast("backend_logs_cleared", {})
-            return web.json_response({"status": "success", "message": "Backend logs cleared"})
-        except Exception as e:
-            logger.exception("Error in /api/backend_logs/clear: %s", e)
-            return web.json_response({"status": "error", "message": str(e)}, status=500)
-
-    async def _avatar_handler(self, request: web.Request) -> web.Response:
-        for p in (
-            self.frontend_dir / "dist" / "zezo-avatar.png",
-            self.frontend_dir / "public" / "zezo-avatar.png",
-            BASE_DIR / "frontend" / "public" / "zezo-avatar.png",
-            BASE_DIR / "web" / "dist" / "zezo-avatar.png",
-            BASE_DIR / "web" / "public" / "zezo-avatar.png",
-        ):
-            if p.exists():
-                return web.FileResponse(p)
-        return web.Response(status=404)
-
-    def _resolve_remote_details(self) -> tuple[str, str]:
-        url, key = "", ""
-        if self.on_remote_clicked:
-            try:
-                res = self.on_remote_clicked()
-                if res:
-                    url, key = str(res[0]), str(res[1])
-            except Exception as e:
-                logger.warning("on_remote_clicked error: %s", e)
-        if not url:
-            # Honor a public URL override (e.g. Cloudflare Tunnel) so the
-            # desktop UI's "Remote Control" button / QR code point at the
-            # internet-reachable endpoint instead of the LAN IP.
-            try:
-                import os
-                pu = os.environ.get("ZEZO_PUBLIC_URL", "").strip()
-                if not pu:
-                    from memory.config_manager import get_public_url
-                    pu = get_public_url()
-                if pu:
-                    url = pu
-            except Exception:
-                url = ""
-            if not url:
-                import socket
-                lan_ip = "127.0.0.1"
-                try:
-                    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                    s.connect(("8.8.8.8", 80))
-                    lan_ip = s.getsockname()[0]
-                    s.close()
-                except Exception:
-                    pass
-                url = f"http://{lan_ip}:8000"
-        if not key:
-            key = "8F3A-9K"
-        return url, key
-
-    async def _remote_gateway_handler(self, request: web.Request) -> web.Response:
-        url, key = self._resolve_remote_details()
-        tm = getattr(self, "tunnel_manager", None)
-        return web.json_response({
-            "status": "success",
-            "url": url,
-            "key": key,
-            "login_url": f"{url}/auto-login?key={key}",
-            "tunnel_status": (tm.status if tm is not None else "unavailable"),
-            "tunnel_available": (tm.available if tm is not None else False),
-            "tunnel_error": (tm.error if tm is not None else ""),
-        })
-
-    async def _remote_new_key_handler(self, request: web.Request) -> web.Response:
-        url, key = self._resolve_remote_details()
-        tm = getattr(self, "tunnel_manager", None)
-        return web.json_response({
-            "status": "success",
-            "url": url,
-            "key": key,
-            "login_url": f"{url}/auto-login?key={key}",
-            "tunnel_status": (tm.status if tm is not None else "unavailable"),
-            "tunnel_available": (tm.available if tm is not None else False),
-            "tunnel_error": (tm.error if tm is not None else ""),
-        })
-
-    async def _favicon_handler(self, request: web.Request) -> web.Response:
-        for p in [self.frontend_dir / "dist" / "favicon.ico", self.frontend_dir / "public" / "favicon.ico"]:
-            if p.exists():
-                return web.FileResponse(p)
-        return web.Response(status=204)
-
-    async def _ws_handler(self, request: web.Request) -> web.WebSocketResponse:
-        ws = web.WebSocketResponse(heartbeat=15.0)
-        await ws.prepare(request)
-        self._clients.add(ws)
-        logger.debug("New web client connected (%d active)", len(self._clients))
-
-        # Send initial full state immediately upon connect
-        try:
-            initial_data = self._build_initial_state()
-            await ws.send_str(json.dumps({"type": "init", "data": initial_data}))
-        except Exception as e:
-            logger.warning("Failed to send initial state to client: %s", e)
-
-        try:
-            async for msg in ws:
-                if msg.type == WSMsgType.TEXT:
-                    try:
-                        payload = json.loads(msg.data)
-                        await self._handle_client_message(ws, payload)
-                    except json.JSONDecodeError:
-                        logger.warning("Invalid JSON from client: %s", msg.data)
-                elif msg.type == WSMsgType.ERROR:
-                    logger.debug("WebSocket connection closed with error %s", ws.exception())
-        finally:
-            self._clients.discard(ws)
-            logger.debug("Client disconnected (%d active)", len(self._clients))
-
-        return ws
-
-    async def _handle_client_message(self, ws: web.WebSocketResponse, payload: dict) -> None:
-        msg_type = payload.get("type", "")
-
-        if msg_type == "get_clipboard":
-            watcher = getattr(self, "clipboard_watcher", None)
-            current = watcher.get_current_payload() if watcher else None
-            if current:
-                await ws.send_str(json.dumps({"type": "clipboard_update", "data": current}))
-
-        elif msg_type in ("user_message", "text_command"):
-            text = str(payload.get("text") or payload.get("command") or "").strip()
-            if text and self.on_text_command:
-                threading.Thread(target=self.on_text_command, args=(text,), daemon=True).start()
-
-        elif msg_type == "interrupt":
-            if self.on_interrupt:
-                self.on_interrupt()
-
-        elif msg_type == "mute_toggle":
-            muted = bool(payload.get("muted", False))
-            if self.on_mute_toggle:
-                self.on_mute_toggle(muted)
-
-        elif msg_type in ("speaker_mute_toggle", "deafen_toggle"):
-            muted = bool(payload.get("muted") if "muted" in payload else payload.get("deafened", False))
-            if self.on_speaker_mute_toggle:
-                try:
-                    self.on_speaker_mute_toggle(muted)
-                except Exception as e:
-                    logger.warning("Failed on_speaker_mute_toggle: %s", e)
-            self.broadcast("speaker_status", {"muted": muted})
-
-        elif msg_type == "confirm_response":
-            accepted = bool(payload.get("accepted", False))
-            try:
-                from core import confirm
-                confirm.resolve(accepted)
-            except Exception as e:
-                logger.warning("Failed resolving confirmation: %s", e)
-
-        elif msg_type == "open_browser":
-            url = str(payload.get("url") or "").strip()
-            if url:
-                if not url.startswith(("http://", "https://")):
-                    url = "https://" + url
-                try:
-                    import webbrowser
-                    webbrowser.open(url)
-                    logger.info("Opened URL in system browser: %s", url)
-                except Exception as e:
-                    logger.warning("Failed to open browser for %s: %s", url, e)
-
-        elif msg_type == "sleep_toggle":
-            sleeping = bool(payload.get("sleeping", False))
-            if self.on_sleep_toggle:
-                try:
-                    self.on_sleep_toggle(sleeping)
-                except Exception as e:
-                    logger.warning("Failed on_sleep_toggle: %s", e)
-            self.broadcast("state_change", {"state": "sleeping" if sleeping else "listening"})
-
-        elif msg_type == "get_backend_logs":
-            try:
-                from core import log_bus
-                snapshot = log_bus.snapshot(min_level="DEBUG")
-                await ws.send_str(json.dumps({
-                    "type": "backend_logs_snapshot",
-                    "data": {
-                        "lines": snapshot[-1200:] if len(snapshot) > 1200 else snapshot,
-                        "stats": log_bus.stats(),
-                        "sources": log_bus.sources()
-                    }
-                }))
-            except Exception as e:
-                logger.warning("Failed to get backend logs snapshot: %s", e)
-
-        elif msg_type == "clear_backend_logs":
-            try:
-                from core import log_bus
-                log_bus.clear()
-                self.broadcast("backend_logs_cleared", {})
-            except Exception as e:
-                logger.warning("Failed to clear log bus: %s", e)
-
-        elif msg_type == "export_backend_logs":
-            try:
-                from core import log_bus
-                full_text = log_bus.export_text()
-                await ws.send_str(json.dumps({
-                    "type": "backend_logs_export_data",
-                    "data": {"text": full_text}
-                }))
-            except Exception as e:
-                logger.warning("Failed to export log bus: %s", e)
-
-        elif msg_type == "get_remote_key":
-            url, key = self._resolve_remote_details()
-            await ws.send_str(json.dumps({
-                "type": "remote_key_data",
-                "data": {"url": url, "key": key, "login_url": f"{url}/auto-login?key={key}"}
-            }))
-
-        elif msg_type == "task_cancel":
-            task_id = str(payload.get("task_id", "")).strip()
-            if task_id:
-                try:
-                    from core.task_manager import get_task_manager
-                    get_task_manager().cancel(task_id)
-                except Exception as e:
-                    logger.warning("Failed to cancel task %s: %e", task_id, e)
-
-        elif msg_type == "payload_remove":
-            item_path = str(payload.get("path", "")).strip()
-            is_folder = bool(payload.get("is_folder", False))
-            if item_path:
-                self.remove_attachment(item_path)
-            if is_folder and item_path:
-                try:
-                    from core.repo_context import forget_repo
-                    forget_repo(item_path)
-                except Exception as e:
-                    logger.debug("payload_remove repo cleanup error: %s", e)
-            self.broadcast("log", {
-                "text": f"[Payload] Removed '{payload.get('name', 'item')}' from active payloads."
-            })
-
-        elif msg_type == "payload_clear":
-            self.clear_attachments()
-            try:
-                from core.repo_context import forget_repo
-                forget_repo()
-            except Exception as e:
-                logger.debug("payload_clear repo cleanup error: %s", e)
-            self.broadcast("log", {
-                "text": "[Payload] Cleared all ingested payloads."
-            })
-
-        elif msg_type == "create_shortcut":
-            if hasattr(self, "on_create_shortcut") and self.on_create_shortcut:
-                try:
-                    self.on_create_shortcut()
-                except Exception as e:
-                    logger.warning("Failed to create desktop shortcut: %s", e)
-
-        elif msg_type == "wake_toggle":
-            enable = bool(payload.get("enable", False))
-            if hasattr(self, "on_wake_toggle") and self.on_wake_toggle:
-                try:
-                    res = self.on_wake_toggle(enable)
-                    self.broadcast("wake_status", {"enabled": enable, "status": res})
-                except Exception as e:
-                    logger.warning("Failed to toggle wake word: %s", e)
-
-        elif msg_type == "ptt_toggle":
-            enable = bool(payload.get("enable", False))
-            if hasattr(self, "on_ptt_toggle") and self.on_ptt_toggle:
-                try:
-                    scope = self.on_ptt_toggle(enable)
-                    self.broadcast("ptt_status", {"enabled": enable, "scope": scope})
-                except Exception as e:
-                    logger.warning("Failed to toggle PTT: %s", e)
-
-        elif msg_type == "save_pipeline_settings":
-            mode = str(payload.get("pipeline_mode", "live")).strip().lower() or "live"
-            try:
-                from memory.config_manager import (
-                    save_pipeline_mode, save_stt_engine, save_llm_engine,
-                    save_tts_engine, save_tts_voice, save_voice_fallback_mode,
-                    get_pipeline_mode, get_stt_engine, get_llm_engine, get_tts_engine, get_tts_voice,
-                    get_voice_fallback_mode, get_groq_api_key, get_masked_groq_key, save_api_keys,
-                )
-                save_pipeline_mode(mode)
-
-                voice_fallback = payload.get("voice_fallback")
-                if voice_fallback is not None:
-                    if isinstance(voice_fallback, bool):
-                        save_voice_fallback_mode("auto" if voice_fallback else "off")
-                    else:
-                        save_voice_fallback_mode(str(voice_fallback))
-
-                groq_key = payload.get("groq_api_key")
-                if groq_key is not None and str(groq_key).strip():
-                    save_api_keys(groq_api_key=str(groq_key).strip())
-
-                # Always save engine selections, regardless of mode.
-                stt = str(payload.get("stt_engine", get_stt_engine())).strip().lower() or get_stt_engine()
-                llm = str(payload.get("llm_engine", get_llm_engine())).strip().lower() or get_llm_engine()
-                tts = str(payload.get("tts_engine", get_tts_engine())).strip().lower() or get_tts_engine()
-                voice = str(payload.get("tts_voice", "")).strip()
-                save_stt_engine(stt)
-                save_llm_engine(llm)
-                save_tts_engine(tts)
-                if voice:
-                    save_tts_voice(voice)
-
-                if self.on_pipeline_settings_changed:
-                    try:
-                        self.on_pipeline_settings_changed()
-                    except Exception as e:
-                        logger.warning("on_pipeline_settings_changed error: %s", e)
-
-                self.broadcast("pipeline_settings_updated", {
-                    "pipeline_mode": get_pipeline_mode(),
-                    "stt_engine": get_stt_engine(),
-                    "llm_engine": get_llm_engine(),
-                    "tts_engine": get_tts_engine(),
-                    "tts_voice": get_tts_voice(),
-                    "voice_fallback": get_voice_fallback_mode(),
-                    "voice_fallback_enabled": get_voice_fallback_mode() == "auto",
-                    "has_groq_key": bool(get_groq_api_key()),
-                    "groq_api_key_masked": get_masked_groq_key(),
-                })
-            except Exception as e:
-                logger.warning("Failed to save pipeline settings from WS: %s", e)
-
-        elif msg_type == "set_accent":
-            color = str(payload.get("color", "")).strip().lower()
-            if color:
-                try:
-                    from memory.config_manager import save_accent
-                    save_accent(color)
-                    self.broadcast("accent_changed", {"color": color})
-                except Exception as e:
-                    logger.warning("Failed to persist accent: %s", e)
-
-        elif msg_type == "set_clipboard":
-            text = str(payload.get("text", ""))
-            try:
-                from PyQt6.QtWidgets import QApplication
-                app = QApplication.instance()
-                if app:
-                    cb = app.clipboard()
-                    if cb:
-                        cb.setText(text)
-                else:
-                    if platform.system() == "Windows":
-                        subprocess.run(["clip"], input=text.encode("utf-8"), check=False)
-            except Exception as e:
-                logger.warning("Failed to set system clipboard: %s", e)
-
-        elif msg_type == "autostart_toggle":
-            enable = bool(payload.get("enable", False))
-            try:
-                from memory.config_manager import save_autostart_enabled
-                res = save_autostart_enabled(enable)
-                self.broadcast("autostart_status", {"enabled": enable, "success": res})
-            except Exception as e:
-                logger.warning("Failed to toggle autostart: %s", e)
-
-        elif msg_type == "operational_mode":
-            mode = str(payload.get("mode", "chat")).strip().lower()
-            if mode in ("chat", "live"):
-                self._operational_mode = mode
-                if self.on_operational_mode_changed:
-                    try:
-                        self.on_operational_mode_changed(mode)
-                    except Exception as e:
-                        logger.warning("on_operational_mode_changed error: %s", e)
-                self.broadcast("operational_mode_status", {"mode": mode})
-
-        elif msg_type == "brief_toggle":
-            enable = bool(payload.get("enable", False))
-            try:
-                from memory.config_manager import save_brief_enabled
-                save_brief_enabled(enable)
-                self.broadcast("brief_status", {"enabled": enable})
-            except Exception as e:
-                logger.warning("Failed to toggle morning brief: %s", e)
-
-        elif msg_type == "save_assistant_settings":
-            name = str(payload.get("assistant_name") or "").strip()
-            voice = str(payload.get("voice_name", "Charon")).strip() or "Charon"
-            lang = str(payload.get("response_language", "auto")).strip() or "auto"
-            fallback_voice = payload.get("fallback_voice")
-            voice_accent = payload.get("voice_accent")
-            try:
-                from memory.config_manager import (
-                    save_assistant_config, save_voice, save_response_language,
-                    get_user_name, save_fallback_voice, get_fallback_voice, get_assistant_name,
-                    save_voice_accent, get_voice_accent, AVAILABLE_VOICE_ACCENTS,
-                )
-                name = name or get_assistant_name()
-                user = get_user_name()
-                save_assistant_config(name, user)
-                save_voice(voice)
-                save_response_language(lang)
-                if fallback_voice is not None:
-                    save_fallback_voice(str(fallback_voice))
-                if voice_accent is not None:
-                    v_acc = str(voice_accent).strip().lower()
-                    if v_acc in AVAILABLE_VOICE_ACCENTS:
-                        save_voice_accent(v_acc)
-
-                current_accent = get_voice_accent()
-                if self.on_assistant_settings_changed:
-                    try:
-                        self.on_assistant_settings_changed(name, voice, lang, current_accent)
-                    except TypeError:
-                        try:
-                            self.on_assistant_settings_changed(name, voice, lang)
-                        except Exception:
-                            pass
-                if getattr(self, "on_accent_change", None) and voice_accent is not None:
-                    try:
-                        self.on_accent_change(current_accent)
-                    except Exception:
-                        pass
-
-                self.broadcast("assistant_settings_updated", {
-                    "assistant_name": name,
-                    "voice_name": voice,
-                    "response_language": lang,
-                    "voice_accent": current_accent,
-                    "available_accents": list(AVAILABLE_VOICE_ACCENTS),
-                    "fallback_voice": get_fallback_voice(),
-                })
-            except Exception as e:
-                logger.warning("Failed to save assistant settings from WS: %s", e)
-
-        elif msg_type == "save_api_keys":
-            gemini_key = payload.get("gemini_api_key")
-            groq_key = payload.get("groq_api_key")
-            try:
-                from memory.config_manager import (
-                    save_api_keys, is_configured, get_masked_gemini_key, get_masked_groq_key
-                )
-                save_api_keys(gemini_api_key=gemini_key, groq_api_key=groq_key)
-                self.broadcast("api_keys_updated", {
-                    "status": "success",
-                    "has_gemini_key": is_configured(),
-                    "gemini_api_key_masked": get_masked_gemini_key(),
-                    "groq_api_key_masked": get_masked_groq_key(),
-                })
-            except Exception as e:
-                logger.warning("Failed to save API keys from WS: %s", e)
-
-        elif msg_type == "get_agents_state":
-            try:
-                from core.agents_manager import agent_manager
-                self._reload_agents_if_modified(agent_manager)
-                await ws.send_str(json.dumps({
-                    "type": "agents_state",
-                    "data": {"agents": agent_manager.get_agents_state()}
-                }))
-            except Exception as e:
-                logger.warning("Failed to send agents state: %s", e)
-
-        elif msg_type == "get_agent_profile":
-            agent_id = str(payload.get("agent_id") or payload.get("id") or "").strip()
-            try:
-                from core.agents_manager import agent_manager
-                profile = agent_manager.get_agent_full_profile(agent_id)
-                await ws.send_str(json.dumps({
-                    "type": "agent_profile_data",
-                    "data": profile
-                }))
-            except Exception as e:
-                logger.warning("Failed to get agent profile: %s", e)
-
-        elif msg_type == "save_agent_soul":
-            agent_id = str(payload.get("agent_id") or payload.get("id") or "").strip()
-            soul = str(payload.get("soul_prompt") or payload.get("soul_md") or "").strip()
-            try:
-                from core.agents_manager import agent_manager
-                res = agent_manager.save_agent_soul(agent_id, soul)
-                self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
-            except Exception as e:
-                logger.warning("Failed to save agent soul: %s", e)
-
-        elif msg_type == "dispatch_agents_task":
-            agent_id = str(payload.get("agent_id") or payload.get("id") or "").strip()
-            prompt = str(payload.get("prompt") or payload.get("task") or "").strip()
-            path = payload.get("path")
-            try:
-                from core.agents_manager import agent_manager
-                res = agent_manager.dispatch_task(agent_id, prompt, path)
-                self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
-            except Exception as e:
-                logger.warning("Failed to dispatch agents task: %s", e)
-
-        elif msg_type == "get_audio_devices":
-            try:
-                await ws.send_str(json.dumps({
-                    "type": "audio_devices_updated",
-                    "data": self._collect_audio_state(),
-                }))
-            except Exception as e:
-                logger.warning("Failed to send audio devices: %s", e)
-
-        elif msg_type == "resolve_confirmation":
-            accepted = bool(payload.get("accepted", False))
-            try:
-                from core import confirm
-                confirm.resolve(accepted)
-            except Exception as e:
-                logger.warning("Failed to resolve confirmation: %s", e)
-
-        elif msg_type == "save_audio_devices":
-            in_name  = str(payload.get("input_device", "")  or "").strip()
-            out_name = str(payload.get("output_device", "") or "").strip()
-            try:
-                from memory.config_manager import save_input_device, save_output_device
-                save_input_device(in_name)
-                save_output_device(out_name)
-                if self.on_audio_devices_changed:
-                    self.on_audio_devices_changed(in_name, out_name)
-                self.broadcast("audio_devices_updated", self._collect_audio_state())
-            except Exception as e:
-                logger.warning("Failed to save audio devices from WS: %s", e)
-
-    def _collect_audio_state(self) -> dict[str, Any]:
-        """Truthful audio endpoint state for the AUDIO I/O panel.
-
-        The panel used to be static HTML, so it showed whatever device name was
-        written into the markup — even when the saved device could not be opened
-        and the app had silently fallen back to the OS default. This reports the
-        saved names, the devices the app can actually open at its sample rates,
-        and whether the saved device is among them. `*_available: false` is the
-        honest signal that a fallback is in effect.
-        """
-        state: dict[str, Any] = {
-            "input_device": "", "output_device": "",
-            "input_devices": [], "output_devices": [],
-            "default_input_device": "", "default_output_device": "",
-            "input_available": True, "output_available": True,
-        }
-        try:
-            from memory.config_manager import get_input_device, get_output_device
-            cur_in  = (get_input_device()  or "").strip()
-            cur_out = (get_output_device() or "").strip()
-            try:
-                from core import audio_devices
-                inputs  = audio_devices.list_devices("input")
-                outputs = audio_devices.list_devices("output")
-            except Exception as e:
-                logger.warning("audio device listing failed: %s", e)
-                inputs, outputs = [], []
-            # The device the OS currently calls "default" — what ZEZO uses when
-            # nothing is pinned. Shown so the panel can say which mic/speaker is
-            # really active under "System default".
-            try:
-                import sounddevice as sd
-                default_in  = (sd.query_devices(kind="input")  or {}).get("name", "")
-                default_out = (sd.query_devices(kind="output") or {}).get("name", "")
-            except Exception:
-                default_in = default_out = ""
-            state.update({
-                "input_device":    cur_in,
-                "output_device":   cur_out,
-                "current_input":   cur_in,
-                "current_output":  cur_out,
-                "input_devices":   inputs,
-                "output_devices":  outputs,
-                "inputs":          [{"name": d, "is_default": d == default_in} for d in inputs],
-                "outputs":         [{"name": d, "is_default": d == default_out} for d in outputs],
-                "default_input_device":  default_in,
-                "default_output_device": default_out,
-                # Empty string means "system default", which is always valid.
-                "input_available":  (not cur_in)  or (cur_in  in inputs),
-                "output_available": (not cur_out) or (cur_out in outputs),
-            })
-        except Exception as e:
-            logger.warning("Failed to collect audio state: %s", e)
-        return state
-
-    def _build_initial_state(self) -> dict:
-        if self.get_initial_state:
-            try:
-                state = self.get_initial_state()
-                state.update(self._collect_audio_state())
-                return state
-            except Exception as e:
-                logger.warning("Error getting initial state: %s", e)
-
-        # Fallback default initial state
-        tasks = []
-        try:
-            from core.task_manager import get_task_manager
-            tasks = get_task_manager().list_tasks()
-        except Exception:
-            pass
-
-        from memory.config_manager import (
-            get_assistant_name, get_voice, get_response_language,
-            get_autostart_enabled, get_brief_enabled,
-            get_wake_word_enabled, get_push_to_talk_enabled,
-            get_masked_gemini_key, get_masked_groq_key, get_masked_elevenlabs_key, get_masked_tavily_key, is_configured,
-            get_opencode_model, get_kilo_model, get_antigravity_model,
-            get_fallback_voice, FALLBACK_VOICES, get_voice_fallback_mode,
-            get_preferred_creation_agent, get_preferred_edit_agent,
-            CREATION_AGENTS, EDIT_AGENTS,
-            get_pipeline_mode, get_stt_engine, get_llm_engine, get_tts_engine, get_tts_voice,
-            PIPELINE_MODES, STT_ENGINES, LLM_ENGINES, TTS_ENGINES,
-            get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
-        )
-        try:
-            from core.wake_word import list_wake_presets
-            _assistant_names = [p["name"] for p in list_wake_presets()]
-        except Exception:
-            _assistant_names = []
-        return {
-            "state": "OFFLINE",
-            "muted": False,
-            "sleeping": False,
-            "assistant_name": get_assistant_name(),
-            "available_assistant_names": _assistant_names,
-            "wake_phrase": f"Hey {get_assistant_name()}",
-            "voice_name": get_voice(),
-            "response_language": get_response_language(),
-            "fallback_voice": get_fallback_voice(),
-            "fallback_voices": list(FALLBACK_VOICES),
-            "voice_fallback": get_voice_fallback_mode(),
-            "voice_fallback_enabled": get_voice_fallback_mode() == "auto",
-            "autostart_enabled": get_autostart_enabled(),
-            "morning_brief_enabled": get_brief_enabled(),
-            "wake_word_enabled": get_wake_word_enabled(),
-            "push_to_talk_enabled": get_push_to_talk_enabled(),
-            "preferred_creation_agent": get_preferred_creation_agent(),
-            "preferred_edit_agent": get_preferred_edit_agent(),
-            "creation_agents": list(CREATION_AGENTS),
-            "edit_agents": list(EDIT_AGENTS),
-            "has_gemini_key": is_configured(),
-            "gemini_api_key_masked": get_masked_gemini_key(),
-            "groq_api_key_masked": get_masked_groq_key(),
-            "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
-            "tavily_api_key_masked": get_masked_tavily_key(),
-            "opencode_model": get_opencode_model(),
-            "kilo_model": get_kilo_model(),
-            "antigravity_model": get_antigravity_model(),
-            "pipeline_mode": get_pipeline_mode(),
-            "stt_engine": get_stt_engine(),
-            "llm_engine": get_llm_engine(),
-            "tts_engine": get_tts_engine(),
-            "tts_voice": get_tts_voice(),
-            "pipeline_modes": list(PIPELINE_MODES),
-            "stt_engines": list(STT_ENGINES),
-            "llm_engines": list(LLM_ENGINES),
-            "tts_engines": list(TTS_ENGINES),
-            "has_groq_key": bool(get_groq_api_key()),
-            "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
-            "has_tavily_key": bool(get_tavily_api_key()),
-            "tasks": tasks,
-            "operational_mode": getattr(self, "_operational_mode", "chat"),
-            "timestamp": time.time(),
-            **self._collect_audio_state(),
-        }
-
-    def broadcast(self, event_type: str, data: dict[str, Any]) -> None:
-        """Thread-safe broadcast of a JSON event to all connected web clients."""
-        if not self._clients or not self._loop or self._loop.is_closed():
-            return
-        payload = json.dumps({"type": event_type, "data": data})
-        asyncio.run_coroutine_threadsafe(self._broadcast_async(payload), self._loop)
-
-    async def _broadcast_async(self, message: str) -> None:
-        if not self._clients:
-            return
-        # Broadcast concurrently across all active client sockets
-        await asyncio.gather(
-            *(client.send_str(message) for client in list(self._clients)),
-            return_exceptions=True
-        )
-
-    def stop(self) -> None:
-        """Stop the UI server."""
-        self._stopped.set()
-        if hasattr(self, "clipboard_watcher") and self.clipboard_watcher:
-            self.clipboard_watcher.stop()
-        if self._loop and self._loop.is_running():
-            self._loop.call_soon_threadsafe(self._loop.stop)
-        if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=2.0)
-
-    async def _cleanup(self) -> None:
-        if hasattr(self, "clipboard_watcher") and self.clipboard_watcher:
-            self.clipboard_watcher.stop()
-        for ws in list(self._clients):
-            await ws.close()
-        self._clients.clear()
-        if self._site:
-            await self._site.stop()
-        if self._runner:
-            await self._runner.cleanup()
-
-
-# Global singleton instance
-_ui_server: ZezoUIServer | None = None
-
-
-def get_ui_server() -> ZezoUIServer:
-    """Get or create the global UI server singleton."""
-    global _ui_server
-    if _ui_server is None:
-        _ui_server = ZezoUIServer()
-    return _ui_server
+"""
+Local UI WebSocket & Static HTTP Server for ZEZO.
+Bridges the Python agent engine (main.py, task_manager, log_bus) with the
+modern HTML5 / ES Modules desktop web frontend.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+import re
+import threading
+import platform
+import subprocess
+import time
+from pathlib import Path
+from typing import Any, Callable
+
+from aiohttp import web, WSMsgType
+
+logger = logging.getLogger("zezo.ui_server")
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_DIR = BASE_DIR / "frontend"
+
+
+def _norm_token(s: str) -> str:
+    """Normalized match key: lowercased, spaces/underscores/hyphens removed."""
+    return re.sub(r"[\s_\-]+", "", (s or "").lower())
+
+
+_IGNORE_DIRS = {
+    "node_modules", ".git", ".venv", "venv", ".next", "dist", "build",
+    "__pycache__", ".cache", ".idea", ".vscode", "coverage", ".turbo",
+}
+
+
+def _scan_folder(root: Path, cap: int = 5000) -> tuple[list[str], int, bool]:
+    """Bounded recursive scan with directory pruning so huge folders never freeze the process.
+
+    Returns (relative_paths, total_size_bytes_of_scanned_files, truncated).
+    """
+    rel_paths: list[str] = []
+    total = 0
+    truncated = False
+    try:
+        for dirpath, dirs, files in os.walk(root):
+            dirs[:] = [d for d in dirs if d not in _IGNORE_DIRS and not d.startswith(".")]
+            for fn in files:
+                if len(rel_paths) >= cap:
+                    truncated = True
+                    return rel_paths, total, truncated
+                fp = Path(dirpath) / fn
+                try:
+                    total += fp.stat().st_size
+                except Exception:
+                    pass
+                try:
+                    rel_paths.append(str(fp.relative_to(root)))
+                except Exception:
+                    rel_paths.append(fn)
+    except Exception:
+        pass
+    return rel_paths, total, truncated
+
+
+
+_USER_FACING_TOOLS: list[dict[str, Any]] = [
+    {
+        "id": "agent_reach",
+        "name": "agent_reach",
+        "label": "Deep Social Research",
+        "category": "Research & Intelligence",
+        "description": "Deep extraction: YouTube transcripts, Reddit threads, Twitter/X, GitHub repos, TikTok/Instagram audio, and cross-platform reports",
+    },
+    {
+        "id": "browser_control",
+        "name": "browser_control",
+        "label": "Browser Control",
+        "category": "Web & Automation",
+        "description": "Playwright automated browser (clicks, typing, forms)",
+    },
+    {
+        "id": "web_search",
+        "name": "web_search",
+        "label": "Web Search",
+        "category": "Web & Intelligence",
+        "description": "DuckDuckGo live internet search",
+    },
+    {
+        "id": "web_read_page",
+        "name": "web_read_page",
+        "label": "Web Page Reader",
+        "category": "Web & Intelligence",
+        "description": "Web page DOM scraping and reading",
+    },
+    {
+        "id": "computer_control",
+        "name": "computer_control",
+        "label": "Desktop Automation",
+        "category": "Desktop & OS",
+        "description": "Native mouse clicks, typing, screen coordinates",
+    },
+    {
+        "id": "desktop_control",
+        "name": "desktop_control",
+        "label": "Window Manager",
+        "category": "Desktop & OS",
+        "description": "Window focus, minimize, maximize, resize",
+    },
+    {
+        "id": "computer_settings",
+        "name": "computer_settings",
+        "label": "System Settings",
+        "category": "Desktop & OS",
+        "description": "OS volume, brightness, Wi-Fi, bluetooth control",
+    },
+    {
+        "id": "open_app",
+        "name": "open_app",
+        "label": "App Launcher",
+        "category": "Desktop & OS",
+        "description": "Launch local applications (Chrome, VS Code, etc.)",
+    },
+    {
+        "id": "file_controller",
+        "name": "file_controller",
+        "label": "File Controller",
+        "category": "Files & Code",
+        "description": "Read, write, create, list local directory files",
+    },
+    {
+        "id": "file_processor",
+        "name": "file_processor",
+        "label": "Batch File Processor",
+        "category": "Files & Code",
+        "description": "Bulk file analysis, transforms, batch updates",
+    },
+    {
+        "id": "quick_snippet",
+        "name": "quick_snippet",
+        "label": "Quick Snippets",
+        "category": "Files & Code",
+        "description": "Save, recall, and search code snippets",
+    },
+    {
+        "id": "reminder",
+        "name": "reminder",
+        "label": "Smart Reminders",
+        "category": "Daily Utilities",
+        "description": "Set alarms, countdowns, and system reminders",
+    },
+    {
+        "id": "weather_report",
+        "name": "weather_report",
+        "label": "Weather Forecast",
+        "category": "Daily Utilities",
+        "description": "Live atmospheric metrics and forecasts",
+    },
+    {
+        "id": "flight_finder",
+        "name": "flight_finder",
+        "label": "Flight Finder",
+        "category": "Daily Utilities",
+        "description": "Search flight availability and airline schedules",
+    },
+    {
+        "id": "youtube_video",
+        "name": "youtube_video",
+        "label": "YouTube Player",
+        "category": "Daily Utilities",
+        "description": "Search and stream YouTube audio/video",
+    },
+]
+
+
+class ZezoUIServer:
+    """Thread-safe local WebSocket & Static file server for the desktop Web UI."""
+
+    def __init__(self, host: str = "127.0.0.1", port: int = 8765):
+        self.host = host
+        self.port = port
+        self.frontend_dir = FRONTEND_DIR
+        self._clients: set[web.WebSocketResponse] = set()
+        self.tunnel_manager = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._thread: threading.Thread | None = None
+        self._runner: web.AppRunner | None = None
+        self._site = None
+        self._stopped = threading.Event()
+        self._ready_event = threading.Event()
+
+        # Lazy attachment registry: dropped/uploaded files are registered by
+        # path only and NOT read until the user explicitly asks (file_processor
+        # resolves them from here). Keeps the drop path instant and silent.
+        self._attached: list[dict[str, Any]] = []
+        self._attached_lock = threading.Lock()
+
+        # Filesystem modification tracking for dynamic reload
+        self._skills_dir_mtime: float = 0.0
+        self._agents_config_mtime: float = 0.0
+
+        # Callbacks from main.py / engine
+        self.on_text_command: Callable[[str], None] | None = None
+        self.on_interrupt: Callable[[], None] | None = None
+        self.on_mute_toggle: Callable[[bool], None] | None = None
+        self.on_speaker_mute_toggle: Callable[[bool], None] | None = None
+        self.on_sleep_toggle: Callable[[bool], None] | None = None
+        self.on_remote_clicked: Callable[[], tuple[str, str] | None] | None = None
+        self.on_file_uploaded: Callable[[dict[str, Any]], None] | None = None
+        self.on_assistant_settings_changed: Callable[..., None] | None = None
+        self.on_accent_change: Callable[[str], None] | None = None
+        self.on_pipeline_settings_changed: Callable[[], None] | None = None
+        self.on_audio_devices_changed: Callable[[str, str], None] | None = None
+        self.on_operational_mode_changed: Callable[[str], None] | None = None
+        self._operational_mode: str = "chat"
+        self.get_initial_state: Callable[[], dict[str, Any]] | None = None
+
+    def start(self) -> None:
+        """Start the server in a background daemon thread."""
+        if self._thread and self._thread.is_alive():
+            return
+        self._stopped.clear()
+        self._thread = threading.Thread(target=self._run_thread, daemon=True, name="ZezoUIServer")
+        self._thread.start()
+
+    def _run_thread(self) -> None:
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+        self._loop.run_until_complete(self._start_server())
+        try:
+            self._loop.run_forever()
+        finally:
+            self._loop.run_until_complete(self._cleanup())
+            self._loop.close()
+
+    async def _start_server(self) -> None:
+        app = web.Application()
+        app.router.add_get("/", self._index_handler)
+        app.router.add_get("/index.html", self._index_handler)
+        app.router.add_get("/office", self._office_view_handler)
+        app.router.add_get("/ws", self._ws_handler)
+        app.router.add_get("/api/health", self._health_handler)
+        app.router.add_get("/api/tools", self._tools_inspection_handler)
+        app.router.add_post("/api/tools/{name}/toggle", self._tool_toggle_handler)
+        app.router.add_post("/api/engines/{engine}/test", self._engine_test_handler)
+        app.router.add_get("/api/engines/{engine}/test", self._engine_test_handler)
+        app.router.add_get("/api/tasks", self._tasks_list_handler)
+        app.router.add_get("/api/agents/state", self._agents_state_handler)
+        app.router.add_get("/api/agents/agent", self._agent_profile_handler)
+        app.router.add_post("/api/agents/save_agent", self._save_agent_handler)
+        app.router.add_post("/api/agents", self._save_agent_handler)
+        app.router.add_post("/api/agents/save_soul", self._save_soul_handler)
+        app.router.add_post("/api/agents/dispatch_task", self._dispatch_agent_task_handler)
+        app.router.add_post("/api/agents/chat", self._agent_chat_handler)
+        app.router.add_post("/api/agents/chat/stream", self._agent_chat_stream_handler)
+        app.router.add_get("/api/agents/conversations", self._agent_conversations_get_handler)
+        app.router.add_post("/api/agents/conversations", self._agent_conversations_create_handler)
+        app.router.add_delete("/api/agents/conversations", self._agent_conversations_delete_handler)
+        app.router.add_get("/api/agents/messages", self._agent_messages_handler)
+        app.router.add_get("/api/agents/tasks/interrupted", self._agent_tasks_interrupted_handler)
+        app.router.add_post("/api/agents/tasks/restart", self._agent_tasks_restart_handler)
+        app.router.add_post("/api/agents/delete_agent", self._delete_agent_handler)
+        app.router.add_post("/api/agents/open_folder", self._open_agent_folder_handler)
+        app.router.add_post("/api/agents/pick_folder", self._pick_agent_folder_handler)
+        app.router.add_post("/api/upload", self._upload_handler)
+        app.router.add_get("/api/config", self._get_config_handler)
+        app.router.add_post("/api/config", self._save_config_handler)
+        app.router.add_get("/api/settings/assistant", self._get_config_handler)
+        app.router.add_post("/api/settings/assistant", self._save_assistant_settings_handler)
+        app.router.add_get("/api/settings/agents", self._get_config_handler)
+        app.router.add_post("/api/settings/agents", self._save_agents_settings_handler)
+        app.router.add_get("/api/settings/pipeline", self._get_config_handler)
+        app.router.add_post("/api/settings/pipeline", self._save_pipeline_settings_handler)
+        app.router.add_get("/api/settings/keys", self._get_config_handler)
+        app.router.add_post("/api/settings/keys", self._save_keys_settings_handler)
+        app.router.add_get("/api/preview_voice", self._preview_voice_handler)
+        app.router.add_get("/api/models", self._models_list_handler)
+        app.router.add_get("/api/audio_devices", self._audio_devices_handler)
+        app.router.add_get("/api/skills", self._skills_list_handler)
+        app.router.add_post("/api/skills/mode", self._skills_mode_handler)
+        app.router.add_post("/api/skills/install", self._skills_install_handler)
+        app.router.add_post("/api/skills/save", self._skills_save_handler)
+        app.router.add_post("/api/skills/delete", self._skills_delete_handler)
+        app.router.add_get("/api/attachments", self._attachments_list_handler)
+        app.router.add_get("/api/memory/stats", self._memory_stats_handler)
+        app.router.add_get("/api/memory/graph", self._memory_graph_handler)
+        app.router.add_get("/api/memory/notes", self._memory_notes_list_handler)
+        app.router.add_get("/api/memory/note", self._memory_note_detail_handler)
+        app.router.add_post("/api/memory/note", self._memory_save_note_handler)
+        app.router.add_post("/api/memory/add", self._memory_create_note_handler)
+        app.router.add_post("/api/memory/delete", self._memory_delete_note_handler)
+        app.router.add_post("/api/memory/clear", self._memory_clear_handler)
+        app.router.add_post("/api/memory/wipe_all", self._memory_wipe_all_handler)
+        app.router.add_post("/api/memory/optimize", self._memory_optimize_handler)
+        app.router.add_post("/api/memory/fact/delete", self._memory_fact_delete_handler)
+        app.router.add_post("/api/memory/fact/retry", self._memory_fact_retry_handler)
+        app.router.add_get("/api/memory/pause", self._memory_pause_get_handler)
+        app.router.add_post("/api/memory/pause", self._memory_pause_set_handler)
+        app.router.add_post("/api/workspace/set", self._workspace_set_handler)
+        app.router.add_post("/api/workspace/pick", self._workspace_pick_handler)
+        app.router.add_get("/api/remote", self._remote_gateway_handler)
+        app.router.add_post("/api/remote/new_key", self._remote_new_key_handler)
+        app.router.add_get("/api/backend_logs", self._get_backend_logs_handler)
+        app.router.add_post("/api/backend_logs/clear", self._clear_backend_logs_handler)
+        app.router.add_get("/api/system/status", self._system_status_handler)
+        app.router.add_get("/api/code_engines", self._code_engines_handler)
+        app.router.add_post("/api/code_engines/probe", self._code_engines_probe_handler)
+        app.router.add_post("/api/code_engines/default", self._code_engines_default_handler)
+        app.router.add_get("/zezo-avatar.png", self._avatar_handler)
+        app.router.add_get("/favicon.ico", self._favicon_handler)
+        app.router.add_get("/favicon.svg", self._dist_file_handler)
+        app.router.add_get("/neural_orb.js", self._dist_file_handler)
+        app.router.add_get("/api/audio/test_mic", self._test_mic_handler)
+
+        # Serve compiled React SPA (frontend/dist) static assets
+        frontend_dist = self.frontend_dir / "dist"
+        if (frontend_dist / "assets").exists():
+            app.router.add_static("/assets", path=str(frontend_dist / "assets"), show_index=False)
+
+        # Serve frontend public static assets (avatar, icons, audio)
+        frontend_public = self.frontend_dir / "public"
+        if frontend_public.exists():
+            app.router.add_static("/public", path=str(frontend_public), show_index=False)
+
+        self._runner = web.AppRunner(app)
+        await self._runner.setup()
+
+        # Attempt to bind to requested port, with fallback retry
+        for attempt in range(5):
+            try:
+                self._site = web.TCPSite(self._runner, self.host, self.port)
+                await self._site.start()
+                self._ready_event.set()
+                logger.info("Zezo UI Server running at http://%s:%d", self.host, self.port)
+                from core.clipboard_watcher import ClipboardWatcher
+                self.clipboard_watcher = ClipboardWatcher(
+                    callback=lambda payload: self.broadcast("clipboard_update", payload)
+                )
+                self.clipboard_watcher.start()
+                self._log_bus_task = asyncio.create_task(self._poll_log_bus_loop())
+
+                # Subscribe to memory outbox activity updates for WebSocket broadcast
+                try:
+                    from memory.memory_manager import register_memory_activity_callback
+
+                    def _on_mem_activity(payload: dict) -> None:
+                        if self._loop and self._loop.is_running() and not self._stopped.is_set():
+                            self._loop.call_soon_threadsafe(self.broadcast, "memory_activity", payload)
+
+                    register_memory_activity_callback(_on_mem_activity)
+                except Exception as ex:
+                    logger.warning("[UI Server] Failed to register memory activity callback: %s", ex)
+                break
+            except OSError:
+                if attempt == 4:
+                    raise
+                self.port += 1
+
+    async def _poll_log_bus_loop(self) -> None:
+        cursor = 0
+        while not self._stopped.is_set():
+            try:
+                await asyncio.sleep(0.25)
+                if not self._clients:
+                    continue
+                try:
+                    from core import log_bus
+                    new_lines, cursor = log_bus.since(cursor, min_level="DEBUG")
+                    if new_lines:
+                        self.broadcast("backend_logs", {
+                            "lines": new_lines,
+                            "stats": log_bus.stats(),
+                            "sources": log_bus.sources()
+                        })
+                except Exception as e:
+                    logger.debug("log_bus polling error: %s", e)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.debug("Error in log bus polling task: %s", e)
+
+    async def _health_handler(self, request: web.Request) -> web.Response:
+        return web.json_response({"status": "ok", "app": "ZEZO", "port": self.port})
+
+    async def _tools_inspection_handler(self, request: web.Request) -> web.Response:
+        """Returns the list of 15 user-facing tools, their categories, descriptions, and active enabled/disabled states."""
+        agent_id = request.query.get("agent_id") or request.query.get("agent")
+        mode = request.query.get("mode")
+        try:
+            from core.action_loader import get_action_registry
+            reg = get_action_registry()
+
+            filter_diag = None
+            if agent_id or mode:
+                filter_diag = reg.filter_tools(agent_id=agent_id, mode=mode)
+
+            tools_status = reg.get_tools_status(as_dict=True) if hasattr(reg, "get_tools_status") else {}
+
+            tools_list = []
+            for t in _USER_FACING_TOOLS:
+                tool_id = t["id"]
+                rec = reg.get(tool_id) if hasattr(reg, "get") else None
+                status_info = tools_status.get(tool_id, {}) if isinstance(tools_status, dict) else {}
+
+                is_enabled = True
+                if rec is not None:
+                    is_enabled = bool(getattr(rec, "enabled", True))
+                elif "enabled" in status_info:
+                    is_enabled = bool(status_info["enabled"])
+                elif hasattr(reg, "_disabled_tools"):
+                    is_enabled = tool_id not in reg._disabled_tools
+
+                tools_list.append({
+                    "id": tool_id,
+                    "name": tool_id,
+                    "label": t.get("label", tool_id),
+                    "category": t.get("category", getattr(rec, "category", "General")),
+                    "description": t.get("description", getattr(rec, "description", "")),
+                    "enabled": is_enabled,
+                    "risk": getattr(rec, "risk", "local_mutation"),
+                })
+
+            resp_payload = {
+                "status": "success",
+                "tools": tools_list,
+                "data": {
+                    "allowed_tools": [t for t in tools_list if t["enabled"]],
+                    "filtered_tools": [{"tool": t["id"], "reason": "tool_disabled"} for t in tools_list if not t["enabled"]],
+                    **(filter_diag or {}),
+                },
+            }
+            return web.json_response(resp_payload)
+        except Exception as e:
+            logger.exception("Error in /api/tools handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _tool_toggle_handler(self, request: web.Request) -> web.Response:
+        """Expects {enabled: bool} or toggles current state. Calls ActionRegistry.toggle_tool(name, enabled)."""
+        name = request.match_info.get("name", "").strip()
+        if not name:
+            return web.json_response({"success": False, "error": "Tool name required."}, status=400)
+        try:
+            data = {}
+            if request.can_read_body:
+                try:
+                    data = await request.json()
+                except Exception:
+                    data = {}
+
+            from core.action_loader import get_action_registry
+            reg = get_action_registry()
+
+            if "enabled" in data and isinstance(data["enabled"], bool):
+                enabled = data["enabled"]
+            else:
+                rec = reg.get(name) if hasattr(reg, "get") else None
+                current = getattr(rec, "enabled", True) if rec else (name not in getattr(reg, "_disabled_tools", set()))
+                enabled = not current
+
+            if hasattr(reg, "toggle_tool"):
+                reg.toggle_tool(name, enabled)
+            else:
+                rec = reg.get(name)
+                if rec:
+                    rec.enabled = enabled
+
+            self.broadcast("tools_updated", {"tool": name, "enabled": enabled})
+            return web.json_response({"success": True, "tool": name, "enabled": enabled})
+        except Exception as e:
+            logger.exception("Error in /api/tools/{name}/toggle handler: %s", e)
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _engine_test_handler(self, request: web.Request) -> web.Response:
+        """Performs a non-blocking 2-second connectivity ping to verify binary path exists and executes cleanly."""
+        engine = request.match_info.get("engine", "").strip().lower()
+        if not engine and request.can_read_body:
+            try:
+                body = await request.json()
+                engine = str(body.get("engine", "")).strip().lower()
+            except Exception:
+                pass
+
+        if not engine:
+            return web.json_response({"success": False, "error": "Engine name required."}, status=400)
+
+        norm_engine = engine.replace("_run", "").replace("_agent", "")
+
+        def _ping() -> dict[str, Any]:
+            from core.code_engines import resolve_binary, ENGINES
+            bin_path = resolve_binary(norm_engine)
+            if not bin_path or not Path(bin_path).exists():
+                return {
+                    "success": False,
+                    "engine": norm_engine,
+                    "latency_ms": 0,
+                    "binary": bin_path or "",
+                    "error": f"Binary for engine '{norm_engine}' not found on system.",
+                }
+
+            engine_def = ENGINES.get(norm_engine)
+            version_args = list(engine_def.version_argv) if engine_def else ["--version"]
+            cmd = [bin_path] + version_args
+
+            t0 = time.perf_counter()
+            try:
+                res = subprocess.run(
+                    cmd,
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True,
+                    text=True,
+                    timeout=2.0,
+                    creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0,
+                )
+                latency_ms = int(round((time.perf_counter() - t0) * 1000))
+                if res.returncode == 0:
+                    return {
+                        "success": True,
+                        "engine": norm_engine,
+                        "latency_ms": latency_ms,
+                        "binary": bin_path,
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "engine": norm_engine,
+                        "latency_ms": latency_ms,
+                        "binary": bin_path,
+                        "error": f"Process exited with code {res.returncode}: {res.stderr or res.stdout}",
+                    }
+            except subprocess.TimeoutExpired:
+                latency_ms = int(round((time.perf_counter() - t0) * 1000))
+                return {
+                    "success": False,
+                    "engine": norm_engine,
+                    "latency_ms": latency_ms,
+                    "binary": bin_path,
+                    "error": "Engine connectivity ping timed out after 2 seconds.",
+                }
+            except Exception as ex:
+                latency_ms = int(round((time.perf_counter() - t0) * 1000))
+                return {
+                    "success": False,
+                    "engine": norm_engine,
+                    "latency_ms": latency_ms,
+                    "binary": bin_path,
+                    "error": str(ex),
+                }
+
+        try:
+            result = await asyncio.to_thread(_ping)
+            return web.json_response(result)
+        except Exception as e:
+            logger.exception("Error in /api/engines/{engine}/test handler: %s", e)
+            return web.json_response({"success": False, "engine": norm_engine, "error": str(e)}, status=500)
+
+    async def _tasks_list_handler(self, request: web.Request) -> web.Response:
+        """Fetch all background tasks categorized for Kanban boards and monitoring."""
+        try:
+            from core.task_manager import get_task_manager
+            tm = get_task_manager()
+            tasks = tm.all_tasks()
+            # Filter out child tasks (subtasks) from the main task list
+            parent_tasks = [t for t in tasks if not t.get('parent_id')]
+            logger.debug(f"[UI_SERVER] Tasks list: {len(tasks)} total, {len(parent_tasks)} parent tasks")
+            return web.json_response({"status": "success", "tasks": parent_tasks})
+        except Exception as e:
+            logger.exception("Error in /api/tasks handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    # ── Lazy attachment registry ──────────────────────────────────────────
+    def register_attachment(self, info: dict[str, Any]) -> None:
+        """Register a dropped/uploaded file by path only. Content is read later,
+        on demand, when the user asks (file_processor pulls from here)."""
+        with self._attached_lock:
+            self._attached = [a for a in self._attached if a.get("path") != info.get("path")]
+            self._attached.insert(0, info)
+            del self._attached[50:]  # keep the 50 most recent
+
+    def list_attachments(self) -> list[dict[str, Any]]:
+        with self._attached_lock:
+            return list(self._attached)
+
+    def latest_attachment(self) -> dict[str, Any] | None:
+        with self._attached_lock:
+            return dict(self._attached[0]) if self._attached else None
+
+    def find_attachment(self, name: str) -> dict[str, Any] | None:
+        """Match an attachment by name (normalized, then substring) for multi-file drops."""
+        target = _norm_token(name)
+        if not target:
+            return None
+        with self._attached_lock:
+            items = list(self._attached)
+        for a in items:
+            if _norm_token(a.get("name", "")) == target:
+                return dict(a)
+        for a in items:
+            key = _norm_token(a.get("name", ""))
+            if target in key or key in target:
+                return dict(a)
+        return None
+
+    def remove_attachment(self, path: str) -> None:
+        with self._attached_lock:
+            self._attached = [a for a in self._attached if a.get("path") != path]
+
+    def clear_attachments(self) -> None:
+        with self._attached_lock:
+            self._attached = []
+
+    async def _upload_handler(self, request: web.Request) -> web.Response:
+        try:
+            reader = await request.multipart()
+            uploads_dir = BASE_DIR / "uploads"
+            uploads_dir.mkdir(parents=True, exist_ok=True)
+
+            saved_files = []
+            has_folder = False
+            root_folder_name = ""
+
+            while True:
+                part = await reader.next()
+                if part is None:
+                    break
+                if part.filename:
+                    # Sanitize relative path to prevent path traversal
+                    raw_rel = part.filename.replace("\\", "/").strip("/")
+                    parts = [p for p in raw_rel.split("/") if p and p not in ("..", ".")]
+                    if not parts:
+                        continue
+
+                    if len(parts) > 1:
+                        has_folder = True
+                        if not root_folder_name:
+                            root_folder_name = parts[0]
+                        dest_file = uploads_dir.joinpath(*parts)
+                    else:
+                        dest_file = uploads_dir / parts[0]
+
+                    dest_file.parent.mkdir(parents=True, exist_ok=True)
+                    with open(dest_file, "wb") as f:
+                        while True:
+                            chunk = await part.read_chunk()
+                            if not chunk:
+                                break
+                            f.write(chunk)
+                    saved_files.append(dest_file)
+
+            if not saved_files:
+                return web.json_response({"status": "error", "message": "No files received"}, status=400)
+
+            # Folder drop: register as the active workspace (cheap metadata, so
+            # coding commands keep their target) but DO NOT read its contents.
+            # A bounded scan keeps a huge folder from blocking the request.
+            if has_folder and root_folder_name:
+                root_folder_dir = uploads_dir / root_folder_name
+                from core.repo_context import remember_repo
+                remember_repo(str(root_folder_dir))
+                try:
+                    from memory.memory_manager import remember
+                    remember("active_project", str(root_folder_dir), category="projects")
+                except Exception:
+                    pass
+
+                rel_paths, total_size, truncated = _scan_folder(root_folder_dir, cap=5000)
+
+                folder_info = {
+                    "name": root_folder_name,
+                    "path": str(root_folder_dir),
+                    "size": total_size,
+                    "file_type": "folder",
+                    "is_folder": True,
+                    "files_count": len(rel_paths),
+                    "text": "",
+                    "engine": "attached",
+                    "is_truncated": truncated,
+                }
+
+                self.register_attachment(folder_info)
+                self.broadcast("file_ingested", folder_info)
+                self.broadcast("log", {
+                    "text": f"[Payload] Attached workspace folder '{root_folder_name}' ({len(rel_paths)} files). Read on request."
+                })
+
+                if self.on_file_uploaded:
+                    try:
+                        self.on_file_uploaded(folder_info)
+                    except Exception as e:
+                        logger.warning("on_file_uploaded callback error: %s", e)
+
+                return web.json_response({
+                    "status": "success",
+                    "folder": folder_info,
+                    "files": [folder_info],
+                })
+
+            # Lazy: register each file by path only. Content is read later, on
+            # demand, via file_processor — nothing is extracted on the drop path.
+            results = []
+            for sf in saved_files:
+                file_info = {
+                    "name": sf.name,
+                    "path": str(sf),
+                    "size": sf.stat().st_size,
+                    "file_type": sf.suffix.lower().lstrip(".") or "file",
+                    "engine": "attached",
+                    "text": "",
+                    "is_truncated": False,
+                    "is_folder": False,
+                }
+                results.append(file_info)
+
+                self.register_attachment(file_info)
+                self.broadcast("file_ingested", file_info)
+                self.broadcast("log", {
+                    "text": f"[Payload] Attached '{sf.name}' ({sf.stat().st_size:,} bytes). Read on request."
+                })
+
+                if self.on_file_uploaded:
+                    try:
+                        self.on_file_uploaded(file_info)
+                    except Exception as e:
+                        logger.warning("on_file_uploaded callback error: %s", e)
+
+            return web.json_response({
+                "status": "success",
+                "files": results
+            })
+        except Exception as e:
+            logger.exception("Upload handler error: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _save_keys_settings_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            from memory.config_manager import (
+                save_api_keys_transactional, is_configured, get_masked_gemini_key,
+                get_masked_groq_key, get_masked_elevenlabs_key, get_masked_tavily_key,
+                get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
+            )
+
+            gemini_key = data.get("gemini_api_key")
+            groq_key = data.get("groq_api_key")
+            elevenlabs_key = data.get("elevenlabs_api_key")
+            tavily_key = data.get("tavily_api_key")
+
+            ok, err = save_api_keys_transactional(
+                gemini_api_key=gemini_key,
+                groq_api_key=groq_key,
+                elevenlabs_api_key=elevenlabs_key,
+                tavily_api_key=tavily_key,
+                validate=True,
+            )
+            if not ok:
+                return web.json_response({"status": "error", "message": err}, status=400)
+
+            res_payload = {
+                "has_gemini_key": is_configured(),
+                "gemini_api_key_masked": get_masked_gemini_key(),
+                "has_groq_key": bool(get_groq_api_key()),
+                "groq_api_key_masked": get_masked_groq_key(),
+                "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
+                "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
+                "has_tavily_key": bool(get_tavily_api_key()),
+                "tavily_api_key_masked": get_masked_tavily_key(),
+            }
+            self.broadcast("api_keys_updated", res_payload)
+            return web.json_response({"status": "success", "data": res_payload})
+        except Exception as e:
+            logger.exception("Save API keys error: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _save_assistant_settings_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            voice = str(data.get("voice_name", "Charon")).strip() or "Charon"
+            lang = str(data.get("response_language", "auto")).strip() or "auto"
+            fallback_voice = data.get("fallback_voice")
+            voice_accent = data.get("voice_accent")
+
+            from memory.config_manager import (
+                save_assistant_config, save_voice, save_response_language, get_assistant_name,
+                save_api_keys_transactional, is_configured, get_masked_gemini_key, get_masked_groq_key,
+                get_masked_elevenlabs_key, get_masked_tavily_key, save_fallback_voice, get_fallback_voice,
+                save_voice_fallback_mode, get_voice_fallback_mode, get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
+                save_voice_accent, get_voice_accent, AVAILABLE_VOICE_ACCENTS,
+            )
+            name = str(data.get("assistant_name") or "").strip() or get_assistant_name()
+
+            if voice_accent is not None:
+                v_acc = str(voice_accent).strip().lower()
+                if v_acc not in AVAILABLE_VOICE_ACCENTS:
+                    return web.json_response({"status": "error", "message": f"Invalid voice accent: {voice_accent}"}, status=400)
+                save_voice_accent(v_acc)
+
+            gemini_key = data.get("gemini_api_key")
+            groq_key = data.get("groq_api_key")
+            elevenlabs_key = data.get("elevenlabs_api_key")
+            tavily_key = data.get("tavily_api_key")
+            if gemini_key is not None or groq_key is not None or elevenlabs_key is not None or tavily_key is not None:
+                ok, err = save_api_keys_transactional(
+                    gemini_api_key=gemini_key,
+                    groq_api_key=groq_key,
+                    elevenlabs_api_key=elevenlabs_key,
+                    tavily_api_key=tavily_key,
+                    validate=True,
+                )
+                if not ok:
+                    return web.json_response({"status": "error", "message": err}, status=400)
+
+            save_assistant_config(name, "")
+            save_voice(voice)
+            save_response_language(lang)
+            if fallback_voice is not None:
+                save_fallback_voice(str(fallback_voice))
+
+            voice_fallback = data.get("voice_fallback")
+            if voice_fallback is not None:
+                if isinstance(voice_fallback, bool):
+                    save_voice_fallback_mode("auto" if voice_fallback else "off")
+                else:
+                    save_voice_fallback_mode(str(voice_fallback))
+
+            current_accent = get_voice_accent()
+            if self.on_assistant_settings_changed:
+                try:
+                    self.on_assistant_settings_changed(name, voice, lang, current_accent)
+                except TypeError:
+                    try:
+                        self.on_assistant_settings_changed(name, voice, lang)
+                    except Exception as e:
+                        logger.warning("on_assistant_settings_changed error: %s", e)
+                except Exception as e:
+                    logger.warning("on_assistant_settings_changed error: %s", e)
+
+            if getattr(self, "on_accent_change", None) and voice_accent is not None:
+                try:
+                    self.on_accent_change(current_accent)
+                except Exception as e:
+                    logger.warning("on_accent_change error: %s", e)
+
+            res_payload = {
+                "assistant_name": name,
+                "voice_name": voice,
+                "response_language": lang,
+                "voice_accent": current_accent,
+                "available_accents": list(AVAILABLE_VOICE_ACCENTS),
+                "fallback_voice": get_fallback_voice(),
+                "voice_fallback": get_voice_fallback_mode(),
+                "voice_fallback_enabled": get_voice_fallback_mode() == "auto",
+                "has_gemini_key": is_configured(),
+                "gemini_api_key_masked": get_masked_gemini_key(),
+                "has_groq_key": bool(get_groq_api_key()),
+                "groq_api_key_masked": get_masked_groq_key(),
+                "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
+                "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
+            }
+            self.broadcast("assistant_settings_updated", res_payload)
+
+            return web.json_response({
+                "status": "success",
+                "data": res_payload
+            })
+        except Exception as e:
+            logger.exception("Save assistant settings error: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _save_agents_settings_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            from memory.config_manager import (
+                save_preferred_creation_agent, get_preferred_creation_agent,
+                save_preferred_edit_agent, get_preferred_edit_agent,
+                CREATION_AGENTS, EDIT_AGENTS,
+            )
+
+            creation_agent = data.get("preferred_creation_agent")
+            if creation_agent is not None:
+                save_preferred_creation_agent(str(creation_agent))
+
+            edit_agent = data.get("preferred_edit_agent")
+            if edit_agent is not None:
+                save_preferred_edit_agent(str(edit_agent))
+
+            res_payload = {
+                "preferred_creation_agent": get_preferred_creation_agent(),
+                "preferred_edit_agent": get_preferred_edit_agent(),
+                "creation_agents": list(CREATION_AGENTS),
+                "edit_agents": list(EDIT_AGENTS),
+            }
+            self.broadcast("agent_settings_updated", res_payload)
+
+            return web.json_response({
+                "status": "success",
+                "data": res_payload
+            })
+        except Exception as e:
+            logger.exception("Save agent settings error: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _save_pipeline_settings_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            mode = str(data.get("pipeline_mode", "live")).strip().lower() or "live"
+
+            from memory.config_manager import (
+                save_pipeline_mode, save_stt_engine, save_llm_engine,
+                save_tts_engine, save_tts_voice, save_voice_fallback_mode,
+                get_pipeline_mode, get_stt_engine, get_llm_engine, get_tts_engine, get_tts_voice,
+                get_voice_fallback_mode, get_groq_api_key, get_masked_groq_key, save_api_keys_transactional,
+                is_configured, get_masked_gemini_key, get_elevenlabs_api_key, get_masked_elevenlabs_key,
+            )
+
+            groq_key = data.get("groq_api_key")
+            if groq_key is not None and str(groq_key).strip() and "••••" not in str(groq_key):
+                ok, err = save_api_keys_transactional(
+                    groq_api_key=str(groq_key).strip(),
+                    validate=True,
+                )
+                if not ok:
+                    return web.json_response({"status": "error", "message": err}, status=400)
+
+            save_pipeline_mode(mode)
+
+            voice_fallback = data.get("voice_fallback")
+            if voice_fallback is not None:
+                if isinstance(voice_fallback, bool):
+                    save_voice_fallback_mode("auto" if voice_fallback else "off")
+                else:
+                    save_voice_fallback_mode(str(voice_fallback))
+
+            # Always persist engine selections — they are only used in cascade
+            # mode, but saving them regardless means switching to cascade later
+            # works without re-entering the settings, and avoids the reset-to-Live
+            # bug when the mode was briefly ambiguous.
+            stt = str(data.get("stt_engine", get_stt_engine())).strip().lower() or get_stt_engine()
+            llm = str(data.get("llm_engine", get_llm_engine())).strip().lower() or get_llm_engine()
+            tts = str(data.get("tts_engine", get_tts_engine())).strip().lower() or get_tts_engine()
+            voice = str(data.get("tts_voice", "")).strip()
+
+            save_stt_engine(stt)
+            save_llm_engine(llm)
+            save_tts_engine(tts)
+            if voice:
+                save_tts_voice(voice)
+
+            res_payload = {
+                "pipeline_mode": get_pipeline_mode(),
+                "stt_engine": get_stt_engine(),
+                "llm_engine": get_llm_engine(),
+                "tts_engine": get_tts_engine(),
+                "tts_voice": get_tts_voice(),
+                "voice_fallback": get_voice_fallback_mode(),
+                "voice_fallback_enabled": get_voice_fallback_mode() == "auto",
+                "has_gemini_key": is_configured(),
+                "gemini_api_key_masked": get_masked_gemini_key(),
+                "has_groq_key": bool(get_groq_api_key()),
+                "groq_api_key_masked": get_masked_groq_key(),
+                "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
+                "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
+            }
+
+            if self.on_pipeline_settings_changed:
+                try:
+                    self.on_pipeline_settings_changed()
+                except Exception as e:
+                    logger.warning("on_pipeline_settings_changed error: %s", e)
+
+            self.broadcast("pipeline_settings_updated", res_payload)
+
+            return web.json_response({
+                "status": "success",
+                "data": res_payload
+            })
+        except Exception as e:
+            logger.exception("Save pipeline settings error: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _get_config_handler(self, request: web.Request) -> web.Response:
+        try:
+            from memory.config_manager import (
+                get_assistant_name, get_voice, get_response_language,
+                get_voice_accent, AVAILABLE_VOICE_ACCENTS,
+                get_autostart_enabled, get_brief_enabled,
+                get_wake_word_enabled, get_push_to_talk_enabled,
+                get_masked_gemini_key, get_masked_groq_key, get_masked_elevenlabs_key, get_masked_tavily_key,
+                is_configured, get_opencode_model, get_kilo_model, get_antigravity_model,
+                get_fallback_voice, FALLBACK_VOICES, get_voice_fallback_mode,
+                get_preferred_creation_agent, get_preferred_edit_agent,
+                CREATION_AGENTS, EDIT_AGENTS,
+                get_pipeline_mode, get_stt_engine, get_llm_engine, get_tts_engine, get_tts_voice,
+                PIPELINE_MODES, STT_ENGINES, LLM_ENGINES, TTS_ENGINES,
+                get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
+                AVAILABLE_LANGUAGES, AVAILABLE_VOICES,
+                get_thinking_enabled, get_proactive_audio_enabled,
+                get_theme, get_accent,
+                get_avatar_settings, save_avatar_settings,
+            )
+            try:
+                from core.wake_word import list_wake_presets
+                _assistant_names = [p["name"] for p in list_wake_presets()]
+            except Exception:
+                _assistant_names = []
+            data = {
+                "status": "success",
+                "assistant_name": get_assistant_name(),
+                "available_assistant_names": _assistant_names,
+                "wake_phrase": f"Hey {get_assistant_name()}",
+                "voice_name": get_voice(),
+                "response_language": get_response_language(),
+                "voice_accent": get_voice_accent(),
+                "available_accents": list(AVAILABLE_VOICE_ACCENTS),
+                "theme": get_theme(),
+                "accent": get_accent(),
+                **get_avatar_settings(),
+                "fallback_voice": get_fallback_voice(),
+                "fallback_voices": list(FALLBACK_VOICES),
+                "voice_fallback": get_voice_fallback_mode(),
+                "voice_fallback_enabled": get_voice_fallback_mode() == "auto",
+                "autostart_enabled": get_autostart_enabled(),
+                "morning_brief_enabled": get_brief_enabled(),
+                "wake_word_enabled": get_wake_word_enabled(),
+                "push_to_talk_enabled": get_push_to_talk_enabled(),
+                "thinking_enabled": get_thinking_enabled(),
+                "proactive_audio_enabled": get_proactive_audio_enabled(),
+                "has_gemini_key": is_configured(),
+                "gemini_api_key_masked": get_masked_gemini_key(),
+                "has_groq_key": bool(get_groq_api_key()),
+                "groq_api_key_masked": get_masked_groq_key(),
+                "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
+                "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
+                "has_tavily_key": bool(get_tavily_api_key()),
+                "tavily_api_key_masked": get_masked_tavily_key(),
+                "opencode_model": get_opencode_model(),
+                "kilo_model": get_kilo_model(),
+                "antigravity_model": get_antigravity_model(),
+                "preferred_creation_agent": get_preferred_creation_agent(),
+                "preferred_edit_agent": get_preferred_edit_agent(),
+                "pipeline_mode": get_pipeline_mode(),
+                "stt_engine": get_stt_engine(),
+                "llm_engine": get_llm_engine(),
+                "tts_engine": get_tts_engine(),
+                "tts_voice": get_tts_voice(),
+                "available_languages": list(AVAILABLE_LANGUAGES),
+                "available_voices": list(AVAILABLE_VOICES),
+                **self._collect_audio_state(),
+            }
+            return web.json_response(data)
+        except Exception as e:
+            logger.exception("Get config error: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _save_config_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            from memory.config_manager import (
+                save_assistant_config, save_voice, save_response_language,
+                get_assistant_name,
+                save_voice_accent, get_voice_accent, AVAILABLE_VOICE_ACCENTS,
+                save_autostart_enabled, save_brief_enabled,
+                save_wake_word_enabled, get_wake_word_enabled,
+                save_push_to_talk_enabled,
+                save_api_keys_transactional,
+                save_pipeline_mode, save_stt_engine, save_llm_engine,
+                save_tts_engine, save_tts_voice, save_voice_fallback_mode,
+                save_fallback_voice,
+                save_preferred_creation_agent, save_preferred_edit_agent,
+                save_opencode_model, save_kilo_model, save_antigravity_model,
+                save_thinking_enabled, save_proactive_audio_enabled,
+                save_theme, save_accent,
+                save_avatar_settings,
+            )
+
+            # 1. Controls
+            if "autostart_enabled" in data or "autostart" in data:
+                save_autostart_enabled(bool(data.get("autostart_enabled", data.get("autostart"))))
+            if "morning_brief_enabled" in data or "morning_brief" in data:
+                save_brief_enabled(bool(data.get("morning_brief_enabled", data.get("morning_brief"))))
+            if "wake_word_enabled" in data or "wake_word" in data:
+                val = bool(data.get("wake_word_enabled", data.get("wake_word")))
+                changed = (val != get_wake_word_enabled())
+                save_wake_word_enabled(val)
+                # Only act on a REAL change — autosave re-sends the same value and
+                # must not cause spurious sleep/wake + session reconnects.
+                if changed and hasattr(self, "on_wake_toggle") and self.on_wake_toggle:
+                    try:
+                        self.on_wake_toggle(val)
+                    except Exception:
+                        pass
+            if "push_to_talk_enabled" in data or "push_to_talk" in data:
+                val = bool(data.get("push_to_talk_enabled", data.get("push_to_talk")))
+                save_push_to_talk_enabled(val)
+                if hasattr(self, "on_ptt_toggle") and self.on_ptt_toggle:
+                    try:
+                        self.on_ptt_toggle(val)
+                    except Exception:
+                        pass
+            if "thinking_enabled" in data:
+                save_thinking_enabled(bool(data["thinking_enabled"]))
+            if "proactive_audio_enabled" in data:
+                save_proactive_audio_enabled(bool(data["proactive_audio_enabled"]))
+            if "theme" in data and data["theme"]:
+                save_theme(str(data["theme"]))
+            if "accent" in data and data["accent"]:
+                save_accent(str(data["accent"]))
+
+            # Avatar customization persistence
+            save_avatar_settings(data)
+
+            # 2. Assistant & Language (identity is user-selectable — see Persona tab)
+            _posted_name = str(data.get("assistant_name") or "").strip()
+            save_assistant_config(_posted_name or get_assistant_name(), "")
+            voice_name = data.get("voice_name")
+            if voice_name is not None:
+                save_voice(str(voice_name).strip())
+            resp_lang = data.get("response_language")
+            if resp_lang is not None:
+                save_response_language(str(resp_lang).strip())
+            voice_accent = data.get("voice_accent")
+            if voice_accent is not None:
+                v_acc = str(voice_accent).strip().lower()
+                if v_acc not in AVAILABLE_VOICE_ACCENTS:
+                    return web.json_response({"status": "error", "message": f"Invalid voice accent: {voice_accent}"}, status=400)
+                save_voice_accent(v_acc)
+
+            # 3. Keys
+            keys_to_save = {}
+            for k in ("gemini_api_key", "groq_api_key", "elevenlabs_api_key", "tavily_api_key",
+                      "gemini_key", "groq_key", "elevenlabs_key", "tavily_key"):
+                val = str(data.get(k) or "").strip()
+                if val and "••••" not in val and "..." not in val:
+                    normalized_k = k if k.endswith("_api_key") else f"{k.replace('_key', '')}_api_key"
+                    keys_to_save[normalized_k] = val
+
+            if keys_to_save:
+                ok, err = save_api_keys_transactional(
+                    gemini_api_key=keys_to_save.get("gemini_api_key"),
+                    groq_api_key=keys_to_save.get("groq_api_key"),
+                    elevenlabs_api_key=keys_to_save.get("elevenlabs_api_key"),
+                    tavily_api_key=keys_to_save.get("tavily_api_key"),
+                    validate=True,
+                )
+                if not ok:
+                    return web.json_response({"status": "error", "message": err}, status=400)
+
+            # 4. Pipeline & Engines
+            if "pipeline_mode" in data:
+                save_pipeline_mode(str(data["pipeline_mode"]))
+            if "stt_engine" in data:
+                save_stt_engine(str(data["stt_engine"]))
+            if "llm_engine" in data:
+                save_llm_engine(str(data["llm_engine"]))
+            if "tts_engine" in data:
+                save_tts_engine(str(data["tts_engine"]))
+            if "tts_voice" in data:
+                save_tts_voice(str(data["tts_voice"]))
+            if "voice_fallback" in data:
+                save_voice_fallback_mode(str(data["voice_fallback"]))
+            if "fallback_voice" in data:
+                save_fallback_voice(str(data["fallback_voice"]))
+
+            # 5. Autonomous Coding Agents & Models
+            if "preferred_creation_agent" in data:
+                save_preferred_creation_agent(str(data["preferred_creation_agent"]))
+            if "preferred_edit_agent" in data:
+                save_preferred_edit_agent(str(data["preferred_edit_agent"]))
+            if "opencode_model" in data:
+                save_opencode_model(str(data["opencode_model"]))
+            if "kilo_model" in data:
+                save_kilo_model(str(data["kilo_model"]))
+            if "antigravity_model" in data:
+                save_antigravity_model(str(data["antigravity_model"]))
+
+            # Notify UI callbacks if relevant
+            if voice_name or resp_lang or _posted_name or voice_accent is not None:
+                current_acc = str(voice_accent).strip().lower() if voice_accent is not None else get_voice_accent()
+                if self.on_assistant_settings_changed:
+                    try:
+                        self.on_assistant_settings_changed(get_assistant_name(), voice_name or "Charon", resp_lang or "auto", current_acc)
+                    except TypeError:
+                        try:
+                            self.on_assistant_settings_changed(get_assistant_name(), voice_name or "Charon", resp_lang or "auto")
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+                if getattr(self, "on_accent_change", None) and voice_accent is not None:
+                    try:
+                        self.on_accent_change(current_acc)
+                    except Exception:
+                        pass
+
+            if any(k in data for k in ("pipeline_mode", "stt_engine", "llm_engine", "tts_engine")):
+                if self.on_pipeline_settings_changed:
+                    try:
+                        self.on_pipeline_settings_changed()
+                    except Exception:
+                        pass
+
+            return await self._get_config_handler(request)
+        except Exception as e:
+            logger.exception("Save config error: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _preview_voice_handler(self, request: web.Request) -> web.Response:
+        voice = request.query.get("voice", "Puck").strip().lower()
+        # Check dist assets first, then public assets
+        mp3_path = self.frontend_dir / "dist" / "assets" / "voices" / f"{voice}.mp3"
+        if not mp3_path.exists():
+            mp3_path = self.frontend_dir / "public" / "assets" / "voices" / f"{voice}.mp3"
+        if mp3_path.exists():
+            return web.FileResponse(mp3_path)
+        return web.Response(status=404, text="Voice preview not found")
+
+    async def _dist_file_handler(self, request: web.Request) -> web.Response:
+        filename = request.path.lstrip("/")
+        fp = self.frontend_dir / "dist" / filename
+        if not fp.exists():
+            fp = self.frontend_dir / "public" / filename
+        if fp.exists() and fp.is_file():
+            return web.FileResponse(fp)
+        return web.Response(status=404, text=f"File {filename} not found")
+
+    async def _test_mic_handler(self, request: web.Request) -> web.Response:
+        """Hardware mic sample test: records 1.0s and returns RMS volume and scaled percentage."""
+        try:
+            import numpy as np
+            import sounddevice as sd
+            duration = 1.0
+            fs = 16000
+            rec = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype="float32")
+            sd.wait()
+            rms = float(np.sqrt(np.mean(rec**2)))
+            level = min(100, max(0, int(rms * 450)))
+            return web.json_response({"status": "success", "rms": round(rms, 4), "level": level})
+        except Exception as e:
+            logger.warning("Microphone test error: %s", e)
+            return web.json_response({"status": "error", "message": str(e), "level": 0})
+
+    async def _index_handler(self, request: web.Request) -> web.Response:
+        frontend_dist_idx = self.frontend_dir / "dist" / "index.html"
+        if frontend_dist_idx.exists():
+            return web.FileResponse(
+                frontend_dist_idx,
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                }
+            )
+        return web.Response(
+            text="<h1>ZEZO React Workstation Initializing...</h1><p>Please compile the frontend using: <code>cd frontend && npm run build</code></p>",
+            content_type="text/html",
+            status=503
+        )
+
+    async def _attachments_list_handler(self, request: web.Request) -> web.Response:
+        """Fetch all currently registered file and folder attachments."""
+        try:
+            return web.json_response({
+                "status": "success",
+                "attachments": self.list_attachments()
+            })
+        except Exception as e:
+            logger.exception("Error in /api/attachments handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _system_status_handler(self, request: web.Request) -> web.Response:
+        try:
+            import psutil
+            cpu = psutil.cpu_percent(interval=None)
+            mem = psutil.virtual_memory().percent
+            return web.json_response({
+                "status": "success",
+                "cpu": cpu,
+                "mem": mem,
+                "gpu": 0,
+                "net": 0,
+            })
+        except Exception:
+            return web.json_response({"status": "success", "cpu": 0, "mem": 0, "gpu": 0, "net": 0})
+
+    async def _office_view_handler(self, request: web.Request) -> web.Response:
+        frontend_dist_idx = self.frontend_dir / "dist" / "index.html"
+        if frontend_dist_idx.exists():
+            return web.FileResponse(frontend_dist_idx)
+        return web.Response(text="<h1>Agents</h1><p>Open the Agents screen in ZEZO Desktop.</p>", content_type="text/html")
+
+    def _reload_agents_if_modified(self, agents_mgr: Any) -> None:
+        """Check file mtime of config/agents.json. If changed on disk, reload agents manager state."""
+        config_file = getattr(agents_mgr, "config_path", None)
+        if config_file and Path(config_file).exists():
+            try:
+                mtime = Path(config_file).stat().st_mtime
+                if mtime != self._agents_config_mtime:
+                    if hasattr(agents_mgr, "_load_agents"):
+                        agents_mgr._load_agents()
+                    elif hasattr(agents_mgr, "reload"):
+                        agents_mgr.reload()
+                    self._agents_config_mtime = mtime
+            except OSError:
+                pass
+
+    async def _agents_state_handler(self, request: web.Request) -> web.Response:
+        try:
+            from core.agents_manager import agent_manager
+            self._reload_agents_if_modified(agent_manager)
+            return web.json_response({
+                "status": "success",
+                "agents": agent_manager.get_agents_state()
+            })
+        except Exception as e:
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _agent_profile_handler(self, request: web.Request) -> web.Response:
+        agent_id = request.query.get("id", "").strip()
+        try:
+            from core.agents_manager import agent_manager
+            self._reload_agents_if_modified(agent_manager)
+            res = agent_manager.get_agent_full_profile(agent_id)
+            return web.json_response(res)
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _save_agent_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            from core.agents_manager import agent_manager
+            res = agent_manager.save_agent_profile(data)
+            self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
+            return web.json_response(res)
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _save_soul_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
+            soul = str(data.get("soul_prompt") or data.get("soul_md") or data.get("prompt_prefix") or "").strip()
+            from core.agents_manager import agent_manager
+            res = agent_manager.save_agent_soul(agent_id, soul)
+            self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
+            return web.json_response(res)
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _dispatch_agent_task_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
+            prompt = str(data.get("prompt") or data.get("task") or "").strip()
+            path = data.get("path")
+            from core.agents_manager import agent_manager
+            res = agent_manager.dispatch_task(agent_id, prompt, path)
+            self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
+            return web.json_response(res)
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _agent_chat_handler(self, request: web.Request) -> web.Response:
+        """Interactive real-time conversational chat response from a agent.
+        Routes the prompt directly and verbatim to agent_manager.dispatch_task using the agent's configured engine.
+        """
+        try:
+            data = await request.json()
+            agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
+            prompt = str(data.get("prompt") or data.get("message") or "").strip()
+            engine_override = (data.get("engine") or "").strip() or None
+            model_override = (data.get("model") or "").strip() or None
+            path = data.get("path")
+
+            if not prompt:
+                return web.json_response({"success": False, "error": "Prompt cannot be empty."}, status=400)
+
+            from core.agents_manager import agent_manager
+            self._reload_agents_if_modified(agent_manager)
+            agent = agent_manager.get_agent(agent_id) or agent_manager.resolve_agent_by_mention_or_capability(agent_id)
+            if not agent:
+                return web.json_response({"success": False, "error": f"Agent '{agent_id}' not found."}, status=404)
+
+            # Resolve configured engine tool (antigravity_run, opencode_run, kilo_run)
+            raw_engine = engine_override or getattr(agent, "engine", None) or getattr(agent, "default_tool", None) or "antigravity_run"
+            engine_name = raw_engine.replace("_run", "").replace("_agent", "")
+            engine_tool = f"{engine_name}_run"
+
+            # Apply engine override to agent if specified
+            if engine_override:
+                agent.engine = engine_name
+                agent.default_tool = engine_tool
+
+            agent_display_name = getattr(agent, "displayName", None) or getattr(agent, "name", agent.id)
+            agent_role = getattr(agent, "role", "") or "Autonomous Agent"
+            agent_specialty = getattr(agent, "specialty", "") or ""
+            agent_soul = getattr(agent, "soul_markdown", "") or getattr(agent, "prompt_prefix", "") or ""
+
+            # Check if user explicitly requested background task execution
+            lower_prompt = prompt.lower().strip()
+            is_explicit_task_dispatch = lower_prompt.startswith(("/task", "/dispatch", "/build", "/run-task"))
+
+            task_id = None
+            if is_explicit_task_dispatch:
+                logger.info("[AgentChat] Explicit task dispatch for agent %s: %s", agent.id, prompt[:60])
+                clean_task_prompt = prompt.split(" ", 1)[1] if " " in prompt else prompt
+                dispatch_res = agent_manager.dispatch_task(
+                    agent_id=agent.id,
+                    prompt=clean_task_prompt,
+                    path=path,
+                    model_override=model_override,
+                )
+                self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
+
+                if isinstance(dispatch_res, dict) and dispatch_res.get("success") is False:
+                    err_msg = dispatch_res.get("error") or "Task dispatch failed."
+                    return web.json_response({
+                        "success": False,
+                        "error": err_msg,
+                        "reply": f"Could not start task: {err_msg}",
+                        "agent_id": agent.id,
+                    }, status=500)
+
+                task_id = dispatch_res.get("task_id") if isinstance(dispatch_res, dict) else None
+                if not task_id and isinstance(dispatch_res, dict) and dispatch_res.get("tasks"):
+                    tasks = dispatch_res.get("tasks")
+                    if isinstance(tasks, list) and len(tasks) > 0:
+                        task_id = tasks[0].get("task_id")
+
+                reply_text = f"I have started working on your task using {engine_tool}! (Task ID: {task_id}). You can follow my live progress on my desk monitor or ask for status."
+            else:
+                # Direct conversational dialogue with persistence & ToolExecutor choke point integration
+                logger.info("[AgentChat] Routing conversational message for agent %s via AgentRuntime", agent.id)
+                conversation_id = data.get("conversation_id")
+                from core.agents.runtime import AgentRuntime
+                runtime = AgentRuntime(
+                    agent_id=agent.id,
+                    workspace_root=path,
+                    conversation_id=conversation_id,
+                    engine_override=raw_engine,
+                    model_override=model_override,
+                )
+                step_res = await runtime.step_async(
+                    user_input=prompt,
+                    conversation_id=conversation_id,
+                )
+                reply_text = step_res.get("reply") or f"Hello Hamza! {agent_display_name} here. Ready to collaborate."
+                conv_id = step_res.get("conversation_id")
+                tool_executions = step_res.get("tool_executions", [])
+
+            return web.json_response({
+                "success": True,
+                "agent_id": agent.id,
+                "agent_name": agent_display_name,
+                "reply": reply_text,
+                "task_id": task_id,
+                "conversation_id": locals().get("conv_id"),
+                "tool_executions": locals().get("tool_executions", []),
+                "engine": engine_tool,
+                "model": model_override or getattr(agent, "model_id", ""),
+            })
+        except Exception as e:
+            logger.exception("Error in _agent_chat_handler: %s", e)
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _agent_chat_stream_handler(self, request: web.Request) -> web.StreamResponse:
+        """Server-Sent Events (SSE) streaming handler for real-time agent responses.
+        Streams incremental tokens, tool status, progress updates, and completion signals.
+        """
+        response = web.StreamResponse(
+            status=200,
+            reason="OK",
+            headers={
+                "Content-Type": "text/event-stream; charset=utf-8",
+                "Cache-Control": "no-cache, no-transform",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+        await response.prepare(request)
+
+        async def send_sse(event_name: str, data_dict: dict) -> bool:
+            try:
+                line = f"event: {event_name}\ndata: {json.dumps(data_dict)}\n\n"
+                await response.write(line.encode("utf-8"))
+                return True
+            except (ConnectionResetError, asyncio.CancelledError):
+                return False
+
+        try:
+            data = await request.json()
+            agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
+            prompt = str(data.get("prompt") or data.get("message") or "").strip()
+            engine_override = (data.get("engine") or "").strip() or None
+            model_override = (data.get("model") or "").strip() or None
+            path = data.get("path")
+            conversation_id = data.get("conversation_id")
+
+            if not prompt:
+                await send_sse("error", {"error": "Prompt cannot be empty."})
+                await send_sse("done", {})
+                return response
+
+            from core.agents_manager import agent_manager
+            self._reload_agents_if_modified(agent_manager)
+            agent = agent_manager.get_agent(agent_id) or agent_manager.resolve_agent_by_mention_or_capability(agent_id)
+            if not agent:
+                await send_sse("error", {"error": f"Agent '{agent_id}' not found."})
+                await send_sse("done", {})
+                return response
+
+            raw_engine = engine_override or getattr(agent, "engine", None) or getattr(agent, "default_tool", None) or "antigravity_run"
+            engine_name = raw_engine.replace("_run", "").replace("_agent", "")
+            engine_tool = f"{engine_name}_run"
+
+            if engine_override:
+                agent.engine = engine_name
+                agent.default_tool = engine_tool
+
+            agent_display_name = getattr(agent, "displayName", None) or getattr(agent, "name", agent.id)
+            lower_prompt = prompt.lower().strip()
+            is_explicit_task_dispatch = lower_prompt.startswith(("/task", "/dispatch", "/build", "/run-task"))
+
+            if is_explicit_task_dispatch:
+                await send_sse("status", {"message": f"Dispatching background task using {engine_tool}..."})
+                clean_task_prompt = prompt.split(" ", 1)[1] if " " in prompt else prompt
+                dispatch_res = agent_manager.dispatch_task(
+                    agent_id=agent.id,
+                    prompt=clean_task_prompt,
+                    path=path,
+                    model_override=model_override,
+                )
+                self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
+
+                if isinstance(dispatch_res, dict) and dispatch_res.get("success") is False:
+                    err = dispatch_res.get("error") or "Task dispatch failed."
+                    await send_sse("error", {"error": err})
+                    await send_sse("done", {})
+                    return response
+
+                task_id = dispatch_res.get("task_id") if isinstance(dispatch_res, dict) else None
+                if not task_id and isinstance(dispatch_res, dict) and dispatch_res.get("tasks"):
+                    tasks = dispatch_res.get("tasks")
+                    if isinstance(tasks, list) and len(tasks) > 0:
+                        task_id = tasks[0].get("task_id")
+
+                await send_sse("task_dispatched", {
+                    "task_id": task_id,
+                    "engine": engine_tool,
+                    "agent_id": agent.id,
+                    "message": f"Task dispatched: {task_id}",
+                })
+                reply_text = f"I have started working on your task using {engine_tool}! (Task ID: {task_id}). You can follow my live progress on my desk monitor or ask for status."
+                await send_sse("chunk", {"text": reply_text})
+                await send_sse("done", {"reply": reply_text, "task_id": task_id})
+                return response
+
+            # Conversational Streaming via AgentRuntime.step_stream_async
+            from core.agents.runtime import AgentRuntime
+            runtime = AgentRuntime(
+                agent_id=agent.id,
+                workspace_root=path,
+                conversation_id=conversation_id,
+                engine_override=raw_engine,
+                model_override=model_override,
+            )
+
+            await send_sse("status", {"message": f"{agent_display_name} is thinking..."})
+
+            async for item in runtime.step_stream_async(user_input=prompt, conversation_id=conversation_id):
+                ev = item.get("event")
+                if ev == "chunk":
+                    ok = await send_sse("chunk", {"text": item.get("text", "")})
+                    if not ok:
+                        break
+                elif ev == "done":
+                    await send_sse("done", {
+                        "reply": item.get("reply", ""),
+                        "conversation_id": item.get("conversation_id"),
+                        "agent_id": agent.id,
+                    })
+                elif ev == "error":
+                    await send_sse("error", {"error": item.get("error", "")})
+                    await send_sse("done", {})
+
+        except asyncio.CancelledError:
+            logger.info("[_agent_chat_stream_handler] Client disconnected or stream cancelled.")
+        except Exception as e:
+            logger.exception("Error in _agent_chat_stream_handler: %s", e)
+            await send_sse("error", {"error": str(e)})
+            await send_sse("done", {})
+
+        return response
+
+    async def _agent_conversations_get_handler(self, request: web.Request) -> web.Response:
+        """Fetch active conversations for an agent from SQLite."""
+        try:
+            agent_id = request.query.get("agent_id", "").strip()
+            from memory.sqlite_memory import query_db
+            if agent_id:
+                rows = query_db(
+                    """
+                    SELECT id, agent_id, title, created_at, updated_at, is_archived, metadata
+                    FROM agent_conversations
+                    WHERE agent_id = ? AND is_archived = 0
+                    ORDER BY updated_at DESC
+                    """,
+                    (agent_id,),
+                )
+            else:
+                rows = query_db(
+                    """
+                    SELECT id, agent_id, title, created_at, updated_at, is_archived, metadata
+                    FROM agent_conversations
+                    WHERE is_archived = 0
+                    ORDER BY updated_at DESC
+                    """
+                )
+            return web.json_response({"success": True, "conversations": [dict(r) for r in rows]})
+        except Exception as e:
+            logger.exception("Error in _agent_conversations_get_handler: %s", e)
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _agent_conversations_create_handler(self, request: web.Request) -> web.Response:
+        """Create a new conversation thread for an agent."""
+        try:
+            data = await request.json()
+            agent_id = str(data.get("agent_id", "")).strip()
+            title = str(data.get("title", "New Conversation")).strip()
+            if not agent_id:
+                return web.json_response({"success": False, "error": "agent_id is required."}, status=400)
+
+            from core.agents.runtime import AgentRuntime
+            runtime = AgentRuntime(agent_id=agent_id)
+            conv_id = runtime.get_or_create_conversation(title=title)
+            return web.json_response({"success": True, "conversation_id": conv_id, "title": title, "agent_id": agent_id})
+        except Exception as e:
+            logger.exception("Error in _agent_conversations_create_handler: %s", e)
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _agent_conversations_delete_handler(self, request: web.Request) -> web.Response:
+        """Archive or delete a conversation thread."""
+        try:
+            conv_id = request.query.get("conversation_id", "").strip()
+            if not conv_id and request.can_read_body:
+                body = await request.json()
+                conv_id = str(body.get("conversation_id", "")).strip()
+            if not conv_id:
+                return web.json_response({"success": False, "error": "conversation_id is required."}, status=400)
+
+            from memory.sqlite_memory import execute_write
+            execute_write("DELETE FROM agent_conversations WHERE id = ?", (conv_id,))
+            return web.json_response({"success": True, "conversation_id": conv_id})
+        except Exception as e:
+            logger.exception("Error in _agent_conversations_delete_handler: %s", e)
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _agent_messages_handler(self, request: web.Request) -> web.Response:
+        """Get message history for a specific conversation."""
+        try:
+            conv_id = request.query.get("conversation_id", "").strip()
+            if not conv_id:
+                return web.json_response({"success": False, "error": "conversation_id is required."}, status=400)
+
+            from memory.sqlite_memory import query_db
+            import json as pyjson
+            rows = query_db(
+                """
+                SELECT id, conversation_id, agent_id, role, content, tool_name, tool_args, tool_result, status, created_at
+                FROM agent_messages
+                WHERE conversation_id = ?
+                ORDER BY created_at ASC
+                """,
+                (conv_id,),
+            )
+            messages = []
+            for r in rows:
+                d = dict(r)
+                if d.get("tool_args"):
+                    try:
+                        d["tool_args"] = pyjson.loads(d["tool_args"])
+                    except Exception:
+                        pass
+                messages.append(d)
+            return web.json_response({"success": True, "conversation_id": conv_id, "messages": messages})
+        except Exception as e:
+            logger.exception("Error in _agent_messages_handler: %s", e)
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _agent_tasks_interrupted_handler(self, request: web.Request) -> web.Response:
+        """Fetch list of interrupted tasks for restart recovery."""
+        try:
+            from core.task_manager import get_interrupted_tasks
+            tasks = get_interrupted_tasks()
+            return web.json_response({"success": True, "interrupted_tasks": tasks})
+        except Exception as e:
+            logger.exception("Error in _agent_tasks_interrupted_handler: %s", e)
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _agent_tasks_restart_handler(self, request: web.Request) -> web.Response:
+        """Restart an interrupted task with confirmation check."""
+        try:
+            data = await request.json()
+            task_id = str(data.get("task_id", "")).strip()
+            confirmed = bool(data.get("confirmed", False))
+            if not task_id:
+                return web.json_response({"success": False, "error": "task_id is required."}, status=400)
+
+            from core.task_manager import restart_interrupted_task
+            result = restart_interrupted_task(task_id=task_id, confirmed=confirmed)
+            return web.json_response(result)
+        except Exception as e:
+            logger.exception("Error in _agent_tasks_restart_handler: %s", e)
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _delete_agent_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            agent_id = str(data.get("agent_id") or data.get("id") or "").strip()
+            from core.agents_manager import agent_manager
+            res = agent_manager.delete_agent(agent_id)
+            self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
+            return web.json_response(res)
+        except Exception as e:
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _open_agent_folder_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            raw_path = str(data.get("path") or "").strip()
+            if not raw_path or raw_path.lower() in ("direct workspace", "main"):
+                target_path = BASE_DIR
+            else:
+                p = Path(raw_path)
+                if not p.is_absolute():
+                    p = BASE_DIR / p
+                target_path = p
+
+            if not target_path.exists():
+                target_path.mkdir(parents=True, exist_ok=True)
+
+            # Open folder in native OS file explorer (Windows / macOS / Linux)
+            import platform
+            system = platform.system()
+            if system == "Windows":
+                os.startfile(str(target_path))
+            elif system == "Darwin":
+                subprocess.Popen(["open", str(target_path)])
+            else:
+                subprocess.Popen(["xdg-open", str(target_path)])
+
+            return web.json_response({"success": True, "path": str(target_path)})
+        except Exception as e:
+            logger.warning("[UI Server] Failed to open folder in explorer: %s", e)
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _pick_agent_folder_handler(self, request: web.Request) -> web.Response:
+        """Open native OS folder selection dialog and return the chosen path."""
+        try:
+            data = await request.json() if request.can_read_body else {}
+        except Exception:
+            data = {}
+        initial_dir = str(data.get("initial_dir") or "").strip()
+        if not initial_dir or not Path(initial_dir).exists():
+            initial_dir = str(Path.home() / "Desktop" if (Path.home() / "Desktop").exists() else Path.home())
+
+        def _open_native_dialog() -> str:
+            selected_path = ""
+            try:
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()
+                root.attributes("-topmost", True)
+                chosen = filedialog.askdirectory(
+                    initialdir=initial_dir,
+                    title="Select Workspace Folder for Agent"
+                )
+                root.destroy()
+                if chosen:
+                    selected_path = str(Path(chosen).resolve()).replace("\\", "/")
+            except Exception as ex:
+                logger.debug("[UI Server] Tkinter dialog fallback: %s", ex)
+
+            # PowerShell fallback if tkinter failed or returned empty
+            if not selected_path:
+                try:
+                    import platform
+                    if platform.system() == "Windows":
+                        ps_script = (
+                            "[System.Reflection.Assembly]::LoadWithPartialName('System.windows.forms') | Out-Null; "
+                            "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
+                            f"$f.SelectedPath = '{initial_dir.replace('/', chr(92))}'; "
+                            "$f.Description = 'Select Workspace Folder for Agent'; "
+                            "if ($f.ShowDialog((New-Object System.Windows.Forms.NativeWindow)) -eq [System.Windows.Forms.DialogResult]::OK) { "
+                            "Write-Output $f.SelectedPath }"
+                        )
+                        res = subprocess.run(
+                            ["powershell", "-NoProfile", "-Command", ps_script],
+                            capture_output=True,
+                            text=True,
+                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
+                            timeout=60,
+                        )
+                        out = res.stdout.strip()
+                        if out and Path(out).exists():
+                            selected_path = str(Path(out).resolve()).replace("\\", "/")
+                except Exception as ex:
+                    logger.debug("[UI Server] PowerShell folder dialog fallback error: %s", ex)
+
+            return selected_path
+
+        loop = asyncio.get_running_loop()
+        try:
+            chosen = await loop.run_in_executor(None, _open_native_dialog)
+            if chosen:
+                return web.json_response({"success": True, "path": chosen})
+            return web.json_response({"success": False, "cancelled": True})
+        except Exception as e:
+            logger.warning("[UI Server] Error in pick folder dialog: %s", e)
+            return web.json_response({"success": False, "error": str(e)}, status=500)
+
+    async def _skills_list_handler(self, request: web.Request) -> web.Response:
+        """Return list of discovered declarative skills, optionally filtered by domain."""
+        domain = request.query.get("domain")
+        try:
+            from core.skill_loader import get_skill_registry, SKILLS_DIR
+            reg = get_skill_registry()
+
+            # Check filesystem mtime of the skills/ directory. If changed since last scan, reload dynamically.
+            skills_dir = getattr(reg, "_dir", SKILLS_DIR)
+            current_mtime = reg.get_mtime() if hasattr(reg, "get_mtime") else (skills_dir.stat().st_mtime if skills_dir.exists() else 0.0)
+            if current_mtime != self._skills_dir_mtime:
+                reg.reload()
+                self._skills_dir_mtime = current_mtime
+
+            skills = reg.list_skills(domain=domain)
+            domains = reg.list_domains()
+            return web.json_response({"status": "success", "skills": skills, "domains": domains})
+        except Exception as e:
+            logger.exception("Error in /api/skills handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _models_list_handler(self, request: web.Request) -> web.Response:
+        """Return dynamic, categorized model lists from core.models."""
+        try:
+            from core import models
+            engine = request.query.get("engine")
+
+            opencode_models = [
+                "opencode/big-pickle",
+                "opencode/nemotron-3-ultra-free",
+                "opencode/nemotron-3.5-lightning-free",
+                "opencode/mimo-v2.6-flash-free",
+                "opencode/ling-3.1-flash-free",
+                "opencode/longcat-2.5-preview-free",
+                "opencode/space-bunny-free",
+                "opencode/fledge-alpha-free",
+                "opencode/muse-spark-1.3-contributor-free",
+                "openrouter/openrouter/free",
+                "openrouter/google/gemma-4-31b-it:free",
+                "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+            ]
+            kilo_models = [
+                "kilo/kilo-auto/free",
+                "kilo/stepfun/step-3.7-flash:free",
+                "kilo/deepseek/deepseek-chat:free",
+                "kilo/qwen/qwen-2.5-coder-32b-instruct:free",
+                "kilo/minimax/minimax-01:free",
+                "kilo/nvidia/nemotron-3-ultra-550b-a55b:free",
+                "kilo/poolside/laguna-s-2.1:free",
+            ]
+            antigravity_models = list(models.ANTIGRAVITY_CLI_MODELS)
+            groq_models = [
+                "groq/llama-3.3-70b-versatile",
+                "groq/deepseek-r1-distill-llama-70b",
+                "groq/qwen-2.5-coder-32b",
+            ]
+            gemini_models = list(dict.fromkeys(models.GEMINI_FAST_MODELS + models.GEMINI_SMART_MODELS))
+
+            categorized = {
+                "opencode_run": opencode_models,
+                "kilo_run": kilo_models,
+                "antigravity_run": antigravity_models,
+                "groq": groq_models,
+                "gemini": gemini_models,
+                "none": gemini_models + groq_models,
+            }
+
+            all_models = list(dict.fromkeys(
+                antigravity_models + opencode_models + kilo_models + groq_models + gemini_models
+            ))
+
+            if engine and engine in categorized:
+                return web.json_response({
+                    "status": "success",
+                    "engine": engine,
+                    "models": categorized[engine],
+                    "all_models": all_models,
+                })
+
+            return web.json_response({
+                "status": "success",
+                "default_engine_models": categorized,
+                "all_models": all_models,
+            })
+        except Exception as e:
+            logger.exception("Error in /api/models handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _code_engines_handler(self, request: web.Request) -> web.Response:
+        """Return status for all registered coding engines."""
+        try:
+            from core.code_engines import probe_all_engines, get_default_engine
+            engines = await asyncio.to_thread(probe_all_engines, False)
+            default_engine = get_default_engine()
+            return web.json_response({
+                "status": "success",
+                "engines": engines,
+                "default_engine": default_engine,
+            })
+        except Exception as e:
+            logger.exception("Error in /api/code_engines handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _code_engines_probe_handler(self, request: web.Request) -> web.Response:
+        """Force re-probe of a specific engine or all engines."""
+        try:
+            data = await request.json() if request.can_read_body else {}
+            engine_id = data.get("engine_id")
+            from core.code_engines import probe_engine, probe_all_engines, get_default_engine
+            if engine_id:
+                engine = await asyncio.to_thread(probe_engine, str(engine_id), True)
+                return web.json_response({"status": "success", "engine": engine})
+            engines = await asyncio.to_thread(probe_all_engines, True)
+            return web.json_response({
+                "status": "success",
+                "engines": engines,
+                "default_engine": get_default_engine(),
+            })
+        except Exception as e:
+            logger.exception("Error in /api/code_engines/probe handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _code_engines_default_handler(self, request: web.Request) -> web.Response:
+        """Save default code engine."""
+        try:
+            data = await request.json() if request.can_read_body else {}
+            engine_id = data.get("engine_id")
+            from core.code_engines import set_default_engine
+            ok = set_default_engine(str(engine_id))
+            return web.json_response({"status": "success" if ok else "error"})
+        except Exception as e:
+            logger.exception("Error in /api/code_engines/default handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _audio_devices_handler(self, request: web.Request) -> web.Response:
+        """Return real host audio input/output devices and current configuration."""
+        try:
+            return web.json_response(self._collect_audio_state())
+        except Exception as e:
+            logger.exception("Error in /api/audio_devices handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _skills_mode_handler(self, request: web.Request) -> web.Response:
+        """Update toggle mode (pinned, disabled, auto_activate) for a skill."""
+        try:
+            data = await request.json()
+            name = str(data.get("name") or "").strip()
+            pinned = bool(data.get("pinned", False))
+            disabled = bool(data.get("disabled", False))
+            auto_activate = bool(data.get("auto_activate", True))
+
+            from core.skill_loader import get_skill_registry
+            reg = get_skill_registry()
+            ok = reg.set_skill_mode(name, pinned=pinned, disabled=disabled, auto_activate=auto_activate)
+            if not ok:
+                return web.json_response({"status": "error", "message": f"Skill '{name}' not found"}, status=404)
+            return web.json_response({"status": "success", "name": name, "pinned": pinned, "disabled": disabled, "auto_activate": auto_activate})
+        except Exception as e:
+            logger.exception("Error in /api/skills/mode handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _skills_install_handler(self, request: web.Request) -> web.Response:
+        """Install a new skill from local file path or zip archive."""
+        try:
+            data = await request.json()
+            source = str(data.get("source") or data.get("path") or "").strip()
+            domain = str(data.get("domain") or "").strip()
+            if not source:
+                return web.json_response({"status": "error", "message": "Source path or zip required"}, status=400)
+
+            from core.skill_loader import get_skill_registry
+            reg = get_skill_registry()
+            ok, msg = reg.install_skill(source, target_domain=domain)
+            if not ok:
+                return web.json_response({"status": "error", "message": msg}, status=400)
+            if hasattr(reg, "get_mtime"):
+                self._skills_dir_mtime = reg.get_mtime()
+            return web.json_response({"status": "success", "message": msg, "skills": reg.list_skills()})
+        except Exception as e:
+            logger.exception("Error in /api/skills/install handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _skills_save_handler(self, request: web.Request) -> web.Response:
+        """Synthesize or update a declarative skill package."""
+        try:
+            data = await request.json()
+            name = str(data.get("name") or "").strip()
+            desc = str(data.get("description") or "").strip()
+            instructions = str(data.get("instructions") or "").strip()
+            domain = str(data.get("domain") or "").strip()
+            author = str(data.get("author") or "user").strip()
+            triggers = data.get("triggers") if isinstance(data.get("triggers"), list) else None
+            tags = data.get("tags") if isinstance(data.get("tags"), list) else None
+
+            from core.skill_loader import get_skill_registry
+            reg = get_skill_registry()
+            ok, msg = reg.save_learned_skill(
+                name=name,
+                description=desc,
+                instructions=instructions,
+                domain=domain,
+                author=author,
+                triggers=triggers,
+                tags=tags,
+            )
+            if not ok:
+                return web.json_response({"status": "error", "message": msg}, status=400)
+            if hasattr(reg, "get_mtime"):
+                self._skills_dir_mtime = reg.get_mtime()
+            return web.json_response({"status": "success", "message": msg, "skills": reg.list_skills()})
+        except Exception as e:
+            logger.exception("Error in /api/skills/save handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _skills_delete_handler(self, request: web.Request) -> web.Response:
+        """Delete a skill package from disk."""
+        try:
+            data = await request.json()
+            name = str(data.get("name") or "").strip()
+            from core.skill_loader import get_skill_registry
+            reg = get_skill_registry()
+            ok, msg = reg.delete_skill(name)
+            if not ok:
+                return web.json_response({"status": "error", "message": msg}, status=404)
+            if hasattr(reg, "get_mtime"):
+                self._skills_dir_mtime = reg.get_mtime()
+            return web.json_response({"status": "success", "message": msg, "skills": reg.list_skills()})
+        except Exception as e:
+            logger.exception("Error in /api/skills/delete handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_stats_handler(self, request: web.Request) -> web.Response:
+        try:
+            from memory.sqlite_memory import get_db_path
+            from core.repo_context import get_last_repo
+            db_path = get_db_path()
+            size_bytes = db_path.stat().st_size if db_path.exists() else 0
+            turns_count = 0
+            facts_count = 0
+            if db_path.exists():
+                import sqlite3
+                with sqlite3.connect(str(db_path)) as conn:
+                    try:
+                        c = conn.cursor()
+                        c.execute("SELECT COUNT(*) FROM history_turns")
+                        turns_count = c.fetchone()[0]
+                    except Exception:
+                        pass
+                    try:
+                        c.execute("SELECT COUNT(*) FROM facts")
+                        facts_count = c.fetchone()[0]
+                    except Exception:
+                        pass
+            active_ws = get_last_repo() or str(BASE_DIR)
+            return web.json_response({
+                "status": "success",
+                "db_path": str(db_path),
+                "db_size_kb": round(size_bytes / 1024, 1),
+                "turns_count": turns_count,
+                "facts_count": facts_count,
+                "active_workspace": active_ws,
+                "fts5_enabled": True,
+            })
+        except Exception as e:
+            logger.exception("Error in /api/memory/stats: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_graph_handler(self, request: web.Request) -> web.Response:
+        """Fetch compiled knowledge graph topology (nodes + links) from Markdown vault."""
+        try:
+            from memory.vault_engine import vault_engine
+            graph_data = vault_engine.get_graph()
+            return web.json_response(graph_data)
+        except Exception as e:
+            logger.exception("Error in /api/memory/graph: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_notes_list_handler(self, request: web.Request) -> web.Response:
+        """Fetch list of all markdown memory notes in the vault."""
+        try:
+            from memory.vault_engine import vault_engine
+            notes = vault_engine.get_all_notes()
+            return web.json_response({"status": "success", "notes": notes})
+        except Exception as e:
+            logger.exception("Error in /api/memory/notes: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_note_detail_handler(self, request: web.Request) -> web.Response:
+        """Fetch full markdown content and outbound links for a specific note."""
+        try:
+            file_param = request.query.get("file") or request.query.get("id") or ""
+            if not file_param:
+                return web.json_response({"status": "error", "message": "Missing file or id parameter"}, status=400)
+            from memory.vault_engine import vault_engine
+            note = vault_engine.get_note_content(file_param)
+            if not note:
+                return web.json_response({"status": "error", "message": "Note not found"}, status=404)
+            return web.json_response({"status": "success", "note": note})
+        except Exception as e:
+            logger.exception("Error in /api/memory/note: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_save_note_handler(self, request: web.Request) -> web.Response:
+        """Save or edit content of an existing markdown note."""
+        try:
+            data = await request.json()
+            file_name = str(data.get("file") or "").strip()
+            content = str(data.get("content") or "")
+            if not file_name:
+                return web.json_response({"status": "error", "message": "File name required"}, status=400)
+            from memory.vault_engine import vault_engine
+            res = vault_engine.save_note(file_name, content)
+            self.broadcast("memory_updated", {"action": "saved", "file": file_name})
+            return web.json_response(res)
+        except Exception as e:
+            logger.exception("Error in /api/memory/note save: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_create_note_handler(self, request: web.Request) -> web.Response:
+        """Create a new memory note in the vault."""
+        try:
+            data = await request.json()
+            title = str(data.get("title") or "").strip()
+            category = str(data.get("category") or "knowledge").strip()
+            content = str(data.get("content") or "").strip()
+            tags = data.get("tags") if isinstance(data.get("tags"), list) else None
+            if not title:
+                return web.json_response({"status": "error", "message": "Title required"}, status=400)
+            from memory.vault_engine import vault_engine
+            res = vault_engine.create_note(title, category, content, tags)
+            self.broadcast("memory_updated", {"action": "created", "title": title})
+            return web.json_response(res)
+        except Exception as e:
+            logger.exception("Error in /api/memory/add: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_delete_note_handler(self, request: web.Request) -> web.Response:
+        """Delete a memory note from the vault."""
+        try:
+            data = await request.json()
+            file_name = str(data.get("file") or "").strip()
+            if not file_name:
+                return web.json_response({"status": "error", "message": "File name required"}, status=400)
+            from memory.vault_engine import vault_engine
+            res = vault_engine.delete_note(file_name)
+            self.broadcast("memory_updated", {"action": "deleted", "file": file_name})
+            return web.json_response(res)
+        except Exception as e:
+            logger.exception("Error in /api/memory/delete: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_clear_handler(self, request: web.Request) -> web.Response:
+        try:
+            from memory.memory_manager import clear_pending_outbox
+            clear_pending_outbox()
+            from memory.sqlite_memory import get_db_path
+            db_path = get_db_path()
+            if db_path.exists():
+                import sqlite3
+                with sqlite3.connect(str(db_path)) as conn:
+                    conn.execute("DELETE FROM turns")
+                    try:
+                        conn.execute("DELETE FROM turns_fts")
+                    except Exception:
+                        pass
+                    conn.commit()
+            return web.json_response({"status": "success", "message": "Conversation history cleared"})
+        except Exception as e:
+            logger.exception("Error in /api/memory/clear: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_wipe_all_handler(self, request: web.Request) -> web.Response:
+        """Atomically purge all 4 memory layers: SQLite turns/facts, Vault Markdown notes, and long_term.json."""
+        try:
+            from memory.sqlite_memory import wipe_all_sqlite_memory
+            from memory.vault_engine import vault_engine
+            from memory.memory_manager import wipe_all_long_term_json, clear_pending_outbox
+
+            clear_pending_outbox()
+
+            preserve_profile = False
+            try:
+                if request.can_read_body:
+                    body = await request.json()
+                    preserve_profile = bool(body.get("preserve_profile", False))
+            except Exception:
+                preserve_profile = False
+
+            sqlite_counts = wipe_all_sqlite_memory()
+            vault_res = vault_engine.wipe_all_vault_memory(preserve_profile=preserve_profile)
+            wipe_all_long_term_json()
+
+            self.broadcast("memory_updated", {"action": "wiped", "details": sqlite_counts})
+
+            return web.json_response({
+                "status": "success",
+                "message": "All memory layers successfully wiped and reset to clean state",
+                "sqlite_deleted": sqlite_counts,
+                "vault_deleted_conv_files": vault_res.get("deleted_conv_files", 0),
+            })
+        except Exception as e:
+            logger.exception("Error in /api/memory/wipe_all: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_optimize_handler(self, request: web.Request) -> web.Response:
+        try:
+            from memory.sqlite_memory import get_db_path
+            db_path = get_db_path()
+            if db_path.exists():
+                import sqlite3
+                with sqlite3.connect(str(db_path)) as conn:
+                    conn.execute("PRAGMA optimize")
+                    conn.execute("VACUUM")
+            return web.json_response({"status": "success", "message": "Memory database optimized and vacuumed"})
+        except Exception as e:
+            logger.exception("Error in /api/memory/optimize: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_fact_delete_handler(self, request: web.Request) -> web.Response:
+        """Endpoint to forget or revert a specific memory fact."""
+        try:
+            data = await request.json()
+            category = str(data.get("category") or "notes").strip().lower()
+            key = str(data.get("key") or "").strip()
+            restore_value = data.get("restore_value")
+
+            if not key:
+                return web.json_response({"status": "error", "message": "Key is required"}, status=400)
+
+            from memory.memory_manager import queue_memory_forget, queue_memory_write
+            loop = asyncio.get_running_loop()
+
+            if restore_value is not None:
+                # Revert to previous value
+                res = await loop.run_in_executor(None, queue_memory_write, category, key, str(restore_value))
+            else:
+                # Forget fact
+                res = await loop.run_in_executor(None, queue_memory_forget, category, key)
+
+            return web.json_response({"status": "success", "result": res})
+        except Exception as e:
+            logger.exception("Error in /api/memory/fact/delete: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_fact_retry_handler(self, request: web.Request) -> web.Response:
+        """Endpoint to retry saving a failed memory fact."""
+        try:
+            from memory.memory_state import is_memory_paused
+            if is_memory_paused():
+                return web.json_response(
+                    {"status": "error", "message": "Cannot retry save while memory is paused."},
+                    status=400,
+                )
+
+            data = await request.json()
+            category = str(data.get("category") or "notes").strip().lower()
+            key = str(data.get("key") or "").strip()
+            value = str(data.get("value") or "").strip()
+
+            canonical_categories = {"identity", "preferences", "projects", "relationships", "wishes", "notes"}
+            if category not in canonical_categories:
+                return web.json_response(
+                    {"status": "error", "message": f"Invalid category '{category}'. Must be one of {sorted(canonical_categories)}"},
+                    status=400,
+                )
+
+            if not key or not value:
+                return web.json_response({"status": "error", "message": "Key and value are required"}, status=400)
+
+            from memory.memory_manager import queue_memory_write
+            loop = asyncio.get_running_loop()
+            res = await loop.run_in_executor(None, queue_memory_write, category, key, value)
+            return web.json_response({"status": "success", "result": res})
+        except Exception as e:
+            logger.exception("Error in /api/memory/fact/retry: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_pause_get_handler(self, request: web.Request) -> web.Response:
+        """Get current incognito memory pause state."""
+        try:
+            from memory.memory_state import is_memory_paused
+            return web.json_response({"paused": is_memory_paused()})
+        except Exception as e:
+            logger.exception("Error in GET /api/memory/pause: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _memory_pause_set_handler(self, request: web.Request) -> web.Response:
+        """Toggle or set incognito memory pause state."""
+        try:
+            data = await request.json()
+            paused = bool(data.get("paused", False))
+            from memory.memory_state import set_memory_paused
+            set_memory_paused(paused)
+            self.broadcast("memory_pause_changed", {"paused": paused})
+            return web.json_response({"status": "success", "paused": paused})
+        except Exception as e:
+            logger.exception("Error in POST /api/memory/pause: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _workspace_set_handler(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            ws_path = str(data.get("path") or "").strip()
+            from core.repo_context import remember_repo, forget_repo
+            if ws_path and ws_path.lower() != "reset":
+                remember_repo(ws_path)
+            else:
+                forget_repo()
+            from core.repo_context import get_last_repo
+            active_ws = get_last_repo() or str(BASE_DIR)
+            return web.json_response({"status": "success", "active_workspace": active_ws})
+        except Exception as e:
+            logger.exception("Error in /api/workspace/set: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _workspace_pick_handler(self, request: web.Request) -> web.Response:
+        """Open native OS folder dialog, attach folder as active workspace, and notify live session."""
+        try:
+            data = await request.json() if request.can_read_body else {}
+        except Exception:
+            data = {}
+        initial_dir = str(data.get("initial_dir") or "").strip()
+        if not initial_dir or not Path(initial_dir).exists():
+            from core.repo_context import get_last_repo
+            initial_dir = get_last_repo() or str(Path.home() / "Desktop" if (Path.home() / "Desktop").exists() else Path.home())
+
+        def _open_native_dialog() -> str:
+            selected_path = ""
+            try:
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()
+                root.attributes("-topmost", True)
+                chosen = filedialog.askdirectory(
+                    initialdir=initial_dir,
+                    title="Select Workspace Folder for ZEZO"
+                )
+                root.destroy()
+                if chosen:
+                    selected_path = str(Path(chosen).resolve()).replace("\\", "/")
+            except Exception as ex:
+                logger.debug("[UI Server] Tkinter dialog fallback: %s", ex)
+
+            if not selected_path:
+                try:
+                    import platform
+                    if platform.system() == "Windows":
+                        ps_script = (
+                            "[System.Reflection.Assembly]::LoadWithPartialName('System.windows.forms') | Out-Null; "
+                            "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
+                            f"$f.SelectedPath = '{initial_dir.replace('/', chr(92))}'; "
+                            "$f.Description = 'Select Workspace Folder for ZEZO'; "
+                            "if ($f.ShowDialog((New-Object System.Windows.Forms.NativeWindow)) -eq [System.Windows.Forms.DialogResult]::OK) { "
+                            "Write-Output $f.SelectedPath }"
+                        )
+                        res = subprocess.run(
+                            ["powershell", "-NoProfile", "-Command", ps_script],
+                            capture_output=True,
+                            text=True,
+                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
+                            timeout=60,
+                        )
+                        out = res.stdout.strip()
+                        if out and Path(out).exists():
+                            selected_path = str(Path(out).resolve()).replace("\\", "/")
+                except Exception as ex:
+                    logger.debug("[UI Server] PowerShell folder dialog fallback error: %s", ex)
+
+            return selected_path
+
+        loop = asyncio.get_running_loop()
+        try:
+            chosen = await loop.run_in_executor(None, _open_native_dialog)
+            if not chosen:
+                return web.json_response({"status": "canceled", "cancelled": True})
+
+            folder_path = Path(chosen).resolve()
+            if not folder_path.exists() or not folder_path.is_dir():
+                return web.json_response({"status": "error", "message": "Invalid directory selected"}, status=400)
+
+            folder_name = folder_path.name
+            from core.repo_context import remember_repo
+            remember_repo(str(folder_path))
+            try:
+                from memory.memory_manager import remember
+                remember("active_project", str(folder_path), category="projects")
+            except Exception:
+                pass
+
+            rel_paths, total_size, truncated = _scan_folder(folder_path, cap=5000)
+
+            folder_info = {
+                "name": folder_name,
+                "path": str(folder_path).replace("\\", "/"),
+                "size": total_size,
+                "file_type": "folder",
+                "is_folder": True,
+                "files_count": len(rel_paths),
+                "text": "",
+                "engine": "attached",
+                "is_truncated": truncated,
+            }
+
+            self.register_attachment(folder_info)
+            self.broadcast("file_ingested", folder_info)
+            self.broadcast("log", {
+                "text": f"[Workspace] Attached local folder '{folder_name}' ({len(rel_paths)} files). Path: {folder_path}"
+            })
+
+            if self.on_file_uploaded:
+                try:
+                    self.on_file_uploaded(folder_info)
+                except Exception as e:
+                    logger.warning("on_file_uploaded callback error: %s", e)
+
+            return web.json_response({
+                "status": "success",
+                "folder": folder_info,
+                "files": [folder_info],
+            })
+        except Exception as e:
+            logger.exception("Error in /api/workspace/pick: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _get_backend_logs_handler(self, request: web.Request) -> web.Response:
+        try:
+            from core import log_bus
+            min_lvl = request.query.get("min_level", "DEBUG")
+            snapshot = log_bus.snapshot(min_level=min_lvl)
+            return web.json_response({
+                "status": "success",
+                "lines": snapshot[-1200:] if len(snapshot) > 1200 else snapshot,
+                "stats": log_bus.stats(),
+                "sources": log_bus.sources(),
+            })
+        except Exception as e:
+            logger.exception("Error in /api/backend_logs handler: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _clear_backend_logs_handler(self, request: web.Request) -> web.Response:
+        try:
+            from core import log_bus
+            log_bus.clear()
+            self.broadcast("backend_logs_cleared", {})
+            return web.json_response({"status": "success", "message": "Backend logs cleared"})
+        except Exception as e:
+            logger.exception("Error in /api/backend_logs/clear: %s", e)
+            return web.json_response({"status": "error", "message": str(e)}, status=500)
+
+    async def _avatar_handler(self, request: web.Request) -> web.Response:
+        for p in (
+            self.frontend_dir / "dist" / "zezo-avatar.png",
+            self.frontend_dir / "public" / "zezo-avatar.png",
+            BASE_DIR / "frontend" / "public" / "zezo-avatar.png",
+            BASE_DIR / "web" / "dist" / "zezo-avatar.png",
+            BASE_DIR / "web" / "public" / "zezo-avatar.png",
+        ):
+            if p.exists():
+                return web.FileResponse(p)
+        return web.Response(status=404)
+
+    def _resolve_remote_details(self) -> tuple[str, str]:
+        url, key = "", ""
+        if self.on_remote_clicked:
+            try:
+                res = self.on_remote_clicked()
+                if res:
+                    url, key = str(res[0]), str(res[1])
+            except Exception as e:
+                logger.warning("on_remote_clicked error: %s", e)
+        if not url:
+            # Honor a public URL override (e.g. Cloudflare Tunnel) so the
+            # desktop UI's "Remote Control" button / QR code point at the
+            # internet-reachable endpoint instead of the LAN IP.
+            try:
+                import os
+                pu = os.environ.get("ZEZO_PUBLIC_URL", "").strip()
+                if not pu:
+                    from memory.config_manager import get_public_url
+                    pu = get_public_url()
+                if pu:
+                    url = pu
+            except Exception:
+                url = ""
+            if not url:
+                import socket
+                lan_ip = "127.0.0.1"
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    s.connect(("8.8.8.8", 80))
+                    lan_ip = s.getsockname()[0]
+                    s.close()
+                except Exception:
+                    pass
+                url = f"http://{lan_ip}:8000"
+        if not key:
+            key = "8F3A-9K"
+        return url, key
+
+    async def _remote_gateway_handler(self, request: web.Request) -> web.Response:
+        url, key = self._resolve_remote_details()
+        tm = getattr(self, "tunnel_manager", None)
+        return web.json_response({
+            "status": "success",
+            "url": url,
+            "key": key,
+            "login_url": f"{url}/auto-login?key={key}",
+            "tunnel_status": (tm.status if tm is not None else "unavailable"),
+            "tunnel_available": (tm.available if tm is not None else False),
+            "tunnel_error": (tm.error if tm is not None else ""),
+        })
+
+    async def _remote_new_key_handler(self, request: web.Request) -> web.Response:
+        url, key = self._resolve_remote_details()
+        tm = getattr(self, "tunnel_manager", None)
+        return web.json_response({
+            "status": "success",
+            "url": url,
+            "key": key,
+            "login_url": f"{url}/auto-login?key={key}",
+            "tunnel_status": (tm.status if tm is not None else "unavailable"),
+            "tunnel_available": (tm.available if tm is not None else False),
+            "tunnel_error": (tm.error if tm is not None else ""),
+        })
+
+    async def _favicon_handler(self, request: web.Request) -> web.Response:
+        for p in [self.frontend_dir / "dist" / "favicon.ico", self.frontend_dir / "public" / "favicon.ico"]:
+            if p.exists():
+                return web.FileResponse(p)
+        return web.Response(status=204)
+
+    async def _ws_handler(self, request: web.Request) -> web.WebSocketResponse:
+        ws = web.WebSocketResponse(heartbeat=15.0)
+        await ws.prepare(request)
+        self._clients.add(ws)
+        logger.debug("New web client connected (%d active)", len(self._clients))
+
+        # Send initial full state immediately upon connect
+        try:
+            initial_data = self._build_initial_state()
+            await ws.send_str(json.dumps({"type": "init", "data": initial_data}))
+        except Exception as e:
+            logger.warning("Failed to send initial state to client: %s", e)
+
+        try:
+            async for msg in ws:
+                if msg.type == WSMsgType.TEXT:
+                    try:
+                        payload = json.loads(msg.data)
+                        await self._handle_client_message(ws, payload)
+                    except json.JSONDecodeError:
+                        logger.warning("Invalid JSON from client: %s", msg.data)
+                elif msg.type == WSMsgType.ERROR:
+                    logger.debug("WebSocket connection closed with error %s", ws.exception())
+        finally:
+            self._clients.discard(ws)
+            logger.debug("Client disconnected (%d active)", len(self._clients))
+
+        return ws
+
+    async def _handle_client_message(self, ws: web.WebSocketResponse, payload: dict) -> None:
+        msg_type = payload.get("type", "")
+
+        if msg_type == "get_clipboard":
+            watcher = getattr(self, "clipboard_watcher", None)
+            current = watcher.get_current_payload() if watcher else None
+            if current:
+                await ws.send_str(json.dumps({"type": "clipboard_update", "data": current}))
+
+        elif msg_type in ("user_message", "text_command"):
+            text = str(payload.get("text") or payload.get("command") or "").strip()
+            if text and self.on_text_command:
+                threading.Thread(target=self.on_text_command, args=(text,), daemon=True).start()
+
+        elif msg_type == "interrupt":
+            if self.on_interrupt:
+                self.on_interrupt()
+
+        elif msg_type == "mute_toggle":
+            muted = bool(payload.get("muted", False))
+            if self.on_mute_toggle:
+                self.on_mute_toggle(muted)
+
+        elif msg_type in ("speaker_mute_toggle", "deafen_toggle"):
+            muted = bool(payload.get("muted") if "muted" in payload else payload.get("deafened", False))
+            if self.on_speaker_mute_toggle:
+                try:
+                    self.on_speaker_mute_toggle(muted)
+                except Exception as e:
+                    logger.warning("Failed on_speaker_mute_toggle: %s", e)
+            self.broadcast("speaker_status", {"muted": muted})
+
+        elif msg_type == "confirm_response":
+            accepted = bool(payload.get("accepted", False))
+            try:
+                from core import confirm
+                confirm.resolve(accepted)
+            except Exception as e:
+                logger.warning("Failed resolving confirmation: %s", e)
+
+        elif msg_type == "open_browser":
+            url = str(payload.get("url") or "").strip()
+            if url:
+                if not url.startswith(("http://", "https://")):
+                    url = "https://" + url
+                try:
+                    import webbrowser
+                    webbrowser.open(url)
+                    logger.info("Opened URL in system browser: %s", url)
+                except Exception as e:
+                    logger.warning("Failed to open browser for %s: %s", url, e)
+
+        elif msg_type == "sleep_toggle":
+            sleeping = bool(payload.get("sleeping", False))
+            if self.on_sleep_toggle:
+                try:
+                    self.on_sleep_toggle(sleeping)
+                except Exception as e:
+                    logger.warning("Failed on_sleep_toggle: %s", e)
+            self.broadcast("state_change", {"state": "sleeping" if sleeping else "listening"})
+
+        elif msg_type == "get_backend_logs":
+            try:
+                from core import log_bus
+                snapshot = log_bus.snapshot(min_level="DEBUG")
+                await ws.send_str(json.dumps({
+                    "type": "backend_logs_snapshot",
+                    "data": {
+                        "lines": snapshot[-1200:] if len(snapshot) > 1200 else snapshot,
+                        "stats": log_bus.stats(),
+                        "sources": log_bus.sources()
+                    }
+                }))
+            except Exception as e:
+                logger.warning("Failed to get backend logs snapshot: %s", e)
+
+        elif msg_type == "clear_backend_logs":
+            try:
+                from core import log_bus
+                log_bus.clear()
+                self.broadcast("backend_logs_cleared", {})
+            except Exception as e:
+                logger.warning("Failed to clear log bus: %s", e)
+
+        elif msg_type == "export_backend_logs":
+            try:
+                from core import log_bus
+                full_text = log_bus.export_text()
+                await ws.send_str(json.dumps({
+                    "type": "backend_logs_export_data",
+                    "data": {"text": full_text}
+                }))
+            except Exception as e:
+                logger.warning("Failed to export log bus: %s", e)
+
+        elif msg_type == "get_remote_key":
+            url, key = self._resolve_remote_details()
+            await ws.send_str(json.dumps({
+                "type": "remote_key_data",
+                "data": {"url": url, "key": key, "login_url": f"{url}/auto-login?key={key}"}
+            }))
+
+        elif msg_type == "task_cancel":
+            task_id = str(payload.get("task_id", "")).strip()
+            if task_id:
+                try:
+                    from core.task_manager import get_task_manager
+                    get_task_manager().cancel(task_id)
+                except Exception as e:
+                    logger.warning("Failed to cancel task %s: %e", task_id, e)
+
+        elif msg_type == "payload_remove":
+            item_path = str(payload.get("path", "")).strip()
+            is_folder = bool(payload.get("is_folder", False))
+            if item_path:
+                self.remove_attachment(item_path)
+            if is_folder and item_path:
+                try:
+                    from core.repo_context import forget_repo
+                    forget_repo(item_path)
+                except Exception as e:
+                    logger.debug("payload_remove repo cleanup error: %s", e)
+            self.broadcast("log", {
+                "text": f"[Payload] Removed '{payload.get('name', 'item')}' from active payloads."
+            })
+
+        elif msg_type == "payload_clear":
+            self.clear_attachments()
+            try:
+                from core.repo_context import forget_repo
+                forget_repo()
+            except Exception as e:
+                logger.debug("payload_clear repo cleanup error: %s", e)
+            self.broadcast("log", {
+                "text": "[Payload] Cleared all ingested payloads."
+            })
+
+        elif msg_type == "create_shortcut":
+            if hasattr(self, "on_create_shortcut") and self.on_create_shortcut:
+                try:
+                    self.on_create_shortcut()
+                except Exception as e:
+                    logger.warning("Failed to create desktop shortcut: %s", e)
+
+        elif msg_type == "wake_toggle":
+            enable = bool(payload.get("enable", False))
+            if hasattr(self, "on_wake_toggle") and self.on_wake_toggle:
+                try:
+                    res = self.on_wake_toggle(enable)
+                    self.broadcast("wake_status", {"enabled": enable, "status": res})
+                except Exception as e:
+                    logger.warning("Failed to toggle wake word: %s", e)
+
+        elif msg_type == "ptt_toggle":
+            enable = bool(payload.get("enable", False))
+            if hasattr(self, "on_ptt_toggle") and self.on_ptt_toggle:
+                try:
+                    scope = self.on_ptt_toggle(enable)
+                    self.broadcast("ptt_status", {"enabled": enable, "scope": scope})
+                except Exception as e:
+                    logger.warning("Failed to toggle PTT: %s", e)
+
+        elif msg_type == "save_pipeline_settings":
+            mode = str(payload.get("pipeline_mode", "live")).strip().lower() or "live"
+            try:
+                from memory.config_manager import (
+                    save_pipeline_mode, save_stt_engine, save_llm_engine,
+                    save_tts_engine, save_tts_voice, save_voice_fallback_mode,
+                    get_pipeline_mode, get_stt_engine, get_llm_engine, get_tts_engine, get_tts_voice,
+                    get_voice_fallback_mode, get_groq_api_key, get_masked_groq_key, save_api_keys,
+                )
+                save_pipeline_mode(mode)
+
+                voice_fallback = payload.get("voice_fallback")
+                if voice_fallback is not None:
+                    if isinstance(voice_fallback, bool):
+                        save_voice_fallback_mode("auto" if voice_fallback else "off")
+                    else:
+                        save_voice_fallback_mode(str(voice_fallback))
+
+                groq_key = payload.get("groq_api_key")
+                if groq_key is not None and str(groq_key).strip():
+                    save_api_keys(groq_api_key=str(groq_key).strip())
+
+                # Always save engine selections, regardless of mode.
+                stt = str(payload.get("stt_engine", get_stt_engine())).strip().lower() or get_stt_engine()
+                llm = str(payload.get("llm_engine", get_llm_engine())).strip().lower() or get_llm_engine()
+                tts = str(payload.get("tts_engine", get_tts_engine())).strip().lower() or get_tts_engine()
+                voice = str(payload.get("tts_voice", "")).strip()
+                save_stt_engine(stt)
+                save_llm_engine(llm)
+                save_tts_engine(tts)
+                if voice:
+                    save_tts_voice(voice)
+
+                if self.on_pipeline_settings_changed:
+                    try:
+                        self.on_pipeline_settings_changed()
+                    except Exception as e:
+                        logger.warning("on_pipeline_settings_changed error: %s", e)
+
+                self.broadcast("pipeline_settings_updated", {
+                    "pipeline_mode": get_pipeline_mode(),
+                    "stt_engine": get_stt_engine(),
+                    "llm_engine": get_llm_engine(),
+                    "tts_engine": get_tts_engine(),
+                    "tts_voice": get_tts_voice(),
+                    "voice_fallback": get_voice_fallback_mode(),
+                    "voice_fallback_enabled": get_voice_fallback_mode() == "auto",
+                    "has_groq_key": bool(get_groq_api_key()),
+                    "groq_api_key_masked": get_masked_groq_key(),
+                })
+            except Exception as e:
+                logger.warning("Failed to save pipeline settings from WS: %s", e)
+
+        elif msg_type == "set_accent":
+            color = str(payload.get("color", "")).strip().lower()
+            if color:
+                try:
+                    from memory.config_manager import save_accent
+                    save_accent(color)
+                    self.broadcast("accent_changed", {"color": color})
+                except Exception as e:
+                    logger.warning("Failed to persist accent: %s", e)
+
+        elif msg_type == "set_clipboard":
+            text = str(payload.get("text", ""))
+            try:
+                from PyQt6.QtWidgets import QApplication
+                app = QApplication.instance()
+                if app:
+                    cb = app.clipboard()
+                    if cb:
+                        cb.setText(text)
+                else:
+                    if platform.system() == "Windows":
+                        subprocess.run(["clip"], input=text.encode("utf-8"), check=False)
+            except Exception as e:
+                logger.warning("Failed to set system clipboard: %s", e)
+
+        elif msg_type == "autostart_toggle":
+            enable = bool(payload.get("enable", False))
+            try:
+                from memory.config_manager import save_autostart_enabled
+                res = save_autostart_enabled(enable)
+                self.broadcast("autostart_status", {"enabled": enable, "success": res})
+            except Exception as e:
+                logger.warning("Failed to toggle autostart: %s", e)
+
+        elif msg_type == "operational_mode":
+            mode = str(payload.get("mode", "chat")).strip().lower()
+            if mode in ("chat", "live"):
+                self._operational_mode = mode
+                if self.on_operational_mode_changed:
+                    try:
+                        self.on_operational_mode_changed(mode)
+                    except Exception as e:
+                        logger.warning("on_operational_mode_changed error: %s", e)
+                self.broadcast("operational_mode_status", {"mode": mode})
+
+        elif msg_type == "brief_toggle":
+            enable = bool(payload.get("enable", False))
+            try:
+                from memory.config_manager import save_brief_enabled
+                save_brief_enabled(enable)
+                self.broadcast("brief_status", {"enabled": enable})
+            except Exception as e:
+                logger.warning("Failed to toggle morning brief: %s", e)
+
+        elif msg_type == "save_assistant_settings":
+            name = str(payload.get("assistant_name") or "").strip()
+            voice = str(payload.get("voice_name", "Charon")).strip() or "Charon"
+            lang = str(payload.get("response_language", "auto")).strip() or "auto"
+            fallback_voice = payload.get("fallback_voice")
+            voice_accent = payload.get("voice_accent")
+            try:
+                from memory.config_manager import (
+                    save_assistant_config, save_voice, save_response_language,
+                    get_user_name, save_fallback_voice, get_fallback_voice, get_assistant_name,
+                    save_voice_accent, get_voice_accent, AVAILABLE_VOICE_ACCENTS,
+                )
+                name = name or get_assistant_name()
+                user = get_user_name()
+                save_assistant_config(name, user)
+                save_voice(voice)
+                save_response_language(lang)
+                if fallback_voice is not None:
+                    save_fallback_voice(str(fallback_voice))
+                if voice_accent is not None:
+                    v_acc = str(voice_accent).strip().lower()
+                    if v_acc in AVAILABLE_VOICE_ACCENTS:
+                        save_voice_accent(v_acc)
+
+                current_accent = get_voice_accent()
+                if self.on_assistant_settings_changed:
+                    try:
+                        self.on_assistant_settings_changed(name, voice, lang, current_accent)
+                    except TypeError:
+                        try:
+                            self.on_assistant_settings_changed(name, voice, lang)
+                        except Exception:
+                            pass
+                if getattr(self, "on_accent_change", None) and voice_accent is not None:
+                    try:
+                        self.on_accent_change(current_accent)
+                    except Exception:
+                        pass
+
+                self.broadcast("assistant_settings_updated", {
+                    "assistant_name": name,
+                    "voice_name": voice,
+                    "response_language": lang,
+                    "voice_accent": current_accent,
+                    "available_accents": list(AVAILABLE_VOICE_ACCENTS),
+                    "fallback_voice": get_fallback_voice(),
+                })
+            except Exception as e:
+                logger.warning("Failed to save assistant settings from WS: %s", e)
+
+        elif msg_type == "save_api_keys":
+            gemini_key = payload.get("gemini_api_key")
+            groq_key = payload.get("groq_api_key")
+            try:
+                from memory.config_manager import (
+                    save_api_keys, is_configured, get_masked_gemini_key, get_masked_groq_key
+                )
+                save_api_keys(gemini_api_key=gemini_key, groq_api_key=groq_key)
+                self.broadcast("api_keys_updated", {
+                    "status": "success",
+                    "has_gemini_key": is_configured(),
+                    "gemini_api_key_masked": get_masked_gemini_key(),
+                    "groq_api_key_masked": get_masked_groq_key(),
+                })
+            except Exception as e:
+                logger.warning("Failed to save API keys from WS: %s", e)
+
+        elif msg_type == "get_agents_state":
+            try:
+                from core.agents_manager import agent_manager
+                self._reload_agents_if_modified(agent_manager)
+                await ws.send_str(json.dumps({
+                    "type": "agents_state",
+                    "data": {"agents": agent_manager.get_agents_state()}
+                }))
+            except Exception as e:
+                logger.warning("Failed to send agents state: %s", e)
+
+        elif msg_type == "get_agent_profile":
+            agent_id = str(payload.get("agent_id") or payload.get("id") or "").strip()
+            try:
+                from core.agents_manager import agent_manager
+                profile = agent_manager.get_agent_full_profile(agent_id)
+                await ws.send_str(json.dumps({
+                    "type": "agent_profile_data",
+                    "data": profile
+                }))
+            except Exception as e:
+                logger.warning("Failed to get agent profile: %s", e)
+
+        elif msg_type == "save_agent_soul":
+            agent_id = str(payload.get("agent_id") or payload.get("id") or "").strip()
+            soul = str(payload.get("soul_prompt") or payload.get("soul_md") or "").strip()
+            try:
+                from core.agents_manager import agent_manager
+                res = agent_manager.save_agent_soul(agent_id, soul)
+                self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
+            except Exception as e:
+                logger.warning("Failed to save agent soul: %s", e)
+
+        elif msg_type == "dispatch_agents_task":
+            agent_id = str(payload.get("agent_id") or payload.get("id") or "").strip()
+            prompt = str(payload.get("prompt") or payload.get("task") or "").strip()
+            path = payload.get("path")
+            try:
+                from core.agents_manager import agent_manager
+                res = agent_manager.dispatch_task(agent_id, prompt, path)
+                self.broadcast("agents_updated", {"agents": agent_manager.get_agents_state()})
+            except Exception as e:
+                logger.warning("Failed to dispatch agents task: %s", e)
+
+        elif msg_type == "get_audio_devices":
+            try:
+                await ws.send_str(json.dumps({
+                    "type": "audio_devices_updated",
+                    "data": self._collect_audio_state(),
+                }))
+            except Exception as e:
+                logger.warning("Failed to send audio devices: %s", e)
+
+        elif msg_type == "resolve_confirmation":
+            accepted = bool(payload.get("accepted", False))
+            try:
+                from core import confirm
+                confirm.resolve(accepted)
+            except Exception as e:
+                logger.warning("Failed to resolve confirmation: %s", e)
+
+        elif msg_type == "save_audio_devices":
+            in_name  = str(payload.get("input_device", "")  or "").strip()
+            out_name = str(payload.get("output_device", "") or "").strip()
+            try:
+                from memory.config_manager import save_input_device, save_output_device
+                save_input_device(in_name)
+                save_output_device(out_name)
+                if self.on_audio_devices_changed:
+                    self.on_audio_devices_changed(in_name, out_name)
+                self.broadcast("audio_devices_updated", self._collect_audio_state())
+            except Exception as e:
+                logger.warning("Failed to save audio devices from WS: %s", e)
+
+    def _collect_audio_state(self) -> dict[str, Any]:
+        """Truthful audio endpoint state for the AUDIO I/O panel.
+
+        The panel used to be static HTML, so it showed whatever device name was
+        written into the markup — even when the saved device could not be opened
+        and the app had silently fallen back to the OS default. This reports the
+        saved names, the devices the app can actually open at its sample rates,
+        and whether the saved device is among them. `*_available: false` is the
+        honest signal that a fallback is in effect.
+        """
+        state: dict[str, Any] = {
+            "input_device": "", "output_device": "",
+            "input_devices": [], "output_devices": [],
+            "default_input_device": "", "default_output_device": "",
+            "input_available": True, "output_available": True,
+        }
+        try:
+            from memory.config_manager import get_input_device, get_output_device
+            cur_in  = (get_input_device()  or "").strip()
+            cur_out = (get_output_device() or "").strip()
+            try:
+                from core import audio_devices
+                inputs  = audio_devices.list_devices("input")
+                outputs = audio_devices.list_devices("output")
+            except Exception as e:
+                logger.warning("audio device listing failed: %s", e)
+                inputs, outputs = [], []
+            # The device the OS currently calls "default" — what ZEZO uses when
+            # nothing is pinned. Shown so the panel can say which mic/speaker is
+            # really active under "System default".
+            try:
+                import sounddevice as sd
+                default_in  = (sd.query_devices(kind="input")  or {}).get("name", "")
+                default_out = (sd.query_devices(kind="output") or {}).get("name", "")
+            except Exception:
+                default_in = default_out = ""
+            state.update({
+                "input_device":    cur_in,
+                "output_device":   cur_out,
+                "current_input":   cur_in,
+                "current_output":  cur_out,
+                "input_devices":   inputs,
+                "output_devices":  outputs,
+                "inputs":          [{"name": d, "is_default": d == default_in} for d in inputs],
+                "outputs":         [{"name": d, "is_default": d == default_out} for d in outputs],
+                "default_input_device":  default_in,
+                "default_output_device": default_out,
+                # Empty string means "system default", which is always valid.
+                "input_available":  (not cur_in)  or (cur_in  in inputs),
+                "output_available": (not cur_out) or (cur_out in outputs),
+            })
+        except Exception as e:
+            logger.warning("Failed to collect audio state: %s", e)
+        return state
+
+    def _build_initial_state(self) -> dict:
+        if self.get_initial_state:
+            try:
+                state = self.get_initial_state()
+                state.update(self._collect_audio_state())
+                return state
+            except Exception as e:
+                logger.warning("Error getting initial state: %s", e)
+
+        # Fallback default initial state
+        tasks = []
+        try:
+            from core.task_manager import get_task_manager
+            tasks = get_task_manager().list_tasks()
+        except Exception:
+            pass
+
+        from memory.config_manager import (
+            get_assistant_name, get_voice, get_response_language,
+            get_autostart_enabled, get_brief_enabled,
+            get_wake_word_enabled, get_push_to_talk_enabled,
+            get_masked_gemini_key, get_masked_groq_key, get_masked_elevenlabs_key, get_masked_tavily_key, is_configured,
+            get_opencode_model, get_kilo_model, get_antigravity_model,
+            get_fallback_voice, FALLBACK_VOICES, get_voice_fallback_mode,
+            get_preferred_creation_agent, get_preferred_edit_agent,
+            CREATION_AGENTS, EDIT_AGENTS,
+            get_pipeline_mode, get_stt_engine, get_llm_engine, get_tts_engine, get_tts_voice,
+            PIPELINE_MODES, STT_ENGINES, LLM_ENGINES, TTS_ENGINES,
+            get_groq_api_key, get_elevenlabs_api_key, get_tavily_api_key,
+        )
+        try:
+            from core.wake_word import list_wake_presets
+            _assistant_names = [p["name"] for p in list_wake_presets()]
+        except Exception:
+            _assistant_names = []
+        return {
+            "state": "OFFLINE",
+            "muted": False,
+            "sleeping": False,
+            "assistant_name": get_assistant_name(),
+            "available_assistant_names": _assistant_names,
+            "wake_phrase": f"Hey {get_assistant_name()}",
+            "voice_name": get_voice(),
+            "response_language": get_response_language(),
+            "fallback_voice": get_fallback_voice(),
+            "fallback_voices": list(FALLBACK_VOICES),
+            "voice_fallback": get_voice_fallback_mode(),
+            "voice_fallback_enabled": get_voice_fallback_mode() == "auto",
+            "autostart_enabled": get_autostart_enabled(),
+            "morning_brief_enabled": get_brief_enabled(),
+            "wake_word_enabled": get_wake_word_enabled(),
+            "push_to_talk_enabled": get_push_to_talk_enabled(),
+            "preferred_creation_agent": get_preferred_creation_agent(),
+            "preferred_edit_agent": get_preferred_edit_agent(),
+            "creation_agents": list(CREATION_AGENTS),
+            "edit_agents": list(EDIT_AGENTS),
+            "has_gemini_key": is_configured(),
+            "gemini_api_key_masked": get_masked_gemini_key(),
+            "groq_api_key_masked": get_masked_groq_key(),
+            "elevenlabs_api_key_masked": get_masked_elevenlabs_key(),
+            "tavily_api_key_masked": get_masked_tavily_key(),
+            "opencode_model": get_opencode_model(),
+            "kilo_model": get_kilo_model(),
+            "antigravity_model": get_antigravity_model(),
+            "pipeline_mode": get_pipeline_mode(),
+            "stt_engine": get_stt_engine(),
+            "llm_engine": get_llm_engine(),
+            "tts_engine": get_tts_engine(),
+            "tts_voice": get_tts_voice(),
+            "pipeline_modes": list(PIPELINE_MODES),
+            "stt_engines": list(STT_ENGINES),
+            "llm_engines": list(LLM_ENGINES),
+            "tts_engines": list(TTS_ENGINES),
+            "has_groq_key": bool(get_groq_api_key()),
+            "has_elevenlabs_key": bool(get_elevenlabs_api_key()),
+            "has_tavily_key": bool(get_tavily_api_key()),
+            "tasks": tasks,
+            "operational_mode": getattr(self, "_operational_mode", "chat"),
+            "timestamp": time.time(),
+            **self._collect_audio_state(),
+        }
+
+    def broadcast(self, event_type: str, data: dict[str, Any]) -> None:
+        """Thread-safe broadcast of a JSON event to all connected web clients."""
+        if not self._clients or not self._loop or self._loop.is_closed():
+            return
+        payload = json.dumps({"type": event_type, "data": data})
+        asyncio.run_coroutine_threadsafe(self._broadcast_async(payload), self._loop)
+
+    async def _broadcast_async(self, message: str) -> None:
+        if not self._clients:
+            return
+        # Broadcast concurrently across all active client sockets
+        await asyncio.gather(
+            *(client.send_str(message) for client in list(self._clients)),
+            return_exceptions=True
+        )
+
+    def stop(self) -> None:
+        """Stop the UI server."""
+        self._stopped.set()
+        if hasattr(self, "clipboard_watcher") and self.clipboard_watcher:
+            self.clipboard_watcher.stop()
+        if self._loop and self._loop.is_running():
+            self._loop.call_soon_threadsafe(self._loop.stop)
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+
+    async def _cleanup(self) -> None:
+        if hasattr(self, "clipboard_watcher") and self.clipboard_watcher:
+            self.clipboard_watcher.stop()
+        for ws in list(self._clients):
+            await ws.close()
+        self._clients.clear()
+        if self._site:
+            await self._site.stop()
+        if self._runner:
+            await self._runner.cleanup()
+
+
+# Global singleton instance
+_ui_server: ZezoUIServer | None = None
+
+
+def get_ui_server() -> ZezoUIServer:
+    """Get or create the global UI server singleton."""
+    global _ui_server
+    if _ui_server is None:
+        _ui_server = ZezoUIServer()
+    return _ui_server

@@ -5,6 +5,7 @@ aiohttp>=3.9,<4               # core/ui_server.py — desktop WebSocket + UI ser
 sounddevice>=0.4,<1           # Audio I/O (PortAudio)
 numpy>=1.24,<3                # Signal processing & audio calculations
 google-genai>=2.8.0,<3        # Gemini Live bi-directional streaming + REST API
+tiktoken>=0.7,<1              # Context token budget estimation (Groq/Ollama)
 
 # ── Web Search, Scraping & Browser Automation ─────────────────────────────────
 requests>=2.31,<3

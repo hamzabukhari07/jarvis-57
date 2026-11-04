@@ -257,3 +257,28 @@ The session survives:
 - Dropped network packets (resumption handle replayed)
 - Voice changes (fresh session, context lost — intentional)
 - Device changes (resumption handle replayed, context preserved)
+
+
+---
+
+## Autonomous Agent LLM Provider Adapter & Context Budgeting (Phase 1)
+
+**Files:** core/agents/context_budget.py, core/agents/provider_adapter.py
+
+Independent custom agents use a normalized, token-aware LLM calling foundation rather than direct unmeasured string concatenation:
+
+### 1. Provider Adapter (core/agents/provider_adapter.py)
+- Unifies **Gemini**, **Groq**, and **Ollama/OpenAI** behind a normalized request/response protocol (NormalizedResponse, ProviderUsage, ProviderError).
+- Returns structured tool calls, content output, and token usage accounting.
+- Supports both synchronous execute() and non-blocking execute_async().
+- Distinguishes exact native token counting from proxy/heuristic estimation (usage.is_estimated).
+
+### 2. Context Token Budget (core/agents/context_budget.py)
+- **Native Gemini Counting:** Server-side client.models.count_tokens (0% safety margin deduction).
+- **Proxy Token Estimation:** 	iktoken (cl100k_base) proxy estimation for Groq / Meta Llama and Ollama models.
+- **Mandatory 20% Safety Buffer:**
+  \\text{Effective Budget} = \\text{Nominal Budget} \\times (1.0 - \\text{Safety Buffer})
+  - Groq Llama 3.3/4: 8,000 nominal → **6,400 effective history tokens**.
+  - Ollama: 2,500 nominal → **2,000 effective history tokens**.
+- **Tool Output Truncation:** Automatically truncates tool output payloads exceeding model tool ceilings (e.g. 2,400 tokens on Groq, 800 on Ollama) with a clear notification notice.
+- **Context Trim:** Iteratively trims oldest history turns before calling LLM providers while always preserving the most recent turn context.

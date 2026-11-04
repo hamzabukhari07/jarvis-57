@@ -1,7 +1,7 @@
 """actions/opencode_agent.py — Transparent OpenCode Engine Bridge (async).
 
 Standardized pure human-like CLI bridge for OpenCode.
-Delegates coding tasks directly to OpenCode CLI via core.opencode_runner.
+Delegates coding tasks directly to OpenCode CLI via core.engines.opencode.
 Returns immediately with a task_id; runs the CLI in a background thread.
 Query progress with the task_status tool.
 """
@@ -13,9 +13,9 @@ import re
 from pathlib import Path
 from typing import Any, Optional
 
-from core.opencode_runner import (
-    _find_opencode_bin,
-    run_opencode_worker,
+from core.engines.opencode import (
+    OpenCodeEngineAdapter,
+    run_opencode_task,
 )
 from core.repo_context import guard_domain_workspace, remember_repo, resolve
 from core.task_manager import get_task_manager, TaskContext
@@ -23,8 +23,15 @@ from memory.config_manager import get_opencode_model
 
 logger = logging.getLogger("zezo.opencode")
 
-# Re-export worker for backwards compatibility
-_run_worker = run_opencode_worker
+# Direct worker alias
+_run_worker = run_opencode_task
+run_opencode_worker = run_opencode_task
+
+
+def _find_opencode_bin() -> Optional[str]:
+    """Finds the native OpenCode CLI binary via OpenCodeEngineAdapter."""
+    p = OpenCodeEngineAdapter().resolve_binary()
+    return str(p) if p else None
 
 
 def _resolve_model(model: Optional[str]) -> str:
@@ -65,6 +72,20 @@ def opencode_agent(parameters: dict, player=None, speak=None) -> str:
         parameters.get("project_path") or parameters.get("path") or ""
     )
     run_in_place = bool(parameters.get("run_in_place", False))
+
+    # PathJail Pre-flight Validation: If explicit path provided, reject root / system paths
+    if explicit_path:
+        import os
+        from core.path_jail import SecurityAccessDenied as PathSecurityAccessDenied
+        p_obj = Path(explicit_path).resolve()
+        if len(p_obj.parts) <= 1 or p_obj.parent == p_obj:
+            raise PathSecurityAccessDenied(f"Access to filesystem root '{explicit_path}' is strictly denied.")
+        sys_root = Path(os.environ.get("SystemRoot", r"C:\Windows")).resolve()
+        try:
+            p_obj.relative_to(sys_root)
+            raise PathSecurityAccessDenied(f"Access to system directory '{explicit_path}' is strictly denied.")
+        except ValueError:
+            pass
 
     # Smart Guard: Detect domain mismatch / context hallucination for new URLs
     domain_guarded_dir = guard_domain_workspace(prompt, explicit_path) if not run_in_place else None
@@ -118,13 +139,13 @@ def opencode_agent(parameters: dict, player=None, speak=None) -> str:
     }
 
     if run_in_place:
-        res = _run_worker(worker_params, ctx=task_ctx)
+        res = run_opencode_task(worker_params, ctx=task_ctx)
         return json.dumps(res) if isinstance(res, dict) else str(res)
 
     tm = get_task_manager()
     task_id = tm.submit(
         "opencode_agent",
-        _run_worker,
+        run_opencode_task,
         worker_params,
     )
 
@@ -167,7 +188,7 @@ TOOL = {
         "inside a specific project directory via the native 'opencode' binary. "
         "Returns a task_id immediately."
     ),
-    "risk": "code_execution",
+    "risk": "local_mutation",
     "enabled": True,
     "behavior": "NON_BLOCKING",
     "scheduling": "WHEN_IDLE",

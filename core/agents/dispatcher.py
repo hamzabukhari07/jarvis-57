@@ -530,6 +530,17 @@ class AgentDispatcher:
                     call_params["model"] = w_model
                     call_params["model_id"] = w_model
 
+                # Centralized Choke Point Security Check: Gate external engine tools
+                if w_tool in ("antigravity_run", "opencode_run", "kilo_run"):
+                    from core.agents.registry import check_agent_tool_permission
+                    allowed, reason = check_agent_tool_permission(w_agent.id, w_tool)
+                    if not allowed:
+                        from core.tool_executor import SecurityAccessDenied
+                        raise SecurityAccessDenied(
+                            reason or f"Tool '{w_tool}' forbidden for agent '{w_agent.id}'.",
+                            blocked_by="permission",
+                        )
+
                 res = reg.run(w_tool, call_params)
 
                 # Check if task was cancelled during action execution

@@ -162,36 +162,43 @@ export function mapRawAgentToOfficeMember(
  `[STATUS] Standby on office deck`,
  ]
 
- return {
- id,
- name,
- role,
- badge: id.toUpperCase().slice(0, 8),
- badgeVariant: isWorking ? 'running' : 'default',
- color: raw.color || '#3b82f6',
- hairColor: '#2b2926',
- shirtColor: raw.color || '#3b82f6',
- status,
- currentTask: taskTitle || raw.specialty || 'Standby for instructions',
- deskPct,
- currentPct,
- targetPct,
- speechBubble,
- isTyping: isWorking,
- tools:
- Array.isArray(raw.allowed_tools) && raw.allowed_tools.length > 0
- ? raw.allowed_tools
- : raw.default_tool
- ? [raw.default_tool]
- : ['opencode_run'],
- logs,
- personality: raw.prompt_prefix || `You are ${name}, ${role}.`,
- engine: raw.default_tool || prevAgent?.engine || 'opencode_run',
- model: raw.model_id || prevAgent?.model || 'gemini-2.5-flash',
- workspace: raw.active_worktree || raw.worktree || 'repo_active',
- safetyTier: raw.risk_tier || 'L1_MUTATION',
- specialty: raw.specialty || `${raw.default_tool || prevAgent?.engine || 'opencode_run'}, ${role}`,
- }
+  // Canonical engine with safe legacy normalization
+  const resolvedEngine = raw.engine
+    ? (String(raw.engine).endsWith('_run') ? String(raw.engine) : (String(raw.engine) + '_run'))
+    : (raw.default_tool || prevAgent?.engine || 'opencode_run')
+  const canonicalEngine = ['antigravity_run', 'opencode_run', 'kilo_run', 'groq'].includes(resolvedEngine)
+    ? resolvedEngine
+    : (resolvedEngine.replace('_run', '') === 'antigravity' ? 'antigravity_run' : 'opencode_run')
+  const availableEngineModels = ENGINE_MODELS_MAP[canonicalEngine] || []
+  let resolvedModel = raw.model_id || prevAgent?.model || ''
+  if (!availableEngineModels.some((m) => m.id === resolvedModel)) {
+    resolvedModel = availableEngineModels[0]?.id || resolvedModel || 'gemini-3.8-flash-low'
+  }
+  return {
+    id,
+    name,
+    role,
+    badge: id.toUpperCase().slice(0, 8),
+    badgeVariant: isWorking ? 'running' : 'default',
+    color: raw.color || '#3b82f6',
+    hairColor: '#2b2926',
+    shirtColor: raw.color || '#3b82f6',
+    status,
+    currentTask: taskTitle || raw.specialty || 'Standby for instructions',
+    deskPct,
+    currentPct,
+    targetPct,
+    speechBubble,
+    isTyping: isWorking,
+    tools: Array.isArray(raw.allowed_tools) && raw.allowed_tools.length > 0 ? raw.allowed_tools : raw.default_tool ? [raw.default_tool] : ['opencode_run'],
+    logs,
+    personality: raw.prompt_prefix || ('You are ' + name + ', ' + role + '.'),
+    engine: canonicalEngine,
+    model: resolvedModel,
+    workspace: raw.active_worktree || raw.worktree || 'repo_active',
+    safetyTier: raw.risk_tier || 'L1_MUTATION',
+    specialty: raw.specialty || (canonicalEngine + ', ' + role),
+  }
 }
 
 const INITIAL_AGENTS: AgentOfficeMember[] = [
@@ -1163,6 +1170,7 @@ export const AutonomousOfficeScreen: React.FC<AutonomousOfficeScreenProps> = ({ 
     specialty: merged.specialty,
     color: merged.color,
     default_tool: merged.engine,
+    engine: merged.engine.replace('_run', ''),
     risk_tier: merged.safetyTier || 'L1_MUTATION',
     model_id: merged.model,
     worktree: merged.workspace,
